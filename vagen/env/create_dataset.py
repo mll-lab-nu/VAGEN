@@ -17,7 +17,19 @@ class DatasetCreator:
         
         
 
-    def create_dataset(self, start_seed, train_size, test_size):
+    def create_dataset(self, start_seed, train_size, test_size, force_gen=False):
+        train_file_path = os.path.join(self.data_dir, 'train.parquet')
+        test_file_path = os.path.join(self.data_dir, 'test.parquet')
+        
+        # Check if files already exist and force_gen is False
+        if not force_gen and os.path.exists(train_file_path) and os.path.exists(test_file_path):
+            print(f"Dataset files already exist at {self.data_dir}. Skipping generation.")
+            print(f"Use --force-gen to override and regenerate the dataset.")
+            return
+            
+        # Ensure data directory exists
+        os.makedirs(self.data_dir, exist_ok=True)
+        
         seeds = range(start_seed, start_seed + train_size + test_size)
         instructions = []
         for seed in seeds:
@@ -56,8 +68,9 @@ class DatasetCreator:
         train_dataset = train_dataset.map(function=make_map_fn('train'), with_indices=True)
         test_dataset = test_dataset.map(function=make_map_fn('test'), with_indices=True)
 
-        train_dataset.to_parquet(os.path.join(self.data_dir, 'train.parquet'))
-        test_dataset.to_parquet(os.path.join(self.data_dir, 'test.parquet'))
+        train_dataset.to_parquet(train_file_path)
+        test_dataset.to_parquet(test_file_path)
+        print(f"Dataset successfully generated at {self.data_dir}")
 
 
     def merge_parquet_files(
@@ -122,6 +135,13 @@ if __name__ == "__main__":
     parser.add_argument('--start_seed', type=int, default=10000)
     parser.add_argument('--train_size', type=int, default=10000)
     parser.add_argument('--test_size', type=int, default=1000)
+    parser.add_argument('--force-gen', action='store_true', 
+                        help='Force dataset generation even if files already exist')
     args = parser.parse_args()
     creator = DatasetCreator(config_path=args.config_path)
-    creator.create_dataset(start_seed=args.start_seed, train_size=args.train_size, test_size=args.test_size)
+    creator.create_dataset(
+        start_seed=args.start_seed, 
+        train_size=args.train_size, 
+        test_size=args.test_size,
+        force_gen=args.force_gen
+    )

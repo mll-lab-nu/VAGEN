@@ -2,6 +2,8 @@ set -x
 
 export VLLM_ATTENTION_BACKEND=XFORMERS
 
+python -m vagen.env.sokoban.create_dataset 
+
 python3 -m vagen.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     data.train_files=data/sokoban/train.parquet \
