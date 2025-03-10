@@ -133,8 +133,8 @@ class QwenVLRolloutManger():
         Let's use the 3rd strategy for now
         Compute loss mask for the input ids and attention mask by:
         1. Removing special tokens
-        2. Adding padding on the left
-        3. Shifting the sequence right
+        2. Adding padding on the right
+        3. Shifting the sequence left
         """
         
         # Get token IDs for special tokens and pad token
@@ -151,33 +151,40 @@ class QwenVLRolloutManger():
         
         # Process each example in the batch
         for b in range(batch_size):
-            # Count initial padding tokens using attention mask
-            initial_pad_tokens = (attention_mask[b] == 0).cumprod(dim=0).sum().item()
+            # Count right padding tokens using attention mask
+            right_pad_tokens = (attention_mask[b] == 0).cumprod(dim=0).sum().item()
             
             # Assert that initial padding tokens have attention mask of 0
-            assert torch.all(attention_mask[b, :initial_pad_tokens] == 0), "Initial padding tokens must have attention mask of 0"
+            assert torch.all(attention_mask[b, -right_pad_tokens:] == 0), "right padding tokens must have attention mask of 0"
             
             # Find special token indices
             sptk_b_indices = (input_ids[b] == sptk_b).nonzero().flatten()
             sptk_e_indices = (input_ids[b] == sptk_e).nonzero().flatten()
             
             # Create a mask for tokens that should compute loss
-            hole_pos=[initial_pad_tokens-1] # initialize holes position list with last padding token position
+            hole_pos=[] # initialize holes position list with last padding token position
             for start_pos, end_pos in zip(sptk_b_indices, sptk_e_indices):
                 loss_mask[b][start_pos+1:end_pos] = 1
                 hole_pos.append(start_pos.item())
                 hole_pos.append(end_pos.item())
+            hole_pos.append(seq_len-right_pad_tokens)
+            assert new_input_ids[b][seq_len-right_pad_tokens]==pad_token_id
             
             # shift right to fill the wholes
             holes_to_fill=1
-            for i in range(len(hole_pos)-1,0,-1):
-                start_pos = hole_pos[i-1]
-                end_pos = hole_pos[i]
-                loss_mask[b][start_pos+1+holes_to_fill:end_pos+holes_to_fill]=loss_mask[b][start_pos+1:end_pos]
-                new_input_ids[b][start_pos+1+holes_to_fill:end_pos+holes_to_fill]=new_input_ids[b][start_pos+1:end_pos]
-                new_attention_mask[b][start_pos+1+holes_to_fill:end_pos+holes_to_fill]=new_attention_mask[b][start_pos+1:end_pos]
+            for i in range(0,len(hole_pos)-1):
+                start_pos = hole_pos[i]
+                end_pos = hole_pos[i+1]
+                loss_mask[b][start_pos+1-holes_to_fill:end_pos-holes_to_fill]=loss_mask[b][start_pos+1:end_pos]
+                new_input_ids[b][start_pos+1-holes_to_fill:end_pos-holes_to_fill]=new_input_ids[b][start_pos+1:end_pos]
+                new_attention_mask[b][start_pos+1-holes_to_fill:end_pos-holes_to_fill]=new_attention_mask[b][start_pos+1:end_pos]
                 holes_to_fill+=1
 
+            valid_tokens = seq_len-right_pad_tokens-len(hole_pos)+1 # the number of non-special tokens and non-padding tokens
+            loss_mask[b][valid_tokens:]=0
+            new_input_ids[b][valid_tokens:]=pad_token_id
+            new_attention_mask[b][valid_tokens:]=0
+            
         return new_input_ids, new_attention_mask, loss_mask
     
         
