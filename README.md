@@ -6,6 +6,10 @@ cd vagen
 bash scripts/install.sh
 ```
 
+## Run
+```
+bash examples/sokoban/debug_qwen2_5_vl.sh
+```
 
 ## TODO
 1. Remove <box_start> and <box_end> in the rollout

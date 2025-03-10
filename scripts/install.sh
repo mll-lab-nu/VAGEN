@@ -3,13 +3,13 @@ set -e
 
 echo "Starting installation process..."
 
-echo "Initializing git submodules..."
-git submodule update --init
+# echo "Initializing git submodules..."
+# git submodule update --init
 
-echo "Installing verl package..."
-cd verl
-pip install -e .
-cd ../
+# echo "Installing verl package..."
+# cd verl
+# pip install -e .
+# cd ../
 
 echo "Installing vagen dependencies..."
 pip install 'transformers>=4.49.0'
