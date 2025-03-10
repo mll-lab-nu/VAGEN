@@ -12,8 +12,8 @@ bash examples/sokoban/debug_qwen2_5_vl.sh
 ```
 
 ## TODO
-1. Remove <box_start> and <box_end> in the rollout
-2. Loss mask
+1. Remove <box_start> and <box_end> in the rollout --done
+2. Loss mask --done 
 3. Implement the validation in ray_trainer
 4. Transfer the old ray_trainer file from RAGEN to VAGEN
     - Implement the metric for wandb

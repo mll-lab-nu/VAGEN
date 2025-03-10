@@ -76,12 +76,11 @@ class QwenVLRolloutManger():
         """
         raw_prompt = prompt_template.replace('<image>', '<|vision_start|><|image_pad|><|vision_end|>')
         row_dict['multi_modal_data'] = {'image': image_data}
+        image_grid_thw = None
         if do_embedding:
             image_inputs = self.processor.image_processor(image_data, return_tensors='pt')
             image_grid_thw = image_inputs['image_grid_thw']
             row_dict['multi_modal_inputs'] = {key: val for key, val in image_inputs.items()}
-        else:
-            image_grid_thw = None
         if image_grid_thw is not None:
             merge_length = self.processor.image_processor.merge_size**2
             index = 0
@@ -104,13 +103,13 @@ class QwenVLRolloutManger():
         Compute loss mask for the input ids and attention mask
 
         Args:
-            input_ids: (seq_len,)
-            attention_mask: (seq_len,)
-        
+            input_ids: (batch_size, seq_len)
+            attention_mask: (batch_size, seq_len)
+    
         Returns:
-            input_ids: (seq_len,)
-            attention_mask: (seq_len,)
-            loss_mask: (seq_len,)
+            input_ids: (batch_size, seq_len)
+            attention_mask: (batch_size, seq_len)
+            loss_mask: (batch_size, seq_len)
         
         - There will be different stratgy to handel special tokens in the list
         - 1. remove them, in this case we need to fill the hole by adding pad in the right and shift the sequence left
@@ -119,16 +118,67 @@ class QwenVLRolloutManger():
         """
         # let's use 2nd for now
         
+        # sptk_b = self.tokenizer.convert_tokens_to_ids(self.config.sptk_for_loss_mask[0])
+        # sptk_e = self.tokenizer.convert_tokens_to_ids(self.config.sptk_for_loss_mask[1])
+        # loss_mask = torch.ones_like(input_ids) # 0 for no loss, 1 for loss
+        # sptk_s_indices = (input_ids == sptk_b).nonzero().flatten()
+        # sptk_e_indices = (input_ids[0] == sptk_e).nonzero().flatten()
+        # attention_mask[sptk_s_indices] = 0
+        # attention_mask[sptk_e_indices] = 0
+        # for s,e in zip(sptk_s_indices,sptk_e_indices):
+        #     loss_mask[s + 1:e] = 1
+        # return input_ids, attention_mask, loss_mask
+        
+        """
+        Let's use the 3rd strategy for now
+        Compute loss mask for the input ids and attention mask by:
+        1. Removing special tokens
+        2. Adding padding on the left
+        3. Shifting the sequence right
+        """
+        
+        # Get token IDs for special tokens and pad token
         sptk_b = self.tokenizer.convert_tokens_to_ids(self.config.sptk_for_loss_mask[0])
         sptk_e = self.tokenizer.convert_tokens_to_ids(self.config.sptk_for_loss_mask[1])
-        loss_mask = torch.ones_like(input_ids) # 0 for no loss, 1 for loss
-        sptk_s_indices = (input_ids == sptk_b).nonzero().flatten()
-        sptk_e_indices = (input_ids[0] == sptk_e).nonzero().flatten()
-        attention_mask[sptk_s_indices] = 0
-        attention_mask[sptk_e_indices] = 0
-        for s,e in zip(sptk_s_indices,sptk_e_indices):
-            loss_mask[s + 1:e] = 1
-        return input_ids, attention_mask, loss_mask
+        pad_token_id = self.tokenizer.pad_token_id
+        
+        batch_size, seq_len = input_ids.shape
+        
+        # Initialize output tensors with same shape as inputs
+        new_input_ids = input_ids.clone()
+        new_attention_mask = attention_mask.clone()
+        loss_mask = torch.zeros_like(input_ids)
+        
+        # Process each example in the batch
+        for b in range(batch_size):
+            # Count initial padding tokens using attention mask
+            initial_pad_tokens = (attention_mask[b] == 0).cumprod(dim=0).sum().item()
+            
+            # Assert that initial padding tokens have attention mask of 0
+            assert torch.all(attention_mask[b, :initial_pad_tokens] == 0), "Initial padding tokens must have attention mask of 0"
+            
+            # Find special token indices
+            sptk_b_indices = (input_ids[b] == sptk_b).nonzero().flatten()
+            sptk_e_indices = (input_ids[b] == sptk_e).nonzero().flatten()
+            
+            # Create a mask for tokens that should compute loss
+            hole_pos=[initial_pad_tokens-1] # initialize holes position list with last padding token position
+            for start_pos, end_pos in zip(sptk_b_indices, sptk_e_indices):
+                loss_mask[b][start_pos+1:end_pos] = 1
+                hole_pos.append(start_pos.item())
+                hole_pos.append(end_pos.item())
+            
+            # shift right to fill the wholes
+            holes_to_fill=1
+            for i in range(len(hole_pos)-1,0,-1):
+                start_pos = hole_pos[i-1]
+                end_pos = hole_pos[i]
+                loss_mask[b][start_pos+1+holes_to_fill:end_pos+holes_to_fill]=loss_mask[b][start_pos+1:end_pos]
+                new_input_ids[b][start_pos+1+holes_to_fill:end_pos+holes_to_fill]=new_input_ids[b][start_pos+1:end_pos]
+                new_attention_mask[b][start_pos+1+holes_to_fill:end_pos+holes_to_fill]=new_attention_mask[b][start_pos+1:end_pos]
+                holes_to_fill+=1
+
+        return new_input_ids, new_attention_mask, loss_mask
     
         
     def reset(self, env_configs: List[EnvConfig]):
@@ -487,144 +537,6 @@ class QwenVLRolloutManger():
         return row_dict
 
 
-    # def __getitem__(
-    #         self, 
-    #         recording: List[Dict], 
-    #         step: int, 
-    #         window_size: int = None,
-    #         compute_loss_mask: bool = False,
-    #         final: bool = False,
-    #     ):
-    #     """
-    #     Given a recording, generate the input for MLLM
-        
-    #     Args:
-    #         recording: List of dictionaries containing recorded environment interactions
-    #         step: Current step to generate input for
-    #         window_size: Number of past steps to include in the context
-    #         compute_loss_mask: Whether to compute loss mask (loss mask: 1 for assistant response, 0 for user response)
-    #         final: Whether to generate final trajectory 
-    #             - if True, image embedding needs to be computed
-    #             - if False, image embedding is not needed for vllm receive PIL image as input
-        
-    #     Returns:
-    #         Dictionary containing properly formatted inputs for the MLLM
-    #     """
-    #     assert step >= 0
-        
-    #     start_step = max(0, step - window_size) if window_size is not None else 0
-    #     end_step = step
-    #     assert len(recording) >= end_step + 1 - start_step
-    #     history = recording[start_step: end_step + 1]
-    #     chat = []
-        
-  
-    #     env_id = history[0]['env_id']
-    #     chat.append({"role": "system", "content": self.envs[env_id].get_task_instruction()})
-        
-   
-    #     if history:
-    #         first_record = history[0]
-    #         if 'text_template' in first_record:
-    #             chat.append({"role": "user", "content": first_record['text_template']})
-    
-    #     for i, record in enumerate(history[1:], 1):
-    #         chat.append({"role": "user", "content": record['text_template']})
-            
-    
-    #         if i < len(history) - 1 or final:
-    #             assert 'llm_raw_response' in record['info']
-    #             llm_raw_response = record['info']['llm_raw_response']
-    #             # filtering llm generated <image> tokens
-    #             llm_raw_response = re.sub(r'<image>', '', llm_raw_response)
-    #             if compute_loss_mask:
-    #                 # filtering special tokens for llm_raw_response, then adding them to the beginning and end of the response
-    #                 sptk_b = self.config.sptk_for_loss_mask[0]
-    #                 sptk_e = self.config.sptk_for_loss_mask[1]
-    #                 llm_raw_response = re.sub(sptk_e, '', llm_raw_response)
-    #                 llm_raw_response = re.sub(sptk_b, '', llm_raw_response)
-    #                 llm_raw_response = sptk_b + llm_raw_response + sptk_e
-    #             chat.append({"role": "assistant", "content": record['info']['llm_raw_response']})
-    #     # chat.append({"role": "assistant", "content": "<think>"})
-        
-    #     # image_data=[image for image in record["image_data"] for record in history if 'multi_modal_inputs' in record]
-    #     image_data = [image for record in history if 'image_data' in record for image in record["image_data"]]
-    #     has_images = len(image_data) > 0
-        
-    #     # modified from verl.utils.dataset.rl_dataset.py
-    #     prompt_with_chat_template = self.tokenizer.apply_chat_template(chat, add_generation_prompt=True, tokenize=False) + '<think>'
-        
-
-    #     row_dict = {}
-    #     if has_images:  # expand image token
-    #         raw_prompt = prompt_with_chat_template.replace('<image>', '<|vision_start|><|image_pad|><|vision_end|>')
-    #         row_dict['multi_modal_data'] = {'image': image_data}
-    #         # vllm does not need image embedding as input for generation sequences
-    #         # if final, image embedding is computed for following logit computation
-    #         if final:
-    #             image_inputs = self.processor.image_processor(image_data, return_tensors='pt')
-    #             image_grid_thw = image_inputs['image_grid_thw']
-    #             row_dict['multi_modal_inputs'] = {key: val for key, val in image_inputs.items()}
-
-    #             if image_grid_thw is not None:
-    #                 merge_length = self.processor.image_processor.merge_size**2
-    #                 index = 0
-    #                 while '<image>' in prompt_with_chat_template:
-    #                     prompt_with_chat_template = prompt_with_chat_template.replace(
-    #                         '<image>',
-    #                         '<|vision_start|>' + '<|placeholder|>' * (image_grid_thw[index].prod() // merge_length) +
-    #                         '<|vision_end|>',
-    #                         1,
-    #                     )
-    #                     index += 1
-
-    #                 prompt_with_chat_template = prompt_with_chat_template.replace('<|placeholder|>',
-    #                                                                             self.processor.image_token)
-    #     else:
-    #         raw_prompt = prompt_with_chat_template
-
-    #     input_ids, attention_mask = verl_F.tokenize_and_postprocess_data(prompt=prompt_with_chat_template,
-    #                                                                      tokenizer=self.tokenizer,
-    #                                                                      max_length=self.config.max_prompt_length,
-    #                                                                      pad_token_id=self.tokenizer.pad_token_id,
-    #                                                                      left_pad=True,
-    #                                                                      truncation=self.truncation)
-
-    #     if compute_loss_mask:
-    #         input_ids, attention_mask, loss_mask = self.compute_loss_mask(input_ids, attention_mask)
-            
-    #     # if self.image_key in row_dict:
-    #     if has_images and final:
-    #         from verl.models.transformers.qwen2_vl import get_rope_index
-
-    #         position_ids = get_rope_index(
-    #             self.processor,
-    #             input_ids=input_ids[0],
-    #             image_grid_thw=image_grid_thw,
-    #             attention_mask=attention_mask[0],
-    #         )  # (3, seq_len)
-    #     else:
-    #         position_ids = compute_position_id_with_mask(attention_mask)
-
-    #     row_dict['input_ids'] = input_ids[0]
-    #     row_dict['attention_mask'] = attention_mask[0]
-    #     row_dict['position_ids'] = position_ids[0]
-    #     row_dict['raw_prompt_ids'] = self.tokenizer.encode(raw_prompt, add_special_tokens=False)
-    #     if compute_loss_mask:
-    #         row_dict['loss_mask'] = loss_mask[0]
-
-    #     # encode prompts without chat template
-    #     # if self.return_raw_chat:
-    #     #     row_dict['raw_prompt'] = chat.tolist()
-
-    #     # add index for each prompt
-    #     index = row_dict.get("extra_info", {}).get("index", 0)
-    #     row_dict["index"] = index
-
-    #     return row_dict
-
-
-
     def gen_batch(self, step, window_size):
         """
         Generate a batch of data for the current step
@@ -634,7 +546,7 @@ class QwenVLRolloutManger():
             window_size: Number of past steps to include in the context
         
         Returns:
-            Dictionary containing properly formatted inputs for the MLLM
+            Dictionary containing properly formatted inputs for the MLLM›
         """
         batch = []
         self.batch_idx_to_env_id = {}
