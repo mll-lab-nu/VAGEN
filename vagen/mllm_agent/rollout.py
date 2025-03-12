@@ -15,7 +15,7 @@ import verl.utils.torch_functional as verl_F
 from verl.utils.dataset.rl_dataset import process_image, collate_fn
 
 from vagen.env.register import REGISTERED_ENVS
-from vagen.env.base import EnvFeedback, EnvConfig
+from vagen.env.base import EnvConfig
 
 @dataclass
 class QwenVLRolloutConifg:
@@ -262,17 +262,23 @@ class QwenVLRolloutManger():
             else:
                 assert "env_class" in env_info
                 self.envs[env_id] = env_info["env_class"](**env_info["env_config"])
-            env_feedback = self.envs[env_id].reset(env_info["seed"])
-            initial_obs[env_id] = env_feedback.observation
-            initial_info[env_id] = env_feedback.info
-            self.record(env_id, env_feedback)
+            obs, info = self.envs[env_id].reset(env_info["seed"])
+            initial_obs[env_id] = obs
+            initial_info[env_id] = info
+            self.record(
+                env_id, 
+                obs=obs, 
+                reward=0, 
+                done=False, 
+                info=info
+            )
         
         self.env_states = {env_id: {'step': 0, 'done': False} for env_id in self.envs}
         
         return initial_obs, initial_info
     
     
-    def record(self, env_id, env_feedback: EnvFeedback):
+    def record(self, env_id, obs, reward, done, info):
         """
         Record each step's obs, info, done, reward,
         Please include "llm_raw_response" in info # it will be decoded by rollout manager and pass to env, then should pass back
@@ -280,16 +286,15 @@ class QwenVLRolloutManger():
         # Create a record entry for this step
         record_entry = {
             'env_id': env_id,
-            'done': env_feedback.done,
-            'reward': env_feedback.reward,
-            'info': copy.deepcopy(env_feedback.info) if env_feedback.info is not None else None
+            'done': done,
+            'reward': reward,
+            'info': copy.deepcopy(info) if info is not None else None
         }
         
         # Process observations if provided
-        observation = env_feedback.observation
-        if observation is not None:
-            template = observation.observation_template
-            mm_observation = observation.multi_modal_observation
+        if obs is not None:
+            template = obs['text_template']
+            mm_observation = obs['multi_modal_data']
             
             # Get all placeholders from mm_observation keys
             placeholders = list(mm_observation.keys())
@@ -610,10 +615,10 @@ class QwenVLRolloutManger():
             )
             
             for batch_idx, env_id in self.batch_idx_to_env_id.items(): # TODO whether multiple actions in one rollout are considered here
-                env_feedback = self.envs[env_id].step(responses_str[batch_idx])
+                obs, reward, done, info = self.envs[env_id].step(responses_str[batch_idx])
                 self.env_states[env_id]['step'] += 1
-                self.env_states[env_id]['done'] = env_feedback.done
-                self.record(env_id, env_feedback)
+                self.env_states[env_id]['done'] = done
+                self.record(env_id, obs, reward, done, info)
         
         
         

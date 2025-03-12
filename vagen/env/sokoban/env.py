@@ -3,20 +3,19 @@ from gym_sokoban.envs.sokoban_env import SokobanEnv as GymSokobanEnv
 import numpy as np
 import re
 import copy
-from typing import Tuple, Dict, Optional, List
+from typing import Tuple, Dict, Optional, List, Any, Union
+from PIL import Image
 from dataclasses import dataclass
 
-from vagen.env.register import register
 from vagen.utils import NoLoggerWarnings
-from vagen.env.sokoban.room_utils import generate_room
 from vagen.utils import set_seed
+from vagen.env.register import register
+from vagen.env.sokoban.room_utils import generate_room
 from vagen.env.base import (
     BaseEnv,
-    BaseGame,
-    PromptTemplate,
-    EnvFeedback,
-    EnvFeedbackSingleStep,
-    EnvObservation,
+    BaseInterface,
+    preprocess_text,
+    convert_numpy_to_PIL,
 )
 
 system_prompt = """
@@ -54,25 +53,14 @@ init_observation_template = """
 Decide your next action.
 """
 
-valid_action_template = """After you move {action}, the observation is: 
+action_template = """After you answer {answer}, the extracted valid action is {valid_action}.\
+After that, the observation is:
 {observation}
 reward: {reward}
 done: {done}
 """
 
-invalid_action_template = """Action is invalid. You stay in the same position. The observation is: 
-{observation}
-reward: {reward}
-done: {done}
-"""
-
-template = PromptTemplate(
-    system_prompt=system_prompt,
-    instruction_prompt=instruction_template,
-    init_observation_template=init_observation_template,
-    valid_action_template=valid_action_template,
-    invalid_action_template=invalid_action_template,
-)
+image_placeholder = "<image{index}>"
 
 
 class SokobanEnv(BaseEnv, GymSokobanEnv):
@@ -109,7 +97,7 @@ class SokobanEnv(BaseEnv, GymSokobanEnv):
         self.ACTION_SPACE = gym.spaces.discrete.Discrete(4, start=1)
 
 
-    def reset(self, mode='text', seed=None):
+    def _reset(self, seed: int):
         with NoLoggerWarnings():
             try:
                 with set_seed(seed):
@@ -123,20 +111,15 @@ class SokobanEnv(BaseEnv, GymSokobanEnv):
                 print("[SOKOBAN] Runtime Error/Warning: {}".format(e))
                 print("[SOKOBAN] Retry . . .")
                 next_seed = abs(hash(str(seed))) % (2 ** 32) if seed is not None else None
-                return self.reset(mode, next_seed)
+                return self._reset(next_seed)
             
             # self.action_sequence = self._reverse_action_sequence(action_sequence)
             self.player_position = np.argwhere(self.room_state == 5)[0]
             self.num_env_steps = self.reward_last = self.boxes_on_target = 0
         
-
-    def finished(self):
-        return self.num_env_steps >= self.max_steps or self.success()
-
-    def success(self):
-        return self.boxes_on_target == self.num_boxes
+        return self._render(mode='text'), {}
     
-    def step(self, action: int):
+    def _step(self, action: int):
         """
         - Step the environment with the given action.
         - Check if the action is effective (whether player moves in the env).
@@ -151,15 +134,13 @@ class SokobanEnv(BaseEnv, GymSokobanEnv):
         }
         
         prev_player_position = self.player_position
-        _, step_reward, done, _ = GymSokobanEnv.step(self, action, observation_mode='rgb_array')
+        obs, step_reward, done, info = GymSokobanEnv.step(self, action, observation_mode='tiny_rgb_array')
         
-        result['step_reward'] = step_reward
-        result['done'] = done
-        result['info'] = {"action_is_effective": not np.array_equal(prev_player_position, self.player_position)}
-        return result
+        info['action_is_effective'] = not np.array_equal(prev_player_position, self.player_position)
+        return obs, step_reward, done, info
      
 
-    def render(self, mode='text'):
+    def _render(self, mode='text'):
         assert mode in ['text', 'list', 'state', 'rgb_array']
 
         if mode == 'rgb_array':
@@ -170,7 +151,7 @@ class SokobanEnv(BaseEnv, GymSokobanEnv):
         if mode == 'state':
             return np.where((self.room_state == 5) & (self.room_fixed == 2), 6, self.room_state)
         
-        room_state = self.render(mode='state').tolist()
+        room_state = self._render(mode='state').tolist()
 
         if mode == 'list':
             lookup = lambda cell: self.GRID_LOOKUP.get(cell, "?").strip("\t").strip()
@@ -179,58 +160,51 @@ class SokobanEnv(BaseEnv, GymSokobanEnv):
         if mode == 'text':
             lookup = lambda cell: self.GRID_LOOKUP.get(cell, "?")
             return "\n".join("".join(lookup(cell) for cell in row) for row in room_state)
-    
-        
-    def copy(self):
-        new_self = SokobanEnv(
-            dim_room=self.dim_room,
-            max_steps=self.max_steps,
-            num_boxes=self.num_boxes,
-            search_depth=self.search_depth
-        )
-        new_self.room_fixed = self.room_fixed.copy()
-        new_self.room_state = self.room_state.copy()
-        new_self.box_mapping = self.box_mapping.copy()
-        new_self.action_sequence = self.action_sequence.copy()
-        new_self.player_position = self.player_position.copy()
-        new_self.reward = self.reward
-        new_self._valid_actions = copy.deepcopy(self._valid_actions)
-        return new_self
-    
-
-    def set_state(self, rendered_state):
-        # from the rendered state, set the room state and player position
-        self.room_state = np.where(rendered_state == 6, 5, rendered_state)
-        self.player_position = np.argwhere(self.room_state == 5)[0]
 
     def close(self):
         GymSokobanEnv.close(self)
+
+    def finished(self):
+        return self.num_env_steps >= self.max_steps or self.success()
+
+    def success(self):
+        return self.boxes_on_target == self.num_boxes
 
 
 
 
 @dataclass
 class PreprocessResult:
-    action: List[int]
-    action_valid: List[bool]
-    extracted_answer: List[str]
-    raw_text: str
+    action_list: List[int]
+    answer_list: List[str] # string of extracted answer (may be invalid action)
+    valid_list: List[bool]
+    think: str
+    answer: str
+    llm_raw_response: str
 
     def to_dict(self):
         return {
-            'action': self.action,
-            'action_valid': self.action_valid,
-            'extracted_answer': self.extracted_answer,
-            'raw_text': self.raw_text,
+            'action_list': self.action_list,
+            'answer_list': self.answer_list,
+            'valid_list': self.valid_list,
+            'think': self.think,
+            'answer': self.answer,
+            'llm_raw_response': self.llm_raw_response,
         }
 
 
 @register(name="sokoban")
-class SokobanGame(BaseGame):
+class SokobanInterface(BaseInterface):
 
     INVALID_ACTION = 0
-    PROMPT_TEMPLATE = template
-    PENALTY_FOR_INVALID = -1
+    FORMAT_REWARD = 1
+    ACTION_LOOKUP = {
+        0: "None",
+        1: "Up",
+        2: "Down",
+        3: "Left",
+        4: "Right",
+    }
 
     def __init__(
             self,
@@ -251,9 +225,9 @@ class SokobanGame(BaseGame):
         self.visual_env = self.env_config.get('visual_env', True)
         
     @classmethod
-    def _extract_action(cls, text):
+    def _extract_one_action(cls, text):
         """
-        Extract action from text.
+        Extract single action from text, the input text should ensure only one action contained
         - 0: Still (Invalid Action)
         - 1: Up
         - 2: Down
@@ -278,24 +252,6 @@ class SokobanGame(BaseGame):
         
         return cls.INVALID_ACTION
     
-    def _get_observation(self):
-        """
-        Get the observation of the environment.
-        If visual_env is True, return the visual observation (PIL RGBA image).
-        """
-        if self.visual_env:
-            visual_observation = self.env.render('rgb_array')
-            if isinstance(visual_observation, np.ndarray):
-                visual_observation = self.convert_numpy_to_PIL(visual_observation)
-            return {
-                'text': self.env.render('text'),
-                'visual': visual_observation,
-            }
-        else:
-            return {
-                'text': self.env.render('text'),
-            }
-    
     @classmethod
     def _preprocess(cls, text: str) -> PreprocessResult:
         """Preprocess the raw text from LLM into a list of actions.
@@ -307,159 +263,158 @@ class SokobanGame(BaseGame):
         Returns:
             PreprocessResult containing parsed actions and validity flags
         """
+        first_step_preprocess = preprocess_text(text)
         preprocess_result = PreprocessResult(
-            action=[],
-            action_valid=[],
-            extracted_answer=[],
-            raw_text=text,
+            action_list=[],
+            valid_list=[],
+            answer_list=first_step_preprocess['answer_list'],
+            think=first_step_preprocess['think'],
+            answer=first_step_preprocess['answer'],
+            llm_raw_response=text,
         )
-
-        # 1. Extract answer from <answer>...</answer>
-        match = re.search(r"<answer>(.*?)</answer>", text, re.DOTALL)
-        if not match:
-            # No valid answer format found
-            preprocess_result.action = [cls.INVALID_ACTION]
-            preprocess_result.action_valid = [False]
-            preprocess_result.extracted_answer = [""]
-            return preprocess_result
-
-        answer = match.group(1).strip()
-        preprocess_result.extracted_answer = [answer]
-
-        # 2. Extract actions from answer
-        # Split by newlines, commas, or semicolons to handle multiple actions
-        action_texts = re.split(r'[,;\n]+', answer)
         
-        valid_actions_found = False
-        for action_text in action_texts:
-            action_text = action_text.strip()
-            if not action_text:
-                continue
-                
-            action = cls._extract_action(action_text)
+        for answer in preprocess_result.answer_list:
+            action = cls._extract_one_action(answer)
             if action != cls.INVALID_ACTION:
-                preprocess_result.action.append(action)
-                preprocess_result.action_valid.append(True)
-                valid_actions_found = True
+                preprocess_result.action_list.append(action)
+                preprocess_result.valid_list.append(True)
             else:
-                preprocess_result.action.append(cls.INVALID_ACTION)
-                preprocess_result.action_valid.append(False)
-        
-        # If no valid actions were found, return a single invalid action
-        if not valid_actions_found and not preprocess_result.action:
-            preprocess_result.action = [cls.INVALID_ACTION]
-            preprocess_result.action_valid = [False]
-            preprocess_result.extracted_answer = [""]
+                preprocess_result.action_list.append(cls.INVALID_ACTION)
+                preprocess_result.valid_list.append(False)
         
         return preprocess_result
         
     @classmethod
     def _postprocess(
         cls, 
-        env_init: bool = False,
-        action_valid: bool = True,
-        observation: Dict = {},
-        reward: float = 0,
-        done: bool = False,
-        info: Dict = {},
-    ) -> EnvFeedbackSingleStep:
+        env_state: Union[str, np.ndarray], 
+        reward: float,
+        done: bool,
+        info: Dict,
+        preprocess_result: PreprocessResult,
+    ) -> Tuple[Dict, float, bool, Dict]:
+        """Postprocess the environment feedback
+        NOTE now assume there's only one image in the observation
+
+        Args:
+            env_state: environment state (text or numpy array (image))
+            reward: reward of the environment
+            done: whether the environment is done
+            info: extra info
+            preprocess_result: preprocess result
+
+        Returns:
+            Tuple[Dict, float, bool, Dict]: observation, reward, done, info
         """
-        Postprocess the observation from environment to feedback for LLM.
-        The returned observation_template is a string with placeholder,
-            and multi_modal_observation defines mapping from placeholder to multi-modal observation.
-        """
-        env_observation = EnvObservation()
 
-        if env_init:
-            observation_template = cls.PROMPT_TEMPLATE.init_observation_template
-            env_observation.create_observation(
-                template=observation_template,
-                contents=[observation['visual']],
-                replace_keys=['{observation}']
-            )
-        else:
-            if not action_valid:
-                observation_template = cls.PROMPT_TEMPLATE.invalid_action_template
-            else:
-                observation_template = cls.PROMPT_TEMPLATE.valid_action_template
-            
-            env_observation.create_observation(
-                template=observation_template,
-                contents=[observation['visual'], reward, done],
-                replace_keys=['{observation}', '{reward}', '{done}']
-            )
+        if isinstance(env_state, np.ndarray):
+            env_state = convert_numpy_to_PIL(env_state)
 
-        
-        
-        
-        return EnvFeedbackSingleStep(
-            step_observation = env_observation,
-            step_reward = reward,
-            step_done = done,
-            step_info = info,
-        )
-    
-
-    def step(self, raw_text: str) -> EnvFeedback:
-
-        assert not self.finished(), "Environment finished before step"
-
-        preprocess_result = self._preprocess(raw_text)
-        env_feedback = EnvFeedback()
-        actions = preprocess_result.action
-        action_valid = preprocess_result.action_valid
-        env_feedback.llm_raw_response = raw_text
-
-
-        for action, valid in zip(actions, action_valid):
+        answer = preprocess_result.answer
+        valid_action = []
+        for action, valid in zip(preprocess_result.action_list, preprocess_result.valid_list):
             if valid:
-                step_result = self.env.step(action)
-                reward = step_result['step_reward']
-                done = step_result['done']
-                info = step_result['info']
+                valid_action.append(cls.ACTION_LOOKUP[action])
             else:
-                reward = self.PENALTY_FOR_INVALID
-                done = False
-                info = {} # TODO
-                action = self.INVALID_ACTION
-            self.traj_reward += reward
-
-            observation = self._get_observation()
-            env_feedback_single_step = self._postprocess(
-                action_valid=valid,
-                observation=observation, 
-                reward=reward, 
-                done=done, 
-                info={
-                    'action_valid': valid,
-                    'action_str': self.env.ACTION_LOOKUP[action],
-                    **info,
-                }
-            )
-            env_feedback.add_step(env_feedback_single_step)
-            if done or self.finished():
                 break
 
-        return env_feedback
+        observation = image_placeholder.format(index=1) if not isinstance(env_state, str) else env_state
+        text_template = action_template.format(
+            answer=answer,
+            valid_action=valid_action,
+            observation=observation,
+            reward=reward,
+            done=done,
+        )
+
+        if isinstance(env_state, str):
+            obs = {'text_template': text_template}
+        else:
+            obs = {
+                'text_template': text_template,
+                'multi_modal_data': {
+                    observation: env_state,
+                },
+            }
+        return obs, reward, done, info
+
     
-    def reset(self, seed: Optional[int] = None) -> EnvFeedback:
+
+    def _step(self, raw_text: str) -> Tuple[Any, float, bool, Dict]:
+        """Step the environment with llm raw response
+        - Multiple actions are allowed, execute until the first invalid action or environment terminates
+        - The observation is the last step observation
+        
+        Args:
+            raw_text: raw text from LLM
+
+        Returns:
+            Tuple[Any, float, bool, Dict]: observation, reward, done, info
+            - observation (dict): observation of the environment
+            - reward (float): reward of the environment for the raw_text (multiple actions, including format reward and env reward)
+            - done (bool): whether the environment is done
+            - info (dict): extra info
+        """
+
+        assert not self.env.finished(), "Environment finished before step"
+        reward, done, info = 0, False, {}
+
+
+        preprocess_result = self._preprocess(raw_text)
+        think = preprocess_result.think
+        action_list = preprocess_result.action_list
+        valid_list = preprocess_result.valid_list
+        answer = preprocess_result.answer
+        info['llm_raw_response'] = preprocess_result.llm_raw_response
+
+        # deal with format
+        if think and answer: # format is correct
+            reward += self.FORMAT_REWARD
+
+
+        for action, valid in zip(action_list, valid_list):
+            if done or self.env.finished():
+                break
+            if valid:
+                _, env_reward, done, info = self.env.step(action)
+                reward += env_reward
+            else: # termiante at the first invalid action
+                break
+        self.traj_reward += reward
+
+        env_state = self.env._render(mode='text' if not self.visual_env else 'rgb_array') # NOTE currently called after step
+
+        return self._postprocess(
+            env_state=env_state,
+            reward=reward,
+            done=done,
+            info=info,
+            preprocess_result=preprocess_result,
+        )
+    
+    def _reset(self, seed: Optional[int] = None) -> Tuple[Dict, Dict]:
         """
         Reset the environment and return the observation at the first step.
         """
-        self.env.reset(seed=seed)
+        self.env._reset(seed=seed)
         self.traj_reward = 0
-        observation = self._get_observation()
-        step_feedback = self._postprocess(
-            env_init=True,
+        env_state = self.env._render(mode='text' if not self.visual_env else 'rgb_array') # NOTE currently called after reset
+        if isinstance(env_state, np.ndarray):
+            env_state = convert_numpy_to_PIL(env_state)
+        observation = image_placeholder.format(index=1) if not isinstance(env_state, str) else env_state
+        text_template = init_observation_template.format(
             observation=observation,
         )
-        return EnvFeedback(env_feedbacks=[step_feedback])
-
-    def finished(self) -> bool:
-        return self.env.finished()
-
-    def success(self) -> bool:
-        return self.env.success()
+        if isinstance(env_state, str):
+            obs = {'text_template': text_template}
+        else:
+            obs = {
+                'text_template': text_template,
+                'multi_modal_data': {
+                    observation: env_state,
+                },
+            }
+        return obs, {}
 
     def close(self):
         self.env.close()
@@ -490,122 +445,6 @@ class SokobanGame(BaseGame):
                 f"num_boxes={config['num_boxes']}, "
                 f"max_steps={config['max_steps']}, "
                 f"search_depth={config['search_depth']})")
-
-
-
-
-
-
-
-
-
-
-GUIDE = """
-### Sokoban Puzzle Instructions
-
-In Sokoban, your goal is to move all the boxes to the target spots on the grid. This requires careful planning and strategic moves. Here's how it works:
-
----
-
-#### Symbols and Their Meaning
-- **Walls (`#`)**: These block movement. You can't move through or push anything into walls.
-- **Floor (`_`)**: Open spaces where you can walk and move boxes.
-- **Targets (`O`)**: The spots where boxes need to go.
-- **Boxes (`X`)**: These are what you need to push onto the targets.
-- **Player (`P`)**: That's you! You'll move around the grid to push boxes.
-- **Box on Target (`√`)**: A box successfully placed on a target.
-- **Player on Target (`S`)**: You standing on a target.
-
----
-
-#### Your Goal
-Push all the boxes (`X`) onto the target spots (`O`). Once all boxes are on targets, you win!
-
----
-
-#### Rules to Remember
-1. **You Can Only Push Boxes**: You can't pull them, so plan ahead to avoid getting stuck.
-2. **No Moving Through Walls**: You can't walk through or push boxes into walls (`#`).
-3. **Avoid Traps**: Don't push boxes into corners or against walls where they can't be moved again.
-
----
-
-#### Controls
-Use these outputs to move the player:
-- `1`: Move **up**.
-- `2`: Move **down**.
-- `3`: Move **left**.
-- `4`: Move **right**.
-
-#### Rewards
-- **Move**: Each step you take costs 0.1.
-- **Push Box to Target**: Each box placed on a target gives you 1.0.
-- **Achieve Goal**: When all boxes are on targets, you get a reward of 10.0.
-
----
-
-#### Example Map
-Here's an example of a Sokoban puzzle:
-
-# 	 # 	 # 	 # 	 # 	 # 	 # 	 
-# 	 _ 	 _ 	 # 	 # 	 # 	 # 	 
-# 	 _ 	 # 	 # 	 # 	 O 	 # 	 
-# 	 _ 	 _ 	 _ 	 O 	 _ 	 # 	 
-# 	 _ 	 X 	 X 	 _ 	 _ 	 # 	 
-# 	 _ 	 O 	 _ 	 X 	 P 	 # 	 
-# 	 # 	 # 	 # 	 # 	 # 	 # 	 
-
-Each puzzle will have a different layout, but the rules and goal remain the same.
-
----
-
-#### Tips for Beginners
-1. **Move Boxes Step by Step**: Push them one at a time toward the targets.
-2. **Think Ahead**: Avoid pushing a box into a spot where you can’t move it again.
-
-Enjoy the challenge!
-"""
-
-if __name__ == '__main__':
-    # Test SokobanGame
-    import matplotlib.pyplot as plt
     
-    # Create a SokobanGame instance
-    game = SokobanGame(dim_room=(6, 6), num_boxes=1, max_steps=100, search_depth=30)
-    game.reset(seed=0)
-    
-    # # Test observation retrieval
-    obs = game._get_observation()
-    print("Initial game state:")
-    print(obs['text'])
-    
-    # Save the initial visual observation
-    plt.imsave('sokobangame_initial.png', obs['visual'])
-    
-    # # Test action extraction
-    # print("\nTesting action extraction:")
-    # test_inputs = ["Up", "Down", "Left", "Right", "1", "2", "3", "4", 
-    #               "1 (up)", "2 (down)", "3 (left)", "4 (right)", "invalid input"]
-    
-    # for input_text in test_inputs:
-    #     action = game._extract_action(input_text)
-    #     print(f"'{input_text}' -> {action} ({game.env.ACTION_LOOKUP.get(action, 'Invalid')})")
-    
-    # # Test preprocessing
-    # print("\nTesting preprocessing:")
-    # test_text = "I'll move Right to push the box. <answer>Right</answer> This should move the player to the right and possibly push a box."
-    
-    # result = game._preprocess(test_text)
-    # print(f"Extracted action: {result['action']}")
-    # print(f"Action valid: {result['action_valid']}")
-    # print(f"Extracted answer: {result['extracted_answer']}")
-    
-    # Test game step
-    print("\nTesting game step with valid action:")
-    # Assuming 'Right' is a valid action (4)
-    feedback = game.step("<answer>down, down</answer>")[1]
-    print(f"Observation after step: \n{feedback.observation_template}")
-    print(f"Reward: {feedback.step_reward}, Done: {feedback.done}")
-    
-    # Save the visual observation after step
-    feedback.multi_modal_observation['<image1>'].save('sokobangame_after_step_pil.png')
+    def get_task_instruction(self) -> str:
+        return instruction_template

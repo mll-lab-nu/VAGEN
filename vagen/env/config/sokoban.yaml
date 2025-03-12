@@ -1,4 +1,3 @@
-# Environment settings
 env:
   name: "sokoban"
   data_dir: "data/sokoban"
