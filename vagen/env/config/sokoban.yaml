@@ -1,9 +1,0 @@
-env:
-  name: "sokoban"
-  data_dir: "data/sokoban"
-  env_config:
-    dim_room: [6, 6]
-    num_boxes: 1
-    max_steps: 100
-    search_depth: 30 # this will change the starting position of the player
-    visual_env: true

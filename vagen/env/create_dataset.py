@@ -8,12 +8,11 @@ from pathlib import Path
 
 class DatasetCreator:
 
-    def __init__(self, config_path):
-        with open(config_path, 'r') as f:
-            self.config = yaml.safe_load(f)
-        self.env_name = self.config['env']['name']
-        self.env_config = self.config['env']['env_config']
-        self.data_dir = self.config['env']['data_dir']
+    def __init__(self, config):
+        self.config = config
+        self.env_name = self.config['name']
+        self.env_config = self.config['env_config']
+        self.data_dir = self.config['data_dir']
         
         
 

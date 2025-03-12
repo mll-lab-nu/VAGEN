@@ -66,8 +66,8 @@ actor_rollout_ref:
     top_k: -1 # 0 for hf rollout, -1 for vllm rollout
     top_p: 1
     use_fire_sampling: False # https://arxiv.org/abs/2410.21236
-    prompt_length: ${data.max_prompt_length}  # not use for opensource
-    response_length: ${data.max_response_length}
+    prompt_length: 2048  # not use for opensource
+    response_length: 512
     # for vllm rollout
     dtype: bfloat16 # should align with FSDP
     gpu_memory_utilization: 0.5

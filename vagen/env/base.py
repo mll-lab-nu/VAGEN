@@ -8,6 +8,8 @@ from PIL import Image
 import numpy as np
 from dataclasses import dataclass, field
 
+IMAGE_PLACEHOLDER = "<image>"
+
 @dataclass
 class EnvConfig:
     """
@@ -132,8 +134,13 @@ class BaseInterface(ABC):
         assert isinstance(obs["text_template"], str), f"obs['text_template'] must be str, got {type(obs['text_template'])}"
         
         if "multi_modal_data" in obs:
-            for key, image in obs["multi_modal_data"].items():
-                assert isinstance(image, Image.Image), f"image must be PIL.Image.Image, got {type(image)}"
+            if IMAGE_PLACEHOLDER in obs["multi_modal_data"]:
+                assert isinstance(obs["multi_modal_data"][IMAGE_PLACEHOLDER], list), f"obs['multi_modal_data']['<image>'] must be list, got {type(obs['multi_modal_data'][IMAGE_PLACEHOLDER])}"
+                for image in obs["multi_modal_data"][IMAGE_PLACEHOLDER]:
+                    assert isinstance(image, Image.Image), f"image must be PIL.Image.Image, got {type(image)}"
+                len_of_images = len(obs["multi_modal_data"][IMAGE_PLACEHOLDER])
+                len_of_image_in_text_template = len(re.findall(r'IMAGE_PLACEHOLDER', obs["text_template"]))
+                assert len_of_images == len_of_image_in_text_template, f"len_of_images must be equal to len_of_image_in_text_template, got {len_of_images} and {len_of_image_in_text_template}"
         return obs, reward, done, info
     
             
@@ -143,14 +150,17 @@ class BaseInterface(ABC):
         obs, info = self._reset(seed)
         assert isinstance(info, dict), f"info must be dict, got {type(info)}"
         assert isinstance(obs, dict), f"obs must be dict, got {type(obs)}"
-        assert "llm_raw_response" in info, f"info must contain 'llm_raw_response' key"
-        assert isinstance(info["llm_raw_response"], str), f"info['llm_raw_response'] must be str, got {type(info['llm_raw_response'])}"
         assert "text_template" in obs, f"obs must contain 'text_template' key"
         assert isinstance(obs["text_template"], str), f"obs['text_template'] must be str, got {type(obs['text_template'])}"
         
         if "multi_modal_data" in obs:
-            for key, image in obs["multi_modal_data"].items():
-                assert isinstance(image, Image.Image), f"image must be PIL.Image.Image, got {type(image)}"
+            if IMAGE_PLACEHOLDER in obs["multi_modal_data"]:
+                assert isinstance(obs["multi_modal_data"][IMAGE_PLACEHOLDER], list), f"obs['multi_modal_data']['<image>'] must be list, got {type(obs['multi_modal_data'][IMAGE_PLACEHOLDER])}"
+                for image in obs["multi_modal_data"][IMAGE_PLACEHOLDER]:
+                    assert isinstance(image, Image.Image), f"image must be PIL.Image.Image, got {type(image)}"
+                len_of_images = len(obs["multi_modal_data"][IMAGE_PLACEHOLDER])
+                len_of_image_in_text_template = len(re.findall(r'IMAGE_PLACEHOLDER', obs["text_template"]))
+                assert len_of_images == len_of_image_in_text_template, f"len_of_images must be equal to len_of_image_in_text_template, got {len_of_images} and {len_of_image_in_text_template}"
         return obs, info
     
     def get_traj_reward(self) -> float:
@@ -158,63 +168,3 @@ class BaseInterface(ABC):
         return self.traj_reward
     
 
-
-
-
-
-def preprocess_text(text: str) -> dict:
-    """Preprocess the raw text from llm to a list of strings
-
-    1. Extract think from the first <think> ... </think>
-    2. Extract answer from the first <answer> ... </answer>
-    3. Split the answer by comma into a list of strings
-    
-    Args:
-        text: raw text from llm
-
-    Returns:
-        dict with keys: llm_raw_response, think, answer_list
-    """
-    # Extract content from <think> tags if they exist
-    think_match = re.search(r'<think>(.*?)</think>', text, re.DOTALL)
-    
-    # Extract content from <answer> tags
-    answer_match = re.search(r'<answer>(.*?)</answer>', text, re.DOTALL)
-
-    answer_list, thinking, answer_content = [], "", ""
-    
-    if think_match:
-        thinking = think_match.group(1).strip()
-    
-    if answer_match:
-        # Get the answer content and split by comma
-        answer_content = answer_match.group(1).strip()
-        # Split by comma and strip whitespace from each item
-        answer_list = [item.strip() for item in answer_content.split(',') if item.strip()]
-    
-    return {
-        'llm_raw_response': text,
-        'answer_list': answer_list,
-        'think': thinking,
-        'answer': answer_content
-    }
-
-def convert_numpy_to_PIL(numpy_array: np.ndarray) -> Image.Image:
-        """Convert a numpy array to a PIL RGB image."""
-        if numpy_array.shape[-1] == 3:
-            # Convert numpy array to RGB PIL Image
-            return Image.fromarray(numpy_array, mode='RGB')
-        else:
-            raise ValueError(f"Unsupported number of channels: {numpy_array.shape[-1]}. Expected 3 (RGB).")
-
-
-if __name__ == "__main__":
-    text = """
-    <think>
-    I am thinking about the problem.
-    </think>
-    <answer>
-    answer1, answer2, answer3
-    </answer>
-    """
-    print(preprocess_text(text))

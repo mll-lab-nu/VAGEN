@@ -14,9 +14,10 @@ from vagen.env.sokoban.room_utils import generate_room
 from vagen.env.base import (
     BaseEnv,
     BaseInterface,
-    preprocess_text,
-    convert_numpy_to_PIL,
+    IMAGE_PLACEHOLDER
 )
+
+from vagen.env.utils import preprocess_text, convert_numpy_to_PIL
 
 system_prompt = """
 You are a helpful assistant. You first think about the reasoning process in the mind and then provides the user with the answer.
@@ -47,6 +48,9 @@ Box on target: +1.0
 All boxes placed: +10.0
 """
 
+
+
+
 init_observation_template = """
 [Initial Observation]:
 {observation}
@@ -59,8 +63,6 @@ After that, the observation is:
 reward: {reward}
 done: {done}
 """
-
-image_placeholder = "<image{index}>"
 
 
 class SokobanEnv(BaseEnv, GymSokobanEnv):
@@ -318,7 +320,7 @@ class SokobanInterface(BaseInterface):
             else:
                 break
 
-        observation = image_placeholder.format(index=1) if not isinstance(env_state, str) else env_state
+        observation = IMAGE_PLACEHOLDER if not isinstance(env_state, str) else env_state
         text_template = action_template.format(
             answer=answer,
             valid_action=valid_action,
@@ -333,7 +335,7 @@ class SokobanInterface(BaseInterface):
             obs = {
                 'text_template': text_template,
                 'multi_modal_data': {
-                    observation: env_state,
+                    IMAGE_PLACEHOLDER: [env_state],
                 },
             }
         return obs, reward, done, info
@@ -401,7 +403,7 @@ class SokobanInterface(BaseInterface):
         env_state = self.env._render(mode='text' if not self.visual_env else 'rgb_array') # NOTE currently called after reset
         if isinstance(env_state, np.ndarray):
             env_state = convert_numpy_to_PIL(env_state)
-        observation = image_placeholder.format(index=1) if not isinstance(env_state, str) else env_state
+        observation = IMAGE_PLACEHOLDER if not isinstance(env_state, str) else env_state
         text_template = init_observation_template.format(
             observation=observation,
         )
@@ -411,7 +413,7 @@ class SokobanInterface(BaseInterface):
             obs = {
                 'text_template': text_template,
                 'multi_modal_data': {
-                    observation: env_state,
+                    IMAGE_PLACEHOLDER: [env_state],
                 },
             }
         return obs, {}

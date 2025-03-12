@@ -2,14 +2,14 @@ set -x
 
 export VLLM_ATTENTION_BACKEND=XFORMERS
 
-python -m vagen.env.sokoban.create_dataset 
+python -m vagen.env.sokoban.create_dataset --visual_env --data_dir data/sokoban
 
 python3 -m vagen.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     data.train_files=data/sokoban/train.parquet \
     data.val_files=data/sokoban/test.parquet \
     data.train_batch_size=16 \
-    data.max_prompt_length=1024 \
+    data.max_prompt_length=2 \ # this could be 0 since currently prompt is padding
     data.max_response_length=2048 \
     data.image_key=images \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \
