@@ -9,7 +9,7 @@ python3 -m vagen.trainer.main_ppo \
     data.train_files=data/sokoban/train.parquet \
     data.val_files=data/sokoban/test.parquet \
     data.train_batch_size=16 \
-    data.max_prompt_length=2 \ # this could be 0 since currently prompt is padding
+    data.max_prompt_length=2048 \ 
     data.max_response_length=2048 \
     data.image_key=images \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \
@@ -41,7 +41,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \
     trainer.save_freq=-1 \
-    trainer.test_freq=5 \
+    trainer.test_freq=-1 \
     trainer.total_epochs=15 \
     +max_turns=2 \
     2>&1 | tee debug.log

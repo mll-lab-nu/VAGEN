@@ -13,7 +13,7 @@ from verl import DataProto
 from verl.utils.model import compute_position_id_with_mask
 import verl.utils.torch_functional as verl_F
 from verl.utils.dataset.rl_dataset import process_image, collate_fn
-
+import vagen.env
 from vagen.env.register import REGISTERED_ENVS
 from vagen.env.base import EnvConfig,IMAGE_PLACEHOLDER
 
@@ -53,7 +53,7 @@ class QwenVLRolloutManger():
         """
         llm_raw_response = re.sub(r'<image>', '', llm_raw_response)
         if compute_loss_mask:
-            # filtering special tokens for llm_raw_response, then adding them to the beginning and end of the response
+            # filtering special tokens for llm_raw_response, then adding them to the beginning and end of the response for loss mask computation
             sptk_b = self.config.sptk_for_loss_mask[0]
             sptk_e = self.config.sptk_for_loss_mask[1]
             llm_raw_response = re.sub(sptk_e, '', llm_raw_response)
@@ -365,7 +365,6 @@ class QwenVLRolloutManger():
             recording: List[Dict], 
             step: int, 
             window_size: int = None,
-            compute_loss_mask: bool = False,
         ):
         """
         Given a recording, generate the final input for MLLM
@@ -374,7 +373,6 @@ class QwenVLRolloutManger():
             recording: List of dictionaries containing recorded environment interactions
             step: Current step to generate input for
             window_size: Number of past steps to include in the context
-            compute_loss_mask: Whether to compute loss mask (loss mask: 1 for assistant response, 0 for user response)
         
         Returns:
             Dictionary containing properly formatted inputs for the MLLM
@@ -386,16 +384,17 @@ class QwenVLRolloutManger():
                 - rest postion_ids: refer to vllm_rollout_spmd.py to check how to compute
 
         """
-        assert step >= 0
+        assert step > 0 # we must update with at least one response
         start_step = max(0, step - window_size) if window_size is not None else 0
         end_step = step
         assert len(recording) >= end_step+1, 'History length is not enough'
         history = recording[start_step: end_step + 1]
 
 
+        # handle prompt, prompt=pad_token since we now have everything in response and compute a loss mask for them
+        prompt_with_chat_template=self.tokenizer.pad_token 
         
-        prompt_with_chat_template=self.tokenizer.pad_token # leave prompt empty for final input
-        
+        # handle response
         response_chat = []
         env_id = history[0]['env_id']
         response_chat.append({"role": "system", "content": self.envs[env_id].get_task_instruction()})
@@ -408,7 +407,7 @@ class QwenVLRolloutManger():
                 response_chat.append({"role": "user", "content": record['text_template']})
         response_with_chat_template = self.tokenizer.apply_chat_template(response_chat, add_generation_prompt=False, tokenize=False)
         image_data=[]
-        for record in history:
+        for record in history[:-1]: # do not collect last step's obseravation data since we don't use it for update
             if 'image_data' in record:
                 for img in record['image_data']:
                     image_data.append(img)
@@ -416,34 +415,34 @@ class QwenVLRolloutManger():
         row_dict = {}
         if has_images:  # expand image token
             response_with_chat_template, row_dict, image_grid_thw, _ = self._handle_multi_modal_data(
-                prompt_with_chat_template, row_dict, image_data, do_embedding=True)
+                response_with_chat_template, row_dict, image_data, do_embedding=True)
 
-
-
-
-        input_ids_prompt, attention_mask_prompt = verl_F.tokenize_and_postprocess_data(prompt=prompt_with_chat_template,
-                                                                         tokenizer=self.tokenizer,
-                                                                         max_length=self.config.max_prompt_length,
-                                                                         pad_token_id=self.tokenizer.pad_token_id,
-                                                                         left_pad=True,
-                                                                         truncation=self.truncation)
-
+        
         input_ids_response, attention_mask_response = verl_F.tokenize_and_postprocess_data(prompt=response_with_chat_template,
                                                                          tokenizer=self.tokenizer,
-                                                                         max_length=self.config.max_response_length,
+                                                                         max_length=self.config.max_response_length+self.config.max_prompt_length,
                                                                          pad_token_id=self.tokenizer.pad_token_id,
                                                                          left_pad=False,
                                                                          truncation=self.truncation)
+        input_ids_prompt, attention_mask_prompt = verl_F.tokenize_and_postprocess_data(prompt=prompt_with_chat_template,
+                                                                         tokenizer=self.tokenizer,
+                                                                         max_length=self.config.max_response_length+self.config.max_prompt_length,
+                                                                         pad_token_id=self.tokenizer.pad_token_id,
+                                                                         left_pad=True,
+                                                                         truncation=self.truncation)
+        attention_mask_prompt=torch.zeros_like(input_ids_prompt) # All prompt will be masked
         
-        input_ids_prompt = input_ids_prompt[0]
-        input_ids_response = input_ids_response[0]
-        attention_mask_prompt = attention_mask_prompt[0]
-        attention_mask_response = attention_mask_response[0]
-
-        if compute_loss_mask:
-            input_ids_response, attention_mask_response, loss_mask_response = self._compute_loss_mask(input_ids_response, attention_mask_response)
-            loss_mask_prompt = torch.zeros_like(attention_mask_prompt)
-            loss_mask = torch.cat([loss_mask_prompt, loss_mask_response], dim=-1)
+        
+        input_ids_response, attention_mask_response, loss_mask_response = self._compute_loss_mask(input_ids_response, attention_mask_response)
+        
+        input_ids_prompt=input_ids_prompt[0]
+        attention_mask_prompt=attention_mask_prompt[0]
+        input_ids_response=input_ids_response[0]
+        attention_mask_response=attention_mask_response[0]
+        loss_mask_response=loss_mask_response[0]
+        loss_mask_prompt = torch.zeros_like(attention_mask_prompt)
+        
+        loss_mask = torch.cat([loss_mask_prompt, loss_mask_response], dim=-1)
         input_ids = torch.cat([input_ids_prompt, input_ids_response], dim=-1)
         attention_mask = torch.cat([attention_mask_prompt, attention_mask_response], dim=-1)
 
@@ -464,7 +463,7 @@ class QwenVLRolloutManger():
         else:
             response_length = input_ids_response.shape[0]
             delta_position_id = torch.arange(1, response_length + 1, device=position_ids_prompt.device)
-            position_ids_response = position_ids_prompt[:, -1:] + delta_position_id
+            position_ids_response = position_ids_prompt[-1:] + delta_position_id
         
         position_ids = torch.cat([position_ids_prompt, position_ids_response], dim=-1)
         row_dict['prompts'] = input_ids_prompt
@@ -472,8 +471,7 @@ class QwenVLRolloutManger():
         row_dict['input_ids'] = input_ids
         row_dict['attention_mask'] = attention_mask
         row_dict['position_ids'] = position_ids
-        if compute_loss_mask:
-            row_dict['loss_mask'] = loss_mask
+        row_dict['loss_mask'] = loss_mask
         index = row_dict.get("extra_info", {}).get("index", 0)
         row_dict["index"] = index
         return row_dict
@@ -496,7 +494,7 @@ class QwenVLRolloutManger():
         for env_id in self.envs.keys():
             if self.env_states[env_id]['done']:
                 continue
-            # batch.append(self.__getitem__(self.recorder[env_id], step, window_size))
+
             batch.append(self._generate_input_item(self.recorder[env_id], step, window_size))
             self.batch_idx_to_env_id[batch_idx] = env_id
             batch_idx += 1
@@ -535,7 +533,10 @@ class QwenVLRolloutManger():
             raw_prompt_ids = gen_batch.non_tensor_batch['raw_prompt_ids']
             raw_prompt_ids_array = np.ndarray(shape=(len(raw_prompt_ids),), dtype=object)
             for i in range(len(raw_prompt_ids)):
-                raw_prompt_ids_array[i] = raw_prompt_ids[i].tolist()
+                if isinstance(raw_prompt_ids[i],list):
+                    raw_prompt_ids_array[i] = raw_prompt_ids[i]
+                else:
+                    raw_prompt_ids_array[i] = raw_prompt_ids[i].tolist()
             gen_batch.non_tensor_batch['raw_prompt_ids'] = raw_prompt_ids_array
             
             output_batch = self.actor_rollout_wg.generate_sequences(gen_batch)
@@ -571,7 +572,6 @@ class QwenVLRolloutManger():
                 recording=self.recorder[env_id],
                 step=self.env_states[env_id]['step'],
                 window_size=self.config.window_size,
-                compute_loss_mask=True,
             )
             row_dict['reward_model'] = {"style": "given", "ground_truth": {"reward": self.envs[env_id].get_traj_reward()}}
             batch_list.append(row_dict)

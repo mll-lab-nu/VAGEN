@@ -9,8 +9,8 @@ python3 -m vagen.trainer.main_ppo \
     data.train_files=data/sokoban-text/train.parquet \
     data.val_files=data/sokoban-text/test.parquet \
     data.train_batch_size=16 \
-    data.max_prompt_length=2 \
-    data.max_response_length=2048 \
+    data.max_prompt_length=1024 \
+    data.max_response_length=1024 \
     data.image_key=images \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-0.5B-Instruct \
     actor_rollout_ref.actor.optim.lr=1e-6 \
@@ -24,9 +24,9 @@ python3 -m vagen.trainer.main_ppo \
     actor_rollout_ref.actor.fsdp_config.param_offload=False \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \
-    actor_rollout_ref.rollout.tensor_model_parallel_size=4 \
+    actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.name=vllm \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.7 \
     actor_rollout_ref.rollout.enable_chunked_prefill=False \
     actor_rollout_ref.rollout.enforce_eager=False \
     actor_rollout_ref.rollout.free_cache_engine=False \
@@ -38,10 +38,10 @@ python3 -m vagen.trainer.main_ppo \
     trainer.logger=['console','wandb'] \
     trainer.project_name='vagen' \
     trainer.experiment_name='qwen2_5_05b_function_rm' \
-    trainer.n_gpus_per_node=4 \
+    trainer.n_gpus_per_node=1 \
     trainer.nnodes=1 \
     trainer.save_freq=-1 \
-    trainer.test_freq=5 \
+    trainer.test_freq=-1 \
     trainer.total_epochs=15 \
     +max_turns=2 \
     2>&1 | tee debug.log
