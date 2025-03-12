@@ -383,7 +383,7 @@ class QwenVLRolloutManger():
 
         image_data = [image for record in history if 'image_data' in record for image in record["image_data"]]
         has_images = len(image_data) > 0        
-        prompt_with_chat_template = self.tokenizer.apply_chat_template(chat, add_generation_prompt=True, tokenize=False) + '<think>'
+        prompt_with_chat_template = self.tokenizer.apply_chat_template(chat, add_generation_prompt=True, tokenize=False)
 
         row_dict = {}
         if has_images:  # expand image token
@@ -451,7 +451,7 @@ class QwenVLRolloutManger():
         init_chat.append({"role": "system", "content": self.envs[env_id].get_task_instruction()})
         if 'text_template' in first_record:
             init_chat.append({"role": "user", "content": first_record['text_template']})
-        prompt_with_chat_template = self.tokenizer.apply_chat_template(init_chat, add_generation_prompt=True, tokenize=False) + '<think>'
+        prompt_with_chat_template = self.tokenizer.apply_chat_template(init_chat, add_generation_prompt=True, tokenize=False)
         image_data = [first_record['image_data']] if 'image_data' in first_record else []
         has_images = len(image_data) > 0
         row_dict = {}
