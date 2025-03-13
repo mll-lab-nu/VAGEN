@@ -452,7 +452,6 @@ class QwenVLRolloutManger():
         # if self.image_key in row_dict:
         if has_images:
             from verl.models.transformers.qwen2_vl import get_rope_index
-            # NOTE please check the way position ids are computed in vllm_rollout_spmd.py
             position_ids_response = get_rope_index(
                 self.processor,
                 image_grid_thw=image_grid_thw,
