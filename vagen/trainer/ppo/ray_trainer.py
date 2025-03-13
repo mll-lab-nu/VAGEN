@@ -896,7 +896,7 @@ class RayPPOTrainer(object):
 
 
         rollout_config = QwenVLRolloutConifg(
-            max_prompt_length=self.config.data.max_prompt_length,
+            max_trajectories_length=self.config.data.max_trajectories_length,
             max_turns=self.config.max_turns,
             n_gpu_per_node=self.config.trainer.n_gpus_per_node,
         )

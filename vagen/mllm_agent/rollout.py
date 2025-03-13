@@ -20,8 +20,7 @@ from vagen.env.base import EnvConfig,IMAGE_PLACEHOLDER
 @dataclass
 class QwenVLRolloutConifg:
     window_size: int = 5
-    max_prompt_length: int = 512 # 1024 
-    max_response_length: int = 2048 # 1024 
+    max_trajectories_length: int = 3072
     max_turns: int = 5
     n_gpu_per_node: int = 1 # used for multigpu batch balancing
     sptk_for_loss_mask: List[str] = field(default_factory=lambda: ['<|box_start|>', '<|box_end|>'])
@@ -421,13 +420,12 @@ class QwenVLRolloutManger():
         
         input_ids_response, attention_mask_response = verl_F.tokenize_and_postprocess_data(prompt=response_with_chat_template,
                                                                          tokenizer=self.tokenizer,
-                                                                         max_length=self.config.max_response_length+self.config.max_prompt_length,
+                                                                         max_length=self.config.max_trajectories_length,
                                                                          pad_token_id=self.tokenizer.pad_token_id,
                                                                          left_pad=False,
                                                                          truncation=self.truncation)
         input_ids_prompt, attention_mask_prompt = verl_F.tokenize_and_postprocess_data(prompt=prompt_with_chat_template,
                                                                          tokenizer=self.tokenizer,
-                                                                        #  max_length=self.config.max_response_length+self.config.max_prompt_length,
                                                                          max_length=1,
                                                                          pad_token_id=self.tokenizer.pad_token_id,
                                                                          left_pad=True,
