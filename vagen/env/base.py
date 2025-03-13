@@ -163,8 +163,8 @@ class BaseInterface(ABC):
                 assert len_of_images == len_of_image_in_text_template, f"len_of_images must be equal to len_of_image_in_text_template, got {len_of_images} and {len_of_image_in_text_template}"
         return obs, info
     
+    @abstractmethod
     def get_traj_reward(self) -> float:
         """Get the reward of the environment."""
-        return self.traj_reward
     
 

@@ -450,3 +450,6 @@ class SokobanInterface(BaseInterface):
     
     def get_task_instruction(self) -> str:
         return instruction_template
+    
+    def get_traj_reward(self):
+        return self.traj_reward
