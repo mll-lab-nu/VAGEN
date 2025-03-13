@@ -707,7 +707,7 @@ class RayPPOTrainer(object):
 
         if self.test_rollout_config==None:
             self.test_rollout_config = QwenVLRolloutConifg(
-                max_trajectories_length=self.config.data.max_trajectories_length,
+                max_trajectory_length=self.config.data.max_trajectory_length,
                 max_turns=self.config.max_turns,
                 n_gpu_per_node=self.config.trainer.n_gpus_per_node,
             )
@@ -956,19 +956,19 @@ class RayPPOTrainer(object):
         # perform validation before training
         # currently, we only support validation using the reward_function.
         # TODO implement validation
-        # if self.val_reward_fn is not None and self.config.trainer.get('val_before_train', True):
-        #     val_metrics = self._validate()
-        #     pprint(f'Initial validation metrics: {val_metrics}')
-        #     logger.log(data=val_metrics, step=self.global_steps)
-        #     if self.config.trainer.get('val_only', False):
-        #         return
+        if self.val_reward_fn is not None and self.config.trainer.get('val_before_train', True):
+            val_metrics = self._validate()
+            pprint(f'Initial validation metrics: {val_metrics}')
+            logger.log(data=val_metrics, step=self.global_steps)
+            if self.config.trainer.get('val_only', False):
+                return
 
         # we start from step 1
         self.global_steps += 1
 
 
         rollout_config = QwenVLRolloutConifg(
-            max_trajectories_length=self.config.data.max_trajectories_length,
+            max_trajectory_length=self.config.data.max_trajectory_length,
             max_turns=self.config.max_turns,
             n_gpu_per_node=self.config.trainer.n_gpus_per_node,
         )
