@@ -40,8 +40,8 @@ class QwenVLRolloutManger():
         self.actor_rollout_wg = actor_rollout_wg
         self.verbose = verbose
         self.truncation = truncation
-        self.recorder= None # defaultdict(list)
-        self.envs = None # dict
+        self.recorder= None # defaultdict(list) env_id:record
+        self.envs = None # dict env_id:EnvInterface
         self.env_states = None # dict
         self.batch_idx_to_env_id = None # dict
 
@@ -101,7 +101,9 @@ class QwenVLRolloutManger():
     def _compute_loss_mask(self, input_ids, attention_mask):
         """
         Compute loss mask for the input ids and attention mask
-
+        We only do loss for the tokens in input_ids that are wrapped by special tokens (by defualt they're <|box_start|> and <|box_end|>)
+        
+        
         Args:
             input_ids: (batch_size, seq_len)
             attention_mask: (batch_size, seq_len)
@@ -111,7 +113,7 @@ class QwenVLRolloutManger():
             attention_mask: (batch_size, seq_len)
             loss_mask: (batch_size, seq_len)
         
-        - There will be different stratgy to handel special tokens in the list
+        - There will be different stratgy to handel special tokens in the input_ids
         - 1. remove them, in this case we need to fill the hole by adding pad in the right and shift the sequence left
         - 2. keep them, attention mask will be 0 for them
         - 3. Replace them with pad token
@@ -287,6 +289,43 @@ class QwenVLRolloutManger():
         self.recorder[env_id].append(record_entry)
 
 
+    def _single_recording_to_prompt(self,
+                            recording: List[Dict], 
+                            step: int, 
+                            window_size: int = None,
+                            last_question: bool = False,):
+        
+        assert step >= 0
+        start_step = max(0, step - window_size) if window_size is not None else 0
+        end_step = step
+        assert len(recording) >= end_step + 1, 'History length is not enough'
+        history = recording[start_step: end_step + 1]
+
+        chat = []
+        
+        env_id = history[0]['env_id']
+        chat.append({"role": "system", "content": self.envs[env_id].get_task_instruction()})
+    
+        for i, record in enumerate(history):
+            if i>0:
+                llm_raw_response = record['info']['llm_raw_response']
+                filtered_llm_raw_response = self._handle_special_tokens(llm_raw_response, compute_loss_mask=False)
+                chat.append({"role": "assistant", "content": filtered_llm_raw_response})
+            if i<len(history)-1 or last_question:
+                chat.append({"role": "user", "content": record['text_template']})
+
+        image_data=[]
+        for record in history:
+            if 'image_data' in record:
+                for img in record['image_data']:
+                    image_data.append(img)
+            
+        prompt_with_chat_template = self.tokenizer.apply_chat_template(chat, add_generation_prompt=True, tokenize=False)
+        return {
+            "prompt": prompt_with_chat_template,
+            "image_data": image_data,
+        }
+        
     def _generate_input_item(
             self, 
             recording: List[Dict], 
@@ -310,33 +349,10 @@ class QwenVLRolloutManger():
                 - position_ids for prompts: rope
                 - rest postion_ids: refer to vllm_rollout_spmd.py to check how to compute
         """
-        assert step >= 0
-        start_step = max(0, step - window_size) if window_size is not None else 0
-        end_step = step
-        assert len(recording) >= end_step + 1, 'History length is not enough'
-        history = recording[start_step: end_step + 1]
-
-        chat = []
-        
-        env_id = history[0]['env_id']
-        chat.append({"role": "system", "content": self.envs[env_id].get_task_instruction()})
-    
-        for i, record in enumerate(history):
-            if i>0:
-                llm_raw_response = record['info']['llm_raw_response']
-                filtered_llm_raw_response = self._handle_special_tokens(llm_raw_response, compute_loss_mask=False)
-                chat.append({"role": "assistant", "content": filtered_llm_raw_response})
-            chat.append({"role": "user", "content": record['text_template']})
-
-        image_data=[]
-        for record in history:
-            if 'image_data' in record:
-                for img in record['image_data']:
-                    image_data.append(img)
-       
-        
+        rst=self._single_recording_to_prompt(recording, step, window_size,last_question=True)
+        prompt_with_chat_template=rst['prompt']
+        image_data=rst['image_data']        
         has_images = len(image_data) > 0        
-        prompt_with_chat_template = self.tokenizer.apply_chat_template(chat, add_generation_prompt=True, tokenize=False)
 
         row_dict = {}
         if has_images:  # expand image token
@@ -384,33 +400,17 @@ class QwenVLRolloutManger():
                 - rest postion_ids: refer to vllm_rollout_spmd.py to check how to compute
 
         """
-        assert step > 0 # we must update with at least one response
-        start_step = max(0, step - window_size) if window_size is not None else 0
-        end_step = step
-        assert len(recording) >= end_step+1, 'History length is not enough'
-        history = recording[start_step: end_step + 1]
+
 
 
         # handle prompt, prompt=pad_token since we now have everything in response and compute a loss mask for them
         prompt_with_chat_template=self.tokenizer.pad_token 
         
         # handle response
-        response_chat = []
-        env_id = history[0]['env_id']
-        response_chat.append({"role": "system", "content": self.envs[env_id].get_task_instruction()})
-        for i, record in enumerate(history):
-            if i>0:
-                llm_raw_response = record['info']['llm_raw_response']
-                filtered_llm_raw_response = self._handle_special_tokens(llm_raw_response, compute_loss_mask=True)
-                response_chat.append({"role": "assistant", "content": filtered_llm_raw_response})
-            if i<len(history)-1:
-                response_chat.append({"role": "user", "content": record['text_template']})
-        response_with_chat_template = self.tokenizer.apply_chat_template(response_chat, add_generation_prompt=False, tokenize=False)
-        image_data=[]
-        for record in history[:-1]: # do not collect last step's obseravation data since we don't use it for update
-            if 'image_data' in record:
-                for img in record['image_data']:
-                    image_data.append(img)
+        response_rst=self._single_recording_to_prompt(recording, step, window_size, last_question=False)
+        response_with_chat_template=response_rst['prompt']
+        image_data=response_rst['image_data']
+       
         has_images = len(image_data) > 0
         row_dict = {}
         if has_images:  # expand image token
@@ -571,10 +571,32 @@ class QwenVLRolloutManger():
             row_dict = self._generate_input_final_item(
                 recording=self.recorder[env_id],
                 step=self.env_states[env_id]['step'],
-                window_size=self.config.window_size,
+                window_size=None,
             )
             row_dict['reward_model'] = {"style": "given", "ground_truth": {"reward": self.envs[env_id].get_traj_reward()}}
             batch_list.append(row_dict)
         batch_dict = collate_fn(batch_list)
         batch = DataProto.from_single_dict(batch_dict)
         return batch
+    
+    
+    def recording_to_log(self):
+        """
+        Get the recording of all environments
+        
+        Returns:
+            Dictionary containing the recording of all environments
+        """
+        inputs=[]
+        outputs=[]
+        scores=[]
+        for k,v in self.recorder.items():
+            step=self.env_states[k]['step']
+            input_str=self.envs[k].name_repr()+self.envs[k].config_repr(self.envs[k].env_config)
+            ouput_rst=self._single_recording_to_prompt(v, step, window_size=None, last_question=False)
+            output_str=ouput_rst['prompt']
+            score=self.envs[k].get_traj_reward()
+            inputs.append(input_str)
+            outputs.append(output_str)
+            scores.append(score)
+        return inputs,outputs,scores
