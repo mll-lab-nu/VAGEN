@@ -139,7 +139,7 @@ class BaseInterface(ABC):
                 for image in obs["multi_modal_data"][IMAGE_PLACEHOLDER]:
                     assert isinstance(image, Image.Image), f"image must be PIL.Image.Image, got {type(image)}"
                 len_of_images = len(obs["multi_modal_data"][IMAGE_PLACEHOLDER])
-                len_of_image_in_text_template = len(re.findall(r'IMAGE_PLACEHOLDER', obs["text_template"]))
+                len_of_image_in_text_template = len(re.findall(IMAGE_PLACEHOLDER, obs["text_template"]))
                 assert len_of_images == len_of_image_in_text_template, f"len_of_images must be equal to len_of_image_in_text_template, got {len_of_images} and {len_of_image_in_text_template}"
         return obs, reward, done, info
     
@@ -159,7 +159,7 @@ class BaseInterface(ABC):
                 for image in obs["multi_modal_data"][IMAGE_PLACEHOLDER]:
                     assert isinstance(image, Image.Image), f"image must be PIL.Image.Image, got {type(image)}"
                 len_of_images = len(obs["multi_modal_data"][IMAGE_PLACEHOLDER])
-                len_of_image_in_text_template = len(re.findall(r'IMAGE_PLACEHOLDER', obs["text_template"]))
+                len_of_image_in_text_template = len(re.findall(IMAGE_PLACEHOLDER, obs["text_template"]))
                 assert len_of_images == len_of_image_in_text_template, f"len_of_images must be equal to len_of_image_in_text_template, got {len_of_images} and {len_of_image_in_text_template}"
         return obs, info
     

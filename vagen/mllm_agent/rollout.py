@@ -74,6 +74,7 @@ class QwenVLRolloutManger():
         - For do_embedding=True, replace <image> with <|vision_start|>{image_token}<|vision_end|> -> prompt_template
             - where {image_token} is the length of image embedding
         """
+        assert len(image_data) == prompt_template.count('<image>'), 'Number of images does not match number of <image> in the prompt template'
         raw_prompt = prompt_template.replace('<image>', '<|vision_start|><|image_pad|><|vision_end|>')
         row_dict['multi_modal_data'] = {'image': image_data}
         image_grid_thw = None
@@ -426,7 +427,8 @@ class QwenVLRolloutManger():
                                                                          truncation=self.truncation)
         input_ids_prompt, attention_mask_prompt = verl_F.tokenize_and_postprocess_data(prompt=prompt_with_chat_template,
                                                                          tokenizer=self.tokenizer,
-                                                                         max_length=self.config.max_response_length+self.config.max_prompt_length,
+                                                                        #  max_length=self.config.max_response_length+self.config.max_prompt_length,
+                                                                         max_length=1,
                                                                          pad_token_id=self.tokenizer.pad_token_id,
                                                                          left_pad=True,
                                                                          truncation=self.truncation)
@@ -452,7 +454,7 @@ class QwenVLRolloutManger():
         # if self.image_key in row_dict:
         if has_images:
             from verl.models.transformers.qwen2_vl import get_rope_index
-
+            # NOTE please check the way position ids are computed in vllm_rollout_spmd.py
             position_ids_response = get_rope_index(
                 self.processor,
                 image_grid_thw=image_grid_thw,
