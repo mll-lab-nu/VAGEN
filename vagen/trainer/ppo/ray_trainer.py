@@ -968,8 +968,9 @@ class RayPPOTrainer(object):
 
 
         rollout_config = QwenVLRolloutConifg(
-            max_trajectory_length=self.config.data.max_trajectory_length,
             max_turns=self.config.max_turns,
+            max_trajectory_length=self.config.data.max_trajectory_length,
+            max_response_per_turn=self.config.data.max_response_per_turn,
             n_gpu_per_node=self.config.trainer.n_gpus_per_node,
         )
         rollout_manager = QwenVLRolloutManger(
@@ -1049,12 +1050,6 @@ class RayPPOTrainer(object):
                         final_gen_batch_output = rollout_manager.get_final_trajectory()
 
                     with torch.no_grad():
-                        print(f"[DEBUG] shape of input_ids: {final_gen_batch_output.batch['input_ids'].shape}")
-                        print(f"[DEBUG] shape of attention_mask: {final_gen_batch_output.batch['attention_mask'].shape}")
-                        print(f"[DEBUG] shape of position_ids: {final_gen_batch_output.batch['position_ids'].shape}")
-                        print(f"[DEBUG] shape of loss_mask: {final_gen_batch_output.batch['loss_mask'].shape}")
-                        print(f"[DEBUG] shape of prompts: {final_gen_batch_output.batch['prompts'].shape}")
-                        print(f"[DEBUG] shape of responses: {final_gen_batch_output.batch['responses'].shape}")
                         output = self.actor_rollout_wg.compute_log_prob(final_gen_batch_output)
                         final_gen_batch_output = final_gen_batch_output.union(output)
                     batch.non_tensor_batch['uid'] = np.array([str(uuid.uuid4()) for _ in range(len(batch.batch))],

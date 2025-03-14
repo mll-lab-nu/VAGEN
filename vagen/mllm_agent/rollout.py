@@ -21,6 +21,7 @@ from vagen.env.base import EnvConfig,IMAGE_PLACEHOLDER
 class QwenVLRolloutConifg:
     window_size: int = 5
     max_trajectory_length: int = 3072
+    max_response_per_turn: int = 256
     max_turns: int = 5
     n_gpu_per_node: int = 1 # used for multigpu batch balancing
     sptk_for_loss_mask: List[str] = field(default_factory=lambda: ['<|box_start|>', '<|box_end|>'])
@@ -536,6 +537,8 @@ class QwenVLRolloutManger():
                     raw_prompt_ids_array[i] = raw_prompt_ids[i]
                 else:
                     raw_prompt_ids_array[i] = raw_prompt_ids[i].tolist()
+                print(f"[DEBUG] raw_prompt_ids_array({i}) length: {len(raw_prompt_ids_array[i])}")
+                print(f"[DEBUG] raw_prompt_ids_array({i}) content: {self.tokenizer.decode(raw_prompt_ids_array[i])}")
             gen_batch.non_tensor_batch['raw_prompt_ids'] = raw_prompt_ids_array
             
             output_batch = self.actor_rollout_wg.generate_sequences(gen_batch)
