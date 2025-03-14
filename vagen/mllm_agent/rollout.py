@@ -294,7 +294,19 @@ class QwenVLRolloutManger():
                             recording: List[Dict], 
                             step: int, 
                             window_size: int = None,
-                            last_question: bool = False,):
+                            is_final: bool = False,
+        ):
+        """
+        Given a recording, generate the prompt for MLLM
+        Chat: Sys -> |InitUser| -> |Assistant, User| -> |Assistant, User| -> ... -> |Assistant, User Final|
+
+        Args:
+            recording: List of dictionaries containing recorded environment interactions
+            step: Current step to generate prompt for
+            window_size: Number of past steps to include in the context
+            is_final: Whether the prompt is for the final step 
+                - if True, the last one should be from assistant
+        """
         
         assert step >= 0
         start_step = max(0, step - window_size) if window_size is not None else 0
@@ -306,22 +318,39 @@ class QwenVLRolloutManger():
         
         env_id = history[0]['env_id']
         chat.append({"role": "system", "content": self.envs[env_id].get_task_instruction()})
-    
+
+        # for i, record in enumerate(history):
+        #     if i>0:
+        #         llm_raw_response = record['info']['llm_raw_response']
+        #         filtered_llm_raw_response = self._handle_special_tokens(llm_raw_response, compute_loss_mask=False)
+        #         chat.append({"role": "assistant", "content": filtered_llm_raw_response})
+        #     if i<len(history)-1 or last_question:
+        #         chat.append({"role": "user", "content": record['text_template']})
+
+        # image_data=[]
+        # for record in history:
+        #     if 'image_data' in record:
+        #         for img in record['image_data']:
+        #             image_data.append(img)
+
+        image_data=[]
         for i, record in enumerate(history):
-            if i>0:
+            if i == 0:
+                chat.append({"role": "user", "content": record['text_template']})
+                if 'image_data' in record:
+                    for img in record['image_data']:
+                        image_data.append(img)
+            else:
                 llm_raw_response = record['info']['llm_raw_response']
                 filtered_llm_raw_response = self._handle_special_tokens(llm_raw_response, compute_loss_mask=False)
                 chat.append({"role": "assistant", "content": filtered_llm_raw_response})
-            if i<len(history)-1 or last_question:
-                chat.append({"role": "user", "content": record['text_template']})
-
-        image_data=[]
-        for record in history:
-            if 'image_data' in record:
-                for img in record['image_data']:
-                    image_data.append(img)
+                if not is_final:
+                    chat.append({"role": "user", "content": record['text_template']})
+                    if 'image_data' in record:
+                        for img in record['image_data']:
+                            image_data.append(img)
             
-        prompt_with_chat_template = self.tokenizer.apply_chat_template(chat, add_generation_prompt=True, tokenize=False)
+        prompt_with_chat_template = self.tokenizer.apply_chat_template(chat, add_generation_prompt=not is_final, tokenize=False)
         return {
             "prompt": prompt_with_chat_template,
             "image_data": image_data,
@@ -350,7 +379,7 @@ class QwenVLRolloutManger():
                 - position_ids for prompts: rope
                 - rest postion_ids: refer to vllm_rollout_spmd.py to check how to compute
         """
-        rst=self._single_recording_to_prompt(recording, step, window_size,last_question=True)
+        rst=self._single_recording_to_prompt(recording, step, window_size, is_final=False)
         prompt_with_chat_template=rst['prompt']
         image_data=rst['image_data']        
         has_images = len(image_data) > 0        
@@ -408,7 +437,7 @@ class QwenVLRolloutManger():
         prompt_with_chat_template=self.tokenizer.pad_token 
         
         # handle response
-        response_rst=self._single_recording_to_prompt(recording, step, window_size, last_question=False)
+        response_rst=self._single_recording_to_prompt(recording, step, window_size, is_final=True)
         response_with_chat_template=response_rst['prompt']
         image_data=response_rst['image_data']
        
@@ -486,7 +515,8 @@ class QwenVLRolloutManger():
             window_size: Number of past steps to include in the context
         
         Returns:
-            Dictionary containing properly formatted inputs for the MLLM›
+            Dictionary containing properly formatted inputs for the MLLM
+            - None if no data is available (all environments are done)
         """
         batch = []
         self.batch_idx_to_env_id = {}
@@ -498,6 +528,8 @@ class QwenVLRolloutManger():
             batch.append(self._generate_input_item(self.recorder[env_id], step, window_size))
             self.batch_idx_to_env_id[batch_idx] = env_id
             batch_idx += 1
+        if not batch:
+            return None
         if len(batch) % self.config.n_gpu_per_node != 0:
             # Pad the batch to make it divisible by n_gpu_per_node
             while len(batch) % self.config.n_gpu_per_node != 0:
@@ -515,6 +547,8 @@ class QwenVLRolloutManger():
         """
         for step in range(self.config.max_turns):
             input_batch_dict = self.gen_batch(step, self.config.window_size)
+            if input_batch_dict is None:
+                break
             input_batch = DataProto.from_single_dict(input_batch_dict)
             if 'multi_modal_data' in input_batch.non_tensor_batch.keys():
                 gen_batch = input_batch.pop(

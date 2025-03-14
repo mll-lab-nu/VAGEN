@@ -708,6 +708,7 @@ class RayPPOTrainer(object):
         if self.test_rollout_config==None:
             self.test_rollout_config = QwenVLRolloutConifg(
                 max_trajectory_length=self.config.data.max_trajectory_length,
+                max_response_per_turn=self.config.data.max_response_per_turn,
                 max_turns=self.config.max_turns,
                 n_gpu_per_node=self.config.trainer.n_gpus_per_node,
             )
@@ -743,11 +744,11 @@ class RayPPOTrainer(object):
                     for i in range(len(batch))
                 ]
             
-            self.rollout_manager.reset(env_configs)
+            self.test_rollout_manager.reset(env_configs)
             print('validation generation start')
-            self.rollout_manager.rollout_loop()
+            self.test_rollout_manager.rollout_loop()
             print('validation generation end')
-            inputs, outputs, scores = self.rollout_manager.recording_to_log() # data source == inputs in our current setting, outputs=whole trjecotry
+            inputs, outputs, scores = self.test_rollout_manager.recording_to_log() # data source == inputs in our current setting, outputs=whole trjecotry
             sample_inputs.extend(inputs)
             sample_outputs.extend(outputs)
             sample_scores.extend(scores)
@@ -955,13 +956,12 @@ class RayPPOTrainer(object):
 
         # perform validation before training
         # currently, we only support validation using the reward_function.
-        # TODO implement validation
-        if self.val_reward_fn is not None and self.config.trainer.get('val_before_train', True):
-            val_metrics = self._validate()
-            pprint(f'Initial validation metrics: {val_metrics}')
-            logger.log(data=val_metrics, step=self.global_steps)
-            if self.config.trainer.get('val_only', False):
-                return
+        # if self.val_reward_fn is not None and self.config.trainer.get('val_before_train', True):
+        #     val_metrics = self._validate()
+        #     pprint(f'Initial validation metrics: {val_metrics}')
+        #     logger.log(data=val_metrics, step=self.global_steps)
+        #     if self.config.trainer.get('val_only', False):
+        #         return
 
         # we start from step 1
         self.global_steps += 1

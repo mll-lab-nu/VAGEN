@@ -46,6 +46,9 @@ Rewards:
 Move: -0.1
 Box on target: +1.0
 All boxes placed: +10.0
+
+Include your thought in <think> </think> tags and your final answer in <answer> </answer> tags.
+Your response should be like: <think> [Your thought] </think> <answer> [Your answer] </answer>
 """
 
 
@@ -359,7 +362,7 @@ class SokobanInterface(BaseInterface):
         """
 
         assert not self.env.finished(), "Environment finished before step"
-        reward, done, info = 0, False, {}
+        reward, done, final_info = 0, False, {}
 
 
         preprocess_result = self._preprocess(raw_text)
@@ -367,13 +370,13 @@ class SokobanInterface(BaseInterface):
         action_list = preprocess_result.action_list
         valid_list = preprocess_result.valid_list
         answer = preprocess_result.answer
-        info['llm_raw_response'] = preprocess_result.llm_raw_response
+        final_info['llm_raw_response'] = preprocess_result.llm_raw_response
 
         # deal with format
         if think and answer: # format is correct
             reward += self.FORMAT_REWARD
 
-
+        info = {}
         for action, valid in zip(action_list, valid_list):
             if done or self.env.finished():
                 break
@@ -383,6 +386,7 @@ class SokobanInterface(BaseInterface):
             else: # termiante at the first invalid action
                 break
         self.traj_reward += reward
+        final_info.update(info) # NOTE currently only use the last step info
 
         env_state = self.env._render(mode='text' if not self.visual_env else 'rgb_array') # NOTE currently called after step
 
@@ -390,7 +394,7 @@ class SokobanInterface(BaseInterface):
             env_state=env_state,
             reward=reward,
             done=done,
-            info=info,
+            info=final_info,
             preprocess_result=preprocess_result,
         )
     

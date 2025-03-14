@@ -8,7 +8,7 @@ python3 -m vagen.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     data.train_files=data/sokoban/train.parquet \
     data.val_files=data/sokoban/test.parquet \
-    data.train_batch_size=16 \
+    data.train_batch_size=2 \
     data.max_prompt_length=512 \
     data.max_response_length=1536 \
     data.max_trajectory_length=2048 \
@@ -19,7 +19,7 @@ python3 -m vagen.trainer.main_ppo \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=True \
-    actor_rollout_ref.actor.ppo_mini_batch_size=4 \
+    actor_rollout_ref.actor.ppo_mini_batch_size=2 \
     actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=1 \
     actor_rollout_ref.actor.use_kl_loss=True \
     actor_rollout_ref.actor.kl_loss_coef=0.001 \
