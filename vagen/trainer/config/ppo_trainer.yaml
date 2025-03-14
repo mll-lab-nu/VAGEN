@@ -71,6 +71,7 @@ actor_rollout_ref:
     use_fire_sampling: False # https://arxiv.org/abs/2410.21236
     prompt_length: ${data.max_prompt_length}  # not use for opensource
     response_length: ${data.max_response_length}
+    max_trajectory_length: ${data.max_trajectory_length}
     # for vllm rollout
     dtype: bfloat16 # should align with FSDP
     gpu_memory_utilization: 0.5
@@ -186,3 +187,9 @@ trainer:
   default_local_dir: checkpoints/${trainer.project_name}/${trainer.experiment_name}
   val_before_train: True
   val_only: False
+
+rollout_manger:
+  max_trajectory_length: ${data.max_trajectory_length}
+  window_size: 5
+  max_turns: 5
+  n_gpus_per_node: ${trainer.n_gpus_per_node}

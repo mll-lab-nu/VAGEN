@@ -21,7 +21,6 @@ from vagen.env.base import EnvConfig,IMAGE_PLACEHOLDER
 class QwenVLRolloutConifg:
     window_size: int = 5
     max_trajectory_length: int = 3072
-    max_response_per_turn: int = 256
     max_turns: int = 5
     n_gpu_per_node: int = 1 # used for multigpu batch balancing
     sptk_for_loss_mask: List[str] = field(default_factory=lambda: ['<|box_start|>', '<|box_end|>'])
@@ -305,7 +304,7 @@ class QwenVLRolloutManger():
             step: Current step to generate prompt for
             window_size: Number of past steps to include in the context
             is_final: Whether the prompt is for the final step 
-                - if True, the last one should be from assistant
+                - if True, the end of the chat is from the last assistant's response
         """
         
         assert step >= 0
@@ -450,7 +449,7 @@ class QwenVLRolloutManger():
         
         input_ids_response, attention_mask_response = verl_F.tokenize_and_postprocess_data(prompt=response_with_chat_template,
                                                                          tokenizer=self.tokenizer,
-                                                                         max_length=self.config.max_trajectory_length,
+                                                                         max_length=self.config.max_trajectory_length-1, # -1 for the prompt padding token
                                                                          pad_token_id=self.tokenizer.pad_token_id,
                                                                          left_pad=False,
                                                                          truncation=self.truncation)
@@ -571,11 +570,21 @@ class QwenVLRolloutManger():
                     raw_prompt_ids_array[i] = raw_prompt_ids[i]
                 else:
                     raw_prompt_ids_array[i] = raw_prompt_ids[i].tolist()
-                print(f"[DEBUG] raw_prompt_ids_array({i}) length: {len(raw_prompt_ids_array[i])}")
-                print(f"[DEBUG] raw_prompt_ids_array({i}) content: {self.tokenizer.decode(raw_prompt_ids_array[i])}")
+                # print(f"[DEBUG] raw_prompt_ids_array({i}) length: {len(raw_prompt_ids_array[i])}")
+                # print(f"[DEBUG] raw_prompt_ids_array({i}) content: {self.tokenizer.decode(raw_prompt_ids_array[i])}")
             gen_batch.non_tensor_batch['raw_prompt_ids'] = raw_prompt_ids_array
             
             output_batch = self.actor_rollout_wg.generate_sequences(gen_batch)
+            ##DEBUG
+            # print(f"[DEBUG] rollout turn {step}")
+            # print(f"[DEBUG] rollout output_batch.non_tensor_batch.keys(): {output_batch.non_tensor_batch.keys()}")
+            # print(f"[DEBUG] rollout output_batch.batch.keys(): {output_batch.batch.keys()}")
+            # print(f"[DEBUG] rollout output_batch.batch['input_ids'].shape: {output_batch.batch['input_ids'].shape}")
+            # print(f"[DEBUG] rollout output_batch.batch['attention_mask'].shape: {output_batch.batch['attention_mask'].shape}")
+            # print(f"[DEBUG] rollout output_batch.batch['position_ids'].shape: {output_batch.batch['position_ids'].shape}")
+            # print(f"[DEBUG] --------------------------------------------")
+            
+            
             responses_str = self.tokenizer.batch_decode(
                 output_batch.batch['responses'], 
                 skip_special_tokens=True
@@ -613,6 +622,14 @@ class QwenVLRolloutManger():
             batch_list.append(row_dict)
         batch_dict = collate_fn(batch_list)
         batch = DataProto.from_single_dict(batch_dict)
+        ##DEBUG
+        # print(f"[DEBUG] final trajectory")
+        # print(f"[DEBUG] rollout batch.non_tensor_batch.keys(): {batch.non_tensor_batch.keys()}")
+        # print(f"[DEBUG] rollout batch.batch.keys(): {batch.batch.keys()}")
+        # print(f"[DEBUG] rollout batch.batch['input_ids'].shape: {batch.batch['input_ids'].shape}")
+        # print(f"[DEBUG] rollout batch.batch['attention_mask'].shape: {batch.batch['attention_mask'].shape}")
+        # print(f"[DEBUG] rollout batch.batch['loss_mask'].shape: {batch.batch['loss_mask'].shape}")
+        # print(f"[DEBUG] --------------------------------------------")
         return batch
     
     
@@ -629,7 +646,7 @@ class QwenVLRolloutManger():
         for k,v in self.recorder.items():
             step=self.env_states[k]['step']
             input_str=self.envs[k].name_repr()+self.envs[k].config_repr(self.envs[k].env_config)
-            ouput_rst=self._single_recording_to_prompt(v, step, window_size=None, last_question=False)
+            ouput_rst=self._single_recording_to_prompt(v, step, window_size=None, is_final=True)
             output_str=ouput_rst['prompt']
             score=self.envs[k].get_traj_reward()
             inputs.append(input_str)

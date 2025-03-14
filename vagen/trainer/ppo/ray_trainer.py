@@ -699,7 +699,7 @@ class RayPPOTrainer(object):
     
     # Agentic Setting _validate
     def _validate(self):
-
+        print(f"[DEBUG] validation at global step {self.global_steps} begins")
         # Lists to collect samples for the table
         sample_inputs = []
         sample_outputs = []
@@ -707,10 +707,10 @@ class RayPPOTrainer(object):
 
         if self.test_rollout_config==None:
             self.test_rollout_config = QwenVLRolloutConifg(
-                max_trajectory_length=self.config.data.max_trajectory_length,
-                max_response_per_turn=self.config.data.max_response_per_turn,
-                max_turns=self.config.max_turns,
-                n_gpu_per_node=self.config.trainer.n_gpus_per_node,
+                max_trajectory_length=self.config.rollout_manger.max_trajectory_length,
+                max_turns=self.config.rollout_manger.max_turns,
+                n_gpu_per_node=self.config.rollout_manger.n_gpus_per_node,
+                window_size=self.config.rollout_manger.window_size,
             )
         
         if self.test_rollout_manager==None:
@@ -745,9 +745,7 @@ class RayPPOTrainer(object):
                 ]
             
             self.test_rollout_manager.reset(env_configs)
-            print('validation generation start')
             self.test_rollout_manager.rollout_loop()
-            print('validation generation end')
             inputs, outputs, scores = self.test_rollout_manager.recording_to_log() # data source == inputs in our current setting, outputs=whole trjecotry
             sample_inputs.extend(inputs)
             sample_outputs.extend(outputs)
@@ -760,6 +758,7 @@ class RayPPOTrainer(object):
             data_source_reward[data_source].append(scores)
         for data_source, rewards in data_source_reward.items():
             metric_dict[f'val/test_score/{data_source}'] = np.mean(rewards)
+        print(f"[DEBUG] validation at global step {self.global_steps} ends")
         return metric_dict
 
             
@@ -956,23 +955,23 @@ class RayPPOTrainer(object):
 
         # perform validation before training
         # currently, we only support validation using the reward_function.
-        # if self.val_reward_fn is not None and self.config.trainer.get('val_before_train', True):
-        #     val_metrics = self._validate()
-        #     pprint(f'Initial validation metrics: {val_metrics}')
-        #     logger.log(data=val_metrics, step=self.global_steps)
-        #     if self.config.trainer.get('val_only', False):
-        #         return
+        if self.val_reward_fn is not None and self.config.trainer.get('val_before_train', True):
+            val_metrics = self._validate()
+            pprint(f'Initial validation metrics: {val_metrics}')
+            logger.log(data=val_metrics, step=self.global_steps)
+            if self.config.trainer.get('val_only', False):
+                return
 
         # we start from step 1
         self.global_steps += 1
 
 
-        rollout_config = QwenVLRolloutConifg(
-            max_turns=self.config.max_turns,
-            max_trajectory_length=self.config.data.max_trajectory_length,
-            max_response_per_turn=self.config.data.max_response_per_turn,
-            n_gpu_per_node=self.config.trainer.n_gpus_per_node,
-        )
+        rollout_config=QwenVLRolloutConifg(
+                max_trajectory_length=self.config.rollout_manger.max_trajectory_length,
+                max_turns=self.config.rollout_manger.max_turns,
+                n_gpu_per_node=self.config.rollout_manger.n_gpus_per_node,
+                window_size=self.config.rollout_manger.window_size,
+            )
         rollout_manager = QwenVLRolloutManger(
             actor_rollout_wg=self.actor_rollout_wg,
             tokenizer=self.tokenizer,
@@ -983,6 +982,7 @@ class RayPPOTrainer(object):
 
         for epoch in range(self.config.trainer.total_epochs):
             for batch_dict in self.train_dataloader:
+                print(f'global_steps: {self.global_steps}')
                 metrics = {}
                 timing_raw = {}
 
@@ -1049,9 +1049,14 @@ class RayPPOTrainer(object):
                         rollout_manager.rollout_loop()
                         final_gen_batch_output = rollout_manager.get_final_trajectory()
 
-                    with torch.no_grad():
-                        output = self.actor_rollout_wg.compute_log_prob(final_gen_batch_output)
-                        final_gen_batch_output = final_gen_batch_output.union(output)
+                    """ 
+                    DEBUG: seems this will cause assertion error: tensor_dict1[key].equal(tensor_dict2[key]), \
+                        AssertionError: old_log_probs in tensor_dict1 and tensor_dict2 are not the same object
+                        So I commented it out
+                    """
+                    # with torch.no_grad():
+                    #     output = self.actor_rollout_wg.compute_log_prob(final_gen_batch_output)
+                    #     final_gen_batch_output = final_gen_batch_output.union(output)
                     batch.non_tensor_batch['uid'] = np.array([str(uuid.uuid4()) for _ in range(len(batch.batch))],
                                                              dtype=object)
                     # repeat to align with repeated responses in rollout
