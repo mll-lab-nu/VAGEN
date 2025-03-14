@@ -590,13 +590,7 @@ class QwenVLRolloutManger():
         Get the final trajectory of all environments
 
         Returns:
-            Dictionary containing the final trajectory of all environments
-            - prompts: task instruction
-            - responses: responses generated from prompts
-            - input_ids, attention_mask, position_ids: prompts and responses generated from prompts
-            - position_ids: 
-                - position_ids for prompts: rope
-                - rest postion_ids: refer to vllm_rollout_spmd.py to check how to compute
+            batch (DataProto): batch of final trajectory of all environments
         """
         batch_list = []
         for env_id in self.envs.keys():
