@@ -38,7 +38,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
     trainer.project_name='vagen' \
-    trainer.experiment_name='qwen2_5_vl_3b_function_rm' \
+    trainer.experiment_name='debug_qwen2_5_vl_4gpu_grpo' \
     trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \
     trainer.save_freq=50 \
