@@ -45,13 +45,13 @@ class QwenVLRolloutManger():
         self.env_states = None # dict
         self.batch_idx_to_env_id = None # dict
 
-    def _handle_special_tokens(self, llm_raw_response: str, compute_loss_mask: bool) -> str:
+    def _handle_special_tokens(self, llm_raw_response: str, prep_for_loss_mask: bool) -> str:
         """
         1. Filter out special tokens: <image> and special tokens marking environment observation in the llm generated response
-        2. Add special tokens to the beginning and end of the response if compute_loss_mask is True
+        2. prep_for_loss_mask: if true, add special tokens to the beginning and end of the response if compute_loss_mask is True
         """
         llm_raw_response = re.sub(r'<image>', '', llm_raw_response)
-        if compute_loss_mask:
+        if prep_for_loss_mask:
             # filtering special tokens for llm_raw_response, then adding them to the beginning and end of the response for loss mask computation
             sptk_b = self.config.sptk_for_loss_mask[0]
             sptk_e = self.config.sptk_for_loss_mask[1]
@@ -81,6 +81,7 @@ class QwenVLRolloutManger():
             image_inputs = self.processor.image_processor(image_data, return_tensors='pt')
             image_grid_thw = image_inputs['image_grid_thw']
             row_dict['multi_modal_inputs'] = {key: val for key, val in image_inputs.items()}
+            # print(f"[DEBUG] number of image_data in rollout: {len(image_data)}")
         if image_grid_thw is not None:
             merge_length = self.processor.image_processor.merge_size**2
             index = 0
@@ -95,7 +96,9 @@ class QwenVLRolloutManger():
 
             prompt_template = prompt_template.replace('<|placeholder|>',
                                                         self.processor.image_token)
-        
+            # print(f"[DEBUG] number of image_data in final trajectory: {len(image_data)}")
+            # number_of_image_tokens=prompt_template.count(self.processor.image_token)
+            # print(f"[DEBUG] number_of_image_tokens: {number_of_image_tokens}")
         return prompt_template, row_dict, image_grid_thw, raw_prompt
     
     def _compute_loss_mask(self, input_ids, attention_mask):
@@ -294,6 +297,7 @@ class QwenVLRolloutManger():
                             step: int, 
                             window_size: int = None,
                             is_final: bool = False,
+                            prep_for_loss_mask: bool = False,
         ):
         """
         Given a recording, generate the prompt for MLLM
@@ -305,6 +309,7 @@ class QwenVLRolloutManger():
             window_size: Number of past steps to include in the context
             is_final: Whether the prompt is for the final step 
                 - if True, the end of the chat is from the last assistant's response
+            prep_for_loss_mask: whether to use special token to wrap llm response
         """
         
         assert step >= 0
@@ -318,38 +323,19 @@ class QwenVLRolloutManger():
         env_id = history[0]['env_id']
         chat.append({"role": "system", "content": self.envs[env_id].get_task_instruction()})
 
-        # for i, record in enumerate(history):
-        #     if i>0:
-        #         llm_raw_response = record['info']['llm_raw_response']
-        #         filtered_llm_raw_response = self._handle_special_tokens(llm_raw_response, compute_loss_mask=False)
-        #         chat.append({"role": "assistant", "content": filtered_llm_raw_response})
-        #     if i<len(history)-1 or last_question:
-        #         chat.append({"role": "user", "content": record['text_template']})
-
-        # image_data=[]
-        # for record in history:
-        #     if 'image_data' in record:
-        #         for img in record['image_data']:
-        #             image_data.append(img)
-
         image_data=[]
         for i, record in enumerate(history):
-            if i == 0:
+            if i>0:
+                llm_raw_response = record['info']['llm_raw_response']
+                filtered_llm_raw_response = self._handle_special_tokens(llm_raw_response, prep_for_loss_mask=prep_for_loss_mask)
+                chat.append({"role": "assistant", "content": filtered_llm_raw_response})
+            if i<len(history)-1 or not is_final:
                 chat.append({"role": "user", "content": record['text_template']})
                 if 'image_data' in record:
                     for img in record['image_data']:
                         image_data.append(img)
-            else:
-                llm_raw_response = record['info']['llm_raw_response']
-                filtered_llm_raw_response = self._handle_special_tokens(llm_raw_response, compute_loss_mask=False)
-                chat.append({"role": "assistant", "content": filtered_llm_raw_response})
-                if not is_final:
-                    chat.append({"role": "user", "content": record['text_template']})
-                    if 'image_data' in record:
-                        for img in record['image_data']:
-                            image_data.append(img)
             
-        prompt_with_chat_template = self.tokenizer.apply_chat_template(chat, add_generation_prompt=not is_final, tokenize=False)
+        prompt_with_chat_template = self.tokenizer.apply_chat_template(chat, add_generation_prompt=True, tokenize=False)
         return {
             "prompt": prompt_with_chat_template,
             "image_data": image_data,
@@ -378,7 +364,7 @@ class QwenVLRolloutManger():
                 - position_ids for prompts: rope
                 - rest postion_ids: refer to vllm_rollout_spmd.py to check how to compute
         """
-        rst=self._single_recording_to_prompt(recording, step, window_size, is_final=False)
+        rst=self._single_recording_to_prompt(recording, step, window_size, is_final=False, prep_for_loss_mask=False)
         prompt_with_chat_template=rst['prompt']
         image_data=rst['image_data']        
         has_images = len(image_data) > 0        
@@ -436,7 +422,7 @@ class QwenVLRolloutManger():
         prompt_with_chat_template=self.tokenizer.pad_token 
         
         # handle response
-        response_rst=self._single_recording_to_prompt(recording, step, window_size, is_final=True)
+        response_rst=self._single_recording_to_prompt(recording, step, window_size, is_final=True, prep_for_loss_mask=True)
         response_with_chat_template=response_rst['prompt']
         image_data=response_rst['image_data']
        
@@ -532,7 +518,8 @@ class QwenVLRolloutManger():
         if len(batch) % self.config.n_gpu_per_node != 0:
             # Pad the batch to make it divisible by n_gpu_per_node
             while len(batch) % self.config.n_gpu_per_node != 0:
-                batch.append(batch[-1])
+                # do we need to use copy or not here?
+                batch.append(batch[-1].copy())
         return collate_fn(batch)
     
     
