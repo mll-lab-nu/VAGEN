@@ -5,6 +5,7 @@ import os
 import pandas as pd
 import argparse
 from pathlib import Path
+from typing import Union, List
 
 class DatasetCreator:
 
@@ -16,7 +17,7 @@ class DatasetCreator:
         
         
 
-    def create_dataset(self, start_seed, train_size, test_size, force_gen=False):
+    def create_dataset(self, seed: Union[int, List[int]], train_size, test_size, force_gen=False):
         train_file_path = os.path.join(self.data_dir, 'train.parquet')
         test_file_path = os.path.join(self.data_dir, 'test.parquet')
         
@@ -29,16 +30,12 @@ class DatasetCreator:
         # Ensure data directory exists
         os.makedirs(self.data_dir, exist_ok=True)
         
-        seeds = range(start_seed, start_seed + train_size + test_size)
-        instructions = []
-        for seed in seeds:
-            # Generate instruction based on environment
-            # This is a placeholder - actual implementation would depend on the environment
-            instruction = f"Instruction for seed {seed}"
-            instructions.append(instruction)
+        if isinstance(seed, int):
+            seeds = range(seed, seed + train_size + test_size)
+        else:
+            seeds = seed
             
-        def _create_instance(seed_idx, instruction):
-            split = "train" if seed_idx < start_seed + train_size else "test"
+        def _create_instance(seed_idx, split: str = 'train'):
             env_settings = {
                 'env_name': self.env_name,
                 'env_config': self.env_config,
@@ -48,12 +45,12 @@ class DatasetCreator:
             # TODO: no reward model defined here for the reward will be generated while rollout
             return {
                 "data_source": self.env_name,
-                "prompt": [{"role": "user", "content": instruction}],
+                "prompt": [{"role": "user", "content": ''}],
                 "extra_info": {"split": split, **env_settings}
             }
 
-        train_instances = [_create_instance(start_seed + i, '') for i in range(train_size)]
-        test_instances = [_create_instance(start_seed + train_size + i, '') for i in range(test_size)]
+        train_instances = [_create_instance(seeds[i], split='train') for i in range(train_size)]
+        test_instances = [_create_instance(seeds[train_size + i], split='test') for i in range(test_size)]
         
         train_dataset = Dataset.from_list(train_instances)
         test_dataset = Dataset.from_list(test_instances)

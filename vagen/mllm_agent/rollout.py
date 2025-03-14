@@ -378,10 +378,10 @@ class QwenVLRolloutManger():
 
         # use random input_ids and attention_mask for vllm only takes raw_prompt_ids as input when generating sequences
         # TODO check if this is correct
-        row_dict['input_ids'] = torch.randint(0, 10000, (1024,))
-        row_dict['attention_mask'] = torch.randint(0, 1, (1024,))
-        row_dict['position_ids'] = torch.randint(0, 1024, (1024,))
         row_dict['raw_prompt_ids'] = self.tokenizer.encode(raw_prompt, add_special_tokens=False)
+        row_dict['input_ids'] = torch.tensor([0], dtype=torch.long)
+        row_dict['attention_mask'] = torch.tensor([0], dtype=torch.long)
+        row_dict['position_ids'] = torch.tensor([0], dtype=torch.long)
 
         # add index for each prompt
         index = row_dict.get("extra_info", {}).get("index", 0)
@@ -557,8 +557,9 @@ class QwenVLRolloutManger():
                     raw_prompt_ids_array[i] = raw_prompt_ids[i]
                 else:
                     raw_prompt_ids_array[i] = raw_prompt_ids[i].tolist()
-                # print(f"[DEBUG] raw_prompt_ids_array({i}) length: {len(raw_prompt_ids_array[i])}")
-                # print(f"[DEBUG] raw_prompt_ids_array({i}) content: {self.tokenizer.decode(raw_prompt_ids_array[i])}")
+                # if not i % 4:
+                #     print(f"[DEBUG] raw_prompt_ids_array({i}) length: {len(raw_prompt_ids_array[i])}")
+                #     print(f"[DEBUG] raw_prompt_ids_array({i}) content: {self.tokenizer.decode(raw_prompt_ids_array[i])}")
             gen_batch.non_tensor_batch['raw_prompt_ids'] = raw_prompt_ids_array
             
             output_batch = self.actor_rollout_wg.generate_sequences(gen_batch)

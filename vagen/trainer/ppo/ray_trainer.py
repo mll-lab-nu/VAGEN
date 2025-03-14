@@ -1049,14 +1049,7 @@ class RayPPOTrainer(object):
                         rollout_manager.rollout_loop()
                         final_gen_batch_output = rollout_manager.get_final_trajectory()
 
-                    """ 
-                    DEBUG: seems this will cause assertion error: tensor_dict1[key].equal(tensor_dict2[key]), \
-                        AssertionError: old_log_probs in tensor_dict1 and tensor_dict2 are not the same object
-                        So I commented it out
-                    """
-                    # with torch.no_grad():
-                    #     output = self.actor_rollout_wg.compute_log_prob(final_gen_batch_output)
-                    #     final_gen_batch_output = final_gen_batch_output.union(output)
+                    print(f"[DEBUG] step {self.global_steps} rollout ends")
                     batch.non_tensor_batch['uid'] = np.array([str(uuid.uuid4()) for _ in range(len(batch.batch))],
                                                              dtype=object)
                     # repeat to align with repeated responses in rollout
