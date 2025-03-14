@@ -2,7 +2,7 @@
 
 ```
 conda create -n vagen python=3.10 -y
-git@github.com:JamesKrW/verl.git
+git clone git@github.com:JamesKrW/verl.git
 cd verl
 pip install -e .
 cd ../
