@@ -59,4 +59,6 @@ python3 -m vagen.trainer.main_ppo \
     rollout_manger.window_size=5 \
     trainer.val_before_train=True \
     trainer.val_generations_to_log_to_wandb=5 \
+    # grpo sampling param
+    rollout_manger.n_trajectory=8 \ 
     2>&1 | tee debug_qwen2_5_vl_4gpu_grpo.log

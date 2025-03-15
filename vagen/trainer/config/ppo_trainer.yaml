@@ -193,3 +193,4 @@ rollout_manger:
   window_size: 5
   max_turns: 5
   n_gpus_per_node: ${trainer.n_gpus_per_node}
+  n_trajectory: 1 # >1 for grpo, please set actor_rollout_ref.rollout.n = 1 since we don't use vllm n sample parameter, set it >1 here for grpo agentic setting

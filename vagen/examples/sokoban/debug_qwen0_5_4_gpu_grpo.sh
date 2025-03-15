@@ -61,6 +61,8 @@ python3 -m vagen.trainer.main_ppo \
     rollout_manger.window_size=5 \
     trainer.val_before_train=True \
     trainer.val_generations_to_log_to_wandb=5 \
+    # grpo sampling param
+    rollout_manger.n_trajectory=8 \ 
     2>&1 | tee debug_qwen0_5_4_gpu_grpo.log
 
 # NOTE change gpu_memory_utilization to a smaller value (0.4) to avoid oom error
