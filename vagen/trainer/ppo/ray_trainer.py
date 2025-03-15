@@ -143,7 +143,8 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         response_mask = attention_mask[:, -response_length:]
         token_level_rewards = data.batch['token_level_rewards']
         if "loss_mask" in data.batch.keys():
-            loss_mask = data.batch['loss_mask']
+            # get non zero position of token level rewards
+            loss_mask = data.batch['loss_mask'][:, -response_length:]
             advantages, returns =core_algos.compute_gae_advantage_return_with_loss_mask(token_level_rewards=token_level_rewards,
                                                                     values=values,
                                                                     eos_mask=loss_mask,
@@ -165,7 +166,12 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         attention_mask = data.batch['attention_mask']
         response_mask = attention_mask[:, -response_length:]
         if "loss_mask" in data.batch.keys():
-            loss_mask = data.batch['loss_mask']
+            loss_mask = data.batch['loss_mask'][:, -response_length:]
+            
+            valid_token_level_rewards_positions = token_level_rewards[0].nonzero(as_tuple=True)[0]
+            valid_loss_positions = loss_mask[0].nonzero(as_tuple=True)[0]
+            print(f"[DEBUG]valid_token_level_rewards_positions={valid_token_level_rewards_positions}")
+            print(f"[DEBUG]valid_loss_positions={valid_loss_positions}")
             # seems here only need to replace eos_mask with loss_mask
             advantages, returns = core_algos.compute_grpo_outcome_advantage(token_level_rewards=token_level_rewards,
                                                                         eos_mask=loss_mask,

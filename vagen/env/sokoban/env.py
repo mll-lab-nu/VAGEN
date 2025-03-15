@@ -375,6 +375,8 @@ class SokobanInterface(BaseInterface):
         # deal with format
         if think and answer: # format is correct
             reward += self.FORMAT_REWARD
+        else:
+            reward -= self.FORMAT_REWARD*0.1
 
         info = {}
         for action, valid in zip(action_list, valid_list):

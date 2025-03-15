@@ -22,7 +22,7 @@ python3 -m vagen.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     data.train_files=data/sokoban-text-1-step/train.parquet \
     data.val_files=data/sokoban-text-1-step/test.parquet \
-    data.train_batch_size=128 \
+    data.train_batch_size=16 \
     data.max_prompt_length=1024 \
     data.max_response_length=128 \
     data.max_trajectory_length=1024 \
@@ -30,7 +30,7 @@ python3 -m vagen.trainer.main_ppo \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-0.5B-Instruct \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=False \
-    actor_rollout_ref.actor.ppo_mini_batch_size=32 \
+    actor_rollout_ref.actor.ppo_mini_batch_size=128 \
     actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=1 \
     actor_rollout_ref.actor.use_kl_loss=True \
     actor_rollout_ref.actor.kl_loss_coef=0.001 \
@@ -41,7 +41,7 @@ python3 -m vagen.trainer.main_ppo \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.name=vllm \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.4 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.3 \
     actor_rollout_ref.rollout.enable_chunked_prefill=False \
     actor_rollout_ref.rollout.enforce_eager=False \
     actor_rollout_ref.rollout.free_cache_engine=False \
@@ -62,6 +62,5 @@ python3 -m vagen.trainer.main_ppo \
     rollout_manger.window_size=5 \
     trainer.val_before_train=True \
     trainer.val_generations_to_log_to_wandb=5 \
-    # grpo sampling param
-    rollout_manger.n_trajectory=8 \ 
+    rollout_manger.n_trajectory=8 \
     2>&1 | tee debug_qwen0_5_1_gpu_grpo.log
