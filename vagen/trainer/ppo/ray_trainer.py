@@ -165,6 +165,9 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         response_length = responses.size(-1)
         attention_mask = data.batch['attention_mask']
         response_mask = attention_mask[:, -response_length:]
+        
+        
+        
         if "loss_mask" in data.batch.keys():
             loss_mask = data.batch['loss_mask'][:, -response_length:]
             
@@ -583,8 +586,8 @@ class RayPPOTrainer(object):
             self.config.actor_rollout_ref.actor.optim.total_training_steps = total_training_steps
             self.config.critic.optim.total_training_steps = total_training_steps
 
-    def _maybe_log_val_generations_to_wandb(self, inputs, outputs, scores):
-        """Log a table of validation samples to wandb"""
+    def _maybe_log_val_generations_to_wandb(self, inputs, outputs, scores, images=None):
+        """Log a table of validation samples with multiple images per sample to wandb"""
 
         generations_to_log = self.config.trainer.val_generations_to_log_to_wandb
 
@@ -592,15 +595,24 @@ class RayPPOTrainer(object):
             return
 
         if generations_to_log > 0 and 'wandb' not in self.config.trainer.logger:
-            print(
-                'WARNING: `val_generations_to_log_to_wandb` is set to a positive value, but no wandb logger is found. ')
+            print('WARNING: `val_generations_to_log_to_wandb` is set to a positive value, but no wandb logger is found. ')
             return
 
         import wandb
         import numpy as np
 
-        # Create tuples of (input, output, score) and sort by input text
-        samples = list(zip(inputs, outputs, scores))
+        # Handle the case where images might not be provided
+        if images is None:
+            samples = list(zip(inputs, outputs, scores))
+            has_images = False
+            max_images_per_sample = 0
+        else:
+            # Here, images is expected to be a list of lists, where each inner list contains images for one sample
+            samples = list(zip(inputs, outputs, scores, images))
+            has_images = True
+            # Find maximum number of images in any sample
+            max_images_per_sample = max(len(img_list) if isinstance(img_list, (list, tuple)) else 1 for img_list in images)
+
         samples.sort(key=lambda x: x[0])  # Sort by input text
 
         # Use fixed random seed for deterministic shuffling
@@ -611,27 +623,102 @@ class RayPPOTrainer(object):
         samples = samples[:generations_to_log]
 
         # Create column names for all samples
-        columns = ["step"] + sum([[f"input_{i+1}", f"output_{i+1}", f"score_{i+1}"] for i in range(len(samples))], [])
+        if has_images:
+            columns = ["step"]
+            for i in range(len(samples)):
+                columns.extend([f"input_{i+1}", f"output_{i+1}", f"score_{i+1}"])
+                columns.extend([f"image_{i+1}_{j+1}" for j in range(max_images_per_sample)])
+        else:
+            columns = ["step"] + sum([[f"input_{i+1}", f"output_{i+1}", f"score_{i+1}"] for i in range(len(samples))], [])
 
         if not hasattr(self, 'validation_table'):
             # Initialize the table on first call
             self.validation_table = wandb.Table(columns=columns)
 
         # Create a new table with same columns and existing data
-        # Workaround for https://github.com/wandb/wandb/issues/2981#issuecomment-1997445737
         new_table = wandb.Table(columns=columns, data=self.validation_table.data)
 
         # Add new row with all data
         row_data = []
         row_data.append(self.global_steps)
+        
         for sample in samples:
-            row_data.extend(sample)
+            if has_images:
+                input_text, output_text, score, sample_images = sample
+                row_data.extend([input_text, output_text, score])
+                
+                # Handle if sample_images is a single image or list of images
+                if not isinstance(sample_images, (list, tuple)):
+                    sample_images = [sample_images]
+                    
+                # Convert each image to wandb.Image
+                wandb_images = []
+                for img in sample_images:
+                    if not isinstance(img, wandb.Image):
+                        img = wandb.Image(img)
+                    wandb_images.append(img)
+                    
+                # Pad with None if there are fewer images than max_images_per_sample
+                wandb_images.extend([None] * (max_images_per_sample - len(wandb_images)))
+                row_data.extend(wandb_images)
+            else:
+                row_data.extend(sample)
 
         new_table.add_data(*row_data)
 
         # Update reference and log
         wandb.log({"val/generations": new_table}, step=self.global_steps)
         self.validation_table = new_table
+    
+    # def _maybe_log_val_generations_to_wandb(self, inputs, outputs, scores):
+    #     """Log a table of validation samples to wandb"""
+
+    #     generations_to_log = self.config.trainer.val_generations_to_log_to_wandb
+
+    #     if generations_to_log == 0:
+    #         return
+
+    #     if generations_to_log > 0 and 'wandb' not in self.config.trainer.logger:
+    #         print(
+    #             'WARNING: `val_generations_to_log_to_wandb` is set to a positive value, but no wandb logger is found. ')
+    #         return
+
+    #     import wandb
+    #     import numpy as np
+
+    #     # Create tuples of (input, output, score) and sort by input text
+    #     samples = list(zip(inputs, outputs, scores))
+    #     samples.sort(key=lambda x: x[0])  # Sort by input text
+
+    #     # Use fixed random seed for deterministic shuffling
+    #     rng = np.random.RandomState(42)
+    #     rng.shuffle(samples)
+
+    #     # Take first N samples after shuffling
+    #     samples = samples[:generations_to_log]
+
+    #     # Create column names for all samples
+    #     columns = ["step"] + sum([[f"input_{i+1}", f"output_{i+1}", f"score_{i+1}"] for i in range(len(samples))], [])
+
+    #     if not hasattr(self, 'validation_table'):
+    #         # Initialize the table on first call
+    #         self.validation_table = wandb.Table(columns=columns)
+
+    #     # Create a new table with same columns and existing data
+    #     # Workaround for https://github.com/wandb/wandb/issues/2981#issuecomment-1997445737
+    #     new_table = wandb.Table(columns=columns, data=self.validation_table.data)
+
+    #     # Add new row with all data
+    #     row_data = []
+    #     row_data.append(self.global_steps)
+    #     for sample in samples:
+    #         row_data.extend(sample)
+
+    #     new_table.add_data(*row_data)
+
+    #     # Update reference and log
+    #     wandb.log({"val/generations": new_table}, step=self.global_steps)
+    #     self.validation_table = new_table
     
     # Agentic Setting _validate
     def _validate(self):
@@ -640,7 +727,7 @@ class RayPPOTrainer(object):
         sample_inputs = []
         sample_outputs = []
         sample_scores = []
-
+        sample_images = []
         if self.test_rollout_config==None:
             self.test_rollout_config = QwenVLRolloutConifg(
                 max_trajectory_length=self.config.rollout_manger.max_trajectory_length,
@@ -682,12 +769,13 @@ class RayPPOTrainer(object):
             
             self.test_rollout_manager.reset(env_configs)
             self.test_rollout_manager.rollout_loop()
-            inputs, outputs, scores = self.test_rollout_manager.recording_to_log() # data source == inputs in our current setting, outputs=whole trjecotry
+            inputs, outputs, scores,images = self.test_rollout_manager.recording_to_log() # data source == inputs in our current setting, outputs=whole trjecotry
             sample_inputs.extend(inputs)
             sample_outputs.extend(outputs)
             sample_scores.extend(scores)
+            sample_images.extend(images)
         
-        self._maybe_log_val_generations_to_wandb(inputs=sample_inputs, outputs=sample_outputs, scores=sample_scores)
+        self._maybe_log_val_generations_to_wandb(inputs=sample_inputs, outputs=sample_outputs, scores=sample_scores, images=sample_images)
         metric_dict = {}
         data_source_reward = defaultdict(list)
         for data_source, scores in zip(sample_inputs, sample_scores):
@@ -1035,8 +1123,12 @@ class RayPPOTrainer(object):
                             batch = batch.union(reward_tensor)
 
                         # we combine with rule-based rm
-                        reward_tensor = self.reward_fn(batch)
-                        batch.batch['token_level_scores'] = reward_tensor
+                        #reward_tensor = self.reward_fn(batch)
+                        #batch.batch['token_level_scores'] = reward_tensor Now let's try to use mutli-turn token level reward
+                        # TODO: use a new reward_fn to combine the results from reward model and rule-based multi-turn token reward.
+                        response_len=batch.batch['responses'].shape[1]
+                        batch.batch['token_level_scores'] = batch.batch['multi_turn_token_level_reward'][:,-response_len:]
+                
 
                         # compute rewards. apply_kl_penalty if available
                         if not self.config.actor_rollout_ref.actor.get('use_kl_loss', False):

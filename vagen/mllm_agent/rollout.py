@@ -114,7 +114,8 @@ class QwenVLRolloutManger():
         Returns:
             input_ids: (batch_size, seq_len)
             attention_mask: (batch_size, seq_len)
-            loss_mask: (batch_size, seq_len)
+            loss_mask: (batch_size, seq_len) # e.g. 0000|1111|0000|11111|000|1111
+            token_level_reward_mask: (batch_size, seq_len) # e.g. 0000|0001|0000|00001|000|0001 given the loss mask, mark the position which will be given step reward
         
         - There will be different stratgy to handel special tokens in the input_ids
         - 1. remove them, in this case we need to fill the hole by adding pad in the right and shift the sequence left
@@ -141,6 +142,8 @@ class QwenVLRolloutManger():
         new_attention_mask = attention_mask.clone()
         loss_mask = torch.zeros_like(input_ids)
         new_loss_mask = torch.zeros_like(input_ids)
+        token_level_reward_mask = torch.zeros_like(input_ids)
+        new_token_level_reward_mask = torch.zeros_like(input_ids)
         # Process each example in the batch
         for b in range(batch_size):
             # Count right padding tokens using attention mask
@@ -157,6 +160,7 @@ class QwenVLRolloutManger():
             hole_pos=[] # initialize holes position list with last padding token position
             for start_pos, end_pos in zip(sptk_b_indices, sptk_e_indices):
                 loss_mask[b][start_pos+1:end_pos] = 1
+                token_level_reward_mask[b][end_pos-1] = 1
                 hole_pos.append(start_pos.item())
                 hole_pos.append(end_pos.item())
             hole_pos.append(seq_len-right_pad_tokens)
@@ -168,6 +172,7 @@ class QwenVLRolloutManger():
                 start_pos = hole_pos[i]
                 end_pos = hole_pos[i+1]
                 new_loss_mask[b,start_pos+1-holes_to_fill:end_pos-holes_to_fill]=loss_mask[b,start_pos+1:end_pos]
+                new_token_level_reward_mask[b,start_pos+1-holes_to_fill:end_pos-holes_to_fill]=token_level_reward_mask[b,start_pos+1:end_pos]
                 new_input_ids[b,start_pos+1-holes_to_fill:end_pos-holes_to_fill]=input_ids[b,start_pos+1:end_pos]
                 new_attention_mask[b,start_pos+1-holes_to_fill:end_pos-holes_to_fill]=attention_mask[b,start_pos+1:end_pos]
                 holes_to_fill+=1
@@ -176,8 +181,8 @@ class QwenVLRolloutManger():
             new_loss_mask[b][valid_tokens:]=0
             new_input_ids[b][valid_tokens:]=pad_token_id
             new_attention_mask[b][valid_tokens:]=0
-            
-        return new_input_ids, new_attention_mask, new_loss_mask
+        
+        return new_input_ids, new_attention_mask, new_loss_mask, new_token_level_reward_mask
     
         
     def reset(self, env_configs: List[EnvConfig]):
@@ -310,6 +315,9 @@ class QwenVLRolloutManger():
             is_final: Whether the prompt is for the final step 
                 - if True, the end of the chat is from the last assistant's response
             prep_for_loss_mask: whether to use special token to wrap llm response
+            
+        Returns:
+            dict: prompt_with_chat_template : str, image_data: list of images, reward: list of reward
         """
         
         assert step >= 0
@@ -317,7 +325,7 @@ class QwenVLRolloutManger():
         end_step = step
         assert len(recording) >= end_step + 1, 'History length is not enough'
         history = recording[start_step: end_step + 1]
-
+        rewards=[]
         chat = []
         
         env_id = history[0]['env_id']
@@ -329,6 +337,7 @@ class QwenVLRolloutManger():
                 llm_raw_response = record['info']['llm_raw_response']
                 filtered_llm_raw_response = self._handle_special_tokens(llm_raw_response, prep_for_loss_mask=prep_for_loss_mask)
                 chat.append({"role": "assistant", "content": filtered_llm_raw_response})
+                rewards.append(record['reward'])
             if i<len(history)-1 or not is_final:
                 chat.append({"role": "user", "content": record['text_template']})
                 if 'image_data' in record:
@@ -339,6 +348,7 @@ class QwenVLRolloutManger():
         return {
             "prompt": prompt_with_chat_template,
             "image_data": image_data,
+            "rewards": rewards,
         }
         
     def _generate_input_item(
@@ -425,6 +435,7 @@ class QwenVLRolloutManger():
         response_rst=self._single_recording_to_prompt(recording, step, window_size, is_final=True, prep_for_loss_mask=True)
         response_with_chat_template=response_rst['prompt']
         image_data=response_rst['image_data']
+        rewards=response_rst['rewards']
        
         has_images = len(image_data) > 0
         row_dict = {}
@@ -448,16 +459,22 @@ class QwenVLRolloutManger():
         attention_mask_prompt=torch.zeros_like(input_ids_prompt) # All prompt will be masked
         
         
-        input_ids_response, attention_mask_response, loss_mask_response = self._compute_loss_mask(input_ids_response, attention_mask_response)
+        input_ids_response, attention_mask_response, loss_mask_response,token_level_reward_mask_response = self._compute_loss_mask(input_ids_response, attention_mask_response)
         
         input_ids_prompt=input_ids_prompt[0]
         attention_mask_prompt=attention_mask_prompt[0]
+        loss_mask_prompt = torch.zeros_like(attention_mask_prompt)
+        token_level_reward_mask_prompt = torch.zeros_like(attention_mask_prompt)
+        
         input_ids_response=input_ids_response[0]
         attention_mask_response=attention_mask_response[0]
         loss_mask_response=loss_mask_response[0]
-        loss_mask_prompt = torch.zeros_like(attention_mask_prompt)
+        token_level_reward_mask_response=token_level_reward_mask_response[0]
+        
+    
         
         loss_mask = torch.cat([loss_mask_prompt, loss_mask_response], dim=-1)
+        token_level_reward_mask = torch.cat([token_level_reward_mask_prompt, token_level_reward_mask_response], dim=-1)
         input_ids = torch.cat([input_ids_prompt, input_ids_response], dim=-1)
         attention_mask = torch.cat([attention_mask_prompt, attention_mask_response], dim=-1)
 
@@ -479,6 +496,12 @@ class QwenVLRolloutManger():
             delta_position_id = torch.arange(1, response_length + 1, device=position_ids_prompt.device)
             position_ids_response = position_ids_prompt[-1:] + delta_position_id
         
+        reward_positions = torch.nonzero(token_level_reward_mask).squeeze(-1)
+        multi_turn_token_level_reward = torch.zeros_like(token_level_reward_mask, dtype=torch.float)
+        assert len(reward_positions) == len(rewards), "Number of rewards does not match number of reward positions"
+        for idx,reward in enumerate(rewards):
+            multi_turn_token_level_reward[reward_positions[idx]] = reward
+            
         position_ids = torch.cat([position_ids_prompt, position_ids_response], dim=-1)
         row_dict['prompts'] = input_ids_prompt
         row_dict['responses'] = input_ids_response
@@ -488,6 +511,7 @@ class QwenVLRolloutManger():
         row_dict['loss_mask'] = loss_mask
         index = row_dict.get("extra_info", {}).get("index", 0)
         row_dict["index"] = index
+        row_dict["multi_turn_token_level_reward"] = multi_turn_token_level_reward # (seq_len) later need to convert to (response_len)
         return row_dict
 
 
@@ -576,9 +600,9 @@ class QwenVLRolloutManger():
             responses_str = self.tokenizer.batch_decode(
                 output_batch.batch['responses'], 
                 skip_special_tokens=True
-            )
+            ) # seems here will remove special token like "<|im_end|>"
             
-            for batch_idx, env_id in self.batch_idx_to_env_id.items(): # TODO whether multiple actions in one rollout are considered here
+            for batch_idx, env_id in self.batch_idx_to_env_id.items(): 
                 obs, reward, done, info = self.envs[env_id].step(responses_str[batch_idx])
                 self.env_states[env_id]['step'] += 1
                 self.env_states[env_id]['done'] = done
@@ -625,13 +649,14 @@ class QwenVLRolloutManger():
         inputs=[]
         outputs=[]
         scores=[]
+        images=[]
         for k,v in self.recorder.items():
             step=self.env_states[k]['step']
             input_str=self.envs[k].name_repr()+self.envs[k].config_repr(self.envs[k].env_config)
-            ouput_rst=self._single_recording_to_prompt(v, step, window_size=None, is_final=True)
-            output_str=ouput_rst['prompt']
+            ouput_rst=self._single_recording_to_prompt(v, step, window_size=None, is_final=False) # we should see the last obs 
             score=self.envs[k].get_traj_reward()
             inputs.append(input_str)
-            outputs.append(output_str)
+            outputs.append(ouput_rst['prompt'])
             scores.append(score)
-        return inputs,outputs,scores
+            images.append(ouput_rst['image_data'])
+        return inputs,outputs,scores,images

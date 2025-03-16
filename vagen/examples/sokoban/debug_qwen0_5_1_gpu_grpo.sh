@@ -61,6 +61,6 @@ python3 -m vagen.trainer.main_ppo \
     rollout_manger.max_turns=1 \
     rollout_manger.window_size=5 \
     trainer.val_before_train=True \
-    trainer.val_generations_to_log_to_wandb=5 \
+    trainer.val_generations_to_log_to_wandb=2 \
     rollout_manger.n_trajectory=8 \
     2>&1 | tee debug_qwen0_5_1_gpu_grpo.log
