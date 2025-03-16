@@ -47,10 +47,13 @@ Move: -0.1
 Box on target: +1.0
 All boxes placed: +10.0
 
-Include your thought in <think> </think> tags and your final answer in <answer> </answer> tags.
-Your response should be like: <think> [Your thought] </think> <answer> [Your answer] </answer>
+Please think step by step and provide the action you want to take.
+Your reponse should be in the format of <think>...</think><answer>...</answer>
+E.g. <think> There's a box on the upper left of me, I need to push it upward. </think><answer> Right,Up,Up </answer>
 """
-
+# Let's try to use a format reward and answer reward
+# If the reponse provides a final answer and is corect, the model receives an accurtacy reward of +1
+# is the response encloses its thinking in <think></think> and the final answer is <answer></answer> tags, the model receives a format reward of +1
 
 
 
@@ -58,6 +61,7 @@ init_observation_template = """
 [Initial Observation]:
 {observation}
 Decide your next action.
+Your reponse should be in the format of <think>...</think><answer>...</answer>
 """
 
 action_template = """After you answer {answer}, the extracted valid action is {valid_action}.\
@@ -65,6 +69,8 @@ After that, the observation is:
 {observation}
 reward: {reward}
 done: {done}
+Decide your next action.
+Your reponse should be in the format of <think>...</think><answer>...</answer>
 """
 
 
@@ -375,6 +381,8 @@ class SokobanInterface(BaseInterface):
         # deal with format
         if think and answer: # format is correct
             reward += self.FORMAT_REWARD
+        else:
+            reward -= self.FORMAT_REWARD*0.1
 
         info = {}
         for action, valid in zip(action_list, valid_list):

@@ -142,11 +142,20 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         attention_mask = data.batch['attention_mask']
         response_mask = attention_mask[:, -response_length:]
         token_level_rewards = data.batch['token_level_rewards']
-        advantages, returns = core_algos.compute_gae_advantage_return(token_level_rewards=token_level_rewards,
-                                                                      values=values,
-                                                                      eos_mask=response_mask,
-                                                                      gamma=gamma,
-                                                                      lam=lam)
+        if "loss_mask" in data.batch.keys():
+            # get non zero position of token level rewards
+            loss_mask = data.batch['loss_mask'][:, -response_length:]
+            advantages, returns =core_algos.compute_gae_advantage_return_with_loss_mask(token_level_rewards=token_level_rewards,
+                                                                    values=values,
+                                                                    eos_mask=loss_mask,
+                                                                    gamma=gamma,
+                                                                    lam=lam)
+        else:
+            advantages, returns = core_algos.compute_gae_advantage_return(token_level_rewards=token_level_rewards,
+                                                                        values=values,
+                                                                        eos_mask=response_mask,
+                                                                        gamma=gamma,
+                                                                        lam=lam)
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
     elif adv_estimator == AdvantageEstimator.GRPO:
@@ -156,9 +165,24 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         response_length = responses.size(-1)
         attention_mask = data.batch['attention_mask']
         response_mask = attention_mask[:, -response_length:]
-        advantages, returns = core_algos.compute_grpo_outcome_advantage(token_level_rewards=token_level_rewards,
-                                                                        eos_mask=response_mask,
+        
+        
+        
+        if "loss_mask" in data.batch.keys():
+            loss_mask = data.batch['loss_mask'][:, -response_length:]
+            
+            valid_token_level_rewards_positions = token_level_rewards[0].nonzero(as_tuple=True)[0]
+            valid_loss_positions = loss_mask[0].nonzero(as_tuple=True)[0]
+            print(f"[DEBUG]valid_token_level_rewards_positions={valid_token_level_rewards_positions}")
+            print(f"[DEBUG]valid_loss_positions={valid_loss_positions}")
+            # seems here only need to replace eos_mask with loss_mask
+            advantages, returns = core_algos.compute_grpo_outcome_advantage(token_level_rewards=token_level_rewards,
+                                                                        eos_mask=loss_mask,
                                                                         index=index)
+        else:
+            advantages, returns = core_algos.compute_grpo_outcome_advantage(token_level_rewards=token_level_rewards,
+                                                                            eos_mask=response_mask,
+                                                                            index=index)
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
     elif adv_estimator == AdvantageEstimator.REINFORCE_PLUS_PLUS:
@@ -562,8 +586,8 @@ class RayPPOTrainer(object):
             self.config.actor_rollout_ref.actor.optim.total_training_steps = total_training_steps
             self.config.critic.optim.total_training_steps = total_training_steps
 
-    def _maybe_log_val_generations_to_wandb(self, inputs, outputs, scores):
-        """Log a table of validation samples to wandb"""
+    def _maybe_log_val_generations_to_wandb(self, inputs, outputs, scores, images=None):
+        """Log a table of validation samples with multiple images per sample to wandb"""
 
         generations_to_log = self.config.trainer.val_generations_to_log_to_wandb
 
@@ -571,15 +595,24 @@ class RayPPOTrainer(object):
             return
 
         if generations_to_log > 0 and 'wandb' not in self.config.trainer.logger:
-            print(
-                'WARNING: `val_generations_to_log_to_wandb` is set to a positive value, but no wandb logger is found. ')
+            print('WARNING: `val_generations_to_log_to_wandb` is set to a positive value, but no wandb logger is found. ')
             return
 
         import wandb
         import numpy as np
 
-        # Create tuples of (input, output, score) and sort by input text
-        samples = list(zip(inputs, outputs, scores))
+        # Handle the case where images might not be provided
+        if images is None:
+            samples = list(zip(inputs, outputs, scores))
+            has_images = False
+            max_images_per_sample = 0
+        else:
+            # Here, images is expected to be a list of lists, where each inner list contains images for one sample
+            samples = list(zip(inputs, outputs, scores, images))
+            has_images = True
+            # Find maximum number of images in any sample
+            max_images_per_sample = max(len(img_list) if isinstance(img_list, (list, tuple)) else 1 for img_list in images)
+
         samples.sort(key=lambda x: x[0])  # Sort by input text
 
         # Use fixed random seed for deterministic shuffling
@@ -590,112 +623,102 @@ class RayPPOTrainer(object):
         samples = samples[:generations_to_log]
 
         # Create column names for all samples
-        columns = ["step"] + sum([[f"input_{i+1}", f"output_{i+1}", f"score_{i+1}"] for i in range(len(samples))], [])
+        if has_images:
+            columns = ["step"]
+            for i in range(len(samples)):
+                columns.extend([f"input_{i+1}", f"output_{i+1}", f"score_{i+1}"])
+                columns.extend([f"image_{i+1}_{j+1}" for j in range(max_images_per_sample)])
+        else:
+            columns = ["step"] + sum([[f"input_{i+1}", f"output_{i+1}", f"score_{i+1}"] for i in range(len(samples))], [])
 
         if not hasattr(self, 'validation_table'):
             # Initialize the table on first call
             self.validation_table = wandb.Table(columns=columns)
 
         # Create a new table with same columns and existing data
-        # Workaround for https://github.com/wandb/wandb/issues/2981#issuecomment-1997445737
         new_table = wandb.Table(columns=columns, data=self.validation_table.data)
 
         # Add new row with all data
         row_data = []
         row_data.append(self.global_steps)
+        
         for sample in samples:
-            row_data.extend(sample)
+            if has_images:
+                input_text, output_text, score, sample_images = sample
+                row_data.extend([input_text, output_text, score])
+                
+                # Handle if sample_images is a single image or list of images
+                if not isinstance(sample_images, (list, tuple)):
+                    sample_images = [sample_images]
+                    
+                # Convert each image to wandb.Image
+                wandb_images = []
+                for img in sample_images:
+                    if not isinstance(img, wandb.Image):
+                        img = wandb.Image(img)
+                    wandb_images.append(img)
+                    
+                # Pad with None if there are fewer images than max_images_per_sample
+                wandb_images.extend([None] * (max_images_per_sample - len(wandb_images)))
+                row_data.extend(wandb_images)
+            else:
+                row_data.extend(sample)
 
         new_table.add_data(*row_data)
 
         # Update reference and log
         wandb.log({"val/generations": new_table}, step=self.global_steps)
         self.validation_table = new_table
-
     
-    # Original _validate
-    # def _validate(self):
-    #     reward_tensor_lst = []
-    #     data_source_lst = []
+    # def _maybe_log_val_generations_to_wandb(self, inputs, outputs, scores):
+    #     """Log a table of validation samples to wandb"""
 
-    #     # Lists to collect samples for the table
-    #     sample_inputs = []
-    #     sample_outputs = []
-    #     sample_scores = []
+    #     generations_to_log = self.config.trainer.val_generations_to_log_to_wandb
 
-    #     for test_data in self.val_dataloader:
-    #         test_batch = DataProto.from_single_dict(test_data)
+    #     if generations_to_log == 0:
+    #         return
 
-    #         # we only do validation on rule-based rm
-    #         if self.config.reward_model.enable and test_batch[0].non_tensor_batch['reward_model']['style'] == 'model':
-    #             return {}
+    #     if generations_to_log > 0 and 'wandb' not in self.config.trainer.logger:
+    #         print(
+    #             'WARNING: `val_generations_to_log_to_wandb` is set to a positive value, but no wandb logger is found. ')
+    #         return
 
-    #         # Store original inputs
-    #         input_ids = test_batch.batch['input_ids']
-    #         input_texts = [self.tokenizer.decode(ids, skip_special_tokens=True) for ids in input_ids]
-    #         sample_inputs.extend(input_texts)
+    #     import wandb
+    #     import numpy as np
 
-    #         if 'multi_modal_inputs' in test_batch.non_tensor_batch.keys():
-    #             test_gen_batch = test_batch.pop(
-    #                 batch_keys=['input_ids', 'attention_mask', 'position_ids'],
-    #                 non_tensor_batch_keys=['raw_prompt_ids', 'multi_modal_data', 'multi_modal_inputs'],
-    #             )
-    #         else:
-    #             test_gen_batch = test_batch.pop(
-    #                 batch_keys=['input_ids', 'attention_mask', 'position_ids'],
-    #                 non_tensor_batch_keys=['raw_prompt_ids'],
-    #             )
+    #     # Create tuples of (input, output, score) and sort by input text
+    #     samples = list(zip(inputs, outputs, scores))
+    #     samples.sort(key=lambda x: x[0])  # Sort by input text
 
-    #         test_gen_batch.meta_info = {
-    #             'eos_token_id': self.tokenizer.eos_token_id,
-    #             'pad_token_id': self.tokenizer.pad_token_id,
-    #             'recompute_log_prob': False,
-    #             'do_sample': False,
-    #             'validate': True,
-    #         }
+    #     # Use fixed random seed for deterministic shuffling
+    #     rng = np.random.RandomState(42)
+    #     rng.shuffle(samples)
 
-    #         # pad to be divisible by dp_size
-    #         test_gen_batch_padded, pad_size = pad_dataproto_to_divisor(test_gen_batch, self.actor_rollout_wg.world_size)
-    #         test_output_gen_batch_padded = self.actor_rollout_wg.generate_sequences(test_gen_batch_padded)
-    #         # unpad
-    #         test_output_gen_batch = unpad_dataproto(test_output_gen_batch_padded, pad_size=pad_size)
-    #         print('validation generation end')
+    #     # Take first N samples after shuffling
+    #     samples = samples[:generations_to_log]
 
-    #         # Store generated outputs
-    #         output_ids = test_output_gen_batch.batch['responses']
-    #         output_texts = [self.tokenizer.decode(ids, skip_special_tokens=True) for ids in output_ids]
-    #         sample_outputs.extend(output_texts)
+    #     # Create column names for all samples
+    #     columns = ["step"] + sum([[f"input_{i+1}", f"output_{i+1}", f"score_{i+1}"] for i in range(len(samples))], [])
 
-    #         test_batch = test_batch.union(test_output_gen_batch)
+    #     if not hasattr(self, 'validation_table'):
+    #         # Initialize the table on first call
+    #         self.validation_table = wandb.Table(columns=columns)
 
-    #         # evaluate using reward_function
-    #         reward_tensor = self.val_reward_fn(test_batch)
+    #     # Create a new table with same columns and existing data
+    #     # Workaround for https://github.com/wandb/wandb/issues/2981#issuecomment-1997445737
+    #     new_table = wandb.Table(columns=columns, data=self.validation_table.data)
 
-    #         # Store scores
-    #         scores = reward_tensor.sum(-1).cpu().tolist()
-    #         sample_scores.extend(scores)
+    #     # Add new row with all data
+    #     row_data = []
+    #     row_data.append(self.global_steps)
+    #     for sample in samples:
+    #         row_data.extend(sample)
 
-    #         reward_tensor_lst.append(reward_tensor)
-    #         data_source_lst.append(test_batch.non_tensor_batch.get('data_source', ['unknown'] * reward_tensor.shape[0]))
+    #     new_table.add_data(*row_data)
 
-    #     self._maybe_log_val_generations_to_wandb(inputs=sample_inputs, outputs=sample_outputs, scores=sample_scores)
-
-    #     reward_tensor = torch.cat(reward_tensor_lst, dim=0).sum(-1).cpu()  # (batch_size,)
-    #     data_sources = np.concatenate(data_source_lst, axis=0)
-
-    #     # evaluate test_score based on data source
-    #     data_source_reward = {}
-    #     for i in range(reward_tensor.shape[0]):
-    #         data_source = data_sources[i]
-    #         if data_source not in data_source_reward:
-    #             data_source_reward[data_source] = []
-    #         data_source_reward[data_source].append(reward_tensor[i].item())
-
-    #     metric_dict = {}
-    #     for data_source, rewards in data_source_reward.items():
-    #         metric_dict[f'val/test_score/{data_source}'] = np.mean(rewards)
-
-    #     return metric_dict
+    #     # Update reference and log
+    #     wandb.log({"val/generations": new_table}, step=self.global_steps)
+    #     self.validation_table = new_table
     
     # Agentic Setting _validate
     def _validate(self):
@@ -704,7 +727,7 @@ class RayPPOTrainer(object):
         sample_inputs = []
         sample_outputs = []
         sample_scores = []
-
+        sample_images = []
         if self.test_rollout_config==None:
             self.test_rollout_config = QwenVLRolloutConifg(
                 max_trajectory_length=self.config.rollout_manger.max_trajectory_length,
@@ -746,12 +769,13 @@ class RayPPOTrainer(object):
             
             self.test_rollout_manager.reset(env_configs)
             self.test_rollout_manager.rollout_loop()
-            inputs, outputs, scores = self.test_rollout_manager.recording_to_log() # data source == inputs in our current setting, outputs=whole trjecotry
+            inputs, outputs, scores,images = self.test_rollout_manager.recording_to_log() # data source == inputs in our current setting, outputs=whole trjecotry
             sample_inputs.extend(inputs)
             sample_outputs.extend(outputs)
             sample_scores.extend(scores)
+            sample_images.extend(images)
         
-        self._maybe_log_val_generations_to_wandb(inputs=sample_inputs, outputs=sample_outputs, scores=sample_scores)
+        self._maybe_log_val_generations_to_wandb(inputs=sample_inputs, outputs=sample_outputs, scores=sample_scores, images=sample_images)
         metric_dict = {}
         data_source_reward = defaultdict(list)
         for data_source, scores in zip(sample_inputs, sample_scores):
@@ -1034,6 +1058,12 @@ class RayPPOTrainer(object):
 
                 #             del gen_baseline_batch, gen_baseline_output
 
+                
+                # We control grpo sampling param here
+                batch.non_tensor_batch['uid'] = np.array([str(uuid.uuid4()) for _ in range(len(batch.batch))],dtype=object)
+                batch = batch.repeat(repeat_times=self.config.rollout_manger.n_trajectory, interleave=True)
+                
+                    
                 env_configs = [
                     EnvConfig(env_name=batch.non_tensor_batch['extra_info'][i]['env_name'],
                               env_config=batch.non_tensor_batch['extra_info'][i]['env_config'],
@@ -1050,10 +1080,12 @@ class RayPPOTrainer(object):
                         final_gen_batch_output = rollout_manager.get_final_trajectory()
 
                     print(f"[DEBUG] step {self.global_steps} rollout ends")
-                    batch.non_tensor_batch['uid'] = np.array([str(uuid.uuid4()) for _ in range(len(batch.batch))],
-                                                             dtype=object)
-                    # repeat to align with repeated responses in rollout
-                    batch = batch.repeat(repeat_times=self.config.actor_rollout_ref.rollout.n, interleave=True)
+                    
+                    # This is moved to before rollout because we don't use vllm n sample param for grpo due to multi-turn nature of our method
+                    # batch.non_tensor_batch['uid'] = np.array([str(uuid.uuid4()) for _ in range(len(batch.batch))],
+                    #                                          dtype=object)
+                    # # repeat to align with repeated responses in rollout
+                    # batch = batch.repeat(repeat_times=self.config.actor_rollout_ref.rollout.n, interleave=True)
                     batch = batch.union(final_gen_batch_output)
 
                     # balance the number of valid tokens on each dp rank.
@@ -1091,8 +1123,12 @@ class RayPPOTrainer(object):
                             batch = batch.union(reward_tensor)
 
                         # we combine with rule-based rm
-                        reward_tensor = self.reward_fn(batch)
-                        batch.batch['token_level_scores'] = reward_tensor
+                        #reward_tensor = self.reward_fn(batch)
+                        #batch.batch['token_level_scores'] = reward_tensor Now let's try to use mutli-turn token level reward
+                        # TODO: use a new reward_fn to combine the results from reward model and rule-based multi-turn token reward.
+                        response_len=batch.batch['responses'].shape[1]
+                        batch.batch['token_level_scores'] = batch.batch['multi_turn_token_level_reward'][:,-response_len:]
+                
 
                         # compute rewards. apply_kl_penalty if available
                         if not self.config.actor_rollout_ref.actor.get('use_kl_loss', False):
