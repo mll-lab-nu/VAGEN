@@ -500,6 +500,7 @@ class QwenVLRolloutManger():
             for idx,reward in enumerate(rewards):
                 multi_turn_token_level_rewards[reward_positions[idx]] = reward
             row_dict["multi_turn_token_level_rewards"] = multi_turn_token_level_rewards # (seq_len,) 
+            row_dict["reward_masks"] = token_level_rewards_mask
         if self.config.use_loss_mask:
             row_dict['loss_mask'] = loss_mask
         position_ids = torch.cat([position_ids_prompt, position_ids_response], dim=-1)

@@ -166,16 +166,16 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         response_length = responses.size(-1)
         attention_mask = data.batch['attention_mask']
         response_mask = attention_mask[:, -response_length:]
-        token_level_rewards = data.batch['token_level_rewards']
-        loss_mask = data.batch['loss_mask'][:, -response_length:]
-        assert "loss_mask" in data.batch.keys()
         assert "multi_turn_token_level_rewards" in data.batch.keys()
-        advantages, returns = core_algos.compute_multi_turn_gae_advantage_return(token_level_rewards=token_level_rewards,
+        loss_mask = data.batch['loss_mask'][:, -response_length:]
+        print(f"[DEBUG] high_level_gamma={high_level_gamma}")
+        advantages, returns = core_algos.compute_multi_turn_gae_advantage_return(token_level_rewards=data.batch['token_level_rewards'],
                                                                         values=values,
                                                                         loss_mask=loss_mask,
                                                                         gamma=gamma,
                                                                         lam=lam,
-                                                                        high_level_gamma=high_level_gamma,)
+                                                                        high_level_gamma=high_level_gamma,
+                                                                        reward_masks=data.batch['reward_masks'][:, -response_length:])
         
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns

@@ -4,8 +4,8 @@ export VLLM_ATTENTION_BACKEND=XFORMERS
 export PYTHONHASHSEED=0
 
 python -m vagen.env.sokoban.create_dataset \
-    --data_dir data/sokoban-text-1-step \
-    --max_action_length 1 \
+    --data_dir data/sokoban-text-3-step \
+    --max_action_length 3 \
     --dim_room 6 6 \
     --num_boxes 1 \
     --max_steps 100 \
@@ -18,12 +18,13 @@ python -m vagen.env.sokoban.create_dataset \
 
 python3 -m vagen.trainer.main_ppo \
     algorithm.adv_estimator=multi_turn_gae \
-    data.train_files=data/sokoban-text-1-step/train.parquet \
-    data.val_files=data/sokoban-text-1-step/test.parquet \
+    algorithm.high_level_gamma=0.95 \
+    data.train_files=data/sokoban-text-3-step/train.parquet \
+    data.val_files=data/sokoban-text-3-step/test.parquet \
     data.train_batch_size=64 \
-    data.max_prompt_length=768 \
+    data.max_prompt_length=1408 \
     data.max_response_length=128 \
-    data.max_trajectory_length=1024 \
+    data.max_trajectory_length=1536 \
     data.image_key=images \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-0.5B-Instruct \
     actor_rollout_ref.actor.optim.lr=1e-6 \
@@ -63,9 +64,9 @@ python3 -m vagen.trainer.main_ppo \
     trainer.save_freq=100 \
     trainer.test_freq=5 \
     trainer.total_epochs=15 \
-    rollout_manager.max_turns=2 \
+    rollout_manager.max_turns=3 \
     rollout_manager.window_size=5 \
     trainer.val_before_train=True \
-    trainer.val_generations_to_log_to_wandb=2 \
+    trainer.val_generations_to_log_to_wandb=4 \
     rollout_manager.n_trajectory=2 \
     2>&1 | tee debug_qwen0_5_1_gpu_ppo_multi_turn_ppo.log

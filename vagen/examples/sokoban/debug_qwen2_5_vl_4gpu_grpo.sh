@@ -5,8 +5,8 @@ export PYTHONHASHSEED=0
 
 python -m vagen.env.sokoban.create_dataset \
     --visual_env \
-    --data_dir data/sokoban-vision-1-step \
-    --max_action_length 1 \
+    --data_dir data/sokoban-vision-2-step \
+    --max_action_length 2 \
     --dim_room 6 6 \
     --num_boxes 1 \
     --max_steps 100 \
@@ -17,12 +17,12 @@ python -m vagen.env.sokoban.create_dataset \
 
 python3 -m vagen.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
-    data.train_files=data/sokoban-vision-1-step/train.parquet \
-    data.val_files=data/sokoban-vision-1-step/test.parquet \
+    data.train_files=data/sokoban-vision-2-step/train.parquet \
+    data.val_files=data/sokoban-vision-2-step/test.parquet \
     data.train_batch_size=16 \
-    data.max_prompt_length=768 \
+    data.max_prompt_length=1920 \
     data.max_response_length=128 \
-    data.max_trajectory_length=1024 \
+    data.max_trajectory_length=2048 \
     data.image_key=images \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \
     actor_rollout_ref.actor.optim.lr=1e-6 \

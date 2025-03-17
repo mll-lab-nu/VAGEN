@@ -206,9 +206,9 @@ class PreprocessResult:
 class SokobanInterface(BaseInterface):
 
     INVALID_ACTION = 0
-    FORMAT_REWARD = 0.1
-    FORMAT_PENALTY = -0.1
-    VALID_ACTION_REWARD = 0.2
+    FORMAT_REWARD = 0.5
+    FORMAT_PENALTY = -0.5
+    VALID_ACTION_REWARD = 0.5
     ACTION_LOOKUP = {
         0: "None",
         1: "Up",
