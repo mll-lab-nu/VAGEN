@@ -63,9 +63,9 @@ python3 -m vagen.trainer.main_ppo \
     trainer.save_freq=100 \
     trainer.test_freq=5 \
     trainer.total_epochs=15 \
-    rollout_manger.max_turns=1 \
-    rollout_manger.window_size=5 \
+    rollout_manager.max_turns=1 \
+    rollout_manager.window_size=5 \
     trainer.val_before_train=True \
     trainer.val_generations_to_log_to_wandb=4 \
-    rollout_manger.n_trajectory=2 \
+    rollout_manager.n_trajectory=2 \
     2>&1 | tee debug_qwen0_5_1_gpu_ppo.log

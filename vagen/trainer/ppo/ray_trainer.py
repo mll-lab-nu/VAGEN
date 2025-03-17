@@ -40,7 +40,7 @@ from verl.utils.dataset.rl_dataset import RLHFDataset, collate_fn
 from torch.utils.data import RandomSampler, SequentialSampler
 from torchdata.stateful_dataloader import StatefulDataLoader
 
-from vagen.mllm_agent.rollout import QwenVLRolloutManger, QwenVLRolloutConifg
+from vagen.mllm_agent.rollout import QwenVLRolloutManger
 from vagen.env.base import EnvConfig
 
 WorkerType = Type[Worker]
@@ -68,6 +68,8 @@ class AdvantageEstimator(str, Enum):
     REINFORCE_PLUS_PLUS = 'reinforce_plus_plus'
     REMAX = 'remax'
     RLOO = 'rloo'
+    MULTI_TURN_GAE = 'multi_turn_gae'
+    MULTI_TURN_GRPO = 'multi_turn_grpo'
 
 
 @dataclass
@@ -132,7 +134,7 @@ def apply_kl_penalty(data: DataProto, kl_ctrl: core_algos.AdaptiveKLController, 
     return data, metrics
 
 
-def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_repeat=1):
+def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_repeat=1,high_level_gamma=1.0):
     # prepare response group
     # TODO: add other ways to estimate advantages
     if adv_estimator == AdvantageEstimator.GAE:
@@ -158,6 +160,25 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
                                                                         lam=lam)
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
+    elif adv_estimator == AdvantageEstimator.MULTI_TURN_GAE:
+        values = data.batch['values']
+        responses = data.batch['responses']
+        response_length = responses.size(-1)
+        attention_mask = data.batch['attention_mask']
+        response_mask = attention_mask[:, -response_length:]
+        token_level_rewards = data.batch['token_level_rewards']
+        loss_mask = data.batch['loss_mask'][:, -response_length:]
+        assert "loss_mask" in data.batch.keys()
+        assert "multi_turn_token_level_rewards" in data.batch.keys()
+        advantages, returns = core_algos.compute_multi_turn_gae_advantage_return(token_level_rewards=token_level_rewards,
+                                                                        values=values,
+                                                                        loss_mask=loss_mask,
+                                                                        gamma=gamma,
+                                                                        lam=lam,
+                                                                        high_level_gamma=high_level_gamma,)
+        
+        data.batch['advantages'] = advantages
+        data.batch['returns'] = returns
     elif adv_estimator == AdvantageEstimator.GRPO:
         token_level_rewards = data.batch['token_level_rewards']
         index = data.non_tensor_batch['uid']
@@ -171,10 +192,10 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         if "loss_mask" in data.batch.keys():
             loss_mask = data.batch['loss_mask'][:, -response_length:]
             
-            valid_token_level_rewards_positions = token_level_rewards[0].nonzero(as_tuple=True)[0]
-            valid_loss_positions = loss_mask[0].nonzero(as_tuple=True)[0]
-            print(f"[DEBUG]valid_token_level_rewards_positions={valid_token_level_rewards_positions}")
-            print(f"[DEBUG]valid_loss_positions={valid_loss_positions}")
+            # valid_token_level_rewards_positions = token_level_rewards[0].nonzero(as_tuple=True)[0]
+            # valid_loss_positions = loss_mask[0].nonzero(as_tuple=True)[0]
+            # print(f"[DEBUG]valid_token_level_rewards_positions={valid_token_level_rewards_positions}")
+            # print(f"[DEBUG]valid_loss_positions={valid_loss_positions}")
             # seems here only need to replace eos_mask with loss_mask
             advantages, returns = core_algos.compute_grpo_outcome_advantage(token_level_rewards=token_level_rewards,
                                                                         eos_mask=loss_mask,
@@ -420,11 +441,11 @@ class RayPPOTrainer(object):
         else:
             self.kl_ctrl = core_algos.FixedKLController(kl_coef=0.)
 
-        if self.config.algorithm.adv_estimator == AdvantageEstimator.GAE:
+        if self.config.algorithm.adv_estimator in [AdvantageEstimator.GAE, AdvantageEstimator.MULTI_TURN_GAE]:
             self.use_critic = True
         elif self.config.algorithm.adv_estimator in [
                 AdvantageEstimator.GRPO, AdvantageEstimator.REINFORCE_PLUS_PLUS, AdvantageEstimator.REMAX,
-                AdvantageEstimator.RLOO
+                AdvantageEstimator.RLOO, AdvantageEstimator.MULTI_TURN_GRPO
         ]:
             self.use_critic = False
         else:
@@ -670,57 +691,6 @@ class RayPPOTrainer(object):
         wandb.log({"val/generations": new_table}, step=self.global_steps)
         self.validation_table = new_table
     
-    # def _maybe_log_val_generations_to_wandb(self, inputs, outputs, scores):
-    #     """Log a table of validation samples to wandb"""
-
-    #     generations_to_log = self.config.trainer.val_generations_to_log_to_wandb
-
-    #     if generations_to_log == 0:
-    #         return
-
-    #     if generations_to_log > 0 and 'wandb' not in self.config.trainer.logger:
-    #         print(
-    #             'WARNING: `val_generations_to_log_to_wandb` is set to a positive value, but no wandb logger is found. ')
-    #         return
-
-    #     import wandb
-    #     import numpy as np
-
-    #     # Create tuples of (input, output, score) and sort by input text
-    #     samples = list(zip(inputs, outputs, scores))
-    #     samples.sort(key=lambda x: x[0])  # Sort by input text
-
-    #     # Use fixed random seed for deterministic shuffling
-    #     rng = np.random.RandomState(42)
-    #     rng.shuffle(samples)
-
-    #     # Take first N samples after shuffling
-    #     samples = samples[:generations_to_log]
-
-    #     # Create column names for all samples
-    #     columns = ["step"] + sum([[f"input_{i+1}", f"output_{i+1}", f"score_{i+1}"] for i in range(len(samples))], [])
-
-    #     if not hasattr(self, 'validation_table'):
-    #         # Initialize the table on first call
-    #         self.validation_table = wandb.Table(columns=columns)
-
-    #     # Create a new table with same columns and existing data
-    #     # Workaround for https://github.com/wandb/wandb/issues/2981#issuecomment-1997445737
-    #     new_table = wandb.Table(columns=columns, data=self.validation_table.data)
-
-    #     # Add new row with all data
-    #     row_data = []
-    #     row_data.append(self.global_steps)
-    #     for sample in samples:
-    #         row_data.extend(sample)
-
-    #     new_table.add_data(*row_data)
-
-    #     # Update reference and log
-    #     wandb.log({"val/generations": new_table}, step=self.global_steps)
-    #     self.validation_table = new_table
-    
-    # Agentic Setting _validate
     def _validate(self):
         print(f"[DEBUG] validation at global step {self.global_steps} begins")
         # Lists to collect samples for the table
@@ -728,21 +698,13 @@ class RayPPOTrainer(object):
         sample_outputs = []
         sample_scores = []
         sample_images = []
-        if self.test_rollout_config==None:
-            self.test_rollout_config = QwenVLRolloutConifg(
-                max_trajectory_length=self.config.rollout_manger.max_trajectory_length,
-                max_turns=self.config.rollout_manger.max_turns,
-                n_gpu_per_node=self.config.rollout_manger.n_gpus_per_node,
-                window_size=self.config.rollout_manger.window_size,
-            )
         
         if self.test_rollout_manager==None:
             self.test_rollout_manager = QwenVLRolloutManger(
                 actor_rollout_wg=self.actor_rollout_wg,
+                config=self.config.rollout_manager,
                 tokenizer=self.tokenizer,
-                config=self.test_rollout_config,
-                processor=self.processor,
-                verbose=self.config.trainer.get('verbose', False),
+                processor=self.processor, 
             )
         
         for batch_dict in self.val_dataloader:
@@ -990,18 +952,11 @@ class RayPPOTrainer(object):
         self.global_steps += 1
 
 
-        rollout_config=QwenVLRolloutConifg(
-                max_trajectory_length=self.config.rollout_manger.max_trajectory_length,
-                max_turns=self.config.rollout_manger.max_turns,
-                n_gpu_per_node=self.config.rollout_manger.n_gpus_per_node,
-                window_size=self.config.rollout_manger.window_size,
-            )
         rollout_manager = QwenVLRolloutManger(
             actor_rollout_wg=self.actor_rollout_wg,
+            config=self.config.rollout_manager,
             tokenizer=self.tokenizer,
-            config=rollout_config,
             processor=self.processor,
-            verbose=self.config.trainer.get('verbose', False),
         )
 
         for epoch in range(self.config.trainer.total_epochs):
@@ -1023,7 +978,7 @@ class RayPPOTrainer(object):
                         non_tensor_batch_keys=['raw_prompt_ids'],
                     )
 
-                # original codes
+                #VAGEN: original codes
                 # # pop those keys for generation
                 # if 'multi_modal_inputs' in batch.non_tensor_batch.keys():
                 #     gen_batch = batch.pop(
@@ -1059,9 +1014,9 @@ class RayPPOTrainer(object):
                 #             del gen_baseline_batch, gen_baseline_output
 
                 
-                # We control grpo sampling param here
+                # We control vanilla-grpo sampling param here (start from init state s0, sample n_trajectory)
                 batch.non_tensor_batch['uid'] = np.array([str(uuid.uuid4()) for _ in range(len(batch.batch))],dtype=object)
-                batch = batch.repeat(repeat_times=self.config.rollout_manger.n_trajectory, interleave=True)
+                batch = batch.repeat(repeat_times=self.config.rollout_manager.n_trajectory, interleave=True)
                 
                     
                 env_configs = [
@@ -1081,7 +1036,7 @@ class RayPPOTrainer(object):
 
                     print(f"[DEBUG] step {self.global_steps} rollout ends")
                     
-                    # This is moved to before rollout because we don't use vllm n sample param for grpo due to multi-turn nature of our method
+                    # VAGEN: This is moved to before rollout because we don't use vllm n sample param for grpo due to multi-turn nature of our method
                     # batch.non_tensor_batch['uid'] = np.array([str(uuid.uuid4()) for _ in range(len(batch.batch))],
                     #                                          dtype=object)
                     # # repeat to align with repeated responses in rollout
@@ -1122,12 +1077,15 @@ class RayPPOTrainer(object):
                             reward_tensor = self.rm_wg.compute_rm_score(batch)
                             batch = batch.union(reward_tensor)
 
-                        # we combine with rule-based rm
-                        #reward_tensor = self.reward_fn(batch)
-                        #batch.batch['token_level_scores'] = reward_tensor Now let's try to use mutli-turn token level reward
-                        # TODO: use a new reward_fn to combine the results from reward model and rule-based multi-turn token reward.
-                        response_len=batch.batch['responses'].shape[1]
-                        batch.batch['token_level_scores'] = batch.batch['multi_turn_token_level_reward'][:,-response_len:]
+                        
+                        if self.config.rollout_manager.use_multi_turn_reward:
+                        #VAGEN: TODO: use a new reward_fn to combine the results from reward model and rule-based multi-turn token reward.
+                            response_len=batch.batch['responses'].shape[1]
+                            batch.batch['token_level_scores'] = batch.batch['multi_turn_token_level_rewards'][:,-response_len:]
+                        else:
+                            # we combine with rule-based rm
+                            reward_tensor = self.reward_fn(batch)
+                            batch.batch['token_level_scores'] = reward_tensor 
                 
 
                         # compute rewards. apply_kl_penalty if available
@@ -1144,7 +1102,8 @@ class RayPPOTrainer(object):
                                                   adv_estimator=self.config.algorithm.adv_estimator,
                                                   gamma=self.config.algorithm.gamma,
                                                   lam=self.config.algorithm.lam,
-                                                  num_repeat=self.config.actor_rollout_ref.rollout.n)
+                                                  num_repeat=self.config.actor_rollout_ref.rollout.n,
+                                                  high_level_gamma=self.config.algorithm.high_level_gamma,)
 
                     # update critic
                     if self.use_critic:

@@ -158,6 +158,7 @@ custom_reward_function:
 
 algorithm:
   gamma: 1.0
+  high_level_gamma: 0.99
   lam: 1.0
   adv_estimator: gae
   kl_penalty: kl  # how to estimate kl divergence
@@ -188,9 +189,14 @@ trainer:
   val_before_train: True
   val_only: False
 
-rollout_manger:
+rollout_manager:
   max_trajectory_length: ${data.max_trajectory_length}
   window_size: 5
   max_turns: 5
   n_gpus_per_node: ${trainer.n_gpus_per_node}
   n_trajectory: 1 # >1 for grpo, please set actor_rollout_ref.rollout.n = 1 since we don't use vllm n sample parameter, set it >1 here for grpo agentic setting
+  use_multi_turn_reward: True # for ablation study
+  use_loss_mask: True # for ablation study
+  special_token_for_loss_mask: ['<|box_start|>', '<|box_end|>']
+  end_turn_token: '<|im_end|>'
+  truncation: ${data.truncation}
