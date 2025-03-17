@@ -16,6 +16,4 @@ bash scripts/install.sh
 bash vagen/examples/sokoban/debug_qwen0_5_1_gpu_grpo.sh
 bash vagen/examples/sokoban/debug_qwen0_5_4_gpu_ppo.sh
 bash vagen/examples/sokoban/debug_qwen2_5_vl_4gpu_grpo.sh
-
-# Verified on 1 and 4 A100 GPUs
 ```
