@@ -1,4 +1,4 @@
-## Setup
+## Installation
 
 ```
 conda create -n vagen python=3.10 -y
