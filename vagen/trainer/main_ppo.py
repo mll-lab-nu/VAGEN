@@ -75,8 +75,8 @@ def main_task(config, compute_score=None):
         Role.Critic: ray.remote(CriticWorker),
     }
 
-    use_ref = config.algorithm.adv_estimator != AdvantageEstimator.GAE.value and \
-        config.actor_rollout_ref.ref.get('use_ref', True)
+    use_ref = (config.algorithm.adv_estimator not in  [AdvantageEstimator.GAE, AdvantageEstimator.MULTI_TURN_GAE] and \
+        config.actor_rollout_ref.ref.get('use_ref', True))
     print(f"[DEBUG] use_ref={use_ref}")
     if use_ref:
         role_worker_mapping[Role.RefPolicy] = ray.remote(ActorRolloutRefWorker)

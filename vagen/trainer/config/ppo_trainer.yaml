@@ -189,7 +189,7 @@ trainer:
   val_before_train: True
   val_only: False
 
-rollout_manger:
+rollout_manager:
   max_trajectory_length: ${data.max_trajectory_length}
   window_size: 5
   max_turns: 5
@@ -198,3 +198,5 @@ rollout_manger:
   use_multi_turn_reward: True # for ablation study
   use_loss_mask: True # for ablation study
   special_token_for_loss_mask: ['<|box_start|>', '<|box_end|>']
+  end_turn_token: '<|im_end|>'
+  truncation: ${data.truncation}

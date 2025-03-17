@@ -68,8 +68,8 @@ class AdvantageEstimator(str, Enum):
     REINFORCE_PLUS_PLUS = 'reinforce_plus_plus'
     REMAX = 'remax'
     RLOO = 'rloo'
-    MULTITURN_GAE = 'multiturn_gae'
-    MULTITURN_GRPO = 'multiturn_grpo'
+    MULTI_TURN_GAE = 'multi_turn_gae'
+    MULTI_TURN_GRPO = 'multi_turn_grpo'
 
 
 @dataclass
@@ -160,7 +160,7 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
                                                                         lam=lam)
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
-    elif adv_estimator == AdvantageEstimator.MULTITURN_GAE:
+    elif adv_estimator == AdvantageEstimator.MULTI_TURN_GAE:
         values = data.batch['values']
         responses = data.batch['responses']
         response_length = responses.size(-1)
@@ -172,12 +172,13 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         assert "multi_turn_token_level_rewards" in data.batch.keys()
         advantages, returns = core_algos.compute_multi_turn_gae_advantage_return(token_level_rewards=token_level_rewards,
                                                                         values=values,
-                                                                        eos_mask=loss_mask,
+                                                                        loss_mask=loss_mask,
                                                                         gamma=gamma,
                                                                         lam=lam,
                                                                         high_level_gamma=high_level_gamma,)
         
-        
+        data.batch['advantages'] = advantages
+        data.batch['returns'] = returns
     elif adv_estimator == AdvantageEstimator.GRPO:
         token_level_rewards = data.batch['token_level_rewards']
         index = data.non_tensor_batch['uid']
@@ -191,10 +192,10 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         if "loss_mask" in data.batch.keys():
             loss_mask = data.batch['loss_mask'][:, -response_length:]
             
-            valid_token_level_rewards_positions = token_level_rewards[0].nonzero(as_tuple=True)[0]
-            valid_loss_positions = loss_mask[0].nonzero(as_tuple=True)[0]
-            print(f"[DEBUG]valid_token_level_rewards_positions={valid_token_level_rewards_positions}")
-            print(f"[DEBUG]valid_loss_positions={valid_loss_positions}")
+            # valid_token_level_rewards_positions = token_level_rewards[0].nonzero(as_tuple=True)[0]
+            # valid_loss_positions = loss_mask[0].nonzero(as_tuple=True)[0]
+            # print(f"[DEBUG]valid_token_level_rewards_positions={valid_token_level_rewards_positions}")
+            # print(f"[DEBUG]valid_loss_positions={valid_loss_positions}")
             # seems here only need to replace eos_mask with loss_mask
             advantages, returns = core_algos.compute_grpo_outcome_advantage(token_level_rewards=token_level_rewards,
                                                                         eos_mask=loss_mask,
@@ -440,11 +441,11 @@ class RayPPOTrainer(object):
         else:
             self.kl_ctrl = core_algos.FixedKLController(kl_coef=0.)
 
-        if self.config.algorithm.adv_estimator == AdvantageEstimator.GAE:
+        if self.config.algorithm.adv_estimator in [AdvantageEstimator.GAE, AdvantageEstimator.MULTI_TURN_GAE]:
             self.use_critic = True
         elif self.config.algorithm.adv_estimator in [
                 AdvantageEstimator.GRPO, AdvantageEstimator.REINFORCE_PLUS_PLUS, AdvantageEstimator.REMAX,
-                AdvantageEstimator.RLOO
+                AdvantageEstimator.RLOO, AdvantageEstimator.MULTI_TURN_GRPO
         ]:
             self.use_critic = False
         else:
@@ -953,7 +954,7 @@ class RayPPOTrainer(object):
 
         rollout_manager = QwenVLRolloutManger(
             actor_rollout_wg=self.actor_rollout_wg,
-            config=self.config.rollout_manger,
+            config=self.config.rollout_manager,
             tokenizer=self.tokenizer,
             processor=self.processor,
         )
@@ -1015,7 +1016,7 @@ class RayPPOTrainer(object):
                 
                 # We control vanilla-grpo sampling param here (start from init state s0, sample n_trajectory)
                 batch.non_tensor_batch['uid'] = np.array([str(uuid.uuid4()) for _ in range(len(batch.batch))],dtype=object)
-                batch = batch.repeat(repeat_times=self.config.rollout_manger.n_trajectory, interleave=True)
+                batch = batch.repeat(repeat_times=self.config.rollout_manager.n_trajectory, interleave=True)
                 
                     
                 env_configs = [
@@ -1077,10 +1078,10 @@ class RayPPOTrainer(object):
                             batch = batch.union(reward_tensor)
 
                         
-                        if self.config.rollout_manger.use_multi_turn_reward:
+                        if self.config.rollout_manager.use_multi_turn_reward:
                         #VAGEN: TODO: use a new reward_fn to combine the results from reward model and rule-based multi-turn token reward.
                             response_len=batch.batch['responses'].shape[1]
-                            batch.batch['token_level_scores'] = batch.batch['multi_turn_token_level_reward'][:,-response_len:]
+                            batch.batch['token_level_scores'] = batch.batch['multi_turn_token_level_rewards'][:,-response_len:]
                         else:
                             # we combine with rule-based rm
                             reward_tensor = self.reward_fn(batch)
