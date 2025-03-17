@@ -17,30 +17,18 @@ import vagen.env
 from vagen.env.register import REGISTERED_ENVS
 from vagen.env.base import EnvConfig,IMAGE_PLACEHOLDER
 
-@dataclass
-class QwenVLRolloutConifg:
-    window_size: int = 5
-    max_trajectory_length: int = 3072
-    max_turns: int = 5
-    n_gpu_per_node: int = 1 # used for multigpu batch balancing
-    sptk_for_loss_mask: List[str] = field(init=False, default_factory=lambda: ['<|box_start|>', '<|box_end|>'])
-    end_turn_token: str = field(init=False, default='<|im_end|>') # specially for Qwen2.5
     
 class QwenVLRolloutManger():
     def __init__(self,
                  actor_rollout_wg,
+                 config,
                  tokenizer: PreTrainedTokenizer,
-                 config: QwenVLRolloutConifg,
                  processor: Optional[ProcessorMixin] = None,
-                 verbose: bool = False,
-                 truncation='error',
                  ):
         self.tokenizer = tokenizer
         self.processor = processor
         self.config = config
         self.actor_rollout_wg = actor_rollout_wg
-        self.verbose = verbose
-        self.truncation = truncation
         self.recorder= None # defaultdict(list) env_id:record
         self.envs = None # dict env_id:EnvInterface
         self.env_states = None # dict
@@ -55,8 +43,8 @@ class QwenVLRolloutManger():
         llm_raw_response = re.sub(r'<image>', '', llm_raw_response)
         if prep_for_loss_mask:
             # filtering special tokens for llm_raw_response, then adding them to the beginning and end of the response for loss mask computation
-            sptk_b = self.config.sptk_for_loss_mask[0]
-            sptk_e = self.config.sptk_for_loss_mask[1]
+            sptk_b = self.config.special_token_for_loss_mask[0]
+            sptk_e = self.config.special_token_for_loss_mask[1]
             llm_raw_response = re.sub(sptk_e, '', llm_raw_response)
             llm_raw_response = re.sub(sptk_b, '', llm_raw_response)
             llm_raw_response = sptk_b + llm_raw_response + sptk_e
@@ -134,8 +122,8 @@ class QwenVLRolloutManger():
         """
         
         # Get token IDs for special tokens and pad token
-        sptk_b = self.tokenizer.convert_tokens_to_ids(self.config.sptk_for_loss_mask[0])
-        sptk_e = self.tokenizer.convert_tokens_to_ids(self.config.sptk_for_loss_mask[1])
+        sptk_b = self.tokenizer.convert_tokens_to_ids(self.config.special_token_for_loss_mask[0])
+        sptk_e = self.tokenizer.convert_tokens_to_ids(self.config.special_token_for_loss_mask[1])
         pad_token_id = self.tokenizer.pad_token_id
 
         batch_size = input_ids.shape[0]
@@ -458,13 +446,13 @@ class QwenVLRolloutManger():
                                                                          max_length=self.config.max_trajectory_length-1, # -1 for the prompt padding token
                                                                          pad_token_id=self.tokenizer.pad_token_id,
                                                                          left_pad=False,
-                                                                         truncation=self.truncation)
+                                                                         truncation=self.config.truncation)
         input_ids_prompt, attention_mask_prompt = verl_F.tokenize_and_postprocess_data(prompt=prompt_with_chat_template,
                                                                          tokenizer=self.tokenizer,
                                                                          max_length=1,
                                                                          pad_token_id=self.tokenizer.pad_token_id,
                                                                          left_pad=True,
-                                                                         truncation=self.truncation)
+                                                                         truncation=self.config.truncation)
         attention_mask_prompt=torch.zeros_like(input_ids_prompt) # All prompt will be masked
         
         
@@ -505,22 +493,23 @@ class QwenVLRolloutManger():
             delta_position_id = torch.arange(1, response_length + 1, device=position_ids_prompt.device)
             position_ids_response = position_ids_prompt[-1:] + delta_position_id
         
-        reward_positions = torch.nonzero(token_level_reward_mask).squeeze(-1)
-        multi_turn_token_level_reward = torch.zeros_like(token_level_reward_mask, dtype=torch.float)
-        assert len(reward_positions) == len(rewards), "Number of rewards does not match number of reward positions"
-        for idx,reward in enumerate(rewards):
-            multi_turn_token_level_reward[reward_positions[idx]] = reward
-            
+        if self.config.use_multi_turn_reward:
+            reward_positions = torch.nonzero(token_level_reward_mask).squeeze(-1)
+            multi_turn_token_level_reward = torch.zeros_like(token_level_reward_mask, dtype=torch.float)
+            assert len(reward_positions) == len(rewards), "Number of rewards does not match number of reward positions"
+            for idx,reward in enumerate(rewards):
+                multi_turn_token_level_reward[reward_positions[idx]] = reward
+            row_dict["multi_turn_token_level_reward"] = multi_turn_token_level_reward # (seq_len,) 
+        if self.config.use_loss_mask:
+            row_dict['loss_mask'] = loss_mask
         position_ids = torch.cat([position_ids_prompt, position_ids_response], dim=-1)
         row_dict['prompts'] = input_ids_prompt
         row_dict['responses'] = input_ids_response
         row_dict['input_ids'] = input_ids
         row_dict['attention_mask'] = attention_mask
         row_dict['position_ids'] = position_ids
-        row_dict['loss_mask'] = loss_mask
         index = row_dict.get("extra_info", {}).get("index", 0)
         row_dict["index"] = index
-        row_dict["multi_turn_token_level_reward"] = multi_turn_token_level_reward # (seq_len) later need to convert to (response_len)
         return row_dict
 
     @torch.no_grad()
@@ -592,14 +581,7 @@ class QwenVLRolloutManger():
             gen_batch.non_tensor_batch['raw_prompt_ids'] = raw_prompt_ids_array
             
             output_batch = self.actor_rollout_wg.generate_sequences(gen_batch)
-            ##DEBUG
-            # print(f"[DEBUG] rollout turn {step}")
-            # print(f"[DEBUG] rollout output_batch.non_tensor_batch.keys(): {output_batch.non_tensor_batch.keys()}")
-            # print(f"[DEBUG] rollout output_batch.batch.keys(): {output_batch.batch.keys()}")
-            # print(f"[DEBUG] rollout output_batch.batch['input_ids'].shape: {output_batch.batch['input_ids'].shape}")
-            # print(f"[DEBUG] rollout output_batch.batch['attention_mask'].shape: {output_batch.batch['attention_mask'].shape}")
-            # print(f"[DEBUG] rollout output_batch.batch['position_ids'].shape: {output_batch.batch['position_ids'].shape}")
-            # print(f"[DEBUG] --------------------------------------------")
+            
             
             
             responses_str = self.tokenizer.batch_decode(
@@ -632,14 +614,6 @@ class QwenVLRolloutManger():
             batch_list.append(row_dict)
         batch_dict = collate_fn(batch_list)
         batch = DataProto.from_single_dict(batch_dict)
-        ##DEBUG
-        # print(f"[DEBUG] final trajectory")
-        # print(f"[DEBUG] rollout batch.non_tensor_batch.keys(): {batch.non_tensor_batch.keys()}")
-        # print(f"[DEBUG] rollout batch.batch.keys(): {batch.batch.keys()}")
-        # print(f"[DEBUG] rollout batch.batch['input_ids'].shape: {batch.batch['input_ids'].shape}")
-        # print(f"[DEBUG] rollout batch.batch['attention_mask'].shape: {batch.batch['attention_mask'].shape}")
-        # print(f"[DEBUG] rollout batch.batch['loss_mask'].shape: {batch.batch['loss_mask'].shape}")
-        # print(f"[DEBUG] --------------------------------------------")
         return batch
     
     @torch.no_grad()
