@@ -16,6 +16,7 @@ Note that we don't combine the main with ray_trainer as ray_trainer is used by o
 """
 from vagen.trainer.ppo.ray_trainer import RayPPOTrainer
 from vagen.utils.compute_score import compute_score
+from vagen.trainer.ppo.ray_trainer import AdvantageEstimator
 
 import ray
 import hydra
@@ -72,8 +73,16 @@ def main_task(config, compute_score=None):
     role_worker_mapping = {
         Role.ActorRollout: ray.remote(ActorRolloutRefWorker),
         Role.Critic: ray.remote(CriticWorker),
-        Role.RefPolicy: ray.remote(ActorRolloutRefWorker)
     }
+
+    use_ref = config.algorithm.adv_estimator != AdvantageEstimator.GAE.value and \
+        config.actor_rollout_ref.ref.get('use_ref', True)
+    print(f"[DEBUG] use_ref={use_ref}")
+    if use_ref:
+        role_worker_mapping[Role.RefPolicy] = ray.remote(ActorRolloutRefWorker)
+    else:
+        config.actor_rollout_ref.actor.use_kl_loss = False
+        print("[WARNING] Ref policy is disabled, use_kl_loss is set to False")
 
     global_pool_id = 'global_pool'
     resource_pool_spec = {
@@ -82,8 +91,9 @@ def main_task(config, compute_score=None):
     mapping = {
         Role.ActorRollout: global_pool_id,
         Role.Critic: global_pool_id,
-        Role.RefPolicy: global_pool_id,
     }
+    if use_ref:
+        mapping[Role.RefPolicy] = global_pool_id
 
     # we should adopt a multi-source reward function here
     # - for rule-based rm, we directly call a reward score

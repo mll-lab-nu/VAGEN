@@ -23,7 +23,8 @@ class QwenVLRolloutConifg:
     max_trajectory_length: int = 3072
     max_turns: int = 5
     n_gpu_per_node: int = 1 # used for multigpu batch balancing
-    sptk_for_loss_mask: List[str] = field(default_factory=lambda: ['<|box_start|>', '<|box_end|>'])
+    sptk_for_loss_mask: List[str] = field(init=False, default_factory=lambda: ['<|box_start|>', '<|box_end|>'])
+    end_turn_token: str = field(init=False, default='<|im_end|>') # specially for Qwen2.5
     
 class QwenVLRolloutManger():
     def __init__(self,
@@ -45,6 +46,7 @@ class QwenVLRolloutManger():
         self.env_states = None # dict
         self.batch_idx_to_env_id = None # dict
 
+    @torch.no_grad()
     def _handle_special_tokens(self, llm_raw_response: str, prep_for_loss_mask: bool) -> str:
         """
         1. Filter out special tokens: <image> and special tokens marking environment observation in the llm generated response
@@ -60,6 +62,7 @@ class QwenVLRolloutManger():
             llm_raw_response = sptk_b + llm_raw_response + sptk_e
         return llm_raw_response
     
+    @torch.no_grad()
     def _handle_multi_modal_data(
             self, 
             prompt_template: str, 
@@ -101,6 +104,7 @@ class QwenVLRolloutManger():
             # print(f"[DEBUG] number_of_image_tokens: {number_of_image_tokens}")
         return prompt_template, row_dict, image_grid_thw, raw_prompt
     
+    @torch.no_grad()
     def _compute_loss_mask(self, input_ids, attention_mask):
         """
         Compute loss mask for the input ids and attention mask
@@ -130,8 +134,8 @@ class QwenVLRolloutManger():
         """
         
         # Get token IDs for special tokens and pad token
-        sptk_b = self.tokenizer.convert_tokens_to_ids('<|box_start|>')
-        sptk_e = self.tokenizer.convert_tokens_to_ids('<|box_end|>')
+        sptk_b = self.tokenizer.convert_tokens_to_ids(self.config.sptk_for_loss_mask[0])
+        sptk_e = self.tokenizer.convert_tokens_to_ids(self.config.sptk_for_loss_mask[1])
         pad_token_id = self.tokenizer.pad_token_id
 
         batch_size = input_ids.shape[0]
@@ -184,7 +188,7 @@ class QwenVLRolloutManger():
         
         return new_input_ids, new_attention_mask, new_loss_mask, new_token_level_reward_mask
     
-        
+    @torch.no_grad()
     def reset(self, env_configs: List[EnvConfig]):
         """
         Reset environments based on provided configurations, reusing environments when possible.
@@ -274,7 +278,7 @@ class QwenVLRolloutManger():
         
         return initial_obs, initial_info
     
-    
+    @torch.no_grad()
     def record(self, env_id, obs, reward, done, info):
         """
         Record each step's obs, info, done, reward,
@@ -296,7 +300,7 @@ class QwenVLRolloutManger():
             record_entry['image_data'] = [process_image(image) for image in obs['multi_modal_data'][IMAGE_PLACEHOLDER]]
         self.recorder[env_id].append(record_entry)
 
-
+    @torch.no_grad()
     def _single_recording_to_prompt(self,
                             recording: List[Dict], 
                             step: int, 
@@ -345,12 +349,17 @@ class QwenVLRolloutManger():
                         image_data.append(img)
             
         prompt_with_chat_template = self.tokenizer.apply_chat_template(chat, add_generation_prompt=True, tokenize=False)
+        # switch box_end and im_end so that the model can learn to generate <|im_end|>
+        prompt_with_chat_template = prompt_with_chat_template.replace(
+            f'{self.config.sptk_for_loss_mask[1]}{self.config.end_turn_token}',
+            f'{self.config.end_turn_token}{self.config.sptk_for_loss_mask[1]}')
         return {
             "prompt": prompt_with_chat_template,
             "image_data": image_data,
             "rewards": rewards,
         }
-        
+    
+    @torch.no_grad()
     def _generate_input_item(
             self, 
             recording: List[Dict], 
@@ -400,7 +409,7 @@ class QwenVLRolloutManger():
         return row_dict
 
 
-
+    @torch.no_grad()
     def _generate_input_final_item(
             self, 
             recording: List[Dict], 
@@ -514,7 +523,7 @@ class QwenVLRolloutManger():
         row_dict["multi_turn_token_level_reward"] = multi_turn_token_level_reward # (seq_len) later need to convert to (response_len)
         return row_dict
 
-
+    @torch.no_grad()
     def gen_batch(self, step, window_size):
         """
         Generate a batch of data for the current step
@@ -546,8 +555,7 @@ class QwenVLRolloutManger():
                 batch.append(batch[-1].copy())
         return collate_fn(batch)
     
-    
-    
+    @torch.no_grad()
     def rollout_loop(self):
         """
         Step the environment and record the results
@@ -581,9 +589,6 @@ class QwenVLRolloutManger():
                     raw_prompt_ids_array[i] = raw_prompt_ids[i]
                 else:
                     raw_prompt_ids_array[i] = raw_prompt_ids[i].tolist()
-                # if not i % 4:
-                #     print(f"[DEBUG] raw_prompt_ids_array({i}) length: {len(raw_prompt_ids_array[i])}")
-                #     print(f"[DEBUG] raw_prompt_ids_array({i}) content: {self.tokenizer.decode(raw_prompt_ids_array[i])}")
             gen_batch.non_tensor_batch['raw_prompt_ids'] = raw_prompt_ids_array
             
             output_batch = self.actor_rollout_wg.generate_sequences(gen_batch)
@@ -608,8 +613,7 @@ class QwenVLRolloutManger():
                 self.env_states[env_id]['done'] = done
                 self.record(env_id, obs, reward, done, info)
         
-        
-        
+    @torch.no_grad()
     def get_final_trajectory(self) -> DataProto:
         """
         Get the final trajectory of all environments
@@ -638,7 +642,7 @@ class QwenVLRolloutManger():
         # print(f"[DEBUG] --------------------------------------------")
         return batch
     
-    
+    @torch.no_grad()
     def recording_to_log(self):
         """
         Get the recording of all environments

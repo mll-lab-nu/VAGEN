@@ -188,7 +188,6 @@ class SokobanEnv(BaseEnv, GymSokobanEnv):
 class PreprocessResult:
     action_list: List[int]
     answer_list: List[str] # string of extracted answer (may be invalid action)
-    valid_list: List[bool]
     think: str
     answer: str
     llm_raw_response: str
@@ -197,7 +196,6 @@ class PreprocessResult:
         return {
             'action_list': self.action_list,
             'answer_list': self.answer_list,
-            'valid_list': self.valid_list,
             'think': self.think,
             'answer': self.answer,
             'llm_raw_response': self.llm_raw_response,
@@ -208,7 +206,9 @@ class PreprocessResult:
 class SokobanInterface(BaseInterface):
 
     INVALID_ACTION = 0
-    FORMAT_REWARD = 1
+    FORMAT_REWARD = 0.1
+    FORMAT_PENALTY = -0.1
+    VALID_ACTION_REWARD = 0.2
     ACTION_LOOKUP = {
         0: "None",
         1: "Up",
@@ -266,32 +266,39 @@ class SokobanInterface(BaseInterface):
     @classmethod
     def _preprocess(cls, text: str) -> PreprocessResult:
         """Preprocess the raw text from LLM into a list of actions.
-        Ensure at least one action (may be invalid).
+        NOTE Only keep valid actions.
 
         Args:
             text: raw text from LLM
 
         Returns:
-            PreprocessResult containing parsed actions and validity flags
+            PreprocessResult containing parsed valid actions
         """
         first_step_preprocess = preprocess_text(text)
         preprocess_result = PreprocessResult(
             action_list=[],
-            valid_list=[],
             answer_list=first_step_preprocess['answer_list'],
             think=first_step_preprocess['think'],
             answer=first_step_preprocess['answer'],
             llm_raw_response=text,
         )
         
+        # for answer in preprocess_result.answer_list:
+        #     action = cls._extract_one_action(answer)
+        #     if action != cls.INVALID_ACTION:
+        #         preprocess_result.action_list.append(action)
+        #         preprocess_result.valid_list.append(True)
+        #     else:
+        #         preprocess_result.action_list.append(cls.INVALID_ACTION)
+        #         preprocess_result.valid_list.append(False)
+
+        # ensure there are only valid actions
         for answer in preprocess_result.answer_list:
             action = cls._extract_one_action(answer)
             if action != cls.INVALID_ACTION:
                 preprocess_result.action_list.append(action)
-                preprocess_result.valid_list.append(True)
             else:
-                preprocess_result.action_list.append(cls.INVALID_ACTION)
-                preprocess_result.valid_list.append(False)
+                break
         
         return preprocess_result
         
@@ -323,11 +330,8 @@ class SokobanInterface(BaseInterface):
 
         answer = preprocess_result.answer
         valid_action = []
-        for action, valid in zip(preprocess_result.action_list, preprocess_result.valid_list):
-            if valid:
-                valid_action.append(cls.ACTION_LOOKUP[action])
-            else:
-                break
+        for action in preprocess_result.action_list:
+            valid_action.append(cls.ACTION_LOOKUP[action])
 
         observation = IMAGE_PLACEHOLDER if not isinstance(env_state, str) else env_state
         text_template = action_template.format(
@@ -374,25 +378,23 @@ class SokobanInterface(BaseInterface):
         preprocess_result = self._preprocess(raw_text)
         think = preprocess_result.think
         action_list = preprocess_result.action_list
-        valid_list = preprocess_result.valid_list
         answer = preprocess_result.answer
         final_info['llm_raw_response'] = preprocess_result.llm_raw_response
 
         # deal with format
         if think and answer: # format is correct
             reward += self.FORMAT_REWARD
+            if action_list:
+                reward += self.VALID_ACTION_REWARD
         else:
-            reward -= self.FORMAT_REWARD*0.1
+            reward += self.FORMAT_PENALTY
 
         info = {}
-        for action, valid in zip(action_list, valid_list):
+        for action in action_list:
             if done or self.env.finished():
                 break
-            if valid:
-                _, env_reward, done, info = self.env.step(action)
-                reward += env_reward
-            else: # termiante at the first invalid action
-                break
+            _, env_reward, done, info = self.env.step(action)
+            reward += env_reward
         self.traj_reward += reward
         final_info.update(info) # NOTE currently only use the last step info
 
