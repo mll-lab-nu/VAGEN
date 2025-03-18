@@ -209,6 +209,7 @@ class SokobanInterface(BaseInterface):
     FORMAT_REWARD = 0.5
     FORMAT_PENALTY = -0.5
     VALID_ACTION_REWARD = 0.5
+    MAX_ACTION_PER_STEP = 1 # NOTE hard coded here
     ACTION_LOOKUP = {
         0: "None",
         1: "Up",
@@ -299,7 +300,7 @@ class SokobanInterface(BaseInterface):
                 preprocess_result.action_list.append(action)
             else:
                 break
-        
+        preprocess_result.action_list = preprocess_result.action_list[:cls.MAX_ACTION_PER_STEP]
         return preprocess_result
         
     @classmethod
@@ -381,13 +382,12 @@ class SokobanInterface(BaseInterface):
         answer = preprocess_result.answer
         final_info['llm_raw_response'] = preprocess_result.llm_raw_response
 
-        # deal with format
-        if think and answer: # format is correct
+        if think and answer: # format reward
             reward += self.FORMAT_REWARD
-            if action_list:
-                reward += self.VALID_ACTION_REWARD
-        else:
+        else: # format penalty
             reward += self.FORMAT_PENALTY
+        if action_list: # valid action reward
+            reward += self.VALID_ACTION_REWARD
 
         info = {}
         for action in action_list:
