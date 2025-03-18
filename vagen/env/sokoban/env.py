@@ -210,6 +210,7 @@ class SokobanInterface(BaseInterface):
     FORMAT_PENALTY = -0.5
     VALID_ACTION_REWARD = 0.5
     MAX_ACTION_PER_STEP = 1 # NOTE hard coded here
+    MAX_ACTION_PENALTY = -0.1
     ACTION_LOOKUP = {
         0: "None",
         1: "Up",
@@ -300,7 +301,7 @@ class SokobanInterface(BaseInterface):
                 preprocess_result.action_list.append(action)
             else:
                 break
-        preprocess_result.action_list = preprocess_result.action_list[:cls.MAX_ACTION_PER_STEP]
+        # preprocess_result.action_list = preprocess_result.action_list[:cls.MAX_ACTION_PER_STEP]
         return preprocess_result
         
     @classmethod
@@ -382,18 +383,22 @@ class SokobanInterface(BaseInterface):
         answer = preprocess_result.answer
         final_info['llm_raw_response'] = preprocess_result.llm_raw_response
 
-        if think and answer: # format reward
+        if think and answer: # format reward for <think>...</think><answer>...</answer>
             reward += self.FORMAT_REWARD
         else: # format penalty
             reward += self.FORMAT_PENALTY
         if action_list: # valid action reward
             reward += self.VALID_ACTION_REWARD
+        if len(action_list) > self.MAX_ACTION_PER_STEP:
+            reward += self.MAX_ACTION_PENALTY
 
         info = {}
         for action in action_list:
             if done or self.env.finished():
                 break
             _, env_reward, done, info = self.env.step(action)
+            if env_reward == -0.1:
+                env_reward = 0 # NOTE hard coded here to set step reward to 0
             reward += env_reward
         self.traj_reward += reward
         final_info.update(info) # NOTE currently only use the last step info
