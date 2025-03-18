@@ -5,7 +5,6 @@ import re
 import copy
 from typing import Tuple, Dict, Optional, List, Any, Union
 from PIL import Image
-from dataclasses import dataclass
 
 from vagen.utils import NoLoggerWarnings
 from vagen.utils import set_seed
@@ -17,7 +16,11 @@ from vagen.env.base import (
     IMAGE_PLACEHOLDER
 )
 
-from vagen.env.utils import preprocess_text, convert_numpy_to_PIL
+from vagen.env.utils import (
+    convert_numpy_to_PIL,
+    preprocess,
+    postprocess,
+)
 
 system_prompt = """
 You are a helpful assistant. You first think about the reasoning process in the mind and then provides the user with the answer.
@@ -184,22 +187,7 @@ class SokobanEnv(BaseEnv, GymSokobanEnv):
 
 
 
-@dataclass
-class PreprocessResult:
-    action_list: List[int]
-    answer_list: List[str] # string of extracted answer (may be invalid action)
-    think: str
-    answer: str
-    llm_raw_response: str
 
-    def to_dict(self):
-        return {
-            'action_list': self.action_list,
-            'answer_list': self.answer_list,
-            'think': self.think,
-            'answer': self.answer,
-            'llm_raw_response': self.llm_raw_response,
-        }
 
 
 @register(name="sokoban")
@@ -265,97 +253,6 @@ class SokobanInterface(BaseInterface):
         
         return cls.INVALID_ACTION
     
-    @classmethod
-    def _preprocess(cls, text: str) -> PreprocessResult:
-        """Preprocess the raw text from LLM into a list of actions.
-        NOTE Only keep valid actions.
-
-        Args:
-            text: raw text from LLM
-
-        Returns:
-            PreprocessResult containing parsed valid actions
-        """
-        first_step_preprocess = preprocess_text(text)
-        preprocess_result = PreprocessResult(
-            action_list=[],
-            answer_list=first_step_preprocess['answer_list'],
-            think=first_step_preprocess['think'],
-            answer=first_step_preprocess['answer'],
-            llm_raw_response=text,
-        )
-        
-        # for answer in preprocess_result.answer_list:
-        #     action = cls._extract_one_action(answer)
-        #     if action != cls.INVALID_ACTION:
-        #         preprocess_result.action_list.append(action)
-        #         preprocess_result.valid_list.append(True)
-        #     else:
-        #         preprocess_result.action_list.append(cls.INVALID_ACTION)
-        #         preprocess_result.valid_list.append(False)
-
-        # ensure there are only valid actions
-        for answer in preprocess_result.answer_list:
-            action = cls._extract_one_action(answer)
-            if action != cls.INVALID_ACTION:
-                preprocess_result.action_list.append(action)
-            else:
-                break
-        # preprocess_result.action_list = preprocess_result.action_list[:cls.MAX_ACTION_PER_STEP]
-        return preprocess_result
-        
-    @classmethod
-    def _postprocess(
-        cls, 
-        env_state: Union[str, np.ndarray], 
-        reward: float,
-        done: bool,
-        info: Dict,
-        preprocess_result: PreprocessResult,
-    ) -> Tuple[Dict, float, bool, Dict]:
-        """Postprocess the environment feedback
-        NOTE now assume there's only one image in the observation
-
-        Args:
-            env_state: environment state (text or numpy array (image))
-            reward: reward of the environment
-            done: whether the environment is done
-            info: extra info
-            preprocess_result: preprocess result
-
-        Returns:
-            Tuple[Dict, float, bool, Dict]: observation, reward, done, info
-        """
-
-        if isinstance(env_state, np.ndarray):
-            env_state = convert_numpy_to_PIL(env_state)
-
-        answer = preprocess_result.answer
-        valid_action = []
-        for action in preprocess_result.action_list:
-            valid_action.append(cls.ACTION_LOOKUP[action])
-
-        observation = IMAGE_PLACEHOLDER if not isinstance(env_state, str) else env_state
-        text_template = action_template.format(
-            answer=answer,
-            valid_action=valid_action,
-            observation=observation,
-            reward=reward,
-            done=done,
-        )
-
-        if isinstance(env_state, str):
-            obs = {'text_template': text_template}
-        else:
-            obs = {
-                'text_template': text_template,
-                'multi_modal_data': {
-                    IMAGE_PLACEHOLDER: [env_state],
-                },
-            }
-        return obs, reward, done, info
-
-    
 
     def _step(self, raw_text: str) -> Tuple[Any, float, bool, Dict]:
         """Step the environment with llm raw response
@@ -377,7 +274,8 @@ class SokobanInterface(BaseInterface):
         reward, done, final_info = 0, False, {}
 
 
-        preprocess_result = self._preprocess(raw_text)
+        # preprocess_result = self._preprocess(raw_text)
+        preprocess_result = preprocess(raw_text, self._extract_one_action, self.INVALID_ACTION)
         think = preprocess_result.think
         action_list = preprocess_result.action_list
         answer = preprocess_result.answer
@@ -405,12 +303,14 @@ class SokobanInterface(BaseInterface):
 
         env_state = self.env._render(mode='text' if not self.visual_env else 'rgb_array') # NOTE currently called after step
 
-        return self._postprocess(
+        return postprocess(
             env_state=env_state,
             reward=reward,
             done=done,
             info=final_info,
             preprocess_result=preprocess_result,
+            action_lookup=self.ACTION_LOOKUP,
+            action_template=action_template,
         )
     
     def _reset(self, seed: Optional[int] = None) -> Tuple[Dict, Dict]:
@@ -472,3 +372,4 @@ class SokobanInterface(BaseInterface):
     
     def get_traj_reward(self):
         return self.traj_reward
+

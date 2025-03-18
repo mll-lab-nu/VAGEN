@@ -8,6 +8,7 @@ from PIL import Image
 import numpy as np
 from dataclasses import dataclass, field
 
+
 IMAGE_PLACEHOLDER = "<image>"
 
 @dataclass
