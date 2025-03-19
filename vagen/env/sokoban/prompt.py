@@ -15,7 +15,7 @@ Rules:
 1. Push boxes (can't pull).
 2. Avoid walls (#).
 
-Actions you can take: Up, Down, Left, Right. You can only take one action at a time.
+Actions you can take: Up, Down, Left, Right. You can only take up to {max_action_per_step} at a time.
 Up: move up to the cell above (to the above row).
 Down: move down to the cell below (to the below row).
 Left: move left to the cell to the left (to the left column).
@@ -28,8 +28,8 @@ Format correct: +0.5
 
 Please think step by step and provide the action you want to take.
 Your reponse should be in the format of <think>...</think><answer>...</answer>
-E.g. <think> There's a box on the upper right of me, the target is on the upper side of the box, I need to push the box it upward. </think><answer> Right,Up,Up </answer>
 """
+# E.g. <think> There's a box on the upper right of me, the target is on the upper side of the box, I need to push the box it upward. </think><answer> Right,Up,Up </answer>
 # Let's try to use a format reward and answer reward
 # If the reponse provides a final answer and is corect, the model receives an accurtacy reward of +1
 # is the response encloses its thinking in <think></think> and the final answer is <answer></answer> tags, the model receives a format reward of +1
