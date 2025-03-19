@@ -336,7 +336,7 @@ class QwenVLRolloutManger():
                     for img in record['image_data']:
                         image_data.append(img)
             
-        prompt_with_chat_template = self.tokenizer.apply_chat_template(chat, add_generation_prompt=True, tokenize=False)
+        prompt_with_chat_template = self.tokenizer.apply_chat_template(chat, add_generation_prompt=(not is_final), tokenize=False)
         # switch box_end and im_end so that the model can learn to generate <|im_end|>
         prompt_with_chat_template = prompt_with_chat_template.replace(
             f'{self.config.special_token_for_loss_mask[1]}{self.tokenizer.eos_token}',
