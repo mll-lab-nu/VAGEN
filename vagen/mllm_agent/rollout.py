@@ -337,6 +337,9 @@ class QwenVLRolloutManger():
                         image_data.append(img)
             
         prompt_with_chat_template = self.tokenizer.apply_chat_template(chat, add_generation_prompt=(not is_final), tokenize=False)
+        if is_final: # NoTE hard coded
+            assert prompt_with_chat_template[-1]== '\n', "The last token should be new line token"
+            prompt_with_chat_template = prompt_with_chat_template[:-1] # remove the last in token
         # switch box_end and im_end so that the model can learn to generate <|im_end|>
         prompt_with_chat_template = prompt_with_chat_template.replace(
             f'{self.config.special_token_for_loss_mask[1]}{self.tokenizer.eos_token}',
@@ -348,7 +351,7 @@ class QwenVLRolloutManger():
         }
     
     @torch.no_grad()
-    def _generate_input_item(
+    def _generate_input_for_rollout(
             self, 
             recording: List[Dict], 
             step: int, 
@@ -398,7 +401,7 @@ class QwenVLRolloutManger():
 
 
     @torch.no_grad()
-    def _generate_input_final_item(
+    def _generate_input_for_uptate(
             self, 
             recording: List[Dict], 
             step: int, 
@@ -514,7 +517,7 @@ class QwenVLRolloutManger():
         return row_dict
 
     @torch.no_grad()
-    def gen_batch(self, step, window_size):
+    def generate_batch_for_rollout(self, step, window_size):
         """
         Generate a batch of data for the current step
         
@@ -533,7 +536,7 @@ class QwenVLRolloutManger():
             if self.env_states[env_id]['done']:
                 continue
 
-            batch.append(self._generate_input_item(self.recorder[env_id], step, window_size))
+            batch.append(self._generate_input_for_rollout(self.recorder[env_id], step, window_size))
             self.batch_idx_to_env_id[batch_idx] = env_id
             batch_idx += 1
         if not batch:
@@ -554,7 +557,7 @@ class QwenVLRolloutManger():
             Dictionary containing the results of the step
         """
         for step in range(self.config.max_turns):
-            input_batch_dict = self.gen_batch(step, self.config.window_size)
+            input_batch_dict = self.generate_batch_for_rollout(step, self.config.window_size)
             if input_batch_dict is None:
                 break
             input_batch = DataProto.from_single_dict(input_batch_dict)
@@ -597,7 +600,7 @@ class QwenVLRolloutManger():
                 self.record(env_id, obs, reward, done, info)
         
     @torch.no_grad()
-    def get_final_trajectory(self) -> DataProto:
+    def generate_batch_for_update(self) -> DataProto:
         """
         Get the final trajectory of all environments
 
@@ -606,7 +609,7 @@ class QwenVLRolloutManger():
         """
         batch_list = []
         for env_id in self.envs.keys():
-            row_dict = self._generate_input_final_item(
+            row_dict = self._generate_input_for_uptate(
                 recording=self.recorder[env_id],
                 step=self.env_states[env_id]['step'],
                 window_size=None,

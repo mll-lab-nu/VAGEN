@@ -256,13 +256,20 @@ def reduce_metrics(metrics: dict):
 
 
 def _compute_response_info(batch):
-    response_length = batch.batch['responses'].shape[-1]
+    if "loss_mask" in batch.batch.keys():
+        end_of_response_position_mask=batch.batch["end_of_response_position_mask"]
+        response_length = (batch.batch['loss_mask'].sum(-1)/ end_of_response_position_mask.sum(-1))
+        prompt_length = ((batch.batch['attention_mask']-batch.batch['loss_mask']).sum(-1)/ end_of_response_position_mask.sum(-1))
+        response_part_length = batch.batch['responses'].shape[-1]
+        response_mask = batch.batch['loss_mask'][:, -response_part_length:]
+    else:
+        response_length = batch.batch['responses'].shape[-1]
 
-    prompt_mask = batch.batch['attention_mask'][:, :-response_length]
-    response_mask = batch.batch['attention_mask'][:, -response_length:]
+        prompt_mask = batch.batch['attention_mask'][:, :-response_length]
+        response_mask = batch.batch['attention_mask'][:, -response_length:]
 
-    prompt_length = prompt_mask.sum(-1).float()
-    response_length = response_mask.sum(-1).float()  # (batch_size,)
+        prompt_length = prompt_mask.sum(-1).float()
+        response_length = response_mask.sum(-1).float()  # (batch_size,)
 
     return dict(
         response_mask=response_mask,
@@ -286,14 +293,10 @@ def compute_data_metrics(batch, use_critic=True):
 
     max_prompt_length = prompt_mask.size(-1)
 
-    if "loss_mask" in batch.batch.keys():
-        end_of_response_position_mask=batch.batch["end_of_response_position_mask"]
-        response_length = (batch.batch['loss_mask'].sum(-1)/ end_of_response_position_mask.sum(-1))
-        prompt_length = ((1-batch.batch['loss_mask']).sum(-1)/ end_of_response_position_mask.sum(-1))
-    else:
-        response_info = _compute_response_info(batch)
-        prompt_length = response_info['prompt_length']
-        response_length = response_info['response_length']
+    
+    response_info = _compute_response_info(batch)
+    prompt_length = response_info['prompt_length']
+    response_length = response_info['response_length']
 
     valid_adv = torch.masked_select(advantages, response_mask)
     valid_returns = torch.masked_select(returns, response_mask)
@@ -642,7 +645,7 @@ class RayPPOTrainer(object):
         samples.sort(key=lambda x: x[0])  # Sort by input text
 
         # Use fixed random seed for deterministic shuffling
-        rng = np.random.RandomState(42)
+        rng = np.random.RandomState()
         rng.shuffle(samples)
 
         # Take first N samples after shuffling
@@ -1037,7 +1040,7 @@ class RayPPOTrainer(object):
                     with _timer('gen', timing_raw):
                         # gen_batch_output = self.actor_rollout_wg.generate_sequences(gen_batch)
                         rollout_manager.rollout_loop()
-                        final_gen_batch_output = rollout_manager.get_final_trajectory()
+                        final_gen_batch_output = rollout_manager.generate_batch_for_update()
 
                     print(f"[DEBUG] step {self.global_steps} rollout ends")
                     
