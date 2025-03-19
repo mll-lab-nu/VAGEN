@@ -12,8 +12,6 @@ echo "Starting installation process..."
 # cd ../
 
 echo "Installing vagen dependencies..."
-pip install 'transformers==4.49.0'
-pip install 'vllm==0.7.3'
 pip install 'qwen-vl-utils'
 pip install 'mathruler'
 pip install 'gym'
