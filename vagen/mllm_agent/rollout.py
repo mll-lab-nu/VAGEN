@@ -343,13 +343,10 @@ class QwenVLRolloutManger():
                         image_data.append(img)
             
         prompt_with_chat_template = self.tokenizer.apply_chat_template(chat, add_generation_prompt=(not is_final), tokenize=False)
-        if is_final: # NoTE hard coded
-            assert prompt_with_chat_template[-1]== '\n', "The last token should be new line token"
+        if is_final: # NOTE hard coded
+            assert prompt_with_chat_template[-1] == '\n', f"The last token should be new line token, got {prompt_with_chat_template[-1]}"
             prompt_with_chat_template = prompt_with_chat_template[:-1] # remove the last in token
         # switch box_end and im_end so that the model can learn to generate <|im_end|>
-        if is_final:
-            assert prompt_with_chat_template[-1] == '\n', "The last token of the prompt should be a newline"
-            prompt_with_chat_template = prompt_with_chat_template[:-1]
         prompt_with_chat_template = prompt_with_chat_template.replace(
             f'{self.config.special_token_for_loss_mask[1]}{self.tokenizer.eos_token}',
             f'{self.tokenizer.eos_token}{self.config.special_token_for_loss_mask[1]}')
