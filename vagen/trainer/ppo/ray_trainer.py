@@ -288,8 +288,8 @@ def compute_data_metrics(batch, use_critic=True):
 
     if "loss_mask" in batch.batch.keys():
         end_of_response_position_mask=batch.batch["end_of_response_position_mask"]
-        response_length = (batch.batch['loss_mask'].sum(-1)/ end_of_response_position_mask.sum(-1)).mean().item()
-        prompt_length = ((1-batch.batch['loss_mask']).sum(-1)/ end_of_response_position_mask.sum(-1)).mean().item()
+        response_length = (batch.batch['loss_mask'].sum(-1)/ end_of_response_position_mask.sum(-1))
+        prompt_length = ((1-batch.batch['loss_mask']).sum(-1)/ end_of_response_position_mask.sum(-1))
     else:
         response_info = _compute_response_info(batch)
         prompt_length = response_info['prompt_length']
