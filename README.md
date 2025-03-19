@@ -1,5 +1,5 @@
 ## Overview
-This repo aims for Multi-turn Reinforcemnet for Vision Language Models.
+This repo aims for Multi-turn Reinforcement Learning for Vision Language Models.
 
 ## Installation
 
