@@ -64,11 +64,12 @@ class AdvantageEstimator(str, Enum):
     Using an enumeration class to avoid spelling errors in adv_estimator
     """
     GAE = 'gae'
+    MASKED_GAE = 'masked_gae'
+    MULTI_TURN_GAE = 'multi_turn_gae'
     GRPO = 'grpo'
     REINFORCE_PLUS_PLUS = 'reinforce_plus_plus'
     REMAX = 'remax'
     RLOO = 'rloo'
-    MULTI_TURN_GAE = 'multi_turn_gae'
     MULTI_TURN_GRPO = 'multi_turn_grpo'
 
 
@@ -144,20 +145,27 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         attention_mask = data.batch['attention_mask']
         response_mask = attention_mask[:, -response_length:]
         token_level_rewards = data.batch['token_level_rewards']
-        if "loss_mask" in data.batch.keys():
-            # get non zero position of token level rewards
-            loss_mask = data.batch['loss_mask'][:, -response_length:]
-            advantages, returns =core_algos.compute_gae_advantage_return_with_loss_mask(token_level_rewards=token_level_rewards,
+        advantages, returns = core_algos.compute_gae_advantage_return(token_level_rewards=token_level_rewards,
                                                                     values=values,
-                                                                    loss_mask=loss_mask,
+                                                                    eos_mask=response_mask,
                                                                     gamma=gamma,
                                                                     lam=lam)
-        else:
-            advantages, returns = core_algos.compute_gae_advantage_return(token_level_rewards=token_level_rewards,
-                                                                        values=values,
-                                                                        eos_mask=response_mask,
-                                                                        gamma=gamma,
-                                                                        lam=lam)
+        data.batch['advantages'] = advantages
+        data.batch['returns'] = returns
+    elif adv_estimator == AdvantageEstimator.MASKED_GAE:
+        values = data.batch['values']
+        responses = data.batch['responses']
+        response_length = responses.size(-1)
+        attention_mask = data.batch['attention_mask']
+        response_mask = attention_mask[:, -response_length:]
+        token_level_rewards = data.batch['token_level_rewards']
+        assert "loss_mask" in data.batch.keys()
+        loss_mask = data.batch['loss_mask'][:, -response_length:]
+        advantages, returns =core_algos.compute_gae_advantage_return_with_loss_mask(token_level_rewards=token_level_rewards,
+                                                                values=values,
+                                                                loss_mask=loss_mask,
+                                                                gamma=gamma,
+                                                                lam=lam)
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
     elif adv_estimator == AdvantageEstimator.MULTI_TURN_GAE:
@@ -167,6 +175,7 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         attention_mask = data.batch['attention_mask']
         response_mask = attention_mask[:, -response_length:]
         assert "multi_turn_token_level_rewards" in data.batch.keys()
+        assert "loss_mask" in data.batch.keys()
         loss_mask = data.batch['loss_mask'][:, -response_length:]
         print(f"[DEBUG] high_level_gamma={high_level_gamma}")
         advantages, returns = core_algos.compute_multi_turn_gae_advantage_return(token_level_rewards=data.batch['token_level_rewards'],
@@ -449,7 +458,7 @@ class RayPPOTrainer(object):
         else:
             self.kl_ctrl = core_algos.FixedKLController(kl_coef=0.)
 
-        if self.config.algorithm.adv_estimator in [AdvantageEstimator.GAE, AdvantageEstimator.MULTI_TURN_GAE]:
+        if self.config.algorithm.adv_estimator in [AdvantageEstimator.GAE, AdvantageEstimator.MULTI_TURN_GAE,AdvantageEstimator.MASKED_GAE]:
             self.use_critic = True
         elif self.config.algorithm.adv_estimator in [
                 AdvantageEstimator.GRPO, AdvantageEstimator.REINFORCE_PLUS_PLUS, AdvantageEstimator.REMAX,
