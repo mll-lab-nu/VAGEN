@@ -161,9 +161,15 @@ class SokobanInterface(BaseInterface):
 
     def __init__(
             self,
-            **env_config,
+            env_config: Dict,
+            interface_config: Dict,
         ):
-        super().__init__(**env_config)
+        """
+        Args:
+            env_config (Dict): environment configuration
+            interface_config (Dict): interface configuration
+        """
+        super().__init__(env_config)
 
         dim_room = self.env_config['dim_room']
         num_boxes = self.env_config['num_boxes']
@@ -176,6 +182,15 @@ class SokobanInterface(BaseInterface):
             search_depth=search_depth
         )
         self.visual_env = self.env_config.get('visual_env', True)
+
+        max_action_per_step = interface_config.setdefault('max_action_per_step', 1)
+        max_action_penalty = interface_config.setdefault('max_action_penalty', -0.5)
+        format_reward = interface_config.setdefault('format_reward', 0.5)
+        self.interface_config = {
+            'max_action_per_step': max_action_per_step,
+            'max_action_penalty': max_action_penalty,
+            'format_reward': format_reward,
+        }
         
     @classmethod
     def _extract_one_action(cls, text):
@@ -233,22 +248,23 @@ class SokobanInterface(BaseInterface):
         answer = preprocess_result.answer
         final_info['llm_raw_response'] = preprocess_result.llm_raw_response
 
-        if think and answer: # format reward for <think>...</think><answer>...</answer>
-            reward += self.FORMAT_REWARD
-        else: # format penalty
-            reward += self.FORMAT_PENALTY
-        if action_list: # valid action reward
-            reward += self.VALID_ACTION_REWARD
-        if len(action_list) > self.MAX_ACTION_PER_STEP:
-            reward += self.MAX_ACTION_PENALTY
+
+        # parse format and action list
+        if action_list:
+            reward += self.interface_config['format_reward']
+        if len(action_list) > self.interface_config['max_action_per_step']:
+            reward += self.interface_config['max_action_penalty']
+            action_list = action_list[:self.interface_config['max_action_per_step']]
+            preprocess_result.action_list = action_list
+            
 
         info = {}
         for action in action_list:
             if done or self.env.finished():
                 break
             _, env_reward, done, info = self.env.step(action)
-            if env_reward == -0.1:
-                env_reward = 0 # NOTE hard coded here to set step reward to 0
+            # if env_reward == -0.1:
+            #     env_reward = -0.01 # NOTE hard coded here to set step reward to 0
             reward += env_reward
         self.traj_reward += reward
         final_info.update(info) # NOTE currently only use the last step info
@@ -293,12 +309,13 @@ class SokobanInterface(BaseInterface):
         self.env.close()
 
     @classmethod
-    def config_repr(cls, config: Dict) -> str:
+    def config_repr(cls, env_config: Dict, interface_config: Dict) -> str:
         """
         Create a string representation of the configuration.
         
         Args:
-            config: Dictionary containing configuration
+            env_config: Dictionary containing environment configuration
+            interface_config: Dictionary containing interface configuration
             
         Returns:
             String representation of the configuration
@@ -306,19 +323,26 @@ class SokobanInterface(BaseInterface):
         Raises:
             ValueError: If required keys are missing from the configuration
         """
+
         required_keys = ['dim_room', 'num_boxes', 'max_steps', 'search_depth']
         
         # Check for required keys
-        if not all(key in config for key in required_keys):
-            missing_keys = [key for key in required_keys if key not in config]
+        if not all(key in env_config for key in required_keys):
+            missing_keys = [key for key in required_keys if key not in env_config]
             raise ValueError(f"Missing required keys in config: {missing_keys}")
             
-        # Format the configuration string
-        return (f"SokobanGame(dim_room={config['dim_room']}, "
-                f"num_boxes={config['num_boxes']}, "
-                f"max_steps={config['max_steps']}, "
-                f"search_depth={config['search_depth']})")
-    
+        env_config_str = (
+            f"SokobanGame(dim_room={env_config['dim_room']}, "
+            f"num_boxes={env_config['num_boxes']}, "
+            f"max_steps={env_config['max_steps']}, "
+            f"search_depth={env_config['search_depth']})"
+        )
+        interface_config_str = (
+            f"SokobanInterface(max_action_per_step={interface_config.get('max_action_per_step', 1)}, "
+            f"max_action_penalty={interface_config.get('max_action_penalty', -0.1)}, "
+            f"format_reward={interface_config.get('format_reward', 0.5)})"
+        )
+        return f"{env_config_str}, {interface_config_str}"
     def get_task_instruction(self) -> str:
         return instruction_template
     

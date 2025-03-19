@@ -12,6 +12,10 @@ python -m vagen.env.sokoban.create_dataset \
     --search_depth 30 \
     --start_seed 0 \
     --train_ratio 0.8 \
+    --visual_env \
+    --max_action_per_step 2 \
+    --max_action_penalty -0.1 \
+    --format_reward 0.5 \
     --n_candidate 20000
 
 # max_trajectory_length = max_prompt_length + max_response_length

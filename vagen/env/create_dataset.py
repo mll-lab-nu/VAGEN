@@ -5,15 +5,17 @@ import os
 import pandas as pd
 import argparse
 from pathlib import Path
-from typing import Union, List
+from typing import Union, List, Dict
 
 class DatasetCreator:
 
-    def __init__(self, config):
+    def __init__(self, config: Dict):
         self.config = config
+        self.data_dir = self.config['data_dir']
+
         self.env_name = self.config['name']
         self.env_config = self.config['env_config']
-        self.data_dir = self.config['data_dir']
+        self.interface_config = self.config['interface_config']
         
         
 
@@ -39,6 +41,7 @@ class DatasetCreator:
             env_settings = {
                 'env_name': self.env_name,
                 'env_config': self.env_config,
+                'interface_config': self.interface_config,
                 'seed': seed_idx
             }
 
@@ -122,22 +125,3 @@ class DatasetCreator:
         except Exception as e:
             print(f"Error merging parquet files: {str(e)}")
             return False
-
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--config_path', type=str, default='config.yaml')
-    parser.add_argument('--start_seed', type=int, default=10000)
-    parser.add_argument('--train_size', type=int, default=10000)
-    parser.add_argument('--test_size', type=int, default=1000)
-    parser.add_argument('--force-gen', action='store_true', 
-                        help='Force dataset generation even if files already exist')
-    args = parser.parse_args()
-    creator = DatasetCreator(config_path=args.config_path)
-    creator.create_dataset(
-        start_seed=args.start_seed, 
-        train_size=args.train_size, 
-        test_size=args.test_size,
-        force_gen=args.force_gen
-    )

@@ -18,6 +18,7 @@ class EnvConfig:
     """
     env_name: str
     env_config: Dict[str, Any]
+    interface_config: Dict[str, Any]
     seed: int
 
 class BaseEnv(ABC):
@@ -79,8 +80,9 @@ class BaseEnv(ABC):
     
         
 class BaseInterface(ABC):
-    def __init__(self, **env_config):
+    def __init__(self, env_config: Dict, interface_config: Dict = None):
         self.env_config = env_config
+        self.interface_config = interface_config
         
     @classmethod
     def name_repr(cls) -> str:

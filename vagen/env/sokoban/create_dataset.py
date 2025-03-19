@@ -22,7 +22,7 @@ from vagen.env.sokoban.room_utils import get_shortest_action_path, plot_animatio
 class SokobanDatasetCreator(DatasetCreator):
 
     def _process_seed(self, seed: int, max_action_length: int = 5):
-        env_interface = SokobanInterface(**self.env_config)
+        env_interface = SokobanInterface(self.env_config, self.interface_config)
         env_interface.reset(seed=seed)
         gt_action_sequence = get_shortest_action_path(
             env_interface.env.room_fixed, 
@@ -141,6 +141,13 @@ if __name__ == "__main__":
     parser.add_argument('--visual_env', action='store_true',
                         help='Whether to use visual environment')
     
+    parser.add_argument('--max_action_per_step', type=int, default=1,
+                        help='Maximum number of actions per step')
+    parser.add_argument('--max_action_penalty', type=float, default=-0.1,
+                        help='Penalty for exceeding the maximum number of actions per step')
+    parser.add_argument('--format_reward', type=float, default=0.5,
+                        help='Reward for correct formatting')
+    
     import os
     if 'PYTHONHASHSEED' not in os.environ:
         os.environ['PYTHONHASHSEED'] = '0'
@@ -157,6 +164,11 @@ if __name__ == "__main__":
         'max_steps': args.max_steps,
         'search_depth': args.search_depth,
         'visual_env': args.visual_env
+    }
+    args.interface_config = {
+        'max_action_per_step': args.max_action_per_step,
+        'max_action_penalty': args.max_action_penalty,
+        'format_reward': args.format_reward,
     }
     creator = SokobanDatasetCreator(config=vars(args))
     if args.max_action_length:

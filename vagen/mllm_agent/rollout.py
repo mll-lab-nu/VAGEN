@@ -201,7 +201,7 @@ class QwenVLRolloutManger():
             
         for env_id, env in self.envs.items():
             env_name = env.name_repr()
-            env_config = env.config_repr(env.env_config)
+            env_config = env.config_repr(env.env_config, env.interface_config)
             bucket_key = f"{env_name}:{env_config}"
             env_buckets[bucket_key].add(env_id)
         
@@ -209,10 +209,11 @@ class QwenVLRolloutManger():
             env_id = i
             env_name = cfg.env_name
             env_config = cfg.env_config
+            interface_config = cfg.interface_config
             seed = cfg.seed
             
             # Create bucket key
-            config_key = REGISTERED_ENVS[env_name].config_repr(env_config)
+            config_key = REGISTERED_ENVS[env_name].config_repr(env_config, interface_config)
             bucket_key = f"{env_name}:{config_key}"
             
             # Check if we have an available environment with the same config
@@ -222,6 +223,7 @@ class QwenVLRolloutManger():
                     "env":self.envs[old_env_id],
                     "seed":seed,
                     "env_config":env_config,
+                    "interface_config":interface_config,
                 }
             else:
                 # don't initialize the environment here, close unused environments first
@@ -229,6 +231,7 @@ class QwenVLRolloutManger():
                     "env_class":REGISTERED_ENVS[env_name],
                     "seed":seed,
                     "env_config":env_config,
+                    "interface_config":interface_config,
                 }
         
         # Close unused environments
@@ -250,7 +253,10 @@ class QwenVLRolloutManger():
                 self.envs[env_id] = env_info["env"]
             else:
                 assert "env_class" in env_info
-                self.envs[env_id] = env_info["env_class"](**env_info["env_config"])
+                self.envs[env_id] = env_info["env_class"](
+                    env_config=env_info["env_config"], 
+                    interface_config=env_info["interface_config"],
+                )
             obs, info = self.envs[env_id].reset(env_info["seed"])
             initial_obs[env_id] = obs
             initial_info[env_id] = info
@@ -341,6 +347,9 @@ class QwenVLRolloutManger():
             assert prompt_with_chat_template[-1]== '\n', "The last token should be new line token"
             prompt_with_chat_template = prompt_with_chat_template[:-1] # remove the last in token
         # switch box_end and im_end so that the model can learn to generate <|im_end|>
+        if is_final:
+            assert prompt_with_chat_template[-1] == '\n', "The last token of the prompt should be a newline"
+            prompt_with_chat_template = prompt_with_chat_template[:-1]
         prompt_with_chat_template = prompt_with_chat_template.replace(
             f'{self.config.special_token_for_loss_mask[1]}{self.tokenizer.eos_token}',
             f'{self.tokenizer.eos_token}{self.config.special_token_for_loss_mask[1]}')
@@ -634,7 +643,7 @@ class QwenVLRolloutManger():
         images=[]
         for k,v in self.recorder.items():
             step=self.env_states[k]['step']
-            input_str=self.envs[k].name_repr()+self.envs[k].config_repr(self.envs[k].env_config)
+            input_str=self.envs[k].name_repr()+self.envs[k].config_repr(self.envs[k].env_config, self.envs[k].interface_config)
             ouput_rst=self._single_recording_to_prompt(v, step, window_size=None, is_final=False) # we should see the last obs 
             score=self.envs[k].get_traj_reward()
             inputs.append(input_str)

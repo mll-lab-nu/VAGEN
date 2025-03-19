@@ -108,8 +108,8 @@ def postprocess(
     done: bool,
     info: Dict,
     preprocess_result: PreprocessResult,
-    action_lookup: Dict,
     action_template: str,
+    action_lookup: Dict = None,
 ) -> Tuple[Dict, float, bool, Dict]:
     """Postprocess the environment feedback to obs, reward, done, info
     NOTE now assume there's only one image in the observation
@@ -133,7 +133,10 @@ def postprocess(
     answer = preprocess_result.answer
     valid_action = []
     for action in preprocess_result.action_list:
-        valid_action.append(action_lookup[action])
+        if action_lookup is None:
+            valid_action.append(action)
+        else:
+            valid_action.append(action_lookup[action])
 
     observation = IMAGE_PLACEHOLDER if not isinstance(env_state, str) else env_state
     text_template = action_template.format(

@@ -4,14 +4,18 @@ export VLLM_ATTENTION_BACKEND=XFORMERS
 export PYTHONHASHSEED=0
 
 python -m vagen.env.sokoban.create_dataset \
-    --data_dir data/sokoban-text-3-step \
-    --max_action_length 3 \
+    --data_dir data/sokoban-vision-2-step \
+    --max_action_length 2 \
     --dim_room 6 6 \
     --num_boxes 1 \
     --max_steps 100 \
     --search_depth 30 \
     --start_seed 0 \
     --train_ratio 0.8 \
+    --visual_env \
+    --max_action_per_step 2 \
+    --max_action_penalty -0.1 \
+    --format_reward 0.5 \
     --n_candidate 20000
 
 # max_trajectory_length = max_prompt_length + max_response_length
@@ -19,8 +23,8 @@ python -m vagen.env.sokoban.create_dataset \
 python3 -m vagen.trainer.main_ppo \
     algorithm.adv_estimator=gae \
     algorithm.high_level_gamma=0.95 \
-    data.train_files=data/sokoban-text-3-step/train.parquet \
-    data.val_files=data/sokoban-text-3-step/test.parquet \
+    data.train_files=data/sokoban-vision-2-step/train.parquet \
+    data.val_files=data/sokoban-vision-2-step/test.parquet \
     data.train_batch_size=64 \
     data.max_prompt_length=1920 \
     data.max_response_length=128 \

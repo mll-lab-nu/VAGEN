@@ -742,6 +742,7 @@ class RayPPOTrainer(object):
             env_configs = [
                     EnvConfig(env_name=batch.non_tensor_batch['extra_info'][i]['env_name'],
                               env_config=batch.non_tensor_batch['extra_info'][i]['env_config'],
+                              interface_config=batch.non_tensor_batch['extra_info'][i]['interface_config'],
                               seed=batch.non_tensor_batch['extra_info'][i]['seed'])
                     for i in range(len(batch))
                 ]
@@ -1039,6 +1040,7 @@ class RayPPOTrainer(object):
                 env_configs = [
                     EnvConfig(env_name=batch.non_tensor_batch['extra_info'][i]['env_name'],
                               env_config=batch.non_tensor_batch['extra_info'][i]['env_config'],
+                              interface_config=batch.non_tensor_batch['extra_info'][i]['interface_config'],
                               seed=batch.non_tensor_batch['extra_info'][i]['seed'])
                     for i in range(len(batch))
                 ]
