@@ -1,3 +1,6 @@
+## Overview
+This repo aims for Multi-turn Reinforcement Learning for Vision Language Models.
+
 ## Installation
 
 ```
@@ -6,7 +9,7 @@ git clone git@github.com:JamesKrW/verl.git
 cd verl
 pip install -e .
 cd ../
-git clone git@github.com:JamesKrW/vagen.git
+git clone git@github.com:RAGEN-AI/vagen.git
 cd vagen
 bash scripts/install.sh
 ```
