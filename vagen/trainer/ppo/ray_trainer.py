@@ -175,7 +175,7 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
                                                                         gamma=gamma,
                                                                         lam=lam,
                                                                         high_level_gamma=high_level_gamma,
-                                                                        reward_masks=data.batch['reward_masks'][:, -response_length:])
+                                                                        reward_masks=data.batch['end_of_response_position_mask'][:, -response_length:])
         
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
@@ -286,9 +286,14 @@ def compute_data_metrics(batch, use_critic=True):
 
     max_prompt_length = prompt_mask.size(-1)
 
-    response_info = _compute_response_info(batch)
-    prompt_length = response_info['prompt_length']
-    response_length = response_info['response_length']
+    if "loss_mask" in batch.batch.keys():
+        end_of_response_position_mask=batch.batch["end_of_response_position_mask"]
+        response_length = (batch.batch['loss_mask'].sum(-1)/ end_of_response_position_mask.sum(-1)).mean().item()
+        prompt_length = ((1-batch.batch['loss_mask']).sum(-1)/ end_of_response_position_mask.sum(-1)).mean().item()
+    else:
+        response_info = _compute_response_info(batch)
+        prompt_length = response_info['prompt_length']
+        response_length = response_info['response_length']
 
     valid_adv = torch.masked_select(advantages, response_mask)
     valid_returns = torch.masked_select(returns, response_mask)

@@ -107,7 +107,7 @@ class QwenVLRolloutManger():
             input_ids: (batch_size, seq_len)
             attention_mask: (batch_size, seq_len)
             loss_mask: (batch_size, seq_len) # e.g. 0000|1111|0000|11111|000|1111
-            token_level_rewards_mask: (batch_size, seq_len) # e.g. 0000|0001|0000|00001|000|0001 given the loss mask, mark the position which will be given step reward
+            end_of_response_position_mask: (batch_size, seq_len) # e.g. 0000|0001|0000|00001|000|0001 given the end of sequence mask, mark the position of the last token in the response
         
         - There will be different stratgy to handel special tokens in the input_ids
         - 1. remove them, in this case we need to fill the hole by adding pad in the right and shift the sequence left
@@ -134,8 +134,8 @@ class QwenVLRolloutManger():
         new_attention_mask = attention_mask.clone()
         loss_mask = torch.zeros_like(input_ids)
         new_loss_mask = torch.zeros_like(input_ids)
-        token_level_rewards_mask = torch.zeros_like(input_ids)
-        new_token_level_rewards_mask = torch.zeros_like(input_ids)
+        end_of_response_position_mask = torch.zeros_like(input_ids)
+        new_end_of_response_position_mask = torch.zeros_like(input_ids)
         # Process each example in the batch
         for b in range(batch_size):
             # Count right padding tokens using attention mask
@@ -152,7 +152,7 @@ class QwenVLRolloutManger():
             hole_pos=[] # initialize holes position list with last padding token position
             for start_pos, end_pos in zip(sptk_b_indices, sptk_e_indices):
                 loss_mask[b][start_pos+1:end_pos] = 1
-                token_level_rewards_mask[b][end_pos-1] = 1
+                end_of_response_position_mask[b][end_pos-1] = 1
                 hole_pos.append(start_pos.item())
                 hole_pos.append(end_pos.item())
             hole_pos.append(seq_len-right_pad_tokens)
@@ -164,7 +164,7 @@ class QwenVLRolloutManger():
                 start_pos = hole_pos[i]
                 end_pos = hole_pos[i+1]
                 new_loss_mask[b,start_pos+1-holes_to_fill:end_pos-holes_to_fill]=loss_mask[b,start_pos+1:end_pos]
-                new_token_level_rewards_mask[b,start_pos+1-holes_to_fill:end_pos-holes_to_fill]=token_level_rewards_mask[b,start_pos+1:end_pos]
+                new_end_of_response_position_mask[b,start_pos+1-holes_to_fill:end_pos-holes_to_fill]=end_of_response_position_mask[b,start_pos+1:end_pos]
                 new_input_ids[b,start_pos+1-holes_to_fill:end_pos-holes_to_fill]=input_ids[b,start_pos+1:end_pos]
                 new_attention_mask[b,start_pos+1-holes_to_fill:end_pos-holes_to_fill]=attention_mask[b,start_pos+1:end_pos]
                 holes_to_fill+=1
@@ -174,7 +174,7 @@ class QwenVLRolloutManger():
             new_input_ids[b][valid_tokens:]=pad_token_id
             new_attention_mask[b][valid_tokens:]=0
         
-        return new_input_ids, new_attention_mask, new_loss_mask, new_token_level_rewards_mask
+        return new_input_ids, new_attention_mask, new_loss_mask, new_end_of_response_position_mask
     
     @torch.no_grad()
     def reset(self, env_configs: List[EnvConfig]):
@@ -456,22 +456,22 @@ class QwenVLRolloutManger():
         attention_mask_prompt=torch.zeros_like(input_ids_prompt) # All prompt will be masked
         
         
-        input_ids_response, attention_mask_response, loss_mask_response,token_level_rewards_mask_response = self._compute_loss_mask(input_ids_response, attention_mask_response)
+        input_ids_response, attention_mask_response, loss_mask_response,end_of_response_position_mask_response = self._compute_loss_mask(input_ids_response, attention_mask_response)
         
         input_ids_prompt=input_ids_prompt[0]
         attention_mask_prompt=attention_mask_prompt[0]
         loss_mask_prompt = torch.zeros_like(attention_mask_prompt)
-        token_level_rewards_mask_prompt = torch.zeros_like(attention_mask_prompt)
+        end_of_response_position_mask_prompt = torch.zeros_like(attention_mask_prompt)
         
         input_ids_response=input_ids_response[0]
         attention_mask_response=attention_mask_response[0]
         loss_mask_response=loss_mask_response[0]
-        token_level_rewards_mask_response=token_level_rewards_mask_response[0]
+        end_of_response_position_mask_response=end_of_response_position_mask_response[0]
         
     
         
         loss_mask = torch.cat([loss_mask_prompt, loss_mask_response], dim=-1)
-        token_level_rewards_mask = torch.cat([token_level_rewards_mask_prompt, token_level_rewards_mask_response], dim=-1)
+        end_of_response_position_mask = torch.cat([end_of_response_position_mask_prompt, end_of_response_position_mask_response], dim=-1)
         input_ids = torch.cat([input_ids_prompt, input_ids_response], dim=-1)
         attention_mask = torch.cat([attention_mask_prompt, attention_mask_response], dim=-1)
 
@@ -494,15 +494,15 @@ class QwenVLRolloutManger():
             position_ids_response = position_ids_prompt[-1:] + delta_position_id
         
         if self.config.use_multi_turn_reward:
-            reward_positions = torch.nonzero(token_level_rewards_mask).squeeze(-1)
-            multi_turn_token_level_rewards = torch.zeros_like(token_level_rewards_mask, dtype=torch.float)
+            reward_positions = torch.nonzero(end_of_response_position_mask).squeeze(-1)
+            multi_turn_token_level_rewards = torch.zeros_like(end_of_response_position_mask, dtype=torch.float)
             assert len(reward_positions) == len(rewards), "Number of rewards does not match number of reward positions"
             for idx,reward in enumerate(rewards):
                 multi_turn_token_level_rewards[reward_positions[idx]] = reward
             row_dict["multi_turn_token_level_rewards"] = multi_turn_token_level_rewards # (seq_len,) 
-            row_dict["reward_masks"] = token_level_rewards_mask
         if self.config.use_loss_mask:
             row_dict['loss_mask'] = loss_mask
+        row_dict["end_of_response_position_mask"] = end_of_response_position_mask # 
         position_ids = torch.cat([position_ids_prompt, position_ids_response], dim=-1)
         row_dict['prompts'] = input_ids_prompt
         row_dict['responses'] = input_ids_response
