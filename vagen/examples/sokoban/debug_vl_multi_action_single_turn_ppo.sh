@@ -1,11 +1,12 @@
 set -x
 
+
 export VLLM_ATTENTION_BACKEND=XFORMERS
 export PYTHONHASHSEED=0
 
 python -m vagen.env.sokoban.create_dataset \
-    --data_dir data/sokoban-vision-2-step \
-    --max_action_length 2 \
+    --data_dir data/sokoban-vision-3-step \
+    --max_action_length 3 \
     --dim_room 6 6 \
     --num_boxes 1 \
     --max_steps 100 \
@@ -13,7 +14,7 @@ python -m vagen.env.sokoban.create_dataset \
     --start_seed 0 \
     --train_ratio 0.8 \
     --visual_env \
-    --max_action_per_step 2 \
+    --max_action_per_step 5 \
     --max_action_penalty -0.1 \
     --format_reward 0.5 \
     --n_candidate 20000
@@ -23,11 +24,11 @@ python -m vagen.env.sokoban.create_dataset \
 python3 -m vagen.trainer.main_ppo \
     algorithm.adv_estimator=gae \
     algorithm.high_level_gamma=0.95 \
-    data.train_files=data/sokoban-vision-2-step/train.parquet \
-    data.val_files=data/sokoban-vision-2-step/test.parquet \
+    data.train_files=data/sokoban-vision-3-step/train.parquet \
+    data.val_files=data/sokoban-vision-3-step/test.parquet \
     data.train_batch_size=64 \
     data.max_prompt_length=1920 \
-    data.max_response_length=128 \
+    data.max_response_length=256 \
     data.max_trajectory_length=2048 \
     data.image_key=images \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \
@@ -37,7 +38,7 @@ python3 -m vagen.trainer.main_ppo \
     actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=1 \
     actor_rollout_ref.actor.use_kl_loss=False \
     actor_rollout_ref.actor.kl_loss_coef=0.001 \
-    actor_rollout_ref.actor.kl_loss_type=low_var_kl \
+    actor_rollout_ref.actor.kl_loss_type=mse \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
     actor_rollout_ref.actor.fsdp_config.param_offload=False \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
@@ -62,7 +63,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
     trainer.project_name='vagen' \
-    trainer.experiment_name='debug_qwen_vl_2gpu_ppo_single_turn_ppo' \
+    trainer.experiment_name='debug_vl_multi_action_single_turn_ppo' \
     trainer.n_gpus_per_node=2 \
     trainer.nnodes=1 \
     trainer.save_freq=100 \
@@ -73,4 +74,4 @@ python3 -m vagen.trainer.main_ppo \
     trainer.val_before_train=True \
     trainer.val_generations_to_log_to_wandb=4 \
     rollout_manager.n_trajectory=2 \
-    2>&1 | tee debug_qwen_vl_2gpu_ppo_single_turn_ppo.log
+    2>&1 | tee debug_vl_multi_action_single_turn_ppo.log
