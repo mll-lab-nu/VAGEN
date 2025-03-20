@@ -15,7 +15,7 @@ Rules:
 1. Push boxes (can't pull).
 2. Avoid walls (#).
 
-Actions you can take: Up, Down, Left, Right. You can only take up to {max_action_per_step} at a time.
+Actions you can take: Up, Down, Left, Right. You can take up to {max_action_per_step} action(s) at a time.
 Up: move up to the cell above (to the above row).
 Down: move down to the cell below (to the below row).
 Left: move left to the cell to the left (to the left column).
@@ -26,7 +26,7 @@ Box on target: +1.0
 All boxes placed: +10.0
 Format correct: +0.5
 
-Please think step by step and provide the action you want to take.
+Please think step by step and provide the actions you want to take.
 Your reponse should be in the format of <think>...</think><answer>...</answer>
 """
 # E.g. <think> There's a box on the upper right of me, the target is on the upper side of the box, I need to push the box it upward. </think><answer> Right,Up,Up </answer>
@@ -39,7 +39,7 @@ Your reponse should be in the format of <think>...</think><answer>...</answer>
 init_observation_template = """
 [Initial Observation]:
 {observation}
-Decide your next action.
+Decide your next action(s).
 Your reponse should be in the format of <think>...</think><answer>...</answer>
 """
 
@@ -48,6 +48,6 @@ After that, the observation is:
 {observation}
 reward: {reward}
 done: {done}
-Decide your next action.
+Decide your next action(s).
 Your reponse should be in the format of <think>...</think><answer>...</answer>
 """
