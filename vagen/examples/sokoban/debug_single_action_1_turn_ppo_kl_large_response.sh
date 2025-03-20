@@ -4,15 +4,15 @@ export VLLM_ATTENTION_BACKEND=XFORMERS
 export PYTHONHASHSEED=0
 
 python -m vagen.env.sokoban.create_dataset \
-    --data_dir data/sokoban-text-3-step \
-    --max_action_length 3 \
+    --data_dir data/sokoban-text-1-step \
+    --max_action_length 1 \
     --dim_room 6 6 \
     --num_boxes 1 \
     --max_steps 100 \
     --search_depth 30 \
     --start_seed 0 \
     --train_ratio 0.8 \
-    --max_action_per_step 5 \
+    --max_action_per_step 1 \
     --max_action_penalty -0.1 \
     --format_reward 0.5 \
     --n_candidate 20000 \
@@ -28,12 +28,12 @@ fi
 python3 -m vagen.trainer.main_ppo \
     algorithm.adv_estimator=gae \
     algorithm.high_level_gamma=0.95 \
-    data.train_files=data/sokoban-text-3-step/train.parquet \
-    data.val_files=data/sokoban-text-3-step/test.parquet \
-    data.train_batch_size=16 \
-    data.max_prompt_length=768 \
+    data.train_files=data/sokoban-text-1-step/train.parquet \
+    data.val_files=data/sokoban-text-1-step/test.parquet \
+    data.train_batch_size=64 \
+    data.max_prompt_length=512 \
     data.max_response_length=1024 \
-    data.max_trajectory_length=1024 \
+    data.max_trajectory_length=2048 \
     data.image_key=images \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-1.5B-Instruct \
     actor_rollout_ref.actor.optim.lr=1e-6 \
@@ -41,7 +41,7 @@ python3 -m vagen.trainer.main_ppo \
     actor_rollout_ref.actor.ppo_mini_batch_size=32 \
     actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=1 \
     actor_rollout_ref.actor.use_kl_loss=True \
-    actor_rollout_ref.actor.kl_loss_coef=0.001 \
+    actor_rollout_ref.actor.kl_loss_coef=0.01 \
     actor_rollout_ref.actor.kl_loss_type=mse \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
     actor_rollout_ref.actor.fsdp_config.param_offload=False \
@@ -54,7 +54,7 @@ python3 -m vagen.trainer.main_ppo \
     actor_rollout_ref.rollout.enforce_eager=False \
     actor_rollout_ref.rollout.free_cache_engine=False \
     actor_rollout_ref.rollout.n=1 \
-    +actor_rollout_ref.ref.use_ref=False \
+    +actor_rollout_ref.ref.use_ref=True \
     actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=1 \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     critic.optim.lr=1e-5 \
@@ -68,7 +68,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
     trainer.project_name='vagen' \
-    trainer.experiment_name='debug_multi_action_1_turn_ppo_kl' \
+    trainer.experiment_name='debug_single_action_1_turn_ppo_kl_large_response' \
     trainer.n_gpus_per_node=2 \
     trainer.nnodes=1 \
     trainer.save_freq=100 \
@@ -78,5 +78,6 @@ python3 -m vagen.trainer.main_ppo \
     rollout_manager.window_size=5 \
     trainer.val_before_train=True \
     trainer.val_generations_to_log_to_wandb=8 \
-    rollout_manager.n_trajectory=8 \
-    2>&1 | tee debug_multi_action_1_turn_ppo_kl.log
+    rollout_manager.n_trajectory=2 \
+    rollout_manager.use_loss_mask=True \
+    2>&1 | tee debug_single_action_1_turn_ppo_kl_large_response.log
