@@ -31,9 +31,9 @@ python3 -m vagen.trainer.main_ppo \
     data.train_files=data/sokoban-text-3-step/train.parquet \
     data.val_files=data/sokoban-text-3-step/test.parquet \
     data.train_batch_size=16 \
-    data.max_prompt_length=768 \
-    data.max_response_length=1024 \
-    data.max_trajectory_length=1024 \
+    data.max_prompt_length=1024 \
+    data.max_response_length=512 \
+    data.max_trajectory_length=2048 \
     data.image_key=images \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-1.5B-Instruct \
     actor_rollout_ref.actor.optim.lr=1e-6 \
