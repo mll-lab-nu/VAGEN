@@ -5,6 +5,7 @@ This repo aims for Multi-turn Reinforcement Learning for Vision Language Models.
 
 ```
 conda create -n vagen python=3.11 -y
+conda activate vagen
 git clone git@github.com:JamesKrW/verl.git
 cd verl
 pip install -e .
