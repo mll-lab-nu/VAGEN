@@ -140,7 +140,6 @@ def postprocess(
 
     observation = IMAGE_PLACEHOLDER if not isinstance(env_state, str) else env_state
     text_template = action_template.format(
-        answer=answer,
         valid_action=valid_action,
         observation=observation,
         reward=reward,

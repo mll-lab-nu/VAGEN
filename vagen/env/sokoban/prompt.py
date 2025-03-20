@@ -43,7 +43,7 @@ Decide your next action.
 Your reponse should be in the format of <think>...</think><answer>...</answer>
 """
 
-action_template = """After you answer {answer}, the extracted valid action is {valid_action}.\
+action_template = """After your answer, the extracted valid action is {valid_action}.\
 After that, the observation is:
 {observation}
 reward: {reward}

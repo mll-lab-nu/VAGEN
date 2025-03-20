@@ -30,7 +30,7 @@ python3 -m vagen.trainer.main_ppo \
     algorithm.high_level_gamma=0.95 \
     data.train_files=data/sokoban-text-1-step/train.parquet \
     data.val_files=data/sokoban-text-1-step/test.parquet \
-    data.train_batch_size=64 \
+    data.train_batch_size=16 \
     data.max_prompt_length=768 \
     data.max_response_length=128 \
     data.max_trajectory_length=1024 \
@@ -40,9 +40,9 @@ python3 -m vagen.trainer.main_ppo \
     actor_rollout_ref.model.use_remove_padding=False \
     actor_rollout_ref.actor.ppo_mini_batch_size=32 \
     actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=1 \
-    actor_rollout_ref.actor.use_kl_loss=True \
-    actor_rollout_ref.actor.kl_loss_coef=0.01 \
-    actor_rollout_ref.actor.kl_loss_type=mse \
+    actor_rollout_ref.actor.use_kl_loss=False \
+    actor_rollout_ref.actor.kl_loss_coef=0.001 \
+    actor_rollout_ref.actor.kl_loss_type=low_var_kl \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
     actor_rollout_ref.actor.fsdp_config.param_offload=False \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
@@ -54,7 +54,7 @@ python3 -m vagen.trainer.main_ppo \
     actor_rollout_ref.rollout.enforce_eager=False \
     actor_rollout_ref.rollout.free_cache_engine=False \
     actor_rollout_ref.rollout.n=1 \
-    +actor_rollout_ref.ref.use_ref=True \
+    +actor_rollout_ref.ref.use_ref=False \
     actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=1 \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     critic.optim.lr=1e-5 \
@@ -68,7 +68,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
     trainer.project_name='vagen' \
-    trainer.experiment_name='debug_single_action_single_turn_ppo_kl' \
+    trainer.experiment_name='debug_single_action_single_turn_ppo_no_masked' \
     trainer.n_gpus_per_node=2 \
     trainer.nnodes=1 \
     trainer.save_freq=100 \
@@ -78,6 +78,6 @@ python3 -m vagen.trainer.main_ppo \
     rollout_manager.window_size=5 \
     trainer.val_before_train=True \
     trainer.val_generations_to_log_to_wandb=8 \
-    rollout_manager.n_trajectory=2 \
-    rollout_manager.use_loss_mask=True \
-    2>&1 | tee debug_single_action_single_turn_ppo_kl.log
+    rollout_manager.n_trajectory=8 \
+    rollout_manager.use_loss_mask=False \
+    2>&1 | tee debug_single_action_single_turn_ppo_no_masked.log
