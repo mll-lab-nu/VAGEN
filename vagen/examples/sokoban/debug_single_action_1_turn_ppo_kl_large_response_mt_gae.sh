@@ -26,14 +26,14 @@ fi
 # max_trajectory_length = max_prompt_length + max_response_length
 
 python3 -m vagen.trainer.main_ppo \
-    algorithm.adv_estimator=masked_gae \
+    algorithm.adv_estimator=multi_turn_gae \
     algorithm.high_level_gamma=0.95 \
     data.train_files=data/sokoban-text-1-step/train.parquet \
     data.val_files=data/sokoban-text-1-step/test.parquet \
     data.train_batch_size=64 \
-    data.max_prompt_length=768 \
-    data.max_response_length=128 \
-    data.max_trajectory_length=1024 \
+    data.max_prompt_length=1024 \
+    data.max_response_length=512 \
+    data.max_trajectory_length=2048 \
     data.image_key=images \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-1.5B-Instruct \
     actor_rollout_ref.actor.optim.lr=1e-6 \
@@ -68,7 +68,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
     trainer.project_name='vagen' \
-    trainer.experiment_name='debug_single_action_single_turn_ppo_kl' \
+    trainer.experiment_name='debug_single_action_1_turn_ppo_kl_large_response_mt_gae' \
     trainer.n_gpus_per_node=2 \
     trainer.nnodes=1 \
     trainer.save_freq=100 \
@@ -80,4 +80,4 @@ python3 -m vagen.trainer.main_ppo \
     trainer.val_generations_to_log_to_wandb=8 \
     rollout_manager.n_trajectory=2 \
     rollout_manager.use_loss_mask=True \
-    2>&1 | tee debug_single_action_single_turn_ppo_kl.log
+    2>&1 | tee debug_single_action_1_turn_ppo_kl_large_response_mt_gae.log

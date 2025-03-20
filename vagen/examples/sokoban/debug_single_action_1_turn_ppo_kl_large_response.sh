@@ -26,7 +26,7 @@ fi
 # max_trajectory_length = max_prompt_length + max_response_length
 
 python3 -m vagen.trainer.main_ppo \
-    algorithm.adv_estimator=gae \
+    algorithm.adv_estimator=masked_gae \
     algorithm.high_level_gamma=0.95 \
     data.train_files=data/sokoban-text-1-step/train.parquet \
     data.val_files=data/sokoban-text-1-step/test.parquet \

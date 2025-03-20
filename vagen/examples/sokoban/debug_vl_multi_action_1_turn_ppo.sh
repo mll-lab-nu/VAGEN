@@ -22,14 +22,14 @@ python -m vagen.env.sokoban.create_dataset \
 # max_trajectory_length = max_prompt_length + max_response_length
 
 python3 -m vagen.trainer.main_ppo \
-    algorithm.adv_estimator=gae \
+    algorithm.adv_estimator=masked_gae \
     algorithm.high_level_gamma=0.95 \
     data.train_files=data/sokoban-vision-3-step/train.parquet \
     data.val_files=data/sokoban-vision-3-step/test.parquet \
     data.train_batch_size=64 \
-    data.max_prompt_length=1920 \
+    data.max_prompt_length=1024 \
     data.max_response_length=256 \
-    data.max_trajectory_length=2048 \
+    data.max_trajectory_length=1024 \
     data.image_key=images \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \
     actor_rollout_ref.actor.optim.lr=1e-6 \
@@ -64,7 +64,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.logger=['console','wandb'] \
     trainer.project_name='vagen' \
     trainer.experiment_name='debug_vl_multi_action_single_turn_ppo' \
-    trainer.n_gpus_per_node=2 \
+    trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \
     trainer.save_freq=100 \
     trainer.test_freq=10 \
