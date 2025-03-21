@@ -250,8 +250,10 @@ class SokobanInterface(BaseInterface):
 
 
         # parse format and action list
-        if action_list:
-            reward += self.interface_config['format_reward']
+        # if action_list:
+        #     reward += self.interface_config['format_reward']
+        if not action_list:
+            reward -= self.interface_config['format_reward']
         if len(action_list) > self.interface_config['max_action_per_step']:
             reward += self.interface_config['max_action_penalty']
             action_list = action_list[:self.interface_config['max_action_per_step']]

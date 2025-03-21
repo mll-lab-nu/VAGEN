@@ -27,7 +27,7 @@ All boxes placed: +10.0
 Format correct: +0.5
 
 Please think step by step and provide the actions you want to take.
-Your reponse should be in the format of <think>...</think><answer>...</answer>
+Your response should STRICTLY follow the format: <think>[Your thoughts]</think><answer>[Your actions]</answer>
 """
 # E.g. <think> There's a box on the upper right of me, the target is on the upper side of the box, I need to push the box it upward. </think><answer> Right,Up,Up </answer>
 # Let's try to use a format reward and answer reward
@@ -40,7 +40,7 @@ init_observation_template = """
 [Initial Observation]:
 {observation}
 Decide your next action(s).
-Your reponse should be in the format of <think>...</think><answer>...</answer>
+Your response should STRICTLY follow the format: <think>[Your thoughts]</think><answer>[Your actions]</answer>
 """
 
 action_template = """After your answer, the extracted valid action is {valid_action}.\
@@ -49,5 +49,5 @@ After that, the observation is:
 reward: {reward}
 done: {done}
 Decide your next action(s).
-Your reponse should be in the format of <think>...</think><answer>...</answer>
+Your response should STRICTLY follow the format: <think>[Your thoughts]</think><answer>[Your actions]</answer>
 """
