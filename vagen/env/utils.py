@@ -7,20 +7,43 @@ from typing import List, Dict, Tuple, Union
 
 
 
-def preprocess_text(text: str) -> dict:
-    """Preprocess the raw text from llm to a list of strings
-
-    1. Extract think from the first <think> ... </think>
-    2. Extract answer from the first <answer> ... </answer>
-    3. Split the answer by comma into a list of strings
+def preprocess_text(text: str, strict_match: bool = True) -> dict:
+    """Preprocess the raw text from llm to a list of strings.
     
     Args:
         text: raw text from llm
+        strict_match: If True, enforces strict format where text must contain exactly one 
+                     <think>...</think> followed by one <answer>...</answer> with possible 
+                     whitespace between them. No content should appear before <think> or 
+                     after </answer>.
 
     Returns:
         dict with keys: llm_raw_response, think, answer_list
     """
-    # Extract content from <think> tags if they exist
+    
+    if strict_match:
+        strict_match_result = None
+
+        # Verify exactly one occurrence of each tag
+        think_open_count = text.count("<think>")
+        think_close_count = text.count("</think>")
+        answer_open_count = text.count("<answer>")
+        answer_close_count = text.count("</answer>")
+        tags_are_balanced = (think_open_count == 1 and think_close_count == 1 and 
+                            answer_open_count == 1 and answer_close_count == 1)
+        
+        if tags_are_balanced:
+            strict_format_pattern = r'^\s*<think>(.*?)</think>\s*<answer>(.*?)</answer>\s*$'
+            strict_match_result = re.match(strict_format_pattern, text, re.DOTALL)
+        if strict_match_result is None:
+            return {
+                'llm_raw_response': text,
+                'answer_list': [],
+                'think': "",
+                'answer': "",
+            }
+    
+    # Extract content from <think> tags
     think_match = re.search(r'<think>(.*?)</think>', text, re.DOTALL)
     
     # Extract content from <answer> tags
@@ -41,8 +64,10 @@ def preprocess_text(text: str) -> dict:
         'llm_raw_response': text,
         'answer_list': answer_list,
         'think': thinking,
-        'answer': answer_content
+        'answer': answer_content,
     }
+
+
 
 def convert_numpy_to_PIL(numpy_array: np.ndarray) -> Image.Image:
         """Convert a numpy array to a PIL RGB image."""

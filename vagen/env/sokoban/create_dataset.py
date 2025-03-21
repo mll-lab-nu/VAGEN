@@ -14,6 +14,7 @@ import argparse
 import datasets
 import multiprocessing as mp
 from functools import partial
+from collections import defaultdict
 import numpy as np
 
 from vagen.env.create_dataset import DatasetCreator
@@ -57,6 +58,7 @@ class SokobanDatasetCreator(DatasetCreator):
         """
         train_file_path = os.path.join(self.data_dir, 'train.parquet')
         test_file_path = os.path.join(self.data_dir, 'test.parquet')
+        action_count = defaultdict(int)
         
         # Check if files already exist and force_gen is False
         if not force_gen and os.path.exists(train_file_path) and os.path.exists(test_file_path):
@@ -73,12 +75,16 @@ class SokobanDatasetCreator(DatasetCreator):
         pool.close()
         pool.join()
 
-        valid_seeds = [seed for seed, gt_action_sequence in results if gt_action_sequence and len(gt_action_sequence) <= max_action_length]
+        valid_seeds_with_actions = [(seed, gt_action_sequence) for seed, gt_action_sequence in results if gt_action_sequence and len(gt_action_sequence) <= max_action_length]
+        valid_seeds = [seed for seed, _ in valid_seeds_with_actions]
         train_size = int(len(valid_seeds) * train_ratio)
         test_size = len(valid_seeds) - train_size
         print(f"Train size: {train_size}, Test size: {test_size}")
         # Analyze statistics of action sequences
-        action_lengths = [len(gt_action_sequence) for _, gt_action_sequence in results if gt_action_sequence]
+        action_lengths = [len(gt_action_sequence) for _, gt_action_sequence in valid_seeds_with_actions]
+        for _, gt_action_sequence in valid_seeds_with_actions:
+            for action in gt_action_sequence:
+                action_count[action] += 1
         
 
 
@@ -104,11 +110,16 @@ class SokobanDatasetCreator(DatasetCreator):
         print(f"Median action length: {median_length}")
         print(f"Min action length: {min_length}")
         print(f"Max action length: {max_length}")
-        print("\nAction length distribution:")
+        print("\nAction length distribution:")        
         for length in sorted(length_counts.keys()):
             count = length_counts[length]
             percentage = (count / len(action_lengths)) * 100
             print(f"  Length {length}: {count} instances ({percentage:.2f}%)")
+        
+        print("\nAction frequency:")
+        for action, count in sorted(action_count.items(), key=lambda x: x[1], reverse=True):
+            percentage = (count / len(valid_seeds_with_actions)) * 100
+            print(f"  {action}: {count} instances ({percentage:.2f}%)")
 
 
 
