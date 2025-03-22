@@ -16,10 +16,11 @@ Rules:
 2. Avoid walls (#).
 
 Actions you can take: Up, Down, Left, Right. You can take up to {max_action_per_step} action(s) at a time.
-Up: move up to the cell above (to the above row).
-Down: move down to the cell below (to the below row).
-Left: move left to the cell to the left (to the left column).
-Right: move right to the cell to the right (to the right column).
+- Up: move up to the cell above
+- Down: move down to the cell below
+- Left: move left to the cell to the left
+- Right: move right to the cell to the right
+If there is a box on the cell you want to move to, you will push the box one cell in the same direction.
 
 Rewards:
 Box on target: +1.0
@@ -27,7 +28,9 @@ All boxes placed: +10.0
 Format correct: +0.5
 
 Please think step by step and provide the actions you want to take.
-Your response should STRICTLY follow the format: <think>[Your thoughts]</think><answer>[Your actions]</answer>
+You should wrap your thought between `<think>` and `</think>` tags, and wrap your answer between `<answer>` and `</answer>` tags.
+Your response should STRICTLY follow the format:
+<think>...</think><answer>...</answer>
 """
 # E.g. <think> There's a box on the upper right of me, the target is on the upper side of the box, I need to push the box it upward. </think><answer> Right,Up,Up </answer>
 # Let's try to use a format reward and answer reward
@@ -40,14 +43,16 @@ init_observation_template = """
 [Initial Observation]:
 {observation}
 Decide your next action(s).
-Your response should STRICTLY follow the format: <think>[Your thoughts]</think><answer>[Your actions]</answer>
+Your response should STRICTLY follow the format:
+<think>...</think><answer>...</answer>
 """
 
-action_template = """After your answer, the extracted valid action is {valid_action}.\
+action_template = """Valid action extracted from your response is {valid_action}.\
 After that, the observation is:
 {observation}
 reward: {reward}
 done: {done}
 Decide your next action(s).
-Your response should STRICTLY follow the format: <think>[Your thoughts]</think><answer>[Your actions]</answer>
+Your response should STRICTLY follow the format:
+<think>...</think><answer>...</answer>
 """

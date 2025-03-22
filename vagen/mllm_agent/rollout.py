@@ -14,7 +14,7 @@ from verl.utils.model import compute_position_id_with_mask
 import verl.utils.torch_functional as verl_F
 from verl.utils.dataset.rl_dataset import process_image, collate_fn
 import vagen.env
-from vagen.env.register import REGISTERED_ENVS
+from vagen.env import REGISTERED_ENVS
 from vagen.env.base import EnvConfig,IMAGE_PLACEHOLDER
 
     

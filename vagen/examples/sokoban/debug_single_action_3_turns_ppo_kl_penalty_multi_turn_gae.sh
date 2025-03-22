@@ -13,9 +13,9 @@ python -m vagen.env.sokoban.create_dataset \
     --start_seed 0 \
     --train_ratio 0.8 \
     --max_action_per_step 1 \
-    --max_action_penalty -0.1 \
-    --format_reward 1 \
-    --n_candidate 20000 \
+    --max_action_penalty 0.0 \
+    --format_reward 0.5 \
+    --n_candidate 50000 \
     --force-gen
 
 if [ $? -ne 0 ]; then
@@ -33,7 +33,7 @@ python3 -m vagen.trainer.main_ppo \
     data.max_response_length=256 \
     data.max_trajectory_length=1664 \
     data.image_key=images \
-    actor_rollout_ref.model.path=Qwen/Qwen2.5-1.5B-Instruct \
+    actor_rollout_ref.model.path=Qwen/Qwen2.5-3B-Instruct \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=False \
     actor_rollout_ref.actor.ppo_mini_batch_size=32 \
@@ -45,7 +45,7 @@ python3 -m vagen.trainer.main_ppo \
     actor_rollout_ref.actor.fsdp_config.param_offload=False \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \
-    actor_rollout_ref.rollout.tensor_model_parallel_size=2 \
+    actor_rollout_ref.rollout.tensor_model_parallel_size=4 \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.4 \
     actor_rollout_ref.rollout.enable_chunked_prefill=False \
@@ -59,7 +59,7 @@ python3 -m vagen.trainer.main_ppo \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     critic.optim.lr=1e-5 \
     critic.model.use_remove_padding=False \
-    critic.model.path=Qwen/Qwen2.5-1.5B-Instruct \
+    critic.model.path=Qwen/Qwen2.5-3B-Instruct \
     critic.model.enable_gradient_checkpointing=True \
     critic.ppo_micro_batch_size_per_gpu=1 \
     critic.model.fsdp_config.param_offload=False \
@@ -68,10 +68,10 @@ python3 -m vagen.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
     trainer.project_name='vagen' \
-    trainer.experiment_name='debug_single_action_3_turns_ppo_1_5B_kl_penalty_multi_turn_gae' \
-    trainer.n_gpus_per_node=2 \
+    trainer.experiment_name='debug_single_action_3_turns_ppo_3B_multi_turn_gae_temp_0.7_top_p_0.95' \
+    trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \
-    trainer.save_freq=100 \
+    trainer.save_freq=400 \
     trainer.test_freq=5 \
     trainer.total_epochs=15 \
     rollout_manager.max_turns=3 \
@@ -79,4 +79,4 @@ python3 -m vagen.trainer.main_ppo \
     trainer.val_before_train=True \
     trainer.val_generations_to_log_to_wandb=8 \
     rollout_manager.n_trajectory=1 \
-    2>&1 | tee debug_single_action_3_turns_ppo_1_5B_kl_penalty_multi_turn_gae.log
+    2>&1 | tee debug_single_action_3_turns_ppo_3B_multi_turn_gae_temp_0.7_top_p_0.95.log
