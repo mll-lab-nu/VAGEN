@@ -78,6 +78,14 @@ The visualizations below show how the agent reasons through sequential steps to 
     <img src="./public/example_2.png" width="1000px" alt="Example 2" />
 </p>
 
+<p align="center">
+    <img src="./public/example_3.png" width="1000px" alt="Example 3: Masked GAE + Masked Loss" />
+</p>
+
+<p align="center">
+    <img src="./public/example_4.png" width="1000px" alt="Example 4: Masked GAE + Masked Loss" />
+</p>
+
 ## Installation
 
 ```bash
