@@ -187,7 +187,7 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
                                                                         gamma=gamma,
                                                                         lam=lam,
                                                                         high_level_gamma=high_level_gamma,
-                                                                        reward_masks=data.batch['end_of_response_position_mask'][:, -response_length:])
+                                                                        reward_mask=data.batch['end_of_response_position_mask'][:, -response_length:])
         
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
@@ -207,9 +207,10 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         advantages, returns = core_algos.compute_turn_wise_gae_advantage_return(token_level_rewards=data.batch['token_level_rewards'],
                                                                         values=values,
                                                                         loss_mask=loss_mask,
+                                                                        reward_mask=data.batch['end_of_response_position_mask'][:, -response_length:],
                                                                         lam=lam,
                                                                         high_level_gamma=high_level_gamma,
-                                                                        reward_mask=data.batch['end_of_response_position_mask'][:, -response_length:])
+                                                                        )
         
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
@@ -484,11 +485,12 @@ class RayPPOTrainer(object):
         else:
             self.kl_ctrl = core_algos.FixedKLController(kl_coef=0.)
 
-        if self.config.algorithm.adv_estimator in [AdvantageEstimator.GAE, AdvantageEstimator.MULTI_TURN_GAE,AdvantageEstimator.MASKED_GAE]:
+        if self.config.algorithm.adv_estimator in [AdvantageEstimator.GAE, AdvantageEstimator.MULTI_TURN_GAE,
+                                                   AdvantageEstimator.MASKED_GAE,AdvantageEstimator.TURN_WISE_GAE]:
             self.use_critic = True
         elif self.config.algorithm.adv_estimator in [
                 AdvantageEstimator.GRPO, AdvantageEstimator.REINFORCE_PLUS_PLUS, AdvantageEstimator.REMAX,
-                AdvantageEstimator.RLOO, AdvantageEstimator.MULTI_TURN_GRPO,AdvantageEstimator.TURN_WISE_GAE
+                AdvantageEstimator.RLOO, AdvantageEstimator.MULTI_TURN_GRPO
         ]:
             self.use_critic = False
         else:
@@ -564,6 +566,7 @@ class RayPPOTrainer(object):
             if config.critic.ppo_micro_batch_size is not None:
                 assert config.critic.ppo_mini_batch_size % config.critic.ppo_micro_batch_size == 0
                 assert config.critic.ppo_micro_batch_size * sp_size >= n_gpus
+            if config.algorithm.adv_estimator == AdvantageEstimator.TURN_WISE_GAE:
             if config.algorithm.adv_estimator == AdvantageEstimator.TURN_WISE_GAE:
                 assert config.critic.get('use_reward_mask', False), \
                     "TURN_WISE_GAE needs reward mask"
