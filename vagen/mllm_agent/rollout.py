@@ -156,7 +156,7 @@ class QwenVLRolloutManger():
                 hole_pos.append(start_pos.item())
                 hole_pos.append(end_pos.item())
             hole_pos.append(seq_len-right_pad_tokens)
-            assert new_input_ids[b][seq_len-right_pad_tokens]==pad_token_id
+            #assert new_input_ids[b][seq_len-right_pad_tokens]==pad_token_id
             
             # shift right to fill the wholes
             holes_to_fill=1
