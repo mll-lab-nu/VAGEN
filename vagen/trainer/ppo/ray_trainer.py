@@ -66,6 +66,7 @@ class AdvantageEstimator(str, Enum):
     GAE = 'gae'
     MASKED_GAE = 'masked_gae'
     MULTI_TURN_GAE = 'multi_turn_gae'
+    TURN_WISE_GAE = 'turn_wise_gae'
     GRPO = 'grpo'
     REINFORCE_PLUS_PLUS = 'reinforce_plus_plus'
     REMAX = 'remax'
@@ -191,6 +192,29 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
+    elif adv_estimator == AdvantageEstimator.TURN_WISE_GAE:
+        values = data.batch['values']
+        responses = data.batch['responses']
+        response_length = responses.size(-1)
+        attention_mask = data.batch['attention_mask']
+        response_mask = attention_mask[:, -response_length:]
+        #assert "multi_turn_token_level_rewards" in data.batch.keys()
+        # assert "loss_mask" in data.batch.keys()
+        # loss_mask = data.batch['loss_mask'][:, -response_length:]
+        if "loss_mask" in data.batch.keys():
+            loss_mask = data.batch['loss_mask'][:, -response_length:]
+        else:
+            loss_mask=data.batch['attention_mask'][:, -response_length:]
+        advantages, returns = core_algos.compute_turn_wise_gae_advantage_return(token_level_rewards=data.batch['token_level_rewards'],
+                                                                        values=values,
+                                                                        loss_mask=loss_mask,
+                                                                        reward_masks=data.batch['end_of_response_position_mask'][:, -response_length:],
+                                                                        lam=lam,
+                                                                        high_level_gamma=high_level_gamma,
+                                                                        reward_masks=data.batch['end_of_response_position_mask'][:, -response_length:])
+        
+        data.batch['advantages'] = advantages
+        data.batch['returns'] = returns
     elif adv_estimator == AdvantageEstimator.GRPO:
         token_level_rewards = data.batch['token_level_rewards']
         index = data.non_tensor_batch['uid']
@@ -218,44 +242,45 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
                                                                             index=index)
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
-    elif adv_estimator == AdvantageEstimator.REINFORCE_PLUS_PLUS:
-        token_level_rewards = data.batch['token_level_rewards']
-        responses = data.batch['responses']
-        response_length = responses.size(-1)
-        attention_mask = data.batch['attention_mask']
-        response_mask = attention_mask[:, -response_length:]
-        advantages, returns = core_algos.compute_reinforce_plus_plus_outcome_advantage(
-            token_level_rewards=token_level_rewards, eos_mask=response_mask, gamma=gamma)
-        data.batch['advantages'] = advantages
-        data.batch['returns'] = returns
-    elif adv_estimator == AdvantageEstimator.REMAX:
-        token_level_rewards = data.batch['token_level_rewards']
-        index = data.non_tensor_batch['uid']
-        responses = data.batch['responses']
-        response_length = responses.size(-1)
-        attention_mask = data.batch['attention_mask']
-        response_mask = attention_mask[:, -response_length:]
+    # elif adv_estimator == AdvantageEstimator.REINFORCE_PLUS_PLUS:
+    #     token_level_rewards = data.batch['token_level_rewards']
+    #     responses = data.batch['responses']
+    #     response_length = responses.size(-1)
+    #     attention_mask = data.batch['attention_mask']
+    #     response_mask = attention_mask[:, -response_length:]
+    #     advantages, returns = core_algos.compute_reinforce_plus_plus_outcome_advantage(
+    #         token_level_rewards=token_level_rewards, eos_mask=response_mask, gamma=gamma)
+    #     data.batch['advantages'] = advantages
+    #     data.batch['returns'] = returns
+    # elif adv_estimator == AdvantageEstimator.REMAX:
+    #     token_level_rewards = data.batch['token_level_rewards']
+    #     index = data.non_tensor_batch['uid']
+    #     responses = data.batch['responses']
+    #     response_length = responses.size(-1)
+    #     attention_mask = data.batch['attention_mask']
+    #     response_mask = attention_mask[:, -response_length:]
 
-        reward_baselines = data.batch['reward_baselines']
+    #     reward_baselines = data.batch['reward_baselines']
 
-        advantages, returns = core_algos.compute_remax_outcome_advantage(token_level_rewards=token_level_rewards,
-                                                                         reward_baselines=reward_baselines,
-                                                                         eos_mask=response_mask)
+    #     advantages, returns = core_algos.compute_remax_outcome_advantage(token_level_rewards=token_level_rewards,
+    #                                                                      reward_baselines=reward_baselines,
+    #                                                                      eos_mask=response_mask)
 
-        data.batch['advantages'] = advantages
-        data.batch['returns'] = returns
-    elif adv_estimator == AdvantageEstimator.RLOO:
-        token_level_rewards = data.batch['token_level_rewards']
-        index = data.non_tensor_batch['uid']
-        responses = data.batch['responses']
-        response_length = responses.size(-1)
-        attention_mask = data.batch['attention_mask']
-        response_mask = attention_mask[:, -response_length:]
-        advantages, returns = core_algos.compute_rloo_outcome_advantage(token_level_rewards=token_level_rewards,
-                                                                        eos_mask=response_mask,
-                                                                        index=index)
-        data.batch['advantages'] = advantages
-        data.batch['returns'] = returns
+    #     data.batch['advantages'] = advantages
+    #     data.batch['returns'] = returns
+    # elif adv_estimator == AdvantageEstimator.RLOO:
+    #     token_level_rewards = data.batch['token_level_rewards']
+    #     index = data.non_tensor_batch['uid']
+    #     responses = data.batch['responses']
+    #     response_length = responses.size(-1)
+    #     attention_mask = data.batch['attention_mask']
+    #     response_mask = attention_mask[:, -response_length:]
+    #     advantages, returns = core_algos.compute_rloo_outcome_advantage(token_level_rewards=token_level_rewards,
+    #                                                                     eos_mask=response_mask,
+    #                                                                     index=index)
+    #     data.batch['advantages'] = advantages
+    #     data.batch['returns'] = returns
+    
     else:
         raise NotImplementedError
     return data
@@ -465,7 +490,7 @@ class RayPPOTrainer(object):
             self.use_critic = True
         elif self.config.algorithm.adv_estimator in [
                 AdvantageEstimator.GRPO, AdvantageEstimator.REINFORCE_PLUS_PLUS, AdvantageEstimator.REMAX,
-                AdvantageEstimator.RLOO, AdvantageEstimator.MULTI_TURN_GRPO
+                AdvantageEstimator.RLOO, AdvantageEstimator.MULTI_TURN_GRPO,AdvantageEstimator.TURN_WISE_GAE
         ]:
             self.use_critic = False
         else:
@@ -541,6 +566,9 @@ class RayPPOTrainer(object):
             if config.critic.ppo_micro_batch_size is not None:
                 assert config.critic.ppo_mini_batch_size % config.critic.ppo_micro_batch_size == 0
                 assert config.critic.ppo_micro_batch_size * sp_size >= n_gpus
+            if config.core_algos.adv_estimator == AdvantageEstimator.TURN_WISE_GAE:
+                assert config.critic.get('use_reward_mask', False), \
+                    "TURN_WISE_GAE needs reward mask"
 
         # Check if use_remove_padding is enabled when using sequence parallelism for fsdp
         if config.actor_rollout_ref.actor.strategy == 'fsdp':
