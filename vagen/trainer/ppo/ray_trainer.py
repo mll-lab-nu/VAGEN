@@ -160,11 +160,10 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         attention_mask = data.batch['attention_mask']
         response_mask = attention_mask[:, -response_length:]
         token_level_rewards = data.batch['token_level_rewards']
-        assert "loss_mask" in data.batch.keys()
-        loss_mask = data.batch['loss_mask'][:, -response_length:]
+        gae_mask = data.batch['gae_mask'][:, -response_length:]
         advantages, returns =core_algos.compute_gae_advantage_return_with_loss_mask(token_level_rewards=token_level_rewards,
                                                                 values=values,
-                                                                loss_mask=loss_mask,
+                                                                loss_mask=gae_mask,
                                                                 gamma=gamma,
                                                                 lam=lam)
         data.batch['advantages'] = advantages
@@ -208,10 +207,9 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         advantages, returns = core_algos.compute_turn_wise_gae_advantage_return(token_level_rewards=data.batch['token_level_rewards'],
                                                                         values=values,
                                                                         loss_mask=loss_mask,
-                                                                        reward_masks=data.batch['end_of_response_position_mask'][:, -response_length:],
                                                                         lam=lam,
                                                                         high_level_gamma=high_level_gamma,
-                                                                        reward_masks=data.batch['end_of_response_position_mask'][:, -response_length:])
+                                                                        reward_mask=data.batch['end_of_response_position_mask'][:, -response_length:])
         
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
@@ -566,7 +564,7 @@ class RayPPOTrainer(object):
             if config.critic.ppo_micro_batch_size is not None:
                 assert config.critic.ppo_mini_batch_size % config.critic.ppo_micro_batch_size == 0
                 assert config.critic.ppo_micro_batch_size * sp_size >= n_gpus
-            if config.core_algos.adv_estimator == AdvantageEstimator.TURN_WISE_GAE:
+            if config.algorithm.adv_estimator == AdvantageEstimator.TURN_WISE_GAE:
                 assert config.critic.get('use_reward_mask', False), \
                     "TURN_WISE_GAE needs reward mask"
 

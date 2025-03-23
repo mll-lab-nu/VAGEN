@@ -198,5 +198,7 @@ rollout_manager:
   n_trajectory: 1 # >1 for grpo, please set actor_rollout_ref.rollout.n = 1 since we don't use vllm n sample parameter, set it >1 here for grpo agentic setting
   use_multi_turn_reward: True # for ablation study
   use_loss_mask: True # for ablation study
+  use_reward_mask: True
+  use_gae_mask: True
   special_token_for_loss_mask: ['<|box_start|>', '<|box_end|>']
   truncation: ${data.truncation}
