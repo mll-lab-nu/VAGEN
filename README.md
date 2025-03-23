@@ -66,9 +66,9 @@ We evaluated VAGEN on the visual puzzle-solving Sokoban task, demonstrating sign
   - Format correct: +0.5
 - **Evaluation Metrics:** Score + Success Rate
 
-## Example Trajectories (LM + GM + Turn-wise Reward + Bi-Level GAE)
+## Example Trajectories
 
-The visualizations below show how the agent reasons through sequential steps to solve Sokoban puzzles, cherry picked from validation steps:
+The visualizations below show how the agent reasons through sequential steps to solve Sokoban puzzles, cherry picked from validation steps when training TRICO: LM + GM + Turn-wise Reward + Bi-Level GAE.
 
 <p align="center">
     <img src="./public/example_1.png" width="1000px" alt="Example 1" />
