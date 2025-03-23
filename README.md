@@ -23,8 +23,8 @@ VAGEN is a multi-turn Reinforcement Learning (RL) framework designed to optimize
 
 VAGEN introduces TRICO, a specialized algorithm for visual agents that extends previous approaches with several key improvements:
 
-<p align="center"><img src="./public/overview_1.pdf" width="800px" alt="TRICO Overview -1 " /></p>
-<p align="center"><img src="./public/overview_2.pdf" width="800px" alt="TRICO Overview -2 " /></p>
+<p align="center"><img src="./public/overview_1.png" width="800px" alt="TRICO Overview -1" /></p>
+<p align="center"><img src="./public/overview_2.png" width="800px" alt="TRICO Overview -2" /></p>
 
 Building on recent advances in LLM reinforcement learning, TRICO explores several key innovations for visual agents:
 
