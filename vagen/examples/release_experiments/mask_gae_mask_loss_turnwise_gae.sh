@@ -71,7 +71,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.n_gpus_per_node=8 \
     trainer.nnodes=1 \
     trainer.save_freq=100 \
-    trainer.test_freq=5 \
+    trainer.test_freq=20 \
     trainer.total_epochs=15 \
     rollout_manager.max_turns=3 \
     rollout_manager.window_size=5 \
