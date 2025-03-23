@@ -130,6 +130,7 @@ critic:
   shuffle: ${actor_rollout_ref.actor.shuffle}
   grad_clip: 1.0
   cliprange_value: 0.5
+  use_reward_mask: False
 
 reward_model:
   enable: False
