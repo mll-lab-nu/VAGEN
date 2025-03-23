@@ -26,7 +26,7 @@ fi
 # max_trajectory_length = max_prompt_length + max_response_length
 
 python3 -m vagen.trainer.main_ppo \
-    algorithm.adv_estimator=multi_turn_gae \
+    algorithm.adv_estimator=bi_level_gae \
     algorithm.high_level_gamma=0.95 \
     data.train_files=data/sokoban-text-5-step/train.parquet \
     data.val_files=data/sokoban-text-5-step/test.parquet \
@@ -68,7 +68,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
     trainer.project_name='vagen' \
-    trainer.experiment_name='debug_single_action_5_turn_ppo_kl_multi_turn_gae' \
+    trainer.experiment_name='debug_single_action_5_turn_ppo_kl_bi_level_gae' \
     trainer.n_gpus_per_node=2 \
     trainer.nnodes=1 \
     trainer.save_freq=100 \
@@ -79,4 +79,4 @@ python3 -m vagen.trainer.main_ppo \
     trainer.val_before_train=True \
     trainer.val_generations_to_log_to_wandb=8 \
     rollout_manager.n_trajectory=2 \
-    2>&1 | tee debug_single_action_5_turn_ppo_kl_multi_turn_gae.log
+    2>&1 | tee debug_single_action_5_turn_ppo_kl_bi_level_gae.log

@@ -65,7 +65,7 @@ class AdvantageEstimator(str, Enum):
     """
     GAE = 'gae'
     MASKED_GAE = 'masked_gae'
-    MULTI_TURN_GAE = 'multi_turn_gae'
+    BI_LEVEL_GAE = 'bi_level_gae'
     TURN_WISE_GAE = 'turn_wise_gae'
     GRPO = 'grpo'
     REINFORCE_PLUS_PLUS = 'reinforce_plus_plus'
@@ -168,7 +168,7 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
                                                                 lam=lam)
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
-    elif adv_estimator == AdvantageEstimator.MULTI_TURN_GAE:
+    elif adv_estimator == AdvantageEstimator.BI_LEVEL_GAE:
         values = data.batch['values']
         responses = data.batch['responses']
         response_length = responses.size(-1)
@@ -181,7 +181,7 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
             loss_mask = data.batch['loss_mask'][:, -response_length:]
         else:
             loss_mask=data.batch['attention_mask'][:, -response_length:]
-        advantages, returns = core_algos.compute_multi_turn_gae_advantage_return(token_level_rewards=data.batch['token_level_rewards'],
+        advantages, returns = core_algos.compute_BI_LEVEL_GAE_advantage_return(token_level_rewards=data.batch['token_level_rewards'],
                                                                         values=values,
                                                                         loss_mask=loss_mask,
                                                                         gamma=gamma,
@@ -485,7 +485,7 @@ class RayPPOTrainer(object):
         else:
             self.kl_ctrl = core_algos.FixedKLController(kl_coef=0.)
 
-        if self.config.algorithm.adv_estimator in [AdvantageEstimator.GAE, AdvantageEstimator.MULTI_TURN_GAE,
+        if self.config.algorithm.adv_estimator in [AdvantageEstimator.GAE, AdvantageEstimator.BI_LEVEL_GAE,
                                                    AdvantageEstimator.MASKED_GAE,AdvantageEstimator.TURN_WISE_GAE]:
             self.use_critic = True
         elif self.config.algorithm.adv_estimator in [

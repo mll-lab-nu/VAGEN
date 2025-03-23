@@ -24,7 +24,7 @@ if [ $? -ne 0 ]; then
 fi
 
 python3 -m vagen.trainer.main_ppo \
-    algorithm.adv_estimator=multi_turn_gae \
+    algorithm.adv_estimator=bi_level_gae \
     algorithm.high_level_gamma=0.95 \
     data.train_files=data/sokoban-text-3-step/train.parquet \
     data.val_files=data/sokoban-text-3-step/test.parquet \
@@ -68,7 +68,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
     trainer.project_name='vagen' \
-    trainer.experiment_name='debug_single_action_3_turns_ppo_3B_multi_turn_gae_temp_0.7_top_p_0.95' \
+    trainer.experiment_name='debug_single_action_3_turns_ppo_3B_bi_level_gae_temp_0.7_top_p_0.95' \
     trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \
     trainer.save_freq=400 \
@@ -79,4 +79,4 @@ python3 -m vagen.trainer.main_ppo \
     trainer.val_before_train=True \
     trainer.val_generations_to_log_to_wandb=8 \
     rollout_manager.n_trajectory=1 \
-    2>&1 | tee debug_single_action_3_turns_ppo_3B_multi_turn_gae_temp_0.7_top_p_0.95.log
+    2>&1 | tee debug_single_action_3_turns_ppo_3B_bi_level_gae_temp_0.7_top_p_0.95.log
