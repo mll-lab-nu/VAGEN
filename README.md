@@ -68,8 +68,9 @@ We evaluated VAGEN on the visual puzzle-solving Sokoban task, demonstrating sign
 
 ## Example Trajectories
 
-The visualizations below show how the agent reasons through sequential steps to solve Sokoban puzzles, cherry picked from validation steps when training TRICO: LM + GM + Turn-wise Reward + Bi-Level GAE.
+The visualizations below show how the agent reasons through sequential steps to solve Sokoban puzzles, cherry picked from validation steps when training TRICO: LM + GM and TRICO: LM + GM + Turn-wise Reward + Bi-Level GAE.
 
+### TRICO: LM + GM
 <p align="center">
     <img src="./public/example_4.png" width="400px" alt="Example 4: Masked GAE + Masked Loss" />
 </p>
@@ -77,6 +78,8 @@ The visualizations below show how the agent reasons through sequential steps to 
 <p align="center">
     <img src="./public/example_3.png" width="600px" alt="Example 3: Masked GAE + Masked Loss" />
 </p>
+
+### TRICO: LM + GM + Turn-wise Reward + Bi-Level GAE
 
 <p align="center">
     <img src="./public/example_1.png" width="1000px" alt="Example 1" />
