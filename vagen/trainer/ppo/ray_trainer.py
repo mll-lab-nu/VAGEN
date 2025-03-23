@@ -174,10 +174,10 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         response_length = responses.size(-1)
         attention_mask = data.batch['attention_mask']
         response_mask = attention_mask[:, -response_length:]
-        assert "multi_turn_token_level_rewards" in data.batch.keys()
+        #assert "multi_turn_token_level_rewards" in data.batch.keys()
         # assert "loss_mask" in data.batch.keys()
         # loss_mask = data.batch['loss_mask'][:, -response_length:]
-        if "loss_mask" in in data.batch.keys():
+        if "loss_mask" in data.batch.keys():
             loss_mask = data.batch['loss_mask'][:, -response_length:]
         else:
             loss_mask=data.batch['attention_mask'][:, -response_length:]
