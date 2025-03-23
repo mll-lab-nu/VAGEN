@@ -30,6 +30,7 @@ python3 -m vagen.trainer.main_ppo \
     data.max_prompt_length=1024 \
     data.max_response_length=128 \
     data.max_trajectory_length=1800 \
+    data.truncation=left \
     data.image_key=images \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \
     actor_rollout_ref.actor.optim.lr=1e-6 \
