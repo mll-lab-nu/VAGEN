@@ -567,7 +567,6 @@ class RayPPOTrainer(object):
                 assert config.critic.ppo_mini_batch_size % config.critic.ppo_micro_batch_size == 0
                 assert config.critic.ppo_micro_batch_size * sp_size >= n_gpus
             if config.algorithm.adv_estimator == AdvantageEstimator.TURN_WISE_GAE:
-            if config.algorithm.adv_estimator == AdvantageEstimator.TURN_WISE_GAE:
                 assert config.critic.get('use_reward_mask', False), \
                     "TURN_WISE_GAE needs reward mask"
 

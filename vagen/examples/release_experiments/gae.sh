@@ -76,6 +76,7 @@ python3 -m vagen.trainer.main_ppo \
     rollout_manager.window_size=5 \
     rollout_manager.use_multi_turn_reward=False \
     rollout_manager.use_loss_mask=False \
+    rollout_manager.use_gae_mask=False \
     trainer.val_before_train=True \
     trainer.val_generations_to_log_to_wandb=8 \
     rollout_manager.n_trajectory=1 \

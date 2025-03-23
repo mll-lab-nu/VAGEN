@@ -513,8 +513,6 @@ class QwenVLRolloutManger():
             row_dict['loss_mask'] = loss_mask
         if self.config.use_gae_mask:
             row_dict['gae_mask'] = loss_mask
-        if self.config.use_reward_mask:
-            row_dict['reward_mask'] = end_of_response_position_mask
         row_dict["end_of_response_position_mask"] = end_of_response_position_mask # 
         position_ids = torch.cat([position_ids_prompt, position_ids_response], dim=-1)
         row_dict['prompts'] = input_ids_prompt
