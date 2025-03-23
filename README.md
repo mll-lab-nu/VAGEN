@@ -19,7 +19,7 @@ VAGEN is a multi-turn Reinforcement Learning (RL) framework designed to optimize
 - **Selective Reward Assignment**: Assigns turn-wise or trajectory rewards to specific tokens
 - **Selective Advantage Calculation**: Implements different advantage calculations for within-turn vs. cross-turn dependencies
 
-## TRICO Algorithm
+## TRICO Overview
 
 VAGEN introduces TRICO, a specialized algorithm for visual agents that extends previous approaches with several key improvements:
 
@@ -40,7 +40,6 @@ Building on recent advances in LLM reinforcement learning, TRICO explores severa
       * $γ_{token}$: Estimates advantage for each token through within-turn temporal difference learning
    * **Turn-Wise GAE**: We use $γ_{turn}$ to compute a single advantage through cross-turn temporal difference learning and assign the same advantage for each token in the turn
 
-<p align="center"><img src="./public/ppo_gae.png" width="800px" alt="TRICO Algorithm" /></p>
 
 ### Algorithm Features
 
@@ -51,14 +50,6 @@ Building on recent advances in LLM reinforcement learning, TRICO explores severa
 | **Discounting** | Single discount rate γ | Single discount rate γ | Bi-level: γ_turn and γ_token |
 | **Optimization** | All tokens equally | All tokens equally | Selective token optimization |
 | **Reward Assignment** | Trajectory | Trajectory | Trajectory / Turn-wise |
-
-### Key Components
-
-- **Loss Mask (LM)**: State tokens (image tokens and text description tokens) are masked during critic and actor updates
-- **GAE Mask (GM)**: State tokens are masked during generalized advantage estimation (GAE)
-- **Bi-level GAE**: Uses two discounting factors:
-  - γ_turn: Estimates advantage for each turn through cross-turn temporal difference learning
-  - γ_token: Estimates advantage for each token through within-turn temporal difference learning
 
 ## Performance
 
@@ -77,9 +68,9 @@ We evaluated VAGEN on the visual puzzle-solving Sokoban task, demonstrating sign
   - Format correct: +0.5
 - **Evaluation Metrics:** Score + Success Rate
 
-## Example Trajectories
+## Example Trajectories (LM + GM + Turn-wise Reward + Bi-Level GAE)
 
-The visualizations below show how the agent reasons through sequential steps to solve Sokoban puzzles:
+The visualizations below show how the agent reasons through sequential steps to solve Sokoban puzzles, cherry picked from validation steps:
 
 <p align="center">
     <img src="./public/example_1.png" width="1000px" alt="Example 1" />
@@ -88,8 +79,6 @@ The visualizations below show how the agent reasons through sequential steps to 
 <p align="center">
     <img src="./public/example_2.png" width="1000px" alt="Example 2" />
 </p>
-
-These examples were cherry-picked from validation results. Notably, **Trico 6** (LM + GM + Turn-wise Reward + Bi-Level GAE) demonstrates enhanced capability for agent exploration and potential to solve harder problems, while **Trico 3** (LM + GM) shows more stability in solving simpler one-step and two-step problems.
 
 ## Installation
 
@@ -113,9 +102,15 @@ bash scripts/install.sh
 
 ```bash
 # Run experiments with different settings
-bash vagen/examples/sokoban/debug_qwen0_5_1_gpu_grpo.sh
-bash vagen/examples/sokoban/debug_qwen0_5_4_gpu_ppo.sh
-bash vagen/examples/sokoban/debug_qwen2_5_vl_4gpu_grpo.sh
+bash vagen/vagen/examples/release_experiments/gae.sh
+bash vagen/vagen/examples/release_experiments/grpo_mask_loss.sh
+bash vagen/vagen/examples/release_experiments/grpo.sh
+bash vagen/vagen/examples/release_experiments/mask_gae_mask_loss_bi_level.sh
+bash vagen/vagen/examples/release_experiments/mask_gae_mask_loss_turnwise_gae.sh
+bash vagen/vagen/examples/release_experiments/mask_gae_mask_loss_turnwise_reward_bi_level.sh
+bash vagen/vagen/examples/release_experiments/mask_gae_mask_loss.sh
+bash vagen/vagen/examples/release_experiments/mask_gae.sh
+bash vagen/vagen/examples/release_experiments/mask_loss.sh
 ```
 
 ## Algorithm Settings
@@ -124,6 +119,7 @@ bash vagen/examples/sokoban/debug_qwen2_5_vl_4gpu_grpo.sh
 |-------------------|------|-----|--------------|---------------|------------|
 | with_loss_mask    | ✓    | ✓   | ✓            | ✓             | ✓          |
 | multi-turn-reward | ✗    | ✓   | ✓            | ✓             | ✓          |
+| with_gae_mask     | ✗    | ✗   | ✓            | ✓             | ✓          |
 
 ### Algorithm Options
 
@@ -144,6 +140,8 @@ bash vagen/examples/sokoban/debug_qwen2_5_vl_4gpu_grpo.sh
   - `rollout_manager.use_multi_turn_reward=True`
 - **with_loss_mask**: Whether to use loss mask to only calculate the loss of tokens output by the models
   - `rollout_manager.use_loss_mask=True`
+- **with_loss_mask**: Whether to use gae mask to only calculate the gae of tokens output by the models
+  - `rollout_manager.use_gae_mask=True`
 
 ## Conclusion
 
