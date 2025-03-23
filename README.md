@@ -21,12 +21,10 @@ VAGEN is a multi-turn Reinforcement Learning (RL) framework designed to optimize
 
 ## TRICO Overview
 
-VAGEN introduces TRICO, a specialized algorithm for visual agents that extends previous approaches with several key improvements:
+Building on recent advances in LLM reinforcement learning, we propose TRICO, a specialized algorithm for visual agents with serval explorations, as shown in figures below.
 
 <p align="center"><img src="./public/overview_1.png" width="800px" alt="TRICO Overview -1" /></p>
 <p align="center"><img src="./public/overview_2.png" width="800px" alt="TRICO Overview -2" /></p>
-
-Building on recent advances in LLM reinforcement learning, TRICO explores several key innovations for visual agents:
 
 * **Selective Training**: Uses masks to control which tokens contribute to the learning process and advantage estimation process
    * **LM**: Loss Mask, state tokens (image tokens and text description tokens) are masked during the critic and actor update
@@ -101,7 +99,7 @@ bash scripts/install.sh
 ## Running Experiments
 
 ```bash
-# Run experiments with different settings
+# To reproduce our reults, you can run
 bash vagen/vagen/examples/release_experiments/gae.sh
 bash vagen/vagen/examples/release_experiments/grpo_mask_loss.sh
 bash vagen/vagen/examples/release_experiments/grpo.sh
