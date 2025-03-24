@@ -39,13 +39,18 @@ Traditional RL frameworks for LLM agents treat all tokens in a trajectory equall
 VAGEN addresses these challenges by focusing optimization on the most critical decision-making tokens and creating a more nuanced reward structure across interaction turns.
 
 ## Experimental Results
-
 Our experiments on visual Sokoban using a Qwen-VL 3B model show:
-
 - TRICO significantly outperforms RICO in visual agentic tasks
 - Both selective token masking and cross-turn credit assignment contribute to performance gains
 - AICO (Action-centric Interaction Chain Optimization), which uses only selective token masking, outperforms TRICO on simple tasks
 - TRICO demonstrates superior exploration capabilities on more complex problems
+
+<img width="990" alt="image" src="./public/1.png" />
+
+<img width="990" alt="image" src="./public/2.png" />
+
+<img width="990" alt="image" src="./public/3.png" />
+  
 
 ## Comparison of Algorithms
 
