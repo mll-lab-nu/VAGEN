@@ -21,11 +21,11 @@ python -m vagen.env.sokoban.create_dataset \
 # max_trajectory_length = max_prompt_length + max_response_length
 
 python3 -m vagen.trainer.main_ppo \
-    algorithm.adv_estimator=masked_gae \
+    algorithm.adv_estimator=grpo \
     algorithm.high_level_gamma=0.95 \
     data.train_files=data/sokoban-text-6-step/train.parquet \
     data.val_files=data/sokoban-text-6-step/test.parquet \
-    data.train_batch_size=128 \
+    data.train_batch_size=16 \
     data.max_prompt_length=1024 \
     data.max_response_length=128 \
     data.max_trajectory_length=1800 \
@@ -65,7 +65,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
     trainer.project_name='vagen-text' \
-    trainer.experiment_name='mask_gae_mask_loss_1_5B' \
+    trainer.experiment_name='grpo_1_5B' \
     trainer.n_gpus_per_node=2 \
     trainer.nnodes=1 \
     trainer.save_freq=100 \
@@ -74,9 +74,8 @@ python3 -m vagen.trainer.main_ppo \
     rollout_manager.max_turns=3 \
     rollout_manager.window_size=5 \
     rollout_manager.use_multi_turn_reward=False \
-    rollout_manager.use_loss_mask=True \
-    rollout_manager.use_gae_mask=True \
+    rollout_manager.use_loss_mask=False \
     trainer.val_before_train=True \
     trainer.val_generations_to_log_to_wandb=8 \
-    rollout_manager.n_trajectory=1 \
-    2>&1 | tee mask_gae_mask_loss_1_5B.log
+    rollout_manager.n_trajectory=8 \
+    2>&1 | tee grpo_1_5B.log
