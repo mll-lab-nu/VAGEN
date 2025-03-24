@@ -132,10 +132,10 @@ class QwenVLRolloutManger():
         # Initialize output tensors with same shape as inputs
         new_input_ids = input_ids.clone()
         new_attention_mask = attention_mask.clone()
-        loss_mask = torch.zeros_like(input_ids)
-        new_loss_mask = torch.zeros_like(input_ids)
-        end_of_response_position_mask = torch.zeros_like(input_ids)
-        new_end_of_response_position_mask = torch.zeros_like(input_ids)
+        loss_mask = torch.zeros_like(new_attention_mask)
+        new_loss_mask = torch.zeros_like(new_attention_mask)
+        end_of_response_position_mask = torch.zeros_like(new_attention_mask)
+        new_end_of_response_position_mask = torch.zeros_like(new_attention_mask)
         # Process each example in the batch
         for b in range(batch_size):
             # Count right padding tokens using attention mask
