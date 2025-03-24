@@ -181,7 +181,7 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
             loss_mask = data.batch['loss_mask'][:, -response_length:]
         else:
             loss_mask=data.batch['attention_mask'][:, -response_length:]
-        advantages, returns = core_algos.compute_BI_LEVEL_GAE_advantage_return(token_level_rewards=data.batch['token_level_rewards'],
+        advantages, returns = core_algos.compute_bi_level_gae_advantage_return(token_level_rewards=data.batch['token_level_rewards'],
                                                                         values=values,
                                                                         loss_mask=loss_mask,
                                                                         gamma=gamma,
