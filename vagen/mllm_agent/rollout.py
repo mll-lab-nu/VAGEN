@@ -142,7 +142,7 @@ class QwenVLRolloutManger():
             right_pad_tokens = (new_input_ids[b] == pad_token_id).sum().item()
             
             # Assert that initial padding tokens have attention mask of 0
-            #assert torch.all(attention_mask[b, -right_pad_tokens:] == 0), "right padding tokens must have attention mask of 0"
+            assert torch.all(attention_mask[b, -right_pad_tokens:] == 0), "right padding tokens must have attention mask of 0"
             
             # Find special token indices
             sptk_b_indices = (input_ids[b] == sptk_b).nonzero().flatten()
@@ -156,7 +156,7 @@ class QwenVLRolloutManger():
                 hole_pos.append(start_pos.item())
                 hole_pos.append(end_pos.item())
             hole_pos.append(seq_len-right_pad_tokens)
-            #assert new_input_ids[b][seq_len-right_pad_tokens]==pad_token_id
+            assert new_input_ids[b][seq_len-right_pad_tokens]==pad_token_id
             
             # shift right to fill the wholes
             holes_to_fill=1
