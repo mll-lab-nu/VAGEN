@@ -82,5 +82,4 @@ python3 -m vagen.trainer.main_ppo \
     rollout_manager.n_trajectory=1 \
     data.truncation=error \
     rollout_manager.truncation=error \
-
     2>&1 | tee mask_gae_mask_loss_turnwise_reward_bi_level.log
