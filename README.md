@@ -93,13 +93,13 @@ We used the following settings in our experiments:
 # Create a new conda environment
 conda create -n vagen python=3.10 -y
 
-# Clone VERL repository
+# verl
 git clone git@github.com:JamesKrW/verl.git
 cd verl
 pip install -e .
 cd ../
 
-# Clone VAGEN repository
+# vagen
 git clone git@github.com:RAGEN-AI/vagen.git
 cd vagen
 bash scripts/install.sh
