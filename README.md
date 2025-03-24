@@ -101,6 +101,7 @@ cd ../
 
 # vagen
 git clone git@github.com:RAGEN-AI/vagen.git
+git checkout release
 cd vagen
 bash scripts/install.sh
 ```
