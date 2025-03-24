@@ -166,15 +166,17 @@ bash vagen/vagen/examples/release_experiments/mask_loss.sh
 - We aim to expand evaluation to more diverse visual environments
 - Future plans include scaling to larger models and applying TRICO to text-only tasks
 
+## Acknowledgement
+We thank [RAGEN](https://github.com/RAGEN-AI/RAGEN) for its innovative exploration in multi-turn reinforcement learning for LLM agents. We thank [verl](https://github.com/volcengine/verl) for its RL framework. We thank [EasyR1](https://github.com/hiyouga/EasyR1) for adding initial support for VLMs to verl.
+
 ## Citation
 
-If you find this work useful, please cite our paper:
+If you find our repo useful, we appreciate it if you could cite our work at:
 
-```
-@misc{...
+```bibtex
+@misc{VAGEN,
   title={VAGEN: Training VLM Agents with Multi-Turn Reinforcement Learning},
-  author={...},
+  author={Kangrui Wang* and Pingyue Zhang* and Zihan Wang* and Qineng Wang* and Chi Wan and Zhengyuan Yang and Linjie Li and Manling Li},
   year={2025},
-  ...
 }
 ```
