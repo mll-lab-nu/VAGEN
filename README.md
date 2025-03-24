@@ -45,11 +45,11 @@ Our experiments on visual Sokoban using a Qwen-VL 3B model show:
 - AICO (Action-centric Interaction Chain Optimization), which uses only selective token masking, outperforms TRICO on simple tasks
 - TRICO demonstrates superior exploration capabilities on more complex problems
 
-<img width="990" alt="image" src="./public/1.png" />
+<img width="800" alt="image" src="./public/1.png" />
 
-<img width="990" alt="image" src="./public/2.png" />
+<img width="800" alt="image" src="./public/2.png" />
 
-<img width="990" alt="image" src="./public/3.png" />
+<img width="800" alt="image" src="./public/3.png" />
   
 
 ## Comparison of Algorithms
@@ -164,12 +164,17 @@ bash vagen/vagen/examples/release_experiments/mask_loss.sh
 ![image (7)](https://github.com/user-attachments/assets/ddea7352-0a14-45a5-94a9-655a07c9fe3e)
 
 
+# Project Roadmap
 
- ## Limitations and Future Work
+## Short-term Goals
+- [ ] Address training stability issues
+  - [ ] Implement improved early stopping techniques
+  - [ ] Investigate root causes of instability
+  - [ ] Test alternative optimization strategies
+- [ ] Expand evaluation framework to more diverse visual environments
+- [ ] Scaling to larger models and applying TRICO to text-only tasks
+- [ ] Merge to RAGEN for better package mangement
 
-- Training can be unstable, often requiring early stopping
-- We aim to expand evaluation to more diverse visual environments
-- Future plans include scaling to larger models and applying TRICO to text-only tasks
 
 ## Acknowledgement
 We thank [RAGEN](https://github.com/RAGEN-AI/RAGEN) for its innovative exploration in multi-turn reinforcement learning for LLM agents. We thank [verl](https://github.com/volcengine/verl) for its RL framework. We thank [EasyR1](https://github.com/hiyouga/EasyR1) for adding initial support for VLMs to verl.
