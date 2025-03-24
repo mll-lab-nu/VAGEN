@@ -6,6 +6,7 @@
   <a href="#"><img src="https://img.shields.io/badge/📚_Documentation-4285F4?style=for-the-badge&logoColor=white" alt="Documentation"></a>
   <a href="#"><img src="https://img.shields.io/badge/📝_Blog-FF5722?style=for-the-badge&logoColor=white" alt="Blog"></a>
   <a href="#"><img src="https://img.shields.io/badge/🔍_Post-34A853?style=for-the-badge&logoColor=white" alt="Post"></a>
+  <a href="#"><img src="https://img.shields.io/badge/📊_Experiment_Log-FB8C00?style=for-the-badge&logoColor=white" alt="Experiment Log"></a>
 </p>
 
 
@@ -155,7 +156,8 @@ bash vagen/vagen/examples/release_experiments/mask_loss.sh
 ### Cases from TRICO Training
 ![image (6)](https://github.com/user-attachments/assets/60b251a2-e395-4079-a9aa-ceb4455b0a7a)
 
-![image.png](attachment:38fb7b01-ffd8-407b-b1f1-4cd37ad18678:image.png)
+![image (7)](https://github.com/user-attachments/assets/ddea7352-0a14-45a5-94a9-655a07c9fe3e)
+
 
 
  ## Limitations and Future Work
