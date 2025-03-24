@@ -1,96 +1,82 @@
-<h1 align="center">VAGEN</h1>
-<p align="center" style="font-size: 18px;">
+<h1 align="center">VAGEN: Training VLM Agents with Multi-Turn Reinforcement Learning</h1>
+<!-- <p align="center" style="font-size: 18px;">
   <strong>VAGEN</strong>: Multi-turn Reinforcement Learning for Visual Reasoning Agents<br>
-</p>
+</p> -->
 <p align="center">
   <a href="#"><img src="https://img.shields.io/badge/📚_Documentation-4285F4?style=for-the-badge&logoColor=white" alt="Documentation"></a>
   <a href="#"><img src="https://img.shields.io/badge/📝_Blog-FF5722?style=for-the-badge&logoColor=white" alt="Blog"></a>
-  <a href="#"><img src="https://img.shields.io/badge/📄_Paper-EA4335?style=for-the-badge&logoColor=white" alt="Paper"></a>
   <a href="#"><img src="https://img.shields.io/badge/🔍_Post-34A853?style=for-the-badge&logoColor=white" alt="Post"></a>
 </p>
 
-## Overview
-
-VAGEN is a multi-turn Reinforcement Learning (RL) framework designed to optimize Vision-Language Models (VLMs) for visual reasoning tasks. The framework introduces the **Turn-aware Reason-Interaction Chain Optimization (TRICO)** algorithm, which enhances VLM performance on complex visual reasoning problems.
-
-### Key Innovations
-
-- **Selective Training**: Uses masks to control which tokens contribute to the learning process
-- **Selective Reward Assignment**: Assigns turn-wise or trajectory rewards to specific tokens
-- **Selective Advantage Calculation**: Implements different advantage calculations for within-turn vs. cross-turn dependencies
-
-## TRICO Overview
-
-Building on recent advances in LLM reinforcement learning, we propose TRICO, a specialized algorithm for visual agents with serval explorations, as shown in figures below.
-
-<p align="center"><img src="./public/overview_1.png" width="800px" alt="TRICO Overview -1" /></p>
-<p align="center"><img src="./public/overview_2.png" width="800px" alt="TRICO Overview -2" /></p>
-
-* **Selective Training**: Uses masks to control which tokens contribute to the learning process and advantage estimation process
-   * **LM**: Loss Mask, state tokens (image tokens and text description tokens) are masked during the critic and actor update
-   * **GM**: GAE Mask, state tokens are masked during generalized advantage estimation (GAE)
-* **Selective Reward Assignment**: Assign turn-wise reward or trajectory reward to tokens
-   * **Turn-wise reward**: Reward is assigned to each turn's <eos> token
-   * **Trajectory reward**: Reward is summed up and assigned to the last token of the trajectory
-* **Selective Advantage Calculation**: Different advantage calculation for within-turn vs. cross-turn dependencies
-   * **Bi-level GAE**: We use two discounting factors:
-      * $γ_{turn}$: Estimates advantage for each turn through cross-turn temporal difference learning
-      * $γ_{token}$: Estimates advantage for each token through within-turn temporal difference learning
-   * **Turn-Wise GAE**: We use $γ_{turn}$ to compute a single advantage through cross-turn temporal difference learning and assign the same advantage for each token in the turn
 
 
-### Algorithm Features
 
-| **Feature** | **PPO-LLM (Standard)** | **RICO** | **TRICO (Ours)** |
+VAGEN is a multi-turn reinforcement learning framework designed specifically for training Vision-Language Model (VLM) Agents. Building upon existing approaches for LLM agents like RAGEN, Search-R1, and Agent-R1, VAGEN introduces enhancements that better handle the unique challenges of visual agents.
+
+## Key Innovations
+
+VAGEN introduces the **Turn-aware Reason-Interaction Chain Optimization (TRICO)** algorithm which extends the traditional RICO approach with two key innovations:
+
+1. **Selective Token Masking** - Focuses optimization on action-critical tokens through:
+   - Loss masking (`M^loss`): Identifies tokens to update during policy optimization
+   - Advantage masking (`M^adv`): Determines tokens to include in advantage calculations
+
+2. **Cross-turn Credit Assignment** - Enables more effective credit attribution through:
+   - Bi-level advantage estimation with separate discount factors for cross-turn (`γ_turn`) and within-turn (`γ_token`) calculations
+   - Turn-level rewards applied at each interaction boundary
+
+## Why VAGEN Works Better for VLM Agents
+
+Traditional RL frameworks for LLM agents treat all tokens in a trajectory equally. This approach is suboptimal for VLM agents due to:
+
+- **Distribution Shift**: Most VLMs aren't pretrained to generate image tokens
+- **State Redundancy**: Visual tasks contain excessive low-level information in long-context inputs
+
+VAGEN addresses these challenges by focusing optimization on the most critical decision-making tokens and creating a more nuanced reward structure across interaction turns.
+
+## Experimental Results
+
+Our experiments on visual Sokoban using a Qwen-VL 3B model show:
+
+- TRICO significantly outperforms RICO in visual agentic tasks
+- Both selective token masking and cross-turn credit assignment contribute to performance gains
+- AICO (Action-centric Interaction Chain Optimization), which uses only selective token masking, outperforms TRICO on simple tasks
+- TRICO demonstrates superior exploration capabilities on more complex problems
+
+## Comparison of Algorithms
+
+| **Feature** | **PPO** | **RICO** | **TRICO (Ours)** |
 | --- | --- | --- | --- |
-| **Sequence Structure** | Single response (y) to prompt (x) | Multiple turn interaction (y₀, x₁, y₁, ...) | Multiple turn interaction with masking |
-| **Reasoning Representation** | No special structure | `<think>...</think><ans>...</ans>` | `<think>...</think><ans>...</ans>` |
-| **Discounting** | Single discount rate γ | Single discount rate γ | Bi-level: γ_turn and γ_token |
+| **Sequence Structure** | Single response | Multiple turn interaction | Multiple turn interaction |
+| **LM output** | No special structure | `<think>...</think><ans>...</ans>` | `<think>...</think><ans>...</ans><eoa>` |
+| **Discounting** | Single discount rate | Single discount rate | Bi-level discounting |
 | **Optimization** | All tokens equally | All tokens equally | Selective token optimization |
-| **Reward Assignment** | Trajectory | Trajectory | Trajectory / Turn-wise |
 
-## Performance
+## Getting Started
 
-We evaluated VAGEN on the visual puzzle-solving Sokoban task, demonstrating significant improvements over previous approaches.
+```bash
+# Clone the repository
+git clone https://github.com/RAGEN-AI/VAGEN.git
+cd VAGEN
 
-<p align="center">
-    <img src="./public/performance.png" width="1000px" alt="Performance Results" />
-</p>
+# Install dependencies
+pip install -e .
 
-### Experiment Settings
+# Run an example experiment
+python vagen/examples/...
+```
 
-- **Task:** Sokoban with visual input
-- **Reward Engineering:**
-  - Box on target: +1.0
-  - All boxes placed: +10.0
-  - Format correct: +0.5
-- **Evaluation Metrics:** Score + Success Rate
+## Training Configuration
 
-## Example Trajectories
+We used the following settings in our experiments:
 
-The visualizations below show how the agent reasons through sequential steps to solve Sokoban puzzles, cherry picked from validation steps when training TRICO: LM + GM and TRICO: LM + GM + Turn-wise Reward + Bi-Level GAE.
-
-### TRICO: LM + GM
-<p align="center">
-    <img src="./public/example_4.png" width="400px" alt="Example 4: Masked GAE + Masked Loss" />
-</p>
-
-<p align="center">
-    <img src="./public/example_3.png" width="600px" alt="Example 3: Masked GAE + Masked Loss" />
-</p>
-
-### TRICO: LM + GM + Turn-wise Reward + Bi-Level GAE
-
-<p align="center">
-    <img src="./public/example_1.png" width="1000px" alt="Example 1" />
-</p>
-
-<p align="center">
-    <img src="./public/example_2.png" width="1000px" alt="Example 2" />
-</p>
+- **Model**: Qwen 2.5 VL-instruction 3B
+- **Environment**: Visual Sokoban (puzzle-solving task)
+- **Rewards**: Box on target (+1.0), All boxes placed (+10.0), Format correct (+0.5), Step penalty (-0.1)
+- **Hyperparameters**: `γ_turn`=0.95, `γ_token`=1.0, KL penalty=0.001, Actor LR=1e-6, Critic LR=1e-5
 
 
-
+----
 
 ## Installation
 
@@ -155,15 +141,22 @@ bash vagen/vagen/examples/release_experiments/mask_loss.sh
 - **with_loss_mask**: Whether to use gae mask to only calculate the gae of tokens output by the models
   - `rollout_manager.use_gae_mask=True`
 
-## Conclusion
 
-VAGEN, powered by the TRICO algorithm, is well-suited for visual agent learning because:
+ ## Limitations and Future Work
 
-1. **Visual agents require multi-turn reasoning**: The agent observes, thinks, acts, and receives updated observations
-2. **Not all tokens are equally important**: In visual reasoning, the action tokens are more critical than observation tokens for VLMs to learn
-3. **Bi-level time dependencies**: Bi-Level discount factors help model both immediate and long-term consequences
+- Training can be unstable, often requiring early stopping
+- We aim to expand evaluation to more diverse visual environments
+- Future plans include scaling to larger models and applying TRICO to text-only tasks
 
-## Future Work
+## Citation
 
-1. Expanding to more environments, real-world applications like GUI agents and embodied agents
-2. Scaling to larger models
+If you find this work useful, please cite our paper:
+
+```
+@misc{...
+  title={VAGEN: Training VLM Agents with Multi-Turn Reinforcement Learning},
+  author={...},
+  year={2025},
+  ...
+}
+```
