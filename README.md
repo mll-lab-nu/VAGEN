@@ -167,13 +167,13 @@ bash vagen/vagen/examples/release_experiments/mask_loss.sh
 # Project Roadmap
 
 ## Short-term Goals
+- [ ] Merge to RAGEN for better package mangement
 - [ ] Address training stability issues
   - [ ] Implement improved early stopping techniques
   - [ ] Investigate root causes of instability
   - [ ] Test alternative optimization strategies
 - [ ] Expand evaluation framework to more diverse visual environments
 - [ ] Scaling to larger models and applying TRICO to text-only tasks
-- [ ] Merge to RAGEN for better package mangement
 
 
 ## Acknowledgement
