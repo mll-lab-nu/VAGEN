@@ -13,6 +13,9 @@
 
 VAGEN is a multi-turn reinforcement learning framework designed specifically for training Vision-Language Model (VLM) Agents. Building upon existing approaches for LLM agents like RAGEN, Search-R1, and Agent-R1, VAGEN introduces enhancements that better handle the unique challenges of visual agents.
 
+<img width="990" alt="image" src="https://github.com/user-attachments/assets/6220f4bd-5af0-4b0f-bf2f-198ac70c9023" />
+
+
 ## Key Innovations
 
 VAGEN introduces the **Turn-aware Reason-Interaction Chain Optimization (TRICO)** algorithm which extends the traditional RICO approach with two key innovations:
@@ -140,6 +143,19 @@ bash vagen/vagen/examples/release_experiments/mask_loss.sh
   - `rollout_manager.use_loss_mask=True`
 - **with_loss_mask**: Whether to use gae mask to only calculate the gae of tokens output by the models
   - `rollout_manager.use_gae_mask=True`
+
+ ## Cases
+  We present several cases from the trained models with AICO and TRICO, as shown below.
+
+### Cases from AICO Training
+<img width="1107" alt="image (4)" src="https://github.com/user-attachments/assets/995ec921-faf8-4832-a4c0-1c2ce559a55c" />
+
+![image (5)](https://github.com/user-attachments/assets/78bbc376-7e61-4a24-9911-eb28416eed37)
+
+### Cases from TRICO Training
+![image (6)](https://github.com/user-attachments/assets/60b251a2-e395-4079-a9aa-ceb4455b0a7a)
+
+![image.png](attachment:38fb7b01-ffd8-407b-b1f1-4cd37ad18678:image.png)
 
 
  ## Limitations and Future Work
