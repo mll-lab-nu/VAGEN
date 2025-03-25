@@ -12,7 +12,7 @@
 
 
 
-VAGEN is a multi-turn reinforcement learning framework designed specifically for training VLM Agents. VAGEN leverages Turn-aware Reason-Interaction Chain Optimization (TRICO) to efficiently train VLMs for visual agentic tasks.
+VAGEN is a multi-turn reinforcement learning framework designed specifically for training VLM Agents. VAGEN leverages the TRICO algorithm to efficiently train VLMs for visual agentic tasks.
 
 ![vagen_new](https://github.com/user-attachments/assets/83c84052-89ba-4a77-9c13-85d882f52a3b)
 
