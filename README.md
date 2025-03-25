@@ -12,9 +12,10 @@
 
 
 
-VAGEN is a multi-turn reinforcement learning framework designed specifically for training Vision-Language Model (VLM) Agents. Building upon existing approaches for LLM agents like RAGEN, Search-R1, and Agent-R1, VAGEN introduces enhancements that better handle the unique challenges of visual agents.
+VAGEN is a multi-turn reinforcement learning framework designed specifically for training VLM Agents. VAGEN leverages Turn-aware Reason-Interaction Chain Optimization (TRICO) to efficiently train VLMs for visual agentic tasks.
 
-<img width="990" alt="image" src="https://github.com/user-attachments/assets/6220f4bd-5af0-4b0f-bf2f-198ac70c9023" />
+![vagen_new](https://github.com/user-attachments/assets/83c84052-89ba-4a77-9c13-85d882f52a3b)
+
 
 
 ## Key Innovations
@@ -168,6 +169,7 @@ bash vagen/vagen/examples/release_experiments/mask_loss.sh
 # Project Roadmap
 
 ## Short-term Goals
+- 🗓️ Mar 25, 2025: We release VAGEN, a multi-turn reinforcement learning framework for training VLM Agents!
 - [ ] Merge to RAGEN for better package mangement
 - [ ] Address training stability issues
   - [ ] Implement improved early stopping techniques
