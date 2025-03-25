@@ -112,16 +112,17 @@ bash scripts/install.sh
 
 ```bash
 # To reproduce our reults, you can run
-bash vagen/vagen/examples/release_experiments/gae.sh
-bash vagen/vagen/examples/release_experiments/grpo_mask_loss.sh
-bash vagen/vagen/examples/release_experiments/grpo.sh
-bash vagen/vagen/examples/release_experiments/mask_gae_mask_loss_bi_level.sh
-bash vagen/vagen/examples/release_experiments/mask_gae_mask_loss_turnwise_gae.sh
-bash vagen/vagen/examples/release_experiments/mask_gae_mask_loss_turnwise_reward_bi_level.sh
-bash vagen/vagen/examples/release_experiments/mask_gae_mask_loss.sh
-bash vagen/vagen/examples/release_experiments/mask_gae.sh
-bash vagen/vagen/examples/release_experiments/mask_loss.sh
+bash vagen/vagen/examples/release_experiments/gae.sh # rico-gae
+bash vagen/vagen/examples/release_experiments/grpo_mask_loss.sh # rico-grpo + loss mask
+bash vagen/vagen/examples/release_experiments/grpo.sh # rico-grpo
+bash vagen/vagen/examples/release_experiments/mask_gae_mask_loss_bi_level.sh # trico - turn reward
+bash vagen/vagen/examples/release_experiments/mask_gae_mask_loss_turnwise_gae.sh # trico - turn reward - bi-level gae + turn-level gae
+bash vagen/vagen/examples/release_experiments/mask_gae_mask_loss_turnwise_reward_bi_level.sh # trico
+bash vagen/vagen/examples/release_experiments/mask_gae_mask_loss.sh # aico
+bash vagen/vagen/examples/release_experiments/mask_gae.sh # aico - loss mask
+bash vagen/vagen/examples/release_experiments/mask_loss.sh # aico - gae mask
 ```
+Each run takes ~4 hours to reach 150 steps on 4 H100s. You can decrease testing frequency to speed up training. Training might be unstable due to loss spikes; we recommend restoring from the latest checkpoint when encountering such cases. We will resolve this issue in future work (see roadmap).
 
 ## Algorithm Settings
 
@@ -174,8 +175,8 @@ bash vagen/vagen/examples/release_experiments/mask_loss.sh
 - [ ] Merge to RAGEN for better package mangement
 - [ ] Address training stability issues
   - [ ] Lora Support
-  - [ ] Implement improved early stopping techniques
-  - [ ] Test alternative optimization strategies
+  - [ ] Implement improved early stopping and gradient clip strategies
+  - [ ] Reward normalization (see RAGEN)
 - [ ] Expand evaluation framework to more diverse visual environments
 - [ ] Scaling to larger models and applying TRICO to text-only tasks
 
