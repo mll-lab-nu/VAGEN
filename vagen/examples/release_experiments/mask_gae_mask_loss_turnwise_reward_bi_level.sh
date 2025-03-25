@@ -29,7 +29,7 @@ python3 -m vagen.trainer.main_ppo \
     data.train_batch_size=128 \
     data.max_prompt_length=1024 \
     data.max_response_length=128 \
-    data.max_trajectory_length=2000 \
+    data.max_trajectory_length=1800 \
     data.image_key=images \
     data.truncation=error \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \

@@ -69,7 +69,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.experiment_name='mask_gae_mask_loss' \
     trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \
-    trainer.save_freq=100 \
+    trainer.save_freq=70 \
     trainer.test_freq=20 \
     trainer.total_epochs=15 \
     rollout_manager.max_turns=3 \
