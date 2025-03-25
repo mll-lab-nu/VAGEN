@@ -155,7 +155,7 @@ Each run takes ~4 hours to reach 150 steps on 4 H100s. You can decrease testing 
   - `rollout_manager.use_gae_mask=True`
 
  ## Cases
-  We present several cases selected from validation steps during training models with AICO and TRICO, as shown below, you can view all the cases at our wandb reports.
+  We present several cases selected from validation steps during training models with AICO and TRICO, as shown below, you can view all the cases at our [experiment log](https://api.wandb.ai/links/ragen-V/nlb40e7l)
 
 ### Cases from AICO Training
 <img width="1107" alt="image (4)" src="https://github.com/user-attachments/assets/995ec921-faf8-4832-a4c0-1c2ce559a55c" />
