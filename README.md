@@ -169,14 +169,12 @@ Each run takes ~4 hours to reach 150 steps on 4 H100s. You can decrease testing 
 
 
 # Project Roadmap
-
-## Short-term Goals
 - 🗓️ Mar 25, 2025: We release VAGEN, a multi-turn reinforcement learning framework for training VLM Agents!
 - [ ] Merge to RAGEN for better package mangement
 - [ ] Address training stability issues
   - [ ] Lora Support
-  - [ ] Implement improved early stopping and gradient clip strategies
-  - [ ] Reward normalization (see RAGEN)
+  - [ ] Implement improved early stopping and gradient clipping strategies
+  - [ ] Reward normalization (refer to RAGEN)
 - [ ] Expand evaluation framework to more diverse visual environments
 - [ ] Scaling to larger models and applying TRICO to text-only tasks
 
