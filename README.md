@@ -97,6 +97,7 @@ conda create -n vagen python=3.10 -y
 # verl
 git clone git@github.com:JamesKrW/verl.git
 cd verl
+git checkout release
 pip install -e .
 cd ../
 
@@ -172,8 +173,8 @@ bash vagen/vagen/examples/release_experiments/mask_loss.sh
 - 🗓️ Mar 25, 2025: We release VAGEN, a multi-turn reinforcement learning framework for training VLM Agents!
 - [ ] Merge to RAGEN for better package mangement
 - [ ] Address training stability issues
+  - [ ] Lora Support
   - [ ] Implement improved early stopping techniques
-  - [ ] Investigate root causes of instability
   - [ ] Test alternative optimization strategies
 - [ ] Expand evaluation framework to more diverse visual environments
 - [ ] Scaling to larger models and applying TRICO to text-only tasks
