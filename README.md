@@ -82,21 +82,24 @@ conda create -n vagen python=3.10 -y
 # verl
 git clone git@github.com:JamesKrW/verl.git
 cd verl
-git checkout release
 pip install -e .
 cd ../
 
 # vagen
 git clone git@github.com:RAGEN-AI/vagen.git
-git checkout release
 cd vagen
 bash scripts/install.sh
 ```
 
-## Running Experiments
+## Reproduce Experiments
 
 ```bash
-# To reproduce our reults, you can run
+# To reproduce our reults, first go to release branch of verl
+cd ../verl
+git checkout release
+cd ../vagen
+
+# Then, you can run
 bash vagen/vagen/examples/release_experiments/gae.sh # rico-gae
 bash vagen/vagen/examples/release_experiments/grpo_mask_loss.sh # rico-grpo + loss mask
 bash vagen/vagen/examples/release_experiments/grpo.sh # rico-grpo
