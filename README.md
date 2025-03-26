@@ -62,20 +62,6 @@ Our experiments on visual Sokoban using a Qwen-VL 3B model show:
 | **Discounting** | Single discount rate | Single discount rate | Bi-level discounting |
 | **Optimization** | All tokens equally | All tokens equally | Selective token optimization |
 
-## Getting Started
-
-```bash
-# Clone the repository
-git clone https://github.com/RAGEN-AI/VAGEN.git
-cd VAGEN
-
-# Install dependencies
-pip install -e .
-
-# Run an example experiment
-python vagen/examples/...
-```
-
 ## Training Configuration
 
 We used the following settings in our experiments:
