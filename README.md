@@ -78,6 +78,7 @@ We used the following settings in our experiments:
 ```bash
 # Create a new conda environment
 conda create -n vagen python=3.10 -y
+conda activate vagen
 
 # verl
 git clone git@github.com:JamesKrW/verl.git
