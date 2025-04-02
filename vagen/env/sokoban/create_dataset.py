@@ -32,16 +32,6 @@ class SokobanDatasetCreator(DatasetCreator):
         )
         if len(gt_action_sequence) > max_action_length:
             return seed, []
-        
-        # images = []
-        # obs = env_interface.env._render('rgb_array')
-        # images.append(obs)
-        # for action in gt_action_sequence:
-        #     env_interface.env._step(action)
-        #     obs = env_interface.env._render('rgb_array')
-        #     images.append(obs)
-        # animation = plot_animation(images)
-        # animation.save(f'animation_{seed}.gif')
 
         return seed, gt_action_sequence
     
