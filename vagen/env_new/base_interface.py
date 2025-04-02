@@ -9,80 +9,13 @@ import numpy as np
 from dataclasses import dataclass, field
 
 
-IMAGE_PLACEHOLDER = "<image>"
-
-@dataclass
-class EnvConfig:
-    """
-    Dataclass for managing environment configuration.
-    """
-    env_name: str
-    env_config: Dict[str, Any]
-    interface_config: Dict[str, Any]
-    seed: int
-
-class BaseEnv(ABC):
-    @abstractmethod
-    def _reset(self, seed: Optional[int] = None) -> Any:
-        """
-        Reset the environment.
-        NOTE: the environment should be same for the same seed
-        Args:
-            seed: Seed for the environment
-            
-        Returns:
-            rendered environment
-        """
-        pass
-    
-    @abstractmethod
-    def _step(self, action) -> Tuple[Any, float, bool, Dict]:
-        """
-        Execute one step in the environment.
-        NOTE should also handle predefined invalid action (0)
-        Args:
-            action: Action to take, must be in action space, or default invalid action
-            
-        Returns:
-            observation (rendered environment), reward, done, info
-        """
-        pass
-    
-    @abstractmethod
-    def close(self):
-        """Close the environment."""
-        pass
-    
-    
-    def step(self, action:Any) -> Tuple[Any, Any, Any, Any]:
-        """
-        Execute one step in the environment.
-        Args:
-            action: Action to take, must be in action space, or default invalid action
-            
-        Returns:
-            observation (rendered environment), reward, done, info
-        """
-        obs,reward,done,info = self._step(action)
-        return obs, reward, done, info
-    
-    def reset(self, seed: Optional[int] = None) -> Any:
-        """
-        Reset the environment.
-        NOTE: the environment should be same for the same seed
-        Args:
-            seed: Seed for the environment  
-        Returns:
-            obs,info
-        """
-        obs,info = self._reset(seed)
-        return obs,info
-    
+IMAGE_PLACEHOLDER = "<image>"    
         
 class BaseInterface(ABC):
-    def __init__(self, env_config: Dict, interface_config: Dict = None):
-        self.env_config = env_config
-        self.interface_config = interface_config
+    
+    @classmethod
+    def __init__(self, config):
+        self.config = config
         
     @classmethod
     def name_repr(cls) -> str:
