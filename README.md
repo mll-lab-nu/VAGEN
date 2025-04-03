@@ -4,8 +4,7 @@
 </p> -->
 <p align="center">
   <a href="#"><img src="https://img.shields.io/badge/📚_Documentation-4285F4?style=for-the-badge&logoColor=white" alt="Documentation"></a>
-  <a href="[#](https://mll-lab.notion.site/vagen)"><img src="https://img.shields.io/badge/📝_Blog-FF5722?style=for-the-badge&logoColor=white" alt="Blog"></a>
-  <a href="#"><img src="https://img.shields.io/badge/🔍_Post-34A853?style=for-the-badge&logoColor=white" alt="Post"></a>
+  <a href="https://mll-lab.notion.site/vagen"><img src="https://img.shields.io/badge/📝_Blog-FF5722?style=for-the-badge&logoColor=white" alt="Blog"></a>
   <a href="https://api.wandb.ai/links/ragen-V/nlb40e7l"><img src="https://img.shields.io/badge/📊_Experiment_Log-FB8C00?style=for-the-badge&logoColor=white" alt="Experiment Log"></a>
 </p>
 
@@ -62,20 +61,6 @@ Our experiments on visual Sokoban using a Qwen-VL 3B model show:
 | **Discounting** | Single discount rate | Single discount rate | Bi-level discounting |
 | **Optimization** | All tokens equally | All tokens equally | Selective token optimization |
 
-## Getting Started
-
-```bash
-# Clone the repository
-git clone https://github.com/RAGEN-AI/VAGEN.git
-cd VAGEN
-
-# Install dependencies
-pip install -e .
-
-# Run an example experiment
-python vagen/examples/...
-```
-
 ## Training Configuration
 
 We used the following settings in our experiments:
@@ -93,34 +78,40 @@ We used the following settings in our experiments:
 ```bash
 # Create a new conda environment
 conda create -n vagen python=3.10 -y
+conda activate vagen
 
 # verl
-git clone git@github.com:JamesKrW/verl.git
+git clone https://github.com/JamesKrW/verl.git
 cd verl
-git checkout release
 pip install -e .
 cd ../
 
 # vagen
-git clone git@github.com:RAGEN-AI/vagen.git
-git checkout release
+git clone https://github.com/RAGEN-AI/VAGEN.git
 cd vagen
 bash scripts/install.sh
 ```
 
-## Running Experiments
+## Reproduce Experiments
 
 ```bash
-# To reproduce our reults, you can run
-bash vagen/vagen/examples/release_experiments/gae.sh # rico-gae
-bash vagen/vagen/examples/release_experiments/grpo_mask_loss.sh # rico-grpo + loss mask
-bash vagen/vagen/examples/release_experiments/grpo.sh # rico-grpo
-bash vagen/vagen/examples/release_experiments/mask_gae_mask_loss_bi_level.sh # trico - turn reward
-bash vagen/vagen/examples/release_experiments/mask_gae_mask_loss_turnwise_gae.sh # trico - turn reward - bi-level gae + turn-level gae
-bash vagen/vagen/examples/release_experiments/mask_gae_mask_loss_turnwise_reward_bi_level.sh # trico
-bash vagen/vagen/examples/release_experiments/mask_gae_mask_loss.sh # aico
-bash vagen/vagen/examples/release_experiments/mask_gae.sh # aico - loss mask
-bash vagen/vagen/examples/release_experiments/mask_loss.sh # aico - gae mask
+# To reproduce our reults, first go to release branch of verl
+cd ../verl
+git checkout release
+cd ../vagen
+
+wandb login # login into wandb
+
+# Then, you can run
+bash vagen/examples/release_experiments/gae.sh # rico-gae
+bash vagen/examples/release_experiments/grpo_mask_loss.sh # rico-grpo + loss mask
+bash vagen/examples/release_experiments/grpo.sh # rico-grpo
+bash vagen/examples/release_experiments/mask_gae_mask_loss_bi_level.sh # trico - turn reward
+bash vagen/examples/release_experiments/mask_gae_mask_loss_turnwise_gae.sh # trico - turn reward - bi-level gae + turn-level gae
+bash vagen/examples/release_experiments/mask_gae_mask_loss_turnwise_reward_bi_level.sh # trico
+bash vagen/examples/release_experiments/mask_gae_mask_loss.sh # aico
+bash vagen/examples/release_experiments/mask_gae.sh # aico - loss mask
+bash vagen/examples/release_experiments/mask_loss.sh # aico - gae mask
 ```
 Each run takes ~4 hours to reach 150 steps on 4 H100s. You can decrease testing frequency to speed up training. Training might be unstable due to loss spikes; we recommend restoring from the latest checkpoint when encountering such cases. We will resolve this issue in future work (see roadmap).
 
