@@ -7,39 +7,19 @@ import torch
 from PIL import Image
 import numpy as np
 from dataclasses import dataclass, field
-
-
-IMAGE_PLACEHOLDER = "<image>"    
-        
+from .utils.io_utils import validate_reset_io,validate_step_io
+           
 class BaseInterface(ABC):
+    image_placeholder="<image>"
     
-    @classmethod
-    def __init__(self, config):
+    def __init__(self, config: Dict):
         self.config = config
-        
-    @classmethod
-    def name_repr(cls) -> str:
-        """Get the name of the environment."""
-        return cls.__name__
-        
-    @abstractmethod
-    def _reset(self, seed: Optional[int] = None) -> Tuple[Any, float, bool, Dict]:
-        """Reset the environment."""
-        pass
-    
-    @abstractmethod
-    def _step(self, action:str) -> Tuple[Any, float, bool, Dict]:
-        """Execute action string in the environment."""
-        # return observation, reward, done, info
-        # info must contain "llm_raw_response" key, which is a string
-        pass
     
     @classmethod
     @abstractmethod
-    def config_repr(cls, config: Dict) -> str:
-        """Get the config of the environment."""
+    def config_repr(cls, config) -> str:
+        """convert config to str"""
         pass
-    
     
     @abstractmethod
     def close(self):
@@ -51,53 +31,16 @@ class BaseInterface(ABC):
         """Get the task instruction."""
         pass
     
-    
+    @abstractmethod
+    @validate_step_io
     def step(self, action: str) -> Tuple[Dict, float, bool, Dict]:
-        """Execute action string in the environment."""
-        """Please use the following assertions to validate the output, 
-        then you can rewrite the step in your own class to improve the performance"""
-        
-        
-        assert isinstance(action, str), f"action must be str, got {type(action)}"
-        obs,reward,done,info = self._step(action)
-        assert isinstance(reward, (int, float)), f"reward must be int or float, got {type(reward)}"
-        assert isinstance(done, bool), f"done must be bool, got {type(done)}"
-        assert isinstance(info, dict), f"info must be dict, got {type(info)}"
-        assert isinstance(obs, dict), f"obs must be dict, got {type(obs)}"
-        assert "llm_raw_response" in info, f"info must contain 'llm_raw_response' key"
-        assert isinstance(info["llm_raw_response"], str), f"info['llm_raw_response'] must be str, got {type(info['llm_raw_response'])}"
-        assert "text_template" in obs, f"obs must contain 'text_template' key"
-        assert isinstance(obs["text_template"], str), f"obs['text_template'] must be str, got {type(obs['text_template'])}"
-        
-        if "multi_modal_data" in obs:
-            if IMAGE_PLACEHOLDER in obs["multi_modal_data"]:
-                assert isinstance(obs["multi_modal_data"][IMAGE_PLACEHOLDER], list), f"obs['multi_modal_data']['<image>'] must be list, got {type(obs['multi_modal_data'][IMAGE_PLACEHOLDER])}"
-                for image in obs["multi_modal_data"][IMAGE_PLACEHOLDER]:
-                    assert isinstance(image, Image.Image), f"image must be PIL.Image.Image, got {type(image)}"
-                len_of_images = len(obs["multi_modal_data"][IMAGE_PLACEHOLDER])
-                len_of_image_in_text_template = len(re.findall(IMAGE_PLACEHOLDER, obs["text_template"]))
-                assert len_of_images == len_of_image_in_text_template, f"len_of_images must be equal to len_of_image_in_text_template, got {len_of_images} and {len_of_image_in_text_template}"
-        return obs, reward, done, info
+        pass
     
-            
-    def reset(self, seed: int):
+    @abstractmethod
+    @validate_reset_io    
+    def reset(self, seed: int) -> Tuple[Dict, Dict]:
         """Reset the environment."""
-        assert isinstance(seed, int), f"seed must be int, got {type(seed)}"
-        obs, info = self._reset(seed)
-        assert isinstance(info, dict), f"info must be dict, got {type(info)}"
-        assert isinstance(obs, dict), f"obs must be dict, got {type(obs)}"
-        assert "text_template" in obs, f"obs must contain 'text_template' key"
-        assert isinstance(obs["text_template"], str), f"obs['text_template'] must be str, got {type(obs['text_template'])}"
-        
-        if "multi_modal_data" in obs:
-            if IMAGE_PLACEHOLDER in obs["multi_modal_data"]:
-                assert isinstance(obs["multi_modal_data"][IMAGE_PLACEHOLDER], list), f"obs['multi_modal_data']['<image>'] must be list, got {type(obs['multi_modal_data'][IMAGE_PLACEHOLDER])}"
-                for image in obs["multi_modal_data"][IMAGE_PLACEHOLDER]:
-                    assert isinstance(image, Image.Image), f"image must be PIL.Image.Image, got {type(image)}"
-                len_of_images = len(obs["multi_modal_data"][IMAGE_PLACEHOLDER])
-                len_of_image_in_text_template = len(re.findall(IMAGE_PLACEHOLDER, obs["text_template"]))
-                assert len_of_images == len_of_image_in_text_template, f"len_of_images must be equal to len_of_image_in_text_template, got {len_of_images} and {len_of_image_in_text_template}"
-        return obs, info
+        pass
     
     @abstractmethod
     def get_traj_reward(self) -> float:

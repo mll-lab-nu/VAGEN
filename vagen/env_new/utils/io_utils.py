@@ -2,10 +2,6 @@ import functools
 from typing import Dict, Tuple, Any, Callable, TypeVar
 from PIL import Image
 import re
-
-# Assuming this is defined elsewhere in your code
-IMAGE_PLACEHOLDER = "<image>"
-
 T = TypeVar('T')
 
 def validate_step_io(func: Callable[..., T]) -> Callable[..., T]:
@@ -37,14 +33,54 @@ def validate_step_io(func: Callable[..., T]) -> Callable[..., T]:
         
         # Validate multi_modal_data if present
         if "multi_modal_data" in obs:
-            if IMAGE_PLACEHOLDER in obs["multi_modal_data"]:
-                assert isinstance(obs["multi_modal_data"][IMAGE_PLACEHOLDER], list), f"obs['multi_modal_data']['<image>'] must be list, got {type(obs['multi_modal_data'][IMAGE_PLACEHOLDER])}"
+            if self.image_placeholder in obs["multi_modal_data"]:
+                assert isinstance(obs["multi_modal_data"][self.image_placeholder], list), f"obs['multi_modal_data']['<image>'] must be list, got {type(obs['multi_modal_data'][self.image_placeholder])}"
                 
-                for image in obs["multi_modal_data"][IMAGE_PLACEHOLDER]:
+                for image in obs["multi_modal_data"][self.image_placeholder]:
                     assert isinstance(image, Image.Image), f"image must be PIL.Image.Image, got {type(image)}"
                 
-                len_of_images = len(obs["multi_modal_data"][IMAGE_PLACEHOLDER])
-                len_of_image_in_text_template = len(re.findall(IMAGE_PLACEHOLDER, obs["text_template"]))
+                len_of_images = len(obs["multi_modal_data"][self.image_placeholder])
+                len_of_image_in_text_template = len(re.findall(self.image_placeholder, obs["text_template"]))
+                assert len_of_images == len_of_image_in_text_template, f"len_of_images must be equal to len_of_image_in_text_template, got {len_of_images} and {len_of_image_in_text_template}"
+        
+        return result
+    
+    return wrapper
+
+
+def validate_reset_io(func: Callable[..., T]) -> Callable[..., T]:
+    """Decorator to validate input and output types for the reset method."""
+    @functools.wraps(func)
+    def wrapper(self, seed, *args, **kwargs):
+        # Validate input
+        assert isinstance(seed, int), f"seed must be int, got {type(seed)}"
+        
+        # Call the function
+        result = func(self, seed, *args, **kwargs)
+        
+        # Validate output structure
+        assert isinstance(result, tuple) and len(result) == 2, f"reset must return a tuple of length 2, got {type(result)} of length {len(result) if isinstance(result, tuple) else 'N/A'}"
+        
+        obs, info = result
+        
+        # Validate types of returned values
+        assert isinstance(info, dict), f"info must be dict, got {type(info)}"
+        assert isinstance(obs, dict), f"obs must be dict, got {type(obs)}"
+        
+        # Validate required keys and their types
+        assert "text_template" in obs, f"obs must contain 'text_template' key"
+        assert isinstance(obs["text_template"], str), f"obs['text_template'] must be str, got {type(obs['text_template'])}"
+        
+        # Validate multi_modal_data if present
+        if "multi_modal_data" in obs:
+            if self.image_placeholder in obs["multi_modal_data"]:
+                assert isinstance(obs["multi_modal_data"][self.image_placeholder], list), f"obs['multi_modal_data']['<image>'] must be list, got {type(obs['multi_modal_data'][self.image_placeholder])}"
+                
+                for image in obs["multi_modal_data"][self.image_placeholder]:
+                    assert isinstance(image, Image.Image), f"image must be PIL.Image.Image, got {type(image)}"
+                
+                len_of_images = len(obs["multi_modal_data"][self.image_placeholder])
+                len_of_image_in_text_template = len(re.findall(self.image_placeholder, obs["text_template"]))
                 assert len_of_images == len_of_image_in_text_template, f"len_of_images must be equal to len_of_image_in_text_template, got {len_of_images} and {len_of_image_in_text_template}"
         
         return result

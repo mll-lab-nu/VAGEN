@@ -12,10 +12,8 @@ class DatasetCreator:
     def __init__(self, config: Dict):
         self.config = config
         self.data_dir = self.config['data_dir']
-
-        self.env_name = self.config['name']
-        self.env_config = self.config['env_config']
         self.interface_config = self.config['interface_config']
+        assert "env_name" in self.interface_config
         
         
 
@@ -39,15 +37,13 @@ class DatasetCreator:
             
         def _create_instance(seed_idx, split: str = 'train'):
             env_settings = {
-                'env_name': self.env_name,
-                'env_config': self.env_config,
-                'interface_config': self.interface_config,
+                'config': self.interface_config,
                 'seed': seed_idx
             }
 
             # TODO: no reward model defined here for the reward will be generated while rollout
             return {
-                "data_source": self.env_name,
+                "data_source": self.interface_config["env_name"],
                 "prompt": [{"role": "user", "content": ''}],
                 "extra_info": {"split": split, **env_settings}
             }

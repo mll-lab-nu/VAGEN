@@ -2,8 +2,8 @@ from abc import ABC, abstractmethod
 from typing import Optional, List, Tuple, Any, Dict
 
 class BaseEnv(ABC):
-    def __init__(self, env_config):
-        self.env_config = env_config    
+    def __init__(self, config):
+        self.config = config    
     
     
     @abstractmethod
@@ -25,7 +25,7 @@ class BaseEnv(ABC):
         pass
     
     @abstractmethod
-    def reset(self, seed: Optional[int] = None) -> Tuple[Any, Dict]:
+    def reset(self, seed: Optional[Any] = None) -> Tuple[Any, Dict]:
         """
         Reset the environment.
         NOTE: the environment should be same for the same seed
