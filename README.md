@@ -81,13 +81,13 @@ conda create -n vagen python=3.10 -y
 conda activate vagen
 
 # verl
-git clone git@github.com:JamesKrW/verl.git
+git clone https://github.com/JamesKrW/verl.git
 cd verl
 pip install -e .
 cd ../
 
 # vagen
-git clone git@github.com:RAGEN-AI/vagen.git
+git clone https://github.com/RAGEN-AI/VAGEN.git
 cd vagen
 bash scripts/install.sh
 ```
@@ -100,16 +100,18 @@ cd ../verl
 git checkout release
 cd ../vagen
 
+wandb login # login into wandb
+
 # Then, you can run
-bash vagen/vagen/examples/release_experiments/gae.sh # rico-gae
-bash vagen/vagen/examples/release_experiments/grpo_mask_loss.sh # rico-grpo + loss mask
-bash vagen/vagen/examples/release_experiments/grpo.sh # rico-grpo
-bash vagen/vagen/examples/release_experiments/mask_gae_mask_loss_bi_level.sh # trico - turn reward
-bash vagen/vagen/examples/release_experiments/mask_gae_mask_loss_turnwise_gae.sh # trico - turn reward - bi-level gae + turn-level gae
-bash vagen/vagen/examples/release_experiments/mask_gae_mask_loss_turnwise_reward_bi_level.sh # trico
-bash vagen/vagen/examples/release_experiments/mask_gae_mask_loss.sh # aico
-bash vagen/vagen/examples/release_experiments/mask_gae.sh # aico - loss mask
-bash vagen/vagen/examples/release_experiments/mask_loss.sh # aico - gae mask
+bash vagen/examples/release_experiments/gae.sh # rico-gae
+bash vagen/examples/release_experiments/grpo_mask_loss.sh # rico-grpo + loss mask
+bash vagen/examples/release_experiments/grpo.sh # rico-grpo
+bash vagen/examples/release_experiments/mask_gae_mask_loss_bi_level.sh # trico - turn reward
+bash vagen/examples/release_experiments/mask_gae_mask_loss_turnwise_gae.sh # trico - turn reward - bi-level gae + turn-level gae
+bash vagen/examples/release_experiments/mask_gae_mask_loss_turnwise_reward_bi_level.sh # trico
+bash vagen/examples/release_experiments/mask_gae_mask_loss.sh # aico
+bash vagen/examples/release_experiments/mask_gae.sh # aico - loss mask
+bash vagen/examples/release_experiments/mask_loss.sh # aico - gae mask
 ```
 Each run takes ~4 hours to reach 150 steps on 4 H100s. You can decrease testing frequency to speed up training. Training might be unstable due to loss spikes; we recommend restoring from the latest checkpoint when encountering such cases. We will resolve this issue in future work (see roadmap).
 
