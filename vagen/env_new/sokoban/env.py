@@ -162,18 +162,14 @@ if __name__ == "__main__":
     env = SokobanEnv(config)
     print(env.system_prompt())
     obs,info=env.reset()
-    print("Obs:", obs["obs_str"])
-    input_actions=[
-        "<think>I think it's nice</think><answer>Up</answer>",
-        "<think>I think it's nice</think><answer>Right</answer>",
-        "<think>I think it's nice</think><answer>Down</answer>",
-        "<think>I think it's nice</think><answer>Left</answer>",
-    ]
-    for action in input_actions:
+    print(obs["obs_str"])
+    while True:
+        action = input("Enter action (Up, Down, Left, Right): ")
+        action=f"<think>xxx</think><answer>{action}</answer>"
         obs, reward, done, info = env.step(action)
-        print("Obs:", obs["obs_str"])
-        print("Info:", info)
+        print(obs["obs_str"])
         if done:
             break
     print(env.compute_reward())
+    print(info)
     env.close()
