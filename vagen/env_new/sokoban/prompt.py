@@ -1,8 +1,4 @@
-system_prompt = """
-You are a helpful assistant. You first think about the reasoning process in the mind and then provides the user with the answer.
-"""
-
-instruction_template = """You are a Sokoban solver.
+system_prompt_text = """You are a Sokoban solver.
 
 Sokoban Quick Guide
 Goal: Push all boxes (X) onto targets (O).
@@ -15,11 +11,7 @@ Rules:
 1. Push boxes (can't pull).
 2. Avoid walls (#).
 
-Actions you can take: Up, Down, Left, Right. You can take up to {max_action_per_step} action(s) at a time.
-Up: move up to the cell above (to the above row).
-Down: move down to the cell below (to the below row).
-Left: move left to the cell to the left (to the left column).
-Right: move right to the cell to the right (to the right column).
+Actions you can take: Up, Down, Left, Right. You can take up to {max_actions_per_step} action(s) at a time.
 
 Rewards:
 Box on target: +1.0
@@ -29,17 +21,25 @@ Format correct: +0.5
 Please think step by step and provide the actions you want to take.
 Your reponse should be in the format of <think>...</think><answer>...</answer>
 """
-# E.g. <think> There's a box on the upper right of me, the target is on the upper side of the box, I need to push the box it upward. </think><answer> Right,Up,Up </answer>
-# Let's try to use a format reward and answer reward
-# If the reponse provides a final answer and is corect, the model receives an accurtacy reward of +1
-# is the response encloses its thinking in <think></think> and the final answer is <answer></answer> tags, the model receives a format reward of +1
 
+system_prompt_vision = """You are a Sokoban solver.
 
+Sokoban Quick Guide
+Goal: Push all boxes onto targets.
+
+Actions you can take: Up, Down, Left, Right. You can take up to {max_actions_per_step} action(s) at a time.
+
+Rewards:
+Box on target: +1.0
+All boxes placed: +10.0
+Format correct: +0.5
+"""
 
 init_observation_template = """
 [Initial Observation]:
 {observation}
 Decide your next action(s).
+Please think step by step and provide the actions you want to take.
 Your reponse should be in the format of <think>...</think><answer>...</answer>
 """
 
@@ -49,5 +49,6 @@ After that, the observation is:
 reward: {reward}
 done: {done}
 Decide your next action(s).
+Please think step by step and provide the actions you want to take.
 Your reponse should be in the format of <think>...</think><answer>...</answer>
 """

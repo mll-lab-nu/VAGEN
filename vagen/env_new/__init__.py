@@ -1,3 +1,7 @@
-from vagen.env.register import REGISTERED_ENVS, register
-
-from vagen.env.sokoban.env import SokobanInterface
+from .sokoban import SokobanEnv,SokobanConfig
+REGISTERED_ENV = {
+    "sokoban": {
+        "env": SokobanEnv,
+        "config": SokobanConfig,
+    }
+}
