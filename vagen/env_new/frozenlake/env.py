@@ -59,20 +59,11 @@ class FrozenLakeEnv(BaseEnv):
         """Reset the environment with seed"""
         with NoLoggerWarnings():
             with set_seed(seed):
-                if self.config.desc is None:
-                    random_map = generate_random_map(
-                        size=self.config.size, 
-                        p=self.config.p, 
-                        seed=seed
-                    )
-                    self.gym_env.desc = np.asarray(random_map, dtype="c")
                 self.gym_env.reset(seed=seed)
-        
         self.total_reward = 0
         return self._render(init_obs=True), {}
 
     def step(self, action_str: str):
-        """Take a step in the environment"""
         rst = parse_llm_raw_response(
             response=action_str,
             special_token_list=self.config.special_token_list,
@@ -98,9 +89,11 @@ class FrozenLakeEnv(BaseEnv):
         for action in action_list:
             if action in self.ACTION_LOOKUP:
                 action_int = self.ACTION_LOOKUP[action]
-                _, step_reward, done, _, _ = self.gym_env.step(action_int)
+                _, step_reward, terminated, _, _ = self.gym_env.step(action_int)
                 self.reward += step_reward
                 self.valid_actions.append(action)
+                done=self._finished()
+                assert terminated == done
                 if done:
                     if self._success():
                         metrics['success'] = True
