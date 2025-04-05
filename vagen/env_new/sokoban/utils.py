@@ -6,7 +6,78 @@ from collections import deque
 
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+from collections import defaultdict
+import multiprocessing as mp
+from functools import partial
+from tqdm import tqdm
+import numpy as np
 
+def process_seed(seed: int,config, min_actions_to_succeed: int = 5):
+    from .env import SokobanEnv
+    env = SokobanEnv(config)
+    env.reset(seed=seed)
+    gt_action_sequence = get_shortest_action_path(
+        env.env.room_fixed, 
+        env.env.room_state, 
+        MAX_DEPTH=min_actions_to_succeed,
+    )
+    if len(gt_action_sequence) > min_actions_to_succeed:
+        return seed, []
+
+    return seed, gt_action_sequence
+
+def generate_seeds(size,config,min_actions_to_succeed=5,seed=0,n_candidate: int = 20000) -> list:
+    action_count = defaultdict(int)
+    num_processes = mp.cpu_count()
+    print(f"Using {num_processes} processes for seed processing")
+    pool = mp.Pool(processes=num_processes)
+    process_seed_partial = partial(process_seed, min_actions_to_succeed=min_actions_to_succeed,config=config)
+    seeds = range(seed, seed + n_candidate)
+    results = list(tqdm(pool.imap(process_seed_partial, seeds), total=len(seeds), desc="Processing seeds"))
+    pool.close()
+    pool.join()
+
+    valid_seeds_with_actions = [(seed, gt_action_sequence) for seed, gt_action_sequence in results if gt_action_sequence and len(gt_action_sequence) <= min_actions_to_succeed]
+    valid_seeds = [seed for seed, _ in valid_seeds_with_actions]
+    action_lengths = [len(gt_action_sequence) for _, gt_action_sequence in valid_seeds_with_actions]
+    for _, gt_action_sequence in valid_seeds_with_actions:
+        for action in gt_action_sequence:
+            action_count[action] += 1
+    
+    # Calculate basic statistics
+    avg_length = np.mean(action_lengths) if action_lengths else 0
+    median_length = np.median(action_lengths) if action_lengths else 0
+    min_length = min(action_lengths) if action_lengths else 0
+    max_length = max(action_lengths) if action_lengths else 0
+    
+    # Count frequency of each action length
+    length_counts = {}
+    for length in action_lengths:
+        length_counts[length] = length_counts.get(length, 0) + 1
+    
+    # Calculate percentage of valid seeds
+    valid_percentage = (len(valid_seeds) / n_candidate) * 100
+    
+    # Print statistics
+    print("\nAction Sequence Statistics:")
+    print(f"Total candidates processed: {n_candidate}")
+    print(f"Valid seeds found: {len(valid_seeds)} ({valid_percentage:.2f}%)")
+    print(f"Average action length: {avg_length:.2f}")
+    print(f"Median action length: {median_length}")
+    print(f"Min action length: {min_length}")
+    print(f"Max action length: {max_length}")
+    print("\nAction length distribution:")        
+    for length in sorted(length_counts.keys()):
+        count = length_counts[length]
+        percentage = (count / len(action_lengths)) * 100
+        print(f"  Length {length}: {count} instances ({percentage:.2f}%)")
+    
+    print("\nAction frequency:")
+    for action, count in sorted(action_count.items(), key=lambda x: x[1], reverse=True):
+        percentage = (count / len(valid_seeds_with_actions)) * 100
+        print(f"  {action}: {count} instances ({percentage:.2f}%)")
+    return valid_seeds[:size]
+        
 def get_shortest_action_path(room_fixed, room_state, MAX_DEPTH=100):
         """
         Get the shortest action path to push all boxes to the target spots.

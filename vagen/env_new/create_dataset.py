@@ -125,7 +125,7 @@ if __name__ == "__main__":
         "env1": {
             "env_name": "sokoban",
             "env_config": {
-                "num_boxes": 3
+                "num_boxes": 1
             },
             "split": "train",
             "size": 2
