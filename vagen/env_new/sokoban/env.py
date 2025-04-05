@@ -51,8 +51,7 @@ class SokobanEnv(BaseEnv):
                 print("[SOKOBAN] Retry . . .")
                 next_seed = abs(hash(str(seed))) % (2 ** 32) if seed is not None else None
                 return self.reset(next_seed)
-            
-            # self.action_sequence = self._reverse_action_sequence(action_sequence)
+    
             self.env.player_position = np.argwhere(self.env.room_state == 5)[0]
             self.env.num_env_steps = self.env.reward_last = self.env.boxes_on_target = 0
         self.total_reward = 0
@@ -155,21 +154,33 @@ class SokobanEnv(BaseEnv):
     
 if __name__ == "__main__":
     kwargs = {
-        'render_mode': 'text',
+        'render_mode': 'vision',
     }
     config = SokobanConfig(**kwargs)
-    print(config)
     env = SokobanEnv(config)
     print(env.system_prompt())
-    obs,info=env.reset()
+    obs, info = env.reset()
     print(obs["obs_str"])
+    i=0
+    import os
+    if config.render_mode == 'vision':
+        os.makedirs("./test_sokoban", exist_ok=True)
+        img = obs["multi_modal_inputs"][config.image_placeholder][0]
+        img.save(f"./test_sokoban/sokoban_{i}.png")
     while True:
-        action = input("Enter action (Up, Down, Left, Right): ")
-        action=f"<think>xxx</think><answer>{action}</answer>"
+        i += 1
+        action = input("Enter action (Left, Down, Right, Up): ")
+        action = f"<think>Let me try this direction.</think><answer>{action}</answer>"
         obs, reward, done, info = env.step(action)
         print(obs["obs_str"])
+        if config.render_mode == 'vision':
+            # save the image
+            img = obs["multi_modal_inputs"][config.image_placeholder][0]
+            img.save(f"./test_sokoban/sokoban_{i}.png")
         if done:
             break
-    print(env.compute_reward())
+        
+    
+    print(f"Total reward: {env.compute_reward()}")
     print(info)
     env.close()
