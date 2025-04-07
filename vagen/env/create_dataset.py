@@ -66,10 +66,10 @@ def create_dataset_from_yaml(yaml_file_path: str, force_gen=False):
         
         env_name = value.get('env_name')
         custom_env_config = value.get('env_config', {})
-        train_size,test_size = value.get('train_size', 100)+value.get('test_size', 100)
+        train_size,test_size = (value.get('train_size', 100), value.get('test_size', 100))
         env_size = train_size + test_size
         
-        env_config = REGISTERED_ENV[env_name]["config"](**custom_env_config)
+        env_config = REGISTERED_ENV[env_name]["config_cls"](**custom_env_config)
         seeds_for_env = None
         if hasattr(env_config, 'generate_seeds'):
             seeds_for_env = env_config.generate_seeds(env_size)
@@ -126,29 +126,12 @@ def create_dataset_from_yaml(yaml_file_path: str, force_gen=False):
         
         
 if __name__ == "__main__":
-    yaml_file_path = {
-        "seed": 42,
-        "train_path": "./train_example.parquet",
-        "test_path": "./test_example.parquet",
-        "env1": {
-            "env_name": "sokoban",
-            "env_config": {
-                "num_boxes": 1
-            },
-            "train_size": 2,
-            "test_size": 2,
-        },
-        "env2": {
-            "env_name": "frozenlake",
-            "env_config": {
-                "is_slippery": False,
-                "p":0.1
-            },
-            "train_size": 2,
-            "test_size": 2,
-        }
-    }
-    create_dataset_from_yaml(yaml_file_path, force_gen=True)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--yaml_path", type=str, required=True, help="Path to YAML configuration file")
+    parser.add_argument("--force_gen", action="store_true", help="Force regenerate dataset even if exists")
+    args = parser.parse_args()
+
+    create_dataset_from_yaml(args.yaml_path, force_gen=args.force_gen)
     # load the dataset and print
     train_dataset = load_dataset('parquet', data_files={"train": "./train_example.parquet"}, split="train")
     test_dataset = load_dataset('parquet', data_files={"test": "./test_example.parquet"}, split="test")

@@ -263,7 +263,7 @@ class QwenVLRolloutManger():
                 info=info
             )
         
-        self.env_states = {env_id: {'step': 0, 'done': False,'metrics':{"turn_metrics":defaultdict[List],"traj_metrics":{}}} for env_id in self.envs}
+        self.env_states = {env_id: {'step': 0, 'done': False,'metrics':{"turn_metrics":defaultdict(list),"traj_metrics":{}}} for env_id in self.envs}
         
         return initial_obs, initial_info
     
