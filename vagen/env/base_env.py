@@ -14,11 +14,11 @@ class BaseEnv(ABC):
         
         obs: {
             'obs_str': "This is the obs template, you see <image> and <image>, you heard <audio> and <audio>",
-            'multi_modal_inputs':{
+            'multi_modal_data':{
                 '<image>':[list of images],
                 '<audio>':[list of audios],
             }
-            # num of <image> and <audio> in the obs_str should match len(multi_modal_inputs['<image>']) and len(multi_modal_inputs['<audio>'])
+            # num of <image> and <audio> in the obs_str should match len(multi_modal_data['<image>']) and len(multi_modal_data['<audio>'])
         }
         info: {
             "metrics": {

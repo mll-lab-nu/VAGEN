@@ -6,7 +6,7 @@ class SokobanConfig(BaseConfig):
     dim_room: tuple = (6, 6)
     max_steps: int = 100
     num_boxes: int = 1
-    render_mode: str = "vision"
+    render_mode: str = "vision" # "vision" or "text"
     min_actions_to_succeed: int = 5
     max_actions_per_step: int = 3
     

@@ -4,35 +4,27 @@ set -x
 export VLLM_ATTENTION_BACKEND=XFORMERS
 export PYTHONHASHSEED=0
 
-python -m vagen.env.sokoban.create_dataset \
-    --data_dir data/sokoban-vision-6-step \
-    --max_action_length 6 \
-    --dim_room 6 6 \
-    --num_boxes 1 \
-    --max_steps 100 \
-    --search_depth 30 \
-    --start_seed 0 \
-    --train_ratio 0.8 \
-    --visual_env \
-    --max_action_per_step 3 \
-    --max_action_penalty -0.1 \
-    --format_reward 0.5 \
-    --n_candidate 20000
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+python -m vagen.env.create_dataset \
+    --yaml_path "$SCRIPT_DIR/env_config.yaml" \
+    --train_path "data/sokoban-vision-debug/train.parquet" \
+    --test_path "data/sokoban-vision-debug/test.parquet" \
 
 # max_trajectory_length = max_prompt_length + max_response_length
 
 python3 -m vagen.trainer.main_ppo \
-    algorithm.adv_estimator=gae \
+    algorithm.adv_estimator=grpo \
     algorithm.high_level_gamma=0.95 \
-    data.train_files=data/sokoban-vision-6-step/train.parquet \
-    data.val_files=data/sokoban-vision-6-step/test.parquet \
-    data.train_batch_size=128 \
+    data.train_files=data/sokoban-vision-debug/train.parquet \
+    data.val_files=data/sokoban-vision-debug/test.parquet \
+    data.train_batch_size=16 \
     data.max_prompt_length=1024 \
     data.max_response_length=128 \
     data.max_trajectory_length=1800 \
     data.image_key=images \
     data.truncation=left \
-    actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \
+    actor_rollout_ref.model.path=Qwen/Qwen2.5-0.5B-Instruct \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.actor.ppo_mini_batch_size=32 \
@@ -57,7 +49,7 @@ python3 -m vagen.trainer.main_ppo \
     actor_rollout_ref.rollout.temperature=0.7 \
     critic.optim.lr=1e-5 \
     critic.model.use_remove_padding=True \
-    critic.model.path=Qwen/Qwen2.5-VL-3B-Instruct \
+    critic.model.path=Qwen/Qwen2.5-0.5B-Instruct \
     critic.model.enable_gradient_checkpointing=True \
     critic.ppo_micro_batch_size_per_gpu=1 \
     critic.model.fsdp_config.param_offload=False \
@@ -65,9 +57,9 @@ python3 -m vagen.trainer.main_ppo \
     algorithm.kl_ctrl.kl_coef=0.001 \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
-    trainer.project_name='vagen' \
-    trainer.experiment_name='mask_loss' \
-    trainer.n_gpus_per_node=4 \
+    trainer.project_name='vagen_debug' \
+    trainer.experiment_name='grpo_mask_loss_sokoban_text_debug' \
+    trainer.n_gpus_per_node=2 \
     trainer.nnodes=1 \
     trainer.save_freq=100 \
     trainer.test_freq=20 \
@@ -76,8 +68,7 @@ python3 -m vagen.trainer.main_ppo \
     rollout_manager.window_size=5 \
     rollout_manager.use_multi_turn_reward=False \
     rollout_manager.use_loss_mask=True \
-    rollout_manager.use_gae_mask=False \
     trainer.val_before_train=True \
     trainer.val_generations_to_log_to_wandb=8 \
-    rollout_manager.n_trajectory=1 \
-    2>&1 | tee mask_loss.log
+    rollout_manager.n_trajectory=8 \
+    2>&1 | tee grpo_mask_loss.log

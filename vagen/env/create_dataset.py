@@ -5,19 +5,19 @@ import yaml
 import argparse
 from datasets import Dataset, load_dataset
 from vagen.env.utils.env_utils import permanent_seed
-def create_dataset_from_yaml(yaml_file_path: str, force_gen=False):
+def create_dataset_from_yaml(yaml_file_path: str, force_gen=False,seed=42,train_path='./train.parquet',test_path='./test.parquet'):
     """
     Create dataset from a YAML configuration file.
     
     Args:
         yaml_file_path (str): Path to the YAML configuration file
         force_gen (bool): Whether to force regeneration of existing datasets
+        seed (int): Seed for random number generation
+        train_path (str): Path to save the training dataset
+        test_path (str): Path to save the testing dataset
         
     The YAML file should have the following structure:
     ```
-    seed: 42
-    train_path: path/to/train.parquet
-    test_path: path/to/test.parquet
     env1:
         env_name: sokoban  # or frozenlake
         env_config:
@@ -42,29 +42,23 @@ def create_dataset_from_yaml(yaml_file_path: str, force_gen=False):
     else:
         yaml_config = yaml_file_path
     
-    train_path = yaml_config.get('train_path')
-    test_path = yaml_config.get('test_path')
-    
     os.makedirs(os.path.dirname(train_path), exist_ok=True)
     os.makedirs(os.path.dirname(test_path), exist_ok=True)
     
     if not force_gen and os.path.exists(train_path) and os.path.exists(test_path):
         print(f"Dataset files already exist at {train_path} and {test_path}. Skipping generation.")
         print(f"Use --force-gen to override and regenerate the dataset.")
-        return
+        return train_path, test_path
     
     
     train_instances = []
     test_instances = []
     
-    global_seed = yaml_config.get('seed', 42)
+    global_seed = seed
     permanent_seed(global_seed)
     
     
     for key, value in yaml_config.items():
-        if key in ['train_path', 'test_path','seed']:
-            continue
-        
         env_name = value.get('env_name')
         custom_env_config = value.get('env_config', {})
         train_size,test_size = (value.get('train_size', 100), value.get('test_size', 100))
@@ -132,9 +126,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--yaml_path", type=str, required=True, help="Path to YAML configuration file")
     parser.add_argument("--force_gen", action="store_true", help="Force regenerate dataset even if exists")
+    parser.add_argument("--train_path", type=str, default="./train.parquet", help="Path to save the training dataset")
+    parser.add_argument("--test_path", type=str, default="./test.parquet", help="Path to save the testing dataset")
+    parser.add_argument("--seed", type=int, default=42, help="Seed for random number generation")
     args = parser.parse_args()
-
-    train_path, test_path = create_dataset_from_yaml(args.yaml_path, args.force_gen)
+    print(args)
+    train_path, test_path = create_dataset_from_yaml(args.yaml_path, args.force_gen, args.seed, args.train_path, args.test_path)
     
     # Optionally load the dataset and print examples
     train_dataset = load_dataset('parquet', data_files={"train": train_path}, split="train")

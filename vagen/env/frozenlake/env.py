@@ -137,11 +137,11 @@ class FrozenLakeEnv(BaseEnv):
 
     def _render(self, init_obs=False):
         """Render the environment"""
-        multi_modal_inputs = None
+        multi_modal_data = None
         
         if self.config.render_mode == 'vision':
             img_placeholder = self.config.image_placeholder
-            multi_modal_inputs = {
+            multi_modal_data = {
                 img_placeholder: [convert_numpy_to_PIL(self.gym_env._render_gui(mode='rgb_array'))]
             }
             img_str = img_placeholder
@@ -160,10 +160,10 @@ class FrozenLakeEnv(BaseEnv):
                 done=self._finished(),
             )
         
-        if multi_modal_inputs is not None:
+        if multi_modal_data is not None:
             return {
                 "obs_str": obs_str,
-                "multi_modal_inputs": multi_modal_inputs,
+                "multi_modal_data": multi_modal_data,
             }
         else:
             return {
@@ -216,7 +216,7 @@ if __name__ == "__main__":
     import os
     if config.render_mode == 'vision':
         os.makedirs("./test_frozenlake", exist_ok=True)
-        img = obs["multi_modal_inputs"][config.image_placeholder][0]
+        img = obs["multi_modal_data"][config.image_placeholder][0]
         img.save(f"./test_frozenlake/frozenlake_{i}.png")
     while True:
         i += 1
@@ -226,7 +226,7 @@ if __name__ == "__main__":
         print(obs["obs_str"])
         if config.render_mode == 'vision':
             # save the image
-            img = obs["multi_modal_inputs"][config.image_placeholder][0]
+            img = obs["multi_modal_data"][config.image_placeholder][0]
             img.save(f"./test_frozenlake/frozenlake_{i}.png")
         if done:
             break

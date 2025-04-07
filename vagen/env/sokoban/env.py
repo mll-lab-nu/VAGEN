@@ -64,7 +64,7 @@ class SokobanEnv(BaseEnv):
             action_sep=self.config.get('action_sep', ','),
             max_actions=self.config.get('max_actions_per_step', 3)
         )
-        print("rst:", rst)
+        #print("rst:", rst)
         action_list=rst['actions']
         prev_player_position = self.env.player_position
         
@@ -119,10 +119,10 @@ class SokobanEnv(BaseEnv):
     
     def _render(self,init_obs=False):
         assert self.config.render_mode in ['text', 'vision']
-        multi_modal_inputs = None
+        multi_modal_data = None
         if self.config.render_mode == 'vision':
             img_placeholder=self.config.get("image_placeholder", "<image>")
-            multi_modal_inputs={
+            multi_modal_data={
                 img_placeholder: [convert_numpy_to_PIL(self.env.render(mode='rgb_array'))],
                 } 
             img_str=img_placeholder
@@ -142,10 +142,10 @@ class SokobanEnv(BaseEnv):
                 done=self._success(),
             )
         
-        if multi_modal_inputs is not None:
+        if multi_modal_data is not None:
             return {
                 "obs_str": obs_str,
-                "multi_modal_inputs": multi_modal_inputs,
+                "multi_modal_data": multi_modal_data,
             }
         else:   
             return {
@@ -169,7 +169,7 @@ if __name__ == "__main__":
     import os
     if config.render_mode == 'vision':
         os.makedirs("./test_sokoban", exist_ok=True)
-        img = obs["multi_modal_inputs"][config.image_placeholder][0]
+        img = obs["multi_modal_data"][config.image_placeholder][0]
         img.save(f"./test_sokoban/sokoban_{i}.png")
     while True:
         i += 1
@@ -179,7 +179,7 @@ if __name__ == "__main__":
         print(obs["obs_str"])
         if config.render_mode == 'vision':
             # save the image
-            img = obs["multi_modal_inputs"][config.image_placeholder][0]
+            img = obs["multi_modal_data"][config.image_placeholder][0]
             img.save(f"./test_sokoban/sokoban_{i}.png")
         if done:
             break
