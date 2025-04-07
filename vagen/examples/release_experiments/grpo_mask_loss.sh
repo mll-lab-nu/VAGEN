@@ -4,20 +4,9 @@ set -x
 export VLLM_ATTENTION_BACKEND=XFORMERS
 export PYTHONHASHSEED=0
 
-python -m vagen.env.sokoban.create_dataset \
-    --data_dir data/sokoban-vision-6-step \
-    --max_action_length 6 \
-    --dim_room 6 6 \
-    --num_boxes 1 \
-    --max_steps 100 \
-    --search_depth 30 \
-    --start_seed 0 \
-    --train_ratio 0.8 \
-    --visual_env \
-    --max_action_per_step 3 \
-    --max_action_penalty -0.1 \
-    --format_reward 0.5 \
-    --n_candidate 20000
+python3 -m vagen.env.create_dataset \
+  --yaml_path sokoban/sokoban-vision-6-step.yaml \
+  --force_gen
 
 # max_trajectory_length = max_prompt_length + max_response_length
 
