@@ -2,6 +2,7 @@ import os
 from vagen.env import REGISTERED_ENV
 import numpy as np
 import yaml
+import argparse
 from datasets import Dataset, load_dataset
 from vagen.env.utils.env_utils import permanent_seed
 def create_dataset_from_yaml(yaml_file_path: str, force_gen=False):
@@ -122,6 +123,8 @@ def create_dataset_from_yaml(yaml_file_path: str, force_gen=False):
     
     if not train_instances and not test_instances:
         print("No instances were generated. Check your YAML configuration.")
+    
+    return train_path, test_path
         
         
         
@@ -131,10 +134,11 @@ if __name__ == "__main__":
     parser.add_argument("--force_gen", action="store_true", help="Force regenerate dataset even if exists")
     args = parser.parse_args()
 
-    create_dataset_from_yaml(args.yaml_path, force_gen=args.force_gen)
-    # load the dataset and print
-    train_dataset = load_dataset('parquet', data_files={"train": "./train_example.parquet"}, split="train")
-    test_dataset = load_dataset('parquet', data_files={"test": "./test_example.parquet"}, split="test")
+    train_path, test_path = create_dataset_from_yaml(args.yaml_path, args.force_gen)
+    
+    # Optionally load the dataset and print examples
+    train_dataset = load_dataset('parquet', data_files={"train": train_path}, split="train")
+    test_dataset = load_dataset('parquet', data_files={"test": test_path}, split="test")
     for i in range(2):
         print(train_dataset[i])
         print(test_dataset[i])
