@@ -101,6 +101,7 @@ class SokobanEnv(BaseEnv):
         info["metrics"] = metrics
         metrics['turn_metrics']['action_is_effective'] = not np.array_equal(prev_player_position, self.env.player_position)
         self.total_reward += self.reward
+
         return self._render(init_obs=False), self.reward, done, info
     
     def system_prompt(self):
