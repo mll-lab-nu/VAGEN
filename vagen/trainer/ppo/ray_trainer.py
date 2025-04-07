@@ -22,7 +22,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
 from pprint import pprint
-from typing import Type, Dict
+from typing import Type, Dict,List,Any
 from copy import deepcopy
 from collections import defaultdict
 import numpy as np
@@ -654,7 +654,7 @@ class RayPPOTrainer(object):
             self.config.actor_rollout_ref.actor.optim.total_training_steps = total_training_steps
             self.config.critic.optim.total_training_steps = total_training_steps
 
-    def _maybe_log_val_generations_to_wandb(self, inputs, outputs, scores, images=None):
+    def _maybe_log_val_generations_to_wandb(self, log_rst: List[Dict[str, Any]]):
         """Log a table of validation samples with multiple images per sample to wandb"""
 
         generations_to_log = self.config.trainer.val_generations_to_log_to_wandb
@@ -668,7 +668,19 @@ class RayPPOTrainer(object):
 
         import wandb
         import numpy as np
-
+        inputs=[]
+        outputs=[]
+        scores=[]
+        images=[]
+        
+        for item in log_rst:
+            inputs.append(item['config_id'])
+            outputs.append(item['output_str'])
+            scores.append(item['metrics']['score'])
+            images.append(item['image_data'])
+        
+        
+        
         # Handle the case where images might not be provided
         if images is None:
             samples = list(zip(inputs, outputs, scores))

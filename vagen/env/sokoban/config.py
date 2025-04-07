@@ -21,6 +21,7 @@ class SokobanConfig(BaseConfig):
                               min_actions_to_succeed=self.min_actions_to_succeed,
                               seed=seed,
                               n_candidate=n_candidate,)
+        
 
         
     
