@@ -1,36 +1,14 @@
+from vagen.env.base_env import BaseEnv
 import gym
 from gym_sokoban.envs.sokoban_env import SokobanEnv as GymSokobanEnv
+from .utils import generate_room
+from typing import Dict
+from vagen.env.utils.env_utils import NoLoggerWarnings, set_seed
+from vagen.env.utils.context_utils import parse_llm_raw_response,convert_numpy_to_PIL
 import numpy as np
-import re
-import copy
-from typing import Tuple, Dict, Optional, List, Any, Union
-from PIL import Image
-
-from vagen.utils import NoLoggerWarnings
-from vagen.utils import set_seed
-from vagen.env.register import register
-from vagen.env.sokoban.room_utils import generate_room
-from vagen.env.base import (
-    BaseEnv,
-    BaseInterface,
-    IMAGE_PLACEHOLDER
-)
-
-from vagen.env.utils import (
-    convert_numpy_to_PIL,
-    preprocess,
-    postprocess,
-)
-from vagen.env.sokoban.prompt import (
-    init_observation_template,
-    action_template,
-    instruction_template,
-)
-
-
-
-class SokobanEnv(BaseEnv, GymSokobanEnv):
-
+from .prompt import system_prompt_text, system_prompt_vision, init_observation_template, action_template
+from .config import SokobanConfig
+class SokobanEnv(BaseEnv):
     GRID_LOOKUP = {
         0: " # \t",  # wall
         1: " _ \t",  # floor
@@ -43,311 +21,170 @@ class SokobanEnv(BaseEnv, GymSokobanEnv):
     }
 
     ACTION_LOOKUP = {
-        0: "None",
-        1: "Up",
-        2: "Down",
-        3: "Left",
-        4: "Right",
+        "Up":1,
+        "Down":2,
+        "Left":3,
+        "Right":4,
     }
 
-    def __init__(self, **kwargs):
+    def __init__(self, config:SokobanConfig):
         BaseEnv.__init__(self)
-        self.search_depth = kwargs.pop('search_depth', 300)
-        GymSokobanEnv.__init__(
-            self,
-            dim_room=kwargs.pop('dim_room', (6, 6)), 
-            max_steps=kwargs.pop('max_steps', 100),
-            num_boxes=kwargs.pop('num_boxes', 3),
-            **kwargs
+        self.config=config
+        self.env=GymSokobanEnv(
+            dim_room=self.config.get('dim_room', (6, 6)), 
+            max_steps=self.config.get('max_steps', 100),
+            num_boxes=self.config.get('num_boxes', 3),
         )
-        self.ACTION_SPACE = gym.spaces.discrete.Discrete(4, start=1)
-
-
-    def _reset(self, seed: int):
+        
+    def reset(self, seed=None):
         with NoLoggerWarnings():
             try:
                 with set_seed(seed):
-                    self.room_fixed, self.room_state, self.box_mapping, action_sequence = generate_room(
-                        dim=self.dim_room,
-                        num_steps=self.num_gen_steps,
-                        num_boxes=self.num_boxes,
-                        search_depth=self.search_depth
+                    self.env.room_fixed, self.env.room_state, self.env.box_mapping, action_sequence = generate_room(
+                        dim=self.env.dim_room,
+                        num_steps=self.env.num_gen_steps,
+                        num_boxes=self.env.num_boxes,
+                        search_depth=self.config.get('search_depth', 100),
                     )
             except (RuntimeError, RuntimeWarning) as e:
                 print("[SOKOBAN] Runtime Error/Warning: {}".format(e))
                 print("[SOKOBAN] Retry . . .")
                 next_seed = abs(hash(str(seed))) % (2 ** 32) if seed is not None else None
-                return self._reset(next_seed)
-            
-            # self.action_sequence = self._reverse_action_sequence(action_sequence)
-            self.player_position = np.argwhere(self.room_state == 5)[0]
-            self.num_env_steps = self.reward_last = self.boxes_on_target = 0
-        
-        return self._render(mode='text'), {}
+                return self.reset(next_seed)
     
-    def _step(self, action: int):
-        """
-        - Step the environment with the given action.
-        - Check if the action is effective (whether player moves in the env).
-
-        TODO modify here after definition of RolloutManager
-        """
-        assert not self.success()
-        result = {
-            'step_reward': 0,
-            'done': False,
-            'info': {},
-        }
-        
-        prev_player_position = self.player_position
-        obs, step_reward, done, info = GymSokobanEnv.step(self, action, observation_mode='tiny_rgb_array')
-        
-        info['action_is_effective'] = not np.array_equal(prev_player_position, self.player_position)
-        return obs, step_reward, done, info
-     
-
-    def _render(self, mode='text'):
-        assert mode in ['text', 'list', 'state', 'rgb_array']
-
-        if mode == 'rgb_array':
-            img = self.get_image(mode, scale=1) # numpy array
-            return img
-
-
-        if mode == 'state':
-            return np.where((self.room_state == 5) & (self.room_fixed == 2), 6, self.room_state)
-        
-        room_state = self._render(mode='state').tolist()
-
-        if mode == 'list':
-            lookup = lambda cell: self.GRID_LOOKUP.get(cell, "?").strip("\t").strip()
-            return [" ".join(lookup(cell) for cell in row) for row in room_state]
-        
-        if mode == 'text':
-            lookup = lambda cell: self.GRID_LOOKUP.get(cell, "?")
-            return "\n".join("".join(lookup(cell) for cell in row) for row in room_state)
-
-    def close(self):
-        GymSokobanEnv.close(self)
-
-    def finished(self):
-        return self.num_env_steps >= self.max_steps or self.success()
-
-    def success(self):
-        return self.boxes_on_target == self.num_boxes
-
-
-
-
-
-
-
-@register(name="sokoban")
-class SokobanInterface(BaseInterface):
-
-    INVALID_ACTION = 0
-    FORMAT_REWARD = 0.5
-    FORMAT_PENALTY = 0.0
-    VALID_ACTION_REWARD = 0.5
-    MAX_ACTION_PER_STEP = 1 # NOTE hard coded here
-    MAX_ACTION_PENALTY = 0.0
-    ACTION_LOOKUP = {
-        0: "None",
-        1: "Up",
-        2: "Down",
-        3: "Left",
-        4: "Right",
-    }
-
-    def __init__(
-            self,
-            env_config: Dict,
-            interface_config: Dict,
-        ):
-        """
-        Args:
-            env_config (Dict): environment configuration
-            interface_config (Dict): interface configuration
-        """
-        super().__init__(env_config)
-
-        dim_room = self.env_config['dim_room']
-        num_boxes = self.env_config['num_boxes']
-        max_steps = self.env_config['max_steps']
-        search_depth = self.env_config['search_depth']
-        self.env = SokobanEnv(
-            dim_room=dim_room,
-            num_boxes=num_boxes,
-            max_steps=max_steps,
-            search_depth=search_depth
-        )
-        self.visual_env = self.env_config.get('visual_env', True)
-
-        max_action_per_step = interface_config.setdefault('max_action_per_step', 1)
-        max_action_penalty = interface_config.setdefault('max_action_penalty', -0.5)
-        format_reward = interface_config.setdefault('format_reward', 0.5)
-        self.interface_config = {
-            'max_action_per_step': max_action_per_step,
-            'max_action_penalty': max_action_penalty,
-            'format_reward': format_reward,
-        }
-        
-    @classmethod
-    def _extract_one_action(cls, text):
-        """
-        Extract single action from text, the input text should ensure only one action contained
-        - 0: Still (Invalid Action)
-        - 1: Up
-        - 2: Down
-        - 3: Left
-        - 4: Right
-        """
-        DIRECTION_MAP = {"Up": 1, "Down": 2, "Left": 3, "Right": 4}
-        # TODO: originally, we parse either number (key of direction_map) or direction (value of direction_map).
-        # here we remove numbers and preserve directions only, but regex has not been removed. please remove them later.
-        pattern = r'^\s*(([1-4])\s*\((up|down|left|right)\)|(up|down|left|right)|([1-4]))\s*$'
-        match = re.fullmatch(pattern, text.strip(), flags=re.IGNORECASE | re.X)
-        
-        if not match:
-            return cls.INVALID_ACTION
-        
-        if match.group(2):   
-            return int(match.group(2))
-        elif match.group(4): 
-            return DIRECTION_MAP[match.group(4).capitalize()]
-        elif match.group(5): 
-            return int(match.group(5))
-        
-        return cls.INVALID_ACTION
+            self.env.player_position = np.argwhere(self.env.room_state == 5)[0]
+            self.env.num_env_steps = self.env.reward_last = self.env.boxes_on_target = 0
+        self.total_reward = 0
+        return self._render(init_obs=True), {}
     
-
-    def _step(self, raw_text: str) -> Tuple[Any, float, bool, Dict]:
-        """Step the environment with llm raw response
-        - Multiple actions are allowed, execute until the first invalid action or environment terminates
-        - The observation is the last step observation
+    def step(self, action_str: str):
+        rst=parse_llm_raw_response(
+            response=action_str,
+            special_token_list=self.config.get('special_token_list', None),
+            action_sep=self.config.get('action_sep', ','),
+            max_actions=self.config.get('max_actions_per_step', 3)
+        )
+        print("rst:", rst)
+        action_list=rst['actions']
+        prev_player_position = self.env.player_position
         
-        Args:
-            raw_text: raw text from LLM
-
-        Returns:
-            Tuple[Any, float, bool, Dict]: observation, reward, done, info
-            - observation (dict): observation of the environment
-            - reward (float): reward of the environment for the raw_text (multiple actions, including format reward and env reward)
-            - done (bool): whether the environment is done
-            - info (dict): extra info
-        """
-
-        assert not self.env.finished(), "Environment finished before step"
-        reward, done, final_info = 0, False, {}
-
-
-        # preprocess_result = self._preprocess(raw_text)
-        preprocess_result = preprocess(raw_text, self._extract_one_action, self.INVALID_ACTION)
-        think = preprocess_result.think
-        action_list = preprocess_result.action_list
-        answer = preprocess_result.answer
-        final_info['llm_raw_response'] = preprocess_result.llm_raw_response
-
-
-        # parse format and action list
-        if action_list:
-            reward += self.interface_config['format_reward']
-        if len(action_list) > self.interface_config['max_action_per_step']:
-            reward += self.interface_config['max_action_penalty']
-            action_list = action_list[:self.interface_config['max_action_per_step']]
-            preprocess_result.action_list = action_list
-            
-
-        info = {}
-        for action in action_list:
-            if done or self.env.finished():
-                break
-            _, env_reward, done, info = self.env.step(action)
-            # if env_reward == -0.1:
-            #     env_reward = -0.01 # NOTE hard coded here to set step reward to 0
-            reward += env_reward
-        self.traj_reward += reward
-        final_info.update(info) # NOTE currently only use the last step info
-
-        env_state = self.env._render(mode='text' if not self.visual_env else 'rgb_array') # NOTE currently called after step
-
-        return postprocess(
-            env_state=env_state,
-            reward=reward,
-            done=done,
-            info=final_info,
-            preprocess_result=preprocess_result,
-            action_lookup=self.ACTION_LOOKUP,
-            action_template=action_template,
-        )
-    
-    def _reset(self, seed: Optional[int] = None) -> Tuple[Dict, Dict]:
-        """
-        Reset the environment and return the observation at the first step.
-        """
-        self.env._reset(seed=seed)
-        self.traj_reward = 0
-        env_state = self.env._render(mode='text' if not self.visual_env else 'rgb_array') # NOTE currently called after reset
-        if isinstance(env_state, np.ndarray):
-            env_state = convert_numpy_to_PIL(env_state)
-        observation = IMAGE_PLACEHOLDER if not isinstance(env_state, str) else env_state
-        text_template = init_observation_template.format(
-            observation=observation,
-        )
-        if isinstance(env_state, str):
-            obs = {'text_template': text_template}
-        else:
-            obs = {
-                'text_template': text_template,
-                'multi_modal_data': {
-                    IMAGE_PLACEHOLDER: [env_state],
-                },
+        metrics={
+            "turn_metrics":{
+                "action_is_valid": action_list != [],
+                "action_is_effective": False,},
+            "traj_metrics": {
+                "success": False,
             }
-        return obs, {}
-
+        }
+        
+        self.reward=0
+        self.valid_actions=[]
+        done=False
+        info={}
+        info.update(rst)
+        
+        for action in action_list:
+            if action in self.ACTION_LOOKUP:
+                action_int=self.ACTION_LOOKUP[action]
+                _,step_reward, _, _=self.env.step(action_int)
+                done=self._success()
+                self.reward+=step_reward
+                self.valid_actions.append(action)
+                if done:
+                    metrics['traj_metrics']['success'] = True
+                    break
+            else:
+                metrics['turn_metrics']['action_is_valid'] = False
+                break
+        if metrics['turn_metrics']['action_is_valid']:
+            self.reward += self.config.format_reward
+        info["metrics"] = metrics
+        metrics['turn_metrics']['action_is_effective'] = not np.array_equal(prev_player_position, self.env.player_position)
+        self.total_reward += self.reward
+        return self._render(init_obs=False), self.reward, done, info
+    
+    def system_prompt(self):
+        if self.config.render_mode == 'vision':
+            return system_prompt_vision.format(max_actions_per_step=self.config.max_actions_per_step)
+        else:
+            return system_prompt_text.format(max_actions_per_step=self.config.max_actions_per_step)
+    
+    
+    def compute_reward(self):
+        return self.total_reward
+    
     def close(self):
         self.env.close()
-
-    @classmethod
-    def config_repr(cls, env_config: Dict, interface_config: Dict) -> str:
-        """
-        Create a string representation of the configuration.
-        
-        Args:
-            env_config: Dictionary containing environment configuration
-            interface_config: Dictionary containing interface configuration
-            
-        Returns:
-            String representation of the configuration
-            
-        Raises:
-            ValueError: If required keys are missing from the configuration
-        """
-
-        required_keys = ['dim_room', 'num_boxes', 'max_steps', 'search_depth']
-        
-        # Check for required keys
-        if not all(key in env_config for key in required_keys):
-            missing_keys = [key for key in required_keys if key not in env_config]
-            raise ValueError(f"Missing required keys in config: {missing_keys}")
-            
-        env_config_str = (
-            f"SokobanGame(dim_room={env_config['dim_room']}, "
-            f"num_boxes={env_config['num_boxes']}, "
-            f"max_steps={env_config['max_steps']}, "
-            f"search_depth={env_config['search_depth']})"
-        )
-        interface_config_str = (
-            f"SokobanInterface(max_action_per_step={interface_config.get('max_action_per_step', 1)}, "
-            f"max_action_penalty={interface_config.get('max_action_penalty', -0.1)}, "
-            f"format_reward={interface_config.get('format_reward', 0.5)})"
-        )
-        return f"{env_config_str}, {interface_config_str}"
-    def get_task_instruction(self) -> str:
-        return instruction_template.format(
-            max_action_per_step=self.interface_config['max_action_per_step']
-        )
     
-    def get_traj_reward(self):
-        return self.traj_reward
-
+    
+    def _render(self,init_obs=False):
+        assert self.config.render_mode in ['text', 'vision']
+        multi_modal_inputs = None
+        if self.config.render_mode == 'vision':
+            img_placeholder=self.config.get("image_placeholder", "<image>")
+            multi_modal_inputs={
+                img_placeholder: [convert_numpy_to_PIL(self.env.render(mode='rgb_array'))],
+                } 
+            img_str=img_placeholder
+        else:
+            room_state = np.where((self.env.room_state == 5) & (self.env.room_fixed == 2), 6, self.env.room_state).tolist()
+            lookup = lambda cell: self.GRID_LOOKUP.get(cell, "?")
+            img_str = "\n".join("".join(lookup(cell) for cell in row) for row in room_state)
+        
+        if init_obs:
+            obs_str = init_observation_template.format(observation=img_str)
+            
+        else:
+            obs_str = action_template.format(
+                valid_action=self.valid_actions,
+                observation=img_str,
+                reward=self.reward,
+                done=self._success(),
+            )
+        
+        if multi_modal_inputs is not None:
+            return {
+                "obs_str": obs_str,
+                "multi_modal_inputs": multi_modal_inputs,
+            }
+        else:   
+            return {
+                "obs_str": obs_str,
+            }
+    def _success(self):
+        return self.env.boxes_on_target == self.env.num_boxes
+    
+    
+    
+if __name__ == "__main__":
+    kwargs = {
+        'render_mode': 'vision',
+    }
+    config = SokobanConfig(**kwargs)
+    env = SokobanEnv(config)
+    print(env.system_prompt())
+    obs, info = env.reset()
+    print(obs["obs_str"])
+    i=0
+    import os
+    if config.render_mode == 'vision':
+        os.makedirs("./test_sokoban", exist_ok=True)
+        img = obs["multi_modal_inputs"][config.image_placeholder][0]
+        img.save(f"./test_sokoban/sokoban_{i}.png")
+    while True:
+        i += 1
+        action = input("Enter action (Left, Down, Right, Up): ")
+        action = f"<think>Let me try this direction.</think><answer>{action}</answer>"
+        obs, reward, done, info = env.step(action)
+        print(obs["obs_str"])
+        if config.render_mode == 'vision':
+            # save the image
+            img = obs["multi_modal_inputs"][config.image_placeholder][0]
+            img.save(f"./test_sokoban/sokoban_{i}.png")
+        if done:
+            break
+        
+    
+    print(f"Total reward: {env.compute_reward()}")
+    print(info)
+    env.close()

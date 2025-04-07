@@ -1,11 +1,11 @@
-from vagen.env_new.base_env import BaseEnv
+from vagen.env.base_env import BaseEnv
 import numpy as np
 import copy
 from typing import Dict, List, Optional, Tuple, Any
 from gymnasium.utils import seeding
 from gymnasium.envs.toy_text.frozen_lake import FrozenLakeEnv as GymFrozenLakeEnv
-from vagen.env_new.utils.env_utils import NoLoggerWarnings, set_seed
-from vagen.env_new.utils.context_utils import parse_llm_raw_response, convert_numpy_to_PIL
+from vagen.env.utils.env_utils import NoLoggerWarnings, set_seed
+from vagen.env.utils.context_utils import parse_llm_raw_response, convert_numpy_to_PIL
 from .prompt import system_prompt_text, system_prompt_vision, init_observation_template, action_template
 from .config import FrozenLakeConfig
 from .utils import generate_random_map, is_valid
@@ -75,9 +75,13 @@ class FrozenLakeEnv(BaseEnv):
         prev_player_position = self._get_player_position()
         
         metrics = {
-            "action_is_valid": action_list != [],
-            "action_is_effective": False,
-            "success": False,
+            "turn_metrics": {
+                "action_is_valid": True,
+                "action_is_effective": False,
+            },
+            "traj_metrics": {
+                "success": False,
+            },
         }
         
         self.reward = 0
@@ -96,17 +100,17 @@ class FrozenLakeEnv(BaseEnv):
                 assert terminated == done
                 if done:
                     if self._success():
-                        metrics['success'] = True
+                        metrics["traj_metrics"]['success'] = True
                     break
             else:
-                metrics['action_is_valid'] = False
+                metrics["turn_metrics"]['action_is_valid'] = False
                 break
         
-        if metrics['action_is_valid']:
+        if metrics["turn_metrics"]['action_is_valid']:
             self.reward += self.config.format_reward
         
         info["metrics"] = metrics
-        metrics['action_is_effective'] = not np.array_equal(prev_player_position, self._get_player_position())
+        metrics["turn_metrics"]['action_is_effective'] = not np.array_equal(prev_player_position, self._get_player_position())
         self.total_reward += self.reward
         
         return self._render(init_obs=False), self.reward, done, info

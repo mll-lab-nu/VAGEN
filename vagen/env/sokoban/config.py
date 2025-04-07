@@ -1,4 +1,4 @@
-from vagen.env_new.base_config import BaseConfig
+from vagen.env.base_config import BaseConfig
 from dataclasses import dataclass, field, fields
 from .utils import generate_seeds
 @dataclass

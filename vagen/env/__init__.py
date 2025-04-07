@@ -1,3 +1,12 @@
-from vagen.env.register import REGISTERED_ENVS, register
-
-from vagen.env.sokoban.env import SokobanInterface
+from .sokoban import SokobanEnv,SokobanConfig
+from .frozenlake import FrozenLakeEnv,FrozenLakeConfig
+REGISTERED_ENV = {
+    "sokoban": {
+        "env_cls": SokobanEnv,
+        "config_cls": SokobanConfig,
+    },
+    "frozenlake": {
+        "env_cls": FrozenLakeEnv,
+        "config_cls": FrozenLakeConfig,
+    }
+}

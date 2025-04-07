@@ -41,7 +41,6 @@ from torch.utils.data import RandomSampler, SequentialSampler
 from torchdata.stateful_dataloader import StatefulDataLoader
 
 from vagen.mllm_agent.rollout import QwenVLRolloutManger
-from vagen.env.base import EnvConfig
 
 WorkerType = Type[Worker]
 
@@ -742,12 +741,7 @@ class RayPPOTrainer(object):
     def _validate(self):
         print(f"[DEBUG] validation at global step {self.global_steps} begins")
         # Lists to collect samples for the table
-        sample_inputs = []
-        sample_outputs = []
-        sample_scores = []
-        sample_images = []
-        sample_dones=[]
-        
+    
         if self.test_rollout_manager==None:
             self.test_rollout_manager = QwenVLRolloutManger(
                 actor_rollout_wg=self.actor_rollout_wg,
@@ -755,6 +749,9 @@ class RayPPOTrainer(object):
                 tokenizer=self.tokenizer,
                 processor=self.processor, 
             )
+        
+        validation_rst=[]
+        
         
         for batch_dict in self.val_dataloader:
             
@@ -772,41 +769,38 @@ class RayPPOTrainer(object):
                 )
 
             env_configs = [
-                    EnvConfig(env_name=batch.non_tensor_batch['extra_info'][i]['env_name'],
-                              env_config=batch.non_tensor_batch['extra_info'][i]['env_config'],
-                              interface_config=batch.non_tensor_batch['extra_info'][i]['interface_config'],
-                              seed=batch.non_tensor_batch['extra_info'][i]['seed'])
+                    batch.non_tensor_batch['extra_info'][i]
                     for i in range(len(batch))
                 ]
             
             self.test_rollout_manager.reset(env_configs)
             self.test_rollout_manager.rollout_loop()
-            rst = self.test_rollout_manager.recording_to_log() # data source == inputs in our current setting, outputs=whole trjecotry
-            sample_inputs.extend(rst['inputs'])
-            sample_outputs.extend(rst['outputs'])
-            sample_scores.extend(rst['scores'])
-            sample_images.extend(rst['images'])
-            sample_dones.extend(rst['dones'])
+            micro_validation_rst = self.test_rollout_manager.recording_to_log() # data source == inputs in our current setting, outputs=whole trjecotry
+            validation_rst.extend(micro_validation_rst)
         
-        self._maybe_log_val_generations_to_wandb(inputs=sample_inputs, outputs=sample_outputs, scores=sample_scores, images=sample_images)
-        metric_dict = {}
-        
-        data_source_reward = defaultdict(list)
-        for data_source, scores in zip(sample_inputs, sample_scores):
-            data_source_reward[data_source].append(scores)
-        for data_source, rewards in data_source_reward.items():
-            metric_dict[f'val/test_score/{data_source}'] = np.mean(rewards)
-        
-        
-        data_source_done = defaultdict(list)
-        for data_source, dones in zip(sample_inputs, sample_dones):
-            data_source_done[data_source].append(dones)
-        for data_source, dones in data_source_done.items():
-            metric_dict[f'val/test_done/{data_source}'] = np.mean(dones)
+        self._maybe_log_val_generations_to_wandb(validation_rst)
+        metric_dict = self.log_rst_to_metrics_dict(validation_rst,mode='val')
         print(f"[DEBUG] validation at global step {self.global_steps} ends")
         return metric_dict
 
-            
+    def log_rst_to_metrics_dict(self,rst,mode='train'):
+        metric_dict = {}
+        
+        
+        metrics_by_config_id = defaultdict(dict)  # a dict of dict of list
+        
+        for item in rst:
+            for k,v in item["metrics"].items():
+                if k not in metrics_by_config_id[item["config_id"]]:
+                    metrics_by_config_id[item["config_id"]][k] = []
+                metrics_by_config_id[item["config_id"]][k].append(v)
+        
+        
+        for config_id, metrics in metrics_by_config_id.items():
+            for k,v in metrics.items():
+                metric_dict[f'{mode}/{k}/{config_id}'] = np.mean(v)
+        
+        return metric_dict
             
 
     def init_workers(self):
@@ -1079,10 +1073,7 @@ class RayPPOTrainer(object):
                 
                     
                 env_configs = [
-                    EnvConfig(env_name=batch.non_tensor_batch['extra_info'][i]['env_name'],
-                              env_config=batch.non_tensor_batch['extra_info'][i]['env_config'],
-                              interface_config=batch.non_tensor_batch['extra_info'][i]['interface_config'],
-                              seed=batch.non_tensor_batch['extra_info'][i]['seed'])
+                    batch.non_tensor_batch['extra_info'][i]
                     for i in range(len(batch))
                 ]
                 rollout_manager.reset(env_configs)
@@ -1095,17 +1086,8 @@ class RayPPOTrainer(object):
                         final_gen_batch_output = rollout_manager.generate_batch_for_update()
                         rst= rollout_manager.recording_to_log() # data source == inputs in our current setting, outputs=whole 
                         
-                        data_source_reward = defaultdict(list)
-                        for data_source, scores in zip(rst["inputs"], rst["scores"]):
-                            data_source_reward[data_source].append(scores)
-                        for data_source, rewards in data_source_reward.items():
-                            metrics[f'train/score/{data_source}'] = np.mean(rewards)
-
-                        data_source_done = defaultdict(list)
-                        for data_source, dones in zip(rst["inputs"], rst["dones"]):
-                            data_source_done[data_source].append(dones)
-                        for data_source, dones in data_source_done.items():
-                            metrics[f'train/done/{data_source}'] = np.mean(dones)
+                        train_metrics=self.log_rst_to_metrics_dict(rst=rst,mode='train')
+                        metrics.update(train_metrics)
                     print(f"[DEBUG] step {self.global_steps} rollout ends")
                     
                     # VAGEN: This is moved to before rollout because we don't use vllm n sample param for grpo due to multi-turn nature of our method
