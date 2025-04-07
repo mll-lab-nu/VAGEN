@@ -6,6 +6,6 @@ test_path: "./data/sokoban-text-1-step/test.parquet"
   'env_config': {
       'num_boxes': 1
   },
-  "train_size": 2,
-  "test_size": 2,
+  "train_size": 1000,
+  "test_size": 100,
 }

@@ -17,6 +17,7 @@ pip install 'mathruler'
 pip install 'gym'
 pip install 'gym-sokoban'
 pip install 'matplotlib'
+pip install 'gymnasium'
 
 echo "Installing flash-attn with no build isolation..."
 pip install flash-attn --no-build-isolation

@@ -4,21 +4,9 @@ export VLLM_ATTENTION_BACKEND=XFORMERS
 
 export PYTHONHASHSEED=0
 
-python -m vagen.env.sokoban.create_dataset \
-    --data_dir data/sokoban-text-1-step \
-    --max_action_length 1 \
-    --dim_room 6 6 \
-    --num_boxes 1 \
-    --max_steps 100 \
-    --search_depth 30 \
-    --start_seed 0 \
-    --train_ratio 0.8 \
-    --max_action_per_step 1 \
-    --max_action_penalty -0.1 \
-    --format_reward 0.5 \
-    --n_candidate 20000 \
-    --force-gen
-
+python vagen/env/create_dataset.py \
+  --yaml_path vagen/configs/sokoban/debug_1_step.yaml \
+  --force_gen
 
 # max_trajectory_length = max_prompt_length + max_response_length
 #Set use_remove_padding to false, if true, causing batch size must be postive error in vllm
@@ -36,15 +24,15 @@ python3 -m vagen.trainer.main_ppo \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-0.5B-Instruct \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=False \
-    actor_rollout_ref.actor.ppo_mini_batch_size=64 \
-    actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=4 \
+    actor_rollout_ref.actor.ppo_mini_batch_size=16 \
+    actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=1 \
     actor_rollout_ref.actor.use_kl_loss=True \
     actor_rollout_ref.actor.kl_loss_coef=0.001 \
     actor_rollout_ref.actor.kl_loss_type=mse \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
     actor_rollout_ref.actor.fsdp_config.param_offload=False \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
-    actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=4 \
+    actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.4 \
@@ -52,7 +40,7 @@ python3 -m vagen.trainer.main_ppo \
     actor_rollout_ref.rollout.enforce_eager=False \
     actor_rollout_ref.rollout.free_cache_engine=False \
     actor_rollout_ref.rollout.n=1 \
-    actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=4 \
+    actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=1 \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     +actor_rollout_ref.ref.use_ref=True \
     algorithm.kl_ctrl.kl_coef=0.001 \

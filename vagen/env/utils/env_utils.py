@@ -3,10 +3,12 @@ import random
 import logging
 import numpy as np
 import torch
-from datetime import UTC, datetime, timedelta
+from datetime import timezone, datetime, timedelta
 from zoneinfo import ZoneInfo
 from contextlib import contextmanager
 import os
+
+UTC = timezone.utc
 
 def permanent_seed(seed: int) -> None:
     random.seed(seed)
