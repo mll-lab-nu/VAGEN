@@ -1,0 +1,172 @@
+
+Section "Device"
+    Identifier     "Device0"
+    Driver         "nvidia"
+    VendorName     "NVIDIA Corporation"
+    BusID          "PCI:5:0:0"
+EndSection
+
+
+Section "Screen"
+    Identifier     "Screen0"
+    Device         "Device0"
+    DefaultDepth    24
+    Option         "AllowEmptyInitialConfiguration" "True"
+    SubSection     "Display"
+        Depth       24
+        Virtual 1024 768
+    EndSubSection
+EndSection
+
+
+Section "Device"
+    Identifier     "Device1"
+    Driver         "nvidia"
+    VendorName     "NVIDIA Corporation"
+    BusID          "PCI:6:0:0"
+EndSection
+
+
+Section "Screen"
+    Identifier     "Screen1"
+    Device         "Device1"
+    DefaultDepth    24
+    Option         "AllowEmptyInitialConfiguration" "True"
+    SubSection     "Display"
+        Depth       24
+        Virtual 1024 768
+    EndSubSection
+EndSection
+
+
+Section "Device"
+    Identifier     "Device2"
+    Driver         "nvidia"
+    VendorName     "NVIDIA Corporation"
+    BusID          "PCI:9:0:0"
+EndSection
+
+
+Section "Screen"
+    Identifier     "Screen2"
+    Device         "Device2"
+    DefaultDepth    24
+    Option         "AllowEmptyInitialConfiguration" "True"
+    SubSection     "Display"
+        Depth       24
+        Virtual 1024 768
+    EndSubSection
+EndSection
+
+
+Section "Device"
+    Identifier     "Device3"
+    Driver         "nvidia"
+    VendorName     "NVIDIA Corporation"
+    BusID          "PCI:10:0:0"
+EndSection
+
+
+Section "Screen"
+    Identifier     "Screen3"
+    Device         "Device3"
+    DefaultDepth    24
+    Option         "AllowEmptyInitialConfiguration" "True"
+    SubSection     "Display"
+        Depth       24
+        Virtual 1024 768
+    EndSubSection
+EndSection
+
+
+Section "Device"
+    Identifier     "Device4"
+    Driver         "nvidia"
+    VendorName     "NVIDIA Corporation"
+    BusID          "PCI:141:0:0"
+EndSection
+
+
+Section "Screen"
+    Identifier     "Screen4"
+    Device         "Device4"
+    DefaultDepth    24
+    Option         "AllowEmptyInitialConfiguration" "True"
+    SubSection     "Display"
+        Depth       24
+        Virtual 1024 768
+    EndSubSection
+EndSection
+
+
+Section "Device"
+    Identifier     "Device5"
+    Driver         "nvidia"
+    VendorName     "NVIDIA Corporation"
+    BusID          "PCI:142:0:0"
+EndSection
+
+
+Section "Screen"
+    Identifier     "Screen5"
+    Device         "Device5"
+    DefaultDepth    24
+    Option         "AllowEmptyInitialConfiguration" "True"
+    SubSection     "Display"
+        Depth       24
+        Virtual 1024 768
+    EndSubSection
+EndSection
+
+
+Section "Device"
+    Identifier     "Device6"
+    Driver         "nvidia"
+    VendorName     "NVIDIA Corporation"
+    BusID          "PCI:145:0:0"
+EndSection
+
+
+Section "Screen"
+    Identifier     "Screen6"
+    Device         "Device6"
+    DefaultDepth    24
+    Option         "AllowEmptyInitialConfiguration" "True"
+    SubSection     "Display"
+        Depth       24
+        Virtual 1024 768
+    EndSubSection
+EndSection
+
+
+Section "Device"
+    Identifier     "Device7"
+    Driver         "nvidia"
+    VendorName     "NVIDIA Corporation"
+    BusID          "PCI:146:0:0"
+EndSection
+
+
+Section "Screen"
+    Identifier     "Screen7"
+    Device         "Device7"
+    DefaultDepth    24
+    Option         "AllowEmptyInitialConfiguration" "True"
+    SubSection     "Display"
+        Depth       24
+        Virtual 1024 768
+    EndSubSection
+EndSection
+
+
+Section "ServerLayout"
+    Identifier     "Layout0"
+    Screen 0 "Screen0" 0 0
+    Screen 1 "Screen1" 0 0
+    Screen 2 "Screen2" 0 0
+    Screen 3 "Screen3" 0 0
+    Screen 4 "Screen4" 0 0
+    Screen 5 "Screen5" 0 0
+    Screen 6 "Screen6" 0 0
+    Screen 7 "Screen7" 0 0
+EndSection
