@@ -24,7 +24,7 @@ python3 -m vagen.trainer.main_ppo \
     data.max_trajectory_length=1800 \
     data.image_key=images \
     data.truncation=left \
-    actor_rollout_ref.model.path=Qwen/Qwen2.5-0.5B-Instruct \
+    actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.actor.ppo_mini_batch_size=32 \
@@ -49,7 +49,7 @@ python3 -m vagen.trainer.main_ppo \
     actor_rollout_ref.rollout.temperature=0.7 \
     critic.optim.lr=1e-5 \
     critic.model.use_remove_padding=True \
-    critic.model.path=Qwen/Qwen2.5-0.5B-Instruct \
+    critic.model.path=Qwen/Qwen2.5-VL-3B-Instruct \
     critic.model.enable_gradient_checkpointing=True \
     critic.ppo_micro_batch_size_per_gpu=1 \
     critic.model.fsdp_config.param_offload=False \
@@ -58,7 +58,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
     trainer.project_name='vagen_debug' \
-    trainer.experiment_name='grpo_mask_loss_sokoban_text_debug' \
+    trainer.experiment_name='grpo_mask_loss_sokoban_vision_debug' \
     trainer.n_gpus_per_node=2 \
     trainer.nnodes=1 \
     trainer.save_freq=100 \
