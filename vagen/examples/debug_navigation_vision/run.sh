@@ -19,6 +19,7 @@ python3 -m vagen.trainer.main_ppo \
     data.train_files=data/navigation-vision-debug/train.parquet \
     data.val_files=data/navigation-vision-debug/test.parquet \
     data.train_batch_size=2 \
+    data.val_batch_size=2 \
     data.max_prompt_length=1024 \
     data.max_response_length=128 \
     data.max_trajectory_length=1800 \
