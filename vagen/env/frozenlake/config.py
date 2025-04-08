@@ -5,7 +5,7 @@ from typing import Optional, List, Union
 @dataclass
 class FrozenLakeConfig(BaseConfig):
     desc: Optional[List[str]] = None  # environment map
-    is_slippery: bool = True
+    is_slippery: bool = False
     size: int = 4
     p: float = 0.8  # probability of frozen tile
     render_mode: str = "vision"  # "text" or "vision"

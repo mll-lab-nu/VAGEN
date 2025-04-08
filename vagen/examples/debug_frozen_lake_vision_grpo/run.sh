@@ -8,16 +8,16 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 python -m vagen.env.create_dataset \
     --yaml_path "$SCRIPT_DIR/env_config.yaml" \
-    --train_path "data/sokoban-vision-debug/train.parquet" \
-    --test_path "data/sokoban-vision-debug/test.parquet" \
+    --train_path "data/frozenlake-vision-debug/train.parquet" \
+    --test_path "data/frozenlake-vision-debug/test.parquet" \
 
 # max_trajectory_length = max_prompt_length + max_response_length
 
 python3 -m vagen.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     algorithm.high_level_gamma=0.95 \
-    data.train_files=data/sokoban-vision-debug/train.parquet \
-    data.val_files=data/sokoban-vision-debug/test.parquet \
+    data.train_files=data/frozenlake-vision-debug/train.parquet \
+    data.val_files=data/frozenlake-vision-debug/test.parquet \
     data.train_batch_size=16 \
     data.max_prompt_length=1024 \
     data.max_response_length=128 \
@@ -39,7 +39,7 @@ python3 -m vagen.trainer.main_ppo \
     actor_rollout_ref.rollout.tensor_model_parallel_size=2 \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.3 \
-    actor_rollout_ref.rollout.enable_chunked_prefill=False \
+    actor_rollout_ref.rollout.enable_chunked_prefill=True \
     actor_rollout_ref.rollout.enforce_eager=False \
     actor_rollout_ref.rollout.free_cache_engine=False \
     actor_rollout_ref.rollout.n=1 \
@@ -58,7 +58,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
     trainer.project_name='vagen_debug' \
-    trainer.experiment_name='grpo_mask_loss_sokoban_vision_debug' \
+    trainer.experiment_name='grpo_mask_loss_frozenlake_vision_debug' \
     trainer.n_gpus_per_node=2 \
     trainer.nnodes=1 \
     trainer.save_freq=100 \
