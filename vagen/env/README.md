@@ -21,3 +21,9 @@ python vagen/env/navigation/startx.py 1
 pip install gymnasium
 pip install "gymnasium[toy-text]"
 ```
+
+### SVG
+```
+# Download dataset from huggingface
+
+```
