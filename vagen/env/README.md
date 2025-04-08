@@ -13,3 +13,11 @@ apt-get install -y xorg xserver-xorg-core xserver-xorg-video-dummy
 python vagen/env/navigation/startx.py 1
 
 ```
+
+
+### FrozenLake
+```
+# Additional dependencies:
+pip install gymnasium
+pip install "gymnasium[toy-text]"
+```
