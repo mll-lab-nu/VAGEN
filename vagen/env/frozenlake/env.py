@@ -101,6 +101,7 @@ class FrozenLakeEnv(BaseEnv):
                 if done:
                     if self._success():
                         metrics["traj_metrics"]['success'] = True
+                        self.reward += 9
                     break
             else:
                 metrics["turn_metrics"]['action_is_valid'] = False
