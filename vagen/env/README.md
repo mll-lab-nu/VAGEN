@@ -12,6 +12,4 @@ apt-get install -y xorg xserver-xorg-core xserver-xorg-video-dummy
 # Start X server in a tmux window
 python vagen/env/navigation/startx.py 1
 
-# In another terminal, run:
-bash vagen/examples/debug_navigation_vision/run.sh
 ```
