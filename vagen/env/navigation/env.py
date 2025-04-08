@@ -69,7 +69,12 @@ class NavigationEnv(BaseEnv):
         }
         
         # Initialize AI2-THOR controller
-        self.env = ai2thor.controller.Controller(**self.thor_config)
+        try:
+            self.env = ai2thor.controller.Controller(**self.thor_config)
+        except Exception as e:
+            print(f"Error initializing AI2-THOR: {e}")
+            import traceback
+            traceback.print_exc()
         
         # Load dataset
         assert config.eval_set in self.ValidEvalSets
