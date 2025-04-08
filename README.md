@@ -115,6 +115,24 @@ bash vagen/examples/release_experiments/mask_loss.sh # aico - gae mask
 ```
 Each run takes ~4 hours to reach 150 steps on 4 H100s. You can decrease testing frequency to speed up training. Training might be unstable due to loss spikes; we recommend restoring from the latest checkpoint when encountering such cases. We will resolve this issue in future work (see roadmap).
 
+### Navigation
+```
+# Additional dependencies:
+pip install ai2thor==5.0.0
+pip install numpy==1.25.1
+
+# For headless servers, additional setup is required:
+# Install required packages
+apt-get install -y pciutils
+apt-get install -y xorg xserver-xorg-core xserver-xorg-video-dummy
+
+# Start X server in a tmux window
+python vagen/env/navigation/startx.py 1
+
+# In another terminal, run:
+bash vagen/examples/debug_navigation_vision/run.sh
+```
+
 ## Algorithm Settings
 
 | Setting           | GRPO | GAE | Bi-Level GAE | Turn-Wise GAE | Masked-GAE |
