@@ -69,12 +69,12 @@ class NavigationEnv(BaseEnv):
         }
         
         # Initialize AI2-THOR controller
-        try:
-            self.env = ai2thor.controller.Controller(**self.thor_config)
-        except Exception as e:
-            print(f"Error initializing AI2-THOR: {e}")
-            import traceback
-            traceback.print_exc()
+        # try:
+        self.env = ai2thor.controller.Controller(**self.thor_config)
+        # except Exception as e:
+        #     print(f"Error initializing AI2-THOR: {e}")
+        #     import traceback
+        #     traceback.print_exc()
         
         # Load dataset
         assert config.eval_set in self.ValidEvalSets
@@ -367,15 +367,19 @@ class NavigationEnv(BaseEnv):
 
 if __name__ == "__main__":
     # Example usage
+    import os
     config = NavigationConfig()
     env = NavigationEnv(config)
     print(env.system_prompt())
     
     obs, info = env.reset(seed=0)
     print(obs["obs_str"])
-    
-    done = False
     i = 0
+    os.makedirs("./test_navigation", exist_ok=True)
+    img = obs["multi_modal_data"][config.image_placeholder][0]
+    img.save(f"./test_navigation/navigation_{i}.png")
+    done = False
+    
     
     # Interactive testing loop
     while not done:
@@ -385,6 +389,8 @@ if __name__ == "__main__":
         obs, reward, done, info = env.step(action)
         print(f"Reward: {reward}, Done: {done}")
         print(obs["obs_str"])
+        img = obs["multi_modal_data"][config.image_placeholder][0]
+        img.save(f"./test_navigation/navigation_{i}.png")
         print(f"Success: {info['metrics']['traj_metrics']['success']}, Action effective: {info['metrics']['turn_metrics']['action_is_effective']}")
         
         if done:
