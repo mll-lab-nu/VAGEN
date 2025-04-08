@@ -3,4 +3,4 @@ env1:
     env_config:
         visual_env: True
     train_size: 10000  
-    test_size: 1000
+    test_size: 16

@@ -623,11 +623,15 @@ class RayPPOTrainer(object):
                                        filter_prompts=True,
                                        return_raw_chat=self.config.data.get('return_raw_chat', False),
                                        truncation='error')
+        if self.config.data.val_batch_size is None:
+            val_batch_size=len(self.val_dataset)
+        else:
+            val_batch_size=self.config.data.val_batch_size
         self.val_dataloader = StatefulDataLoader(
             dataset=self.val_dataset,
             # Validation datasets are sent to inference engines as a whole batch,
             # which will schedule the memory themselves.
-            batch_size=self.config.data.val_batch_size,
+            batch_size=val_batch_size,
             num_workers=8,
             shuffle=False,
             drop_last=False,

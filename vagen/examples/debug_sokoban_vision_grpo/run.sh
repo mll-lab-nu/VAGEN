@@ -19,7 +19,6 @@ python3 -m vagen.trainer.main_ppo \
     data.train_files=data/sokoban-vision-debug/train.parquet \
     data.val_files=data/sokoban-vision-debug/test.parquet \
     data.train_batch_size=16 \
-    data.val_batch_size=256 \
     data.max_prompt_length=1024 \
     data.max_response_length=128 \
     data.max_trajectory_length=1800 \
