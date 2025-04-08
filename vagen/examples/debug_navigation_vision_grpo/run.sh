@@ -64,7 +64,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.nnodes=1 \
     trainer.save_freq=100 \
     trainer.test_freq=20 \
-    trainer.total_epochs=15 \
+    trainer.total_training_steps=300 \
     rollout_manager.max_turns=3 \
     rollout_manager.window_size=5 \
     rollout_manager.use_multi_turn_reward=False \

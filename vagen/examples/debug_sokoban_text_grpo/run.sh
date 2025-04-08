@@ -19,7 +19,7 @@ python3 -m vagen.trainer.main_ppo \
     data.train_files=data/sokoban-text-debug/train.parquet \
     data.val_files=data/sokoban-text-debug/test.parquet \
     data.train_batch_size=16 \
-    data.val_batch_size=128 \
+    data.val_batch_size=256 \
     data.max_prompt_length=1024 \
     data.max_response_length=128 \
     data.max_trajectory_length=1800 \
@@ -64,7 +64,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.nnodes=1 \
     trainer.save_freq=100 \
     trainer.test_freq=20 \
-    trainer.total_epochs=15 \
+    trainer.total_training_steps=300 \
     rollout_manager.max_turns=3 \
     rollout_manager.window_size=5 \
     rollout_manager.use_multi_turn_reward=False \

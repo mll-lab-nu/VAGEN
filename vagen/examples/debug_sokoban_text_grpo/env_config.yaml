@@ -3,4 +3,4 @@ env1:
     env_config:
         render_mode: text
     train_size: 10000  
-    test_size: 500
+    test_size: 1024

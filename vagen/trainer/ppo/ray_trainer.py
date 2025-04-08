@@ -639,6 +639,7 @@ class RayPPOTrainer(object):
         # ) == 1, "Validation dataloader must have a single batch, which inference engines will schedule the memory themselves." # for agent training we still use val batch size
 
         print(f'Size of train dataloader: {len(self.train_dataloader)}')
+        print(f"Size of val dataloader: {len(self.val_dataloader)}")
 
         # inject total_training_steps to actor/critic optim_config. This is hacky.
         total_training_steps = len(self.train_dataloader) * self.config.trainer.total_epochs
