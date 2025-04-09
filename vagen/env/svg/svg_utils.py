@@ -109,7 +109,6 @@ def load_svg_dataset(data_dir, dataset_name, split):
         try:
             from datasets import load_from_disk
             dataset = load_from_disk(local_path)
-            print(f"Successfully loaded dataset from {local_path} with {len(dataset)} examples")
             return dataset
         except Exception as e:
             print(f"Error loading from simplified path: {e}")
@@ -117,7 +116,6 @@ def load_svg_dataset(data_dir, dataset_name, split):
     try:
         print(f"Downloading dataset from HuggingFace: {dataset_name}")
         dataset = load_dataset(dataset_name, split=split)
-        print(f"Successfully downloaded dataset with {len(dataset)} examples")
         
         try:
             os.makedirs(os.path.dirname(local_path), exist_ok=True)

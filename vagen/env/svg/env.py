@@ -10,6 +10,7 @@ import re
 import json
 import logging
 import random
+from PIL import Image
 from typing import Dict, Any, Optional, Tuple
 from pathlib import Path
 from datasets import Dataset
@@ -32,7 +33,7 @@ class SVGEnv(BaseEnv):
         self.img_id = None
         self.gt_svg_code = None
         self.gt_image = None
-        self.gen_svg_code = ""
+        self.gen_svg_code = None
         self.gen_image = None
         
         # Initialize random number generator
@@ -127,6 +128,12 @@ class SVGEnv(BaseEnv):
                     'failure_reason': 'invalid_svg'
                 }
                 self.failure_logger.info(json.dumps(failure_info))
+                
+                done = True
+                info["metrics"] = metrics
+                self.total_reward += self.reward
+                self.gen_svg_code = None
+                return self._render(init_obs=False), self.reward, done, info
         else:
             # Valid SVG code - apply format reward and process it
             self.reward += self.config.format_reward
@@ -225,22 +232,6 @@ class SVGEnv(BaseEnv):
         """Return the total reward collected so far"""
         return self.total_reward
         
-    def render(self, mode='text'):
-        """Render the current state of the environment
-        
-        Args:
-            mode: Rendering mode ('text' is the only supported mode)
-            
-        Returns:
-            String representation of the current state
-        """
-        assert mode == 'text', "Only text mode is supported for rendering"
-        
-        if not self.gen_svg_code:
-            return self.gt_svg_code
-        else:
-            return self.gen_svg_code
-        
     def close(self):
         """Close the environment and clean up resources"""
         if hasattr(self, 'failure_logger'):
@@ -260,8 +251,10 @@ class SVGEnv(BaseEnv):
         # Determine which image to show
         if init_obs:
             img = self.gt_image
-        else:
+        elif self.gen_svg_code:
             img = self.gen_image
+        else:
+            img = Image.new('RGB', (256, 256), color='white')
             
         # Set up multi-modal data with the image
         img_placeholder = self.config.get("image_placeholder", "image")
@@ -347,6 +340,7 @@ if __name__ == "__main__":
         obs, reward, done, info = env.step(action)
         print(f"Reward: {reward}")
         print(f"Done: {done}")
+        print(f"obs:{obs}")
         print(f"Score components: {info.get('scores', {})}")
         
         # Test with another seed to verify determinism

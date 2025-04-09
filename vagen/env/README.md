@@ -24,6 +24,8 @@ pip install "gymnasium[toy-text]"
 
 ### SVG
 ```
-# Download dataset from huggingface
-
+# Additional dependencies:
+pip install bs4
+pip install svgpathtools
+pip install cairosvg
 ```
