@@ -70,5 +70,5 @@ python -m vagen.trainer.main_ppo \
     rollout_manager.use_loss_mask=True \
     trainer.val_before_train=True \
     trainer.val_generations_to_log_to_wandb=8 \
-    rollout_manager.n_trajectory=8 \
+    rollout_manager.n_trajectory=1 \
     2>&1 | tee grpo_mask_loss_navigation_vision_debug.log
