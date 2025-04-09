@@ -1,7 +1,7 @@
 from .sokoban import SokobanEnv,SokobanConfig
 from .frozenlake import FrozenLakeEnv,FrozenLakeConfig
 from .navigation import NavigationEnv, NavigationConfig
-from .svg import SVGDINOEnv, SVGDINOConfig
+from .svgdino import SVGDINOEnv, SVGDINOConfig
 from .svg import SVGEnv, SVGConfig
 
 REGISTERED_ENV = {
