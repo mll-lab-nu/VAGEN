@@ -70,7 +70,7 @@ class SokobanEnv(BaseEnv):
         
         metrics={
             "turn_metrics":{
-                "action_is_valid": action_list != [],
+                "action_is_valid": len(action_list) != 0,
                 "action_is_effective": False,},
             "traj_metrics": {
                 "success": False,
