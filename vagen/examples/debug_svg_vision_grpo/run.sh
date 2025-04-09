@@ -7,7 +7,7 @@ export PYTHONHASHSEED=0
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 python -m vagen.env.create_dataset \
-    --yaml_path "$SCRIPT_DIR/env_config_structure.yaml" \
+    --yaml_path "$SCRIPT_DIR/env_config.yaml" \
     --train_path "data/svg-vision-debug/train.parquet" \
     --test_path "data/svg-vision-debug/test.parquet" \
 
