@@ -76,7 +76,7 @@ class FrozenLakeEnv(BaseEnv):
         
         metrics = {
             "turn_metrics": {
-                "action_is_valid": True,
+                "action_is_valid": action_list != [],
                 "action_is_effective": False,
             },
             "traj_metrics": {
