@@ -71,8 +71,9 @@ def calculate_total_score(gt_im, gen_im, gt_code, gen_code, score_config):
     model_size = score_config.get("model_size", "large")
     dino_only = score_config.get("dino_only", False)
 
-    reward_model = DINOScoreCalculator(model_size=model_size, device="cuda")
-    dino_score = reward_model.calculate_DINOv2_similarity_score(gt_im=gt_im, gen_im=gen_im)
+    if score_config.dino_weight != 0:
+        reward_model = DINOScoreCalculator(model_size=model_size, device="cuda")
+        dino_score = reward_model.calculate_DINOv2_similarity_score(gt_im=gt_im, gen_im=gen_im)
     
     if dino_only:
         return {
