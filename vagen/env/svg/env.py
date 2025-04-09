@@ -4,6 +4,7 @@ from vagen.env.svg.score import calculate_total_score
 from vagen.env.utils.context_utils import parse_llm_raw_response, convert_numpy_to_PIL
 from .config import SVGConfig
 from .prompt import system_prompt, init_observation_template, action_template
+from .reward_model_server import compute_svg_score
 
 import os
 import re
@@ -44,6 +45,9 @@ class SVGEnv(BaseEnv):
         # Set up analysis logging if enabled
         if self.config.analysis_mode:
             self._setup_analysis_logging()
+            
+        # initialize reward model server api url
+        self.reward_url = self.config.get("reward_url", "http://127.0.0.1:5000")
     
 
     def reset(self, seed=None) -> Tuple[Dict, Dict]:
@@ -162,13 +166,11 @@ class SVGEnv(BaseEnv):
                     score_config["code_weight"] = self.config.code_weight
                 
                 try:
-                    scores = calculate_total_score(
-                        gt_im=self.gt_image,
-                        gen_im=gen_image,
-                        gt_code=self.gt_svg_code,
-                        gen_code=self.gen_svg_code,
-                        score_config=score_config
-                    )                
+                    scores = self._get_scores_from_service(self.gt_svg_code, self.gen_svg_code)
+                
+                    if not scores or "error" in scores:
+                        logging.warning(f"ERROR IN SCORE SERVER!!!: {scores.get('error') if scores else 'Unknown error'}")
+                        scores = {"total_score": 0, "dino_score": 0, "structural_score": 0, "color_score": 0, "code_score": 0}             
                 except Exception as e:
                     print(f"Score calculation failed: {e}")
                 
@@ -302,18 +304,65 @@ class SVGEnv(BaseEnv):
             success_handler = logging.FileHandler(log_dir / 'success_cases.log')
             success_handler.setFormatter(logging.Formatter('%(message)s'))
             self.success_logger.addHandler(success_handler)
+    
+    def _get_scores_from_service(self, gt_svg_code, gen_svg_code):
+        try:
+            import requests
+            
+            data = {
+                "gt_svg_code": gt_svg_code,
+                "gen_svg_code": gen_svg_code
+            }
+            
+            response = requests.post(
+                f"{self.reward_url}/compute_score",
+                json=data,
+                headers={"Content-Type": "application/json"},
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                return response.json()
+            else:
+                logging.error(f"Error in scoring: {response.status_code} - {response.text}")
+                return {"error": f"Error in scoring: {response.status_code}"}
+        
+        except Exception as e:
+            logging.error(f"error in scoring server: {str(e)}")
+            return {"error": str(e)}
 
 if __name__ == "__main__":
+    import requests
+    import time
+    
+    # Create configuration
     config = SVGConfig(
         dataset_name="starvector/svg-emoji-simple",
         data_dir="vagen/env/svg/data",
         split="test",
-        model_size="small"
+        model_size="small",
+        dino_only=True,
+        reward_url="http://127.0.0.1:5000"  # Default reward server URL
     )
     
+    # Check if reward server is running
+    server_available = False
     try:
+        response = requests.get("http://127.0.0.1:5000/health", timeout=2)
+        if response.status_code == 200:
+            server_available = True
+            print("Reward server is available")
+        else:
+            print(f"Reward server returned status code: {response.status_code}")
+    except Exception as e:
+        print(f"Reward server is not available: {e}")
+        print("Please make sure to run the reward server first:")
+        print("python simple_reward_server.py --port 5000")
+    
+    try:
+        # Initialize environment
         env = SVGEnv(config)
-        print(f"Successfully loaded dataset")
+        print("Successfully loaded dataset")
         
         # Test with seed
         seed = 42
@@ -337,11 +386,29 @@ if __name__ == "__main__":
         </svg>
         </answer>"""
         
+        # Execute step
+        print("Executing step with SVG action...")
+        start_time = time.time()
         obs, reward, done, info = env.step(action)
+        elapsed_time = time.time() - start_time
+        
+        print(f"Step completed in {elapsed_time:.4f} seconds")
         print(f"Reward: {reward}")
         print(f"Done: {done}")
-        print(f"obs:{obs}")
-        print(f"Score components: {info.get('scores', {})}")
+        
+        # Print score components
+        if 'scores' in info:
+            print("Score components:")
+            for key, value in info['scores'].items():
+                print(f"  {key}: {value}")
+        else:
+            print("No scores returned")
+            
+        # If server was unavailable, explain the fallback behavior
+        if not server_available:
+            print("\nNote: Test completed without an active reward server.")
+            print("The environment used fallback scoring or empty scores.")
+            print("For proper scoring, please start the reward server before running this test.")
         
         # Test with another seed to verify determinism
         seed = 123

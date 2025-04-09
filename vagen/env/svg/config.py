@@ -21,6 +21,7 @@ class SVGConfig(BaseConfig):
     format_penalty: float = 0.0
     # Analysis mode for logging
     analysis_mode: bool = False
+    reward_url: str = "http://127.0.0.1:5000"
     
     def config_id(self) -> str:
         """Generate a unique identifier for this configuration"""
