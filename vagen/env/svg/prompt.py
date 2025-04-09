@@ -24,10 +24,7 @@ Process:
 
 Rewards:
 - Overall visual similarity: +5.0
-- Structural accuracy: +3.0
-- Color fidelity: +2.0
-- Code efficiency (using appropriate elements): +2.0
-- Complete reproduction: +10.0
+- Structural accuracy: +20.0
 
 Please think step by step and provide the svg code.
 Your response should be in the format of <think>...</think><answer>...</answer>
@@ -45,6 +42,6 @@ You have successfully generated SVG code. Your generated image looks like:
 {observation}
 Reward for this attempt: {reward}
 
-Try to revise your code to make it more precise and similar to the original image.
+You need to revise your code to make it more precise and similar to the original image.
 Your response should be in the format of <think>...</think><answer>...</answer>
 """
