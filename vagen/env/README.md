@@ -42,7 +42,7 @@ pip install cairosvg
 pip install flask
 
 # create server for reward model
-python vagen/env/svgdino/reward_model_server.py --port 5000
+python vagen/env/svgdino/reward_model_server.py
 
 # Then run experiment of SVG simply copy the code below
 bash vagen/examples/debug_svgdino_vision_grpo/run.sh
