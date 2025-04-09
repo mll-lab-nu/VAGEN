@@ -1,0 +1,23 @@
+env1:
+    env_name: svg
+    env_config:
+        split: train
+        dino_weight: 0.0
+        structural_weight: 1.0
+        color_weight: 0.0
+        code_weight: 0.0
+    train_size: 10000
+    test_size: 0
+
+env2:
+    env_name: svg
+    env_config:
+        split: test
+        dino_weight: 0.0
+        structural_weight: 1.0
+        color_weight: 0.0
+        code_weight: 0.0
+    train_size: 0 
+    test_size: 512
+    
+

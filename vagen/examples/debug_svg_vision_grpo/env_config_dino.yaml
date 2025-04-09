@@ -1,0 +1,17 @@
+env1:
+    env_name: svg
+    env_config:
+        split: train
+        dino_only: True
+    train_size: 10000
+    test_size: 0
+
+env2:
+    env_name: svg
+    env_config:
+        split: test
+        dino_only: True
+    train_size: 0 
+    test_size: 512
+    
+
