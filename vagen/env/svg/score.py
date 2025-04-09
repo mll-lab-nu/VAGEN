@@ -81,9 +81,7 @@ def calculate_total_score(gt_im, gen_im, gt_code, gen_code, score_config):
             'total_score': dino_score
         }
     
-    structural_score = calculate_structural_accuracy(gt_im, gen_im)
-    color_score = calculate_color_fidelity(gt_im, gen_im)
-    code_score = calculate_code_efficiency(gt_code, gen_code)
+    
     
     default_weights = {
         "small":{"dino": 3.0, "structural": 7.0, "color": 0.0, "code": 0.0},
@@ -97,6 +95,10 @@ def calculate_total_score(gt_im, gen_im, gt_code, gen_code, score_config):
         "color": score_config.get("color_weight", default_weights[model_size]["color"]),
         "code": score_config.get("code_weight", default_weights[model_size]["code"]),
     }
+    
+    structural_score = calculate_structural_accuracy(gt_im, gen_im) if score_config.structural_weight != 0 else 0
+    color_score = calculate_color_fidelity(gt_im, gen_im) if score_config.color_weight != 0 else 0
+    code_score = calculate_code_efficiency(gt_code, gen_code) if score_config.code_weight != 0 else 0
 
     
     scores = {
