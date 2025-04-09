@@ -28,12 +28,22 @@ pip install "gymnasium[toy-text]"
 pip install bs4
 pip install svgpathtools
 pip install cairosvg
-pip install flask
-
-# create server for reward model
-python vagen/env/svg/reward_model_server.py
 
 # Then run experiment of SVG simply copy the code below
 bash vagen\examples\debug_svg_vision_grpo\run_structure_only.sh
+```
+
+### SVGDino
+```
+# Additional dependencies:
+pip install bs4
+pip install svgpathtools
+pip install cairosvg
+pip install flask
+
+# create server for reward model
+python vagen/env/svg/reward_model_server.py --port 5000
+
+# Then run experiment of SVG simply copy the code below
 bash vagen\examples\debug_svg_vision_grpo\run_dino_only.sh
 ```
