@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 import os
-from vagen.env.svg.dino import DINOScoreCalculator
+from vagen.env.svgdino.dino import DINOScoreCalculator
 
 
 def calculate_structural_accuracy(gt_im, gen_im):

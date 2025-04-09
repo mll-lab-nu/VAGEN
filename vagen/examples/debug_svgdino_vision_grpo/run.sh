@@ -7,17 +7,17 @@ export PYTHONHASHSEED=0
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 python -m vagen.env.create_dataset \
-    --yaml_path "$SCRIPT_DIR/env_config_dino.yaml" \
-    --train_path "data/svg-vision-debug/train.parquet" \
-    --test_path "data/svg-vision-debug/test.parquet" \
+    --yaml_path "$SCRIPT_DIR/env_config.yaml" \
+    --train_path "data/svgdino-vision-debug/train.parquet" \
+    --test_path "data/svgdino-vision-debug/test.parquet" \
 
 # max_trajectory_length = max_prompt_length + max_response_length
 
 python3 -m vagen.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     algorithm.high_level_gamma=0.95 \
-    data.train_files=data/svg-vision-debug/train.parquet \
-    data.val_files=data/svg-vision-debug/test.parquet \
+    data.train_files=data/svgdino-vision-debug/train.parquet \
+    data.val_files=data/svgdino-vision-debug/test.parquet \
     data.train_batch_size=16 \
     data.max_prompt_length=1024 \
     data.max_response_length=648 \
