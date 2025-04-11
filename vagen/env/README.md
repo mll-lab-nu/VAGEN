@@ -1,3 +1,8 @@
+## General Server
+```
+# Start a Server
+python vagen/env/server.py
+```
 ### Navigation
 ```
 # Additional dependencies:

@@ -1,34 +1,29 @@
 from typing import Dict, List, Tuple, Optional, Any, Union
 import requests
-import logging
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from vagen.utils.serial import deserialize_observation
 
 class BatchEnvClient:
     """
     Client for interacting with the batch environment server.
-    This client provides methods to create, reset, step and close environments remotely.
+    Uses dictionary-based interface to match the server API and service interface.
     """
     
-    def __init__(self, base_url: str, timeout: int = 60, max_workers: int = 10, 
-                 logger: Optional[logging.Logger] = None):
+    def __init__(self, base_url: str, timeout: int = 60, max_workers: int = 10):
         """
         Initialize the BatchEnvClient.
         
         Args:
             base_url: Base URL of the environment server
             timeout: Timeout for HTTP requests in seconds
-            max_workers: Maximum number of worker threads for parallel requests
-            logger: Optional logger for client logs
+            max_workers: Maximum number of worker threads for parallel processing
         """
         self.base_url = base_url.rstrip('/')
         self.timeout = timeout
         self.max_workers = max_workers
-        self.logger = logger or logging.getLogger(self.__class__.__name__)
         self.env_configs = {}  # Store configs for each environment for reference
         
-    def _make_request(self, endpoint: str, method: str = "POST", data: Any = None, 
-                      env_id: Optional[str] = None) -> Any:
+    def _make_request(self, endpoint: str, method: str = "POST", data: Any = None) -> Any:
         """
         Make an HTTP request to the environment server.
         
@@ -36,7 +31,6 @@ class BatchEnvClient:
             endpoint: API endpoint to call
             method: HTTP method (GET, POST, etc.)
             data: Data to send with the request
-            env_id: Optional environment ID to include in the URL
             
         Returns:
             Response data from the server
@@ -45,9 +39,6 @@ class BatchEnvClient:
             ConnectionError: If the request fails
         """
         url = f"{self.base_url}/{endpoint}"
-        if env_id:
-            url = f"{url}/{env_id}"
-            
         headers = {"Content-Type": "application/json"}
         
         try:
@@ -64,48 +55,7 @@ class BatchEnvClient:
             return response.json()
             
         except requests.exceptions.RequestException as e:
-            self.logger.error(f"Request to {url} failed: {str(e)}")
-            raise ConnectionError(f"Failed to communicate with environment server: {str(e)}")
-    
-    def _process_batch_request(self, endpoint: str, items: List, data_key: str, 
-                           method: str = "POST") -> List:
-        """
-        Process a batch of requests in parallel using a thread pool.
-        """
-        results = [None] * len(items)
-        
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures = []
-            
-            for i, item in enumerate(items):
-                if isinstance(item, tuple) and len(item) == 2:
-                    env_id, data = item
-                    future = executor.submit(
-                        self._make_request, 
-                        endpoint, 
-                        method, 
-                        data, 
-                        env_id
-                    )
-                else:
-                    future = executor.submit(
-                        self._make_request,
-                        endpoint,
-                        method,
-                        None,
-                        item
-                    )
-                    
-                futures.append((i, future))
-            
-            for i, future in futures:
-                try:
-                    results[i] = future.result()
-                except Exception as e:
-                    self.logger.error(f"Error processing request for item {i}: {str(e)}")
-                    results[i] = {"error": str(e)}
-                    
-        return results
+            raise ConnectionError(f"Failed to communicate with server: {str(e)}")
     
     def check_server_health(self) -> Dict[str, Any]:
         """
@@ -117,7 +67,6 @@ class BatchEnvClient:
         try:
             return self._make_request("health", method="GET")
         except Exception as e:
-            self.logger.error(f"Health check failed: {str(e)}")
             return {"status": "error", "message": str(e)}
     
     def wait_for_server(self, max_retries: int = 10, retry_delay: float = 1.0) -> bool:
@@ -135,151 +84,98 @@ class BatchEnvClient:
             try:
                 health = self.check_server_health()
                 if health.get("status") == "ok":
-                    self.logger.info(f"Server available at {self.base_url}")
+                    print(f"Server available at {self.base_url}")
                     return True
             except Exception:
                 pass
                 
-            self.logger.info(f"Waiting for server (attempt {i+1}/{max_retries})...")
+            print(f"Waiting for server (attempt {i+1}/{max_retries})...")
             time.sleep(retry_delay)
             
-        self.logger.error(f"Server not available after {max_retries} attempts")
+        print(f"Server not available after {max_retries} attempts")
         return False
         
-    def create_environments(self, env_configs: List[Dict[str, Any]]) -> List[str]:
+    def create_environments_batch(self, ids2configs: Dict[Any, Any]) -> None:
         """
         Create multiple environments based on the provided configurations.
+        Implements BaseService.create_environments_batch interface.
         
         Args:
-            env_configs: List of environment configurations
-            
-        Returns:
-            List of environment IDs that can be used to reference these environments
+            ids2configs: Dictionary mapping environment IDs to their configurations
         """
-        response = self._make_request("environments", "POST", {"configs": env_configs})
-        env_ids = response.get("env_ids", [])
+        response = self._make_request("environments", "POST", {"ids2configs": ids2configs})
+        if response.get("success") != True:
+            raise Exception(f"Failed to create environments: {response.get('error', 'Unknown error')}")
         
         # Store the configs for reference
-        for i, env_id in enumerate(env_ids):
-            self.env_configs[env_id] = env_configs[i]
-            
-        return env_ids
+        for env_id in ids2configs:
+            self.env_configs[env_id] = ids2configs[env_id]
     
-    def reset_batch(self, env_ids: List[str], seeds: Optional[List[int]] = None) -> List[Tuple[Dict, Dict]]:
+    def reset_batch(self, ids2seeds: Dict[str, Any]) -> Dict[str, Tuple[Dict, Dict]]:
         """
-        Reset multiple environments simultaneously.
+        Reset multiple environments in batch.
         
         Args:
-            env_ids: List of environment IDs to reset
-            seeds: Optional list of seeds for resetting environments (one per environment)
+            ids2seeds: Dictionary mapping environment IDs to seeds
             
         Returns:
-            List of (observation, info) tuples, one for each environment
+            Dictionary mapping environment IDs to (observation, info) tuples
         """
-        # Prepare data for each environment
-        data = []
-        for i, env_id in enumerate(env_ids):
-            seed = seeds[i] if seeds and i < len(seeds) else None
-            data.append((env_id, {"seed": seed} if seed is not None else {}))
-            
-        # Make parallel requests
-        results = self._process_batch_request("reset", data, "reset_params")
+        response = self._make_request("batch/reset", "POST", {"ids2seeds": ids2seeds})
+        results = response.get("results", {})
         
-        # Process results
-        reset_results = []
-        for result in results:
-            if "error" in result:
-                # Handle error case
-                reset_results.append(({}, {"error": result["error"]}))
-            else:
-                # Extract observation and info
-                obs = result.get("observation", {})
-                info = result.get("info", {})
-                reset_results.append((obs, info))
-                
-        return reset_results
+        # Deserialize observations
+        deserialized_results = {}
+        for env_id, (observation, info) in results.items():
+            deserialized_results[env_id] = (deserialize_observation(observation), info)
+            
+        return deserialized_results
     
-    def step_batch(self, env_ids: List[str], actions: List[str]) -> List[Tuple[Dict, float, bool, Dict]]:
+    def step_batch(self, ids2actions: Dict[str, str]) -> Dict[str, Tuple[Dict, float, bool, Dict]]:
         """
-        Take a step in multiple environments simultaneously.
+        Step multiple environments in batch.
         
         Args:
-            env_ids: List of environment IDs
-            actions: List of actions to take in each environment
+            ids2actions: Dictionary mapping environment IDs to actions
             
         Returns:
-            List of (observation, reward, done, info) tuples, one for each environment
+            Dictionary mapping environment IDs to (observation, reward, done, info) tuples
         """
-        if len(env_ids) != len(actions):
-            raise ValueError("Number of environment IDs must match number of actions")
+        response = self._make_request("batch/step", "POST", {"ids2actions": ids2actions})
+        results = response.get("results", {})
+        
+        # Deserialize observations
+        deserialized_results = {}
+        for env_id, (observation, reward, done, info) in results.items():
+            deserialized_results[env_id] = (deserialize_observation(observation), reward, done, info)
             
-        # Prepare data for each environment
-        data = [(env_id, {"action": action}) for env_id, action in zip(env_ids, actions)]
-        
-        # Make parallel requests
-        results = self._process_batch_request("step", data, "step_params")
-        
-        # Process results
-        step_results = []
-        for result in results:
-            if "error" in result:
-                # Handle error case
-                step_results.append(({}, 0.0, True, {"error": result["error"]}))
-            else:
-                # Extract observation, reward, done, and info
-                obs = result.get("observation", {})
-                reward = result.get("reward", 0.0)
-                done = result.get("done", False)
-                info = result.get("info", {})
-                step_results.append((obs, reward, done, info))
-                
-        return step_results
+        return deserialized_results
     
-    def compute_reward_batch(self, env_ids: List[str]) -> List[float]:
+    def compute_reward_batch(self, env_ids: List[str]) -> Dict[str, float]:
         """
-        Compute the total reward for multiple environments.
+        Compute rewards for multiple environments in batch.
         
         Args:
             env_ids: List of environment IDs
             
         Returns:
-            List of rewards, one for each environment
+            Dictionary mapping environment IDs to reward values
         """
-        # Make parallel requests
-        results = self._process_batch_request("reward", env_ids, "", "GET")
-        
-        # Process results
-        rewards = []
-        for result in results:
-            if "error" in result:
-                rewards.append(0.0)  # Default to zero reward on error
-            else:
-                rewards.append(result.get("reward", 0.0))
-                
-        return rewards
+        response = self._make_request("batch/reward", "POST", {"env_ids": env_ids})
+        return response.get("rewards", {})
     
-    def get_system_prompts_batch(self, env_ids: List[str]) -> List[str]:
+    def get_system_prompts_batch(self, env_ids: List[str]) -> Dict[str, str]:
         """
-        Get system prompts for multiple environments.
+        Get system prompts for multiple environments in batch.
         
         Args:
             env_ids: List of environment IDs
             
         Returns:
-            List of system prompts, one for each environment
+            Dictionary mapping environment IDs to system prompt strings
         """
-        # Make parallel requests
-        results = self._process_batch_request("system_prompt", env_ids, "", "GET")
-        
-        # Process results
-        prompts = []
-        for result in results:
-            if "error" in result:
-                prompts.append("")  # Default to empty prompt on error
-            else:
-                prompts.append(result.get("system_prompt", ""))
-                
-        return prompts
+        response = self._make_request("batch/system_prompt", "POST", {"env_ids": env_ids})
+        return response.get("system_prompts", {})
     
     def close_batch(self, env_ids: Optional[List[str]] = None) -> None:
         """
@@ -292,149 +188,125 @@ class BatchEnvClient:
         if env_ids is None:
             env_ids = list(self.env_configs.keys())
             
-        # Make parallel requests
-        self._process_batch_request("close", env_ids, "", "DELETE")
+        self._make_request("batch/close", "POST", {"env_ids": env_ids})
         
         # Remove closed environments from tracking
         for env_id in env_ids:
             self.env_configs.pop(env_id, None)
-
-
-class FrozenLakeBatchClient(BatchEnvClient):
-    """
-    Client for interacting with FrozenLake environments.
-    Extends the BatchEnvClient with FrozenLake-specific operations.
-    """
     
-    def create_frozen_lake_environments(self, configs: List[Dict[str, Any]]) -> List[str]:
+    # Convenience methods for single-environment operations
+    
+    def reset(self, env_id: str, seed: Any = None) -> Tuple[Dict, Dict]:
         """
-        Create multiple FrozenLake environments with specific configurations.
+        Reset a single environment.
         
         Args:
-            configs: List of FrozenLake configurations
+            env_id: Environment ID
+            seed: Optional seed for resetting
             
         Returns:
-            List of environment IDs
+            Tuple of (observation, info)
         """
-        env_configs = []
-        
-        for config in configs:
-            env_config = {
-                "env_name": "frozenlake",
-                "env_config": config
-            }
-            env_configs.append(env_config)
-            
-        return self.create_environments(env_configs)
+        results = self.reset_batch({env_id: seed})
+        return results.get(env_id, ({}, {"error": "Reset failed"}))
     
-    def get_maps_batch(self, env_ids: List[str]) -> List[Optional[List[List[str]]]]:
+    def step(self, env_id: str, action: str) -> Tuple[Dict, float, bool, Dict]:
         """
-        Get maps for multiple FrozenLake environments.
+        Take a step in a single environment.
         
         Args:
-            env_ids: List of environment IDs
+            env_id: Environment ID
+            action: Action to take
             
         Returns:
-            List of maps, or None for environments where the request failed
+            Tuple of (observation, reward, done, info)
         """
-        # Make parallel requests
-        results = self._process_batch_request("map", env_ids, "", "GET")
-        
-        # Process results
-        maps = []
-        for result in results:
-            if "error" in result:
-                maps.append(None)
-            else:
-                maps.append(result.get("map"))
-                
-        return maps
+        results = self.step_batch({env_id: action})
+        return results.get(env_id, ({}, 0.0, True, {"error": "Step failed"}))
     
-    def get_player_positions_batch(self, env_ids: List[str]) -> List[Optional[Tuple[int, int]]]:
+    def compute_reward(self, env_id: str) -> float:
         """
-        Get player positions for multiple FrozenLake environments.
+        Compute reward for a single environment.
         
         Args:
-            env_ids: List of environment IDs
+            env_id: Environment ID
             
         Returns:
-            List of player positions, or None for environments where the request failed
+            Reward value
         """
-        # Make parallel requests
-        results = self._process_batch_request("player_position", env_ids, "", "GET")
+        results = self.compute_reward_batch([env_id])
+        return results.get(env_id, 0.0)
+    
+    def get_system_prompt(self, env_id: str) -> str:
+        """
+        Get system prompt for a single environment.
         
-        # Process results
-        positions = []
-        for result in results:
-            if "error" in result:
-                positions.append(None)
-            else:
-                position = result.get("position")
-                if position:
-                    positions.append(tuple(position))
-                else:
-                    positions.append(None)
-                
-        return positions
+        Args:
+            env_id: Environment ID
+            
+        Returns:
+            System prompt string
+        """
+        results = self.get_system_prompts_batch([env_id])
+        return results.get(env_id, "")
+    
+    def close(self, env_id: str) -> None:
+        """
+        Close a single environment.
+        
+        Args:
+            env_id: Environment ID
+        """
+        self.close_batch([env_id])
 
 
 if __name__ == "__main__":
     # Example usage of the client
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    logger = logging.getLogger("BatchEnvClient")
-    
-    # Create client
-    client = FrozenLakeBatchClient(
-        base_url="http://localhost:5000",
-        timeout=10,
-        max_workers=5,
-        logger=logger
-    )
+    client = BatchEnvClient(base_url="http://localhost:5000", timeout=10)
     
     # Wait for server to be available
     if client.wait_for_server():
         try:
-            # Create FrozenLake environments
+            # Create environments
             configs = [
-                {"is_slippery": False, "size": 4, "render_mode": "text"},
-                {"is_slippery": True, "size": 8, "render_mode": "vision"}
+                {
+                    "env_name": "frozenlake",
+                    "env_config": {"is_slippery": False, "size": 4, "render_mode": "text"}
+                },
+                {
+                    "env_name": "frozenlake",
+                    "env_config": {"is_slippery": True, "size": 8, "render_mode": "vision"}
+                }
             ]
             
-            logger.info("Creating environments...")
-            env_ids = client.create_frozen_lake_environments(configs)
-            logger.info(f"Created {len(env_ids)} environments: {env_ids}")
+            print("Creating environments...")
+            env_ids = client.create_environments_batchs(configs)
+            print(f"Created {len(env_ids)} environments: {env_ids}")
             
             # Reset environments
-            logger.info("Resetting environments...")
-            seeds = [42, 123]
-            obs_infos = client.reset_batch(env_ids, seeds)
+            print("Resetting environments...")
+            ids2seeds = {env_id: i*42 for i, env_id in enumerate(env_ids)}
+            results = client.reset_batch(ids2seeds)
             
             # Get system prompts
-            logger.info("Getting system prompts...")
+            print("Getting system prompts...")
             prompts = client.get_system_prompts_batch(env_ids)
             
-            # Get maps
-            logger.info("Getting maps...")
-            maps = client.get_maps_batch(env_ids)
-            
             # Step environments
-            logger.info("Stepping environments...")
-            actions = [
-                "<think>Let me try going right first.</think><answer>Right</answer>",
-                "<think>I'll start by going down.</think><answer>Down</answer>"
-            ]
-            results = client.step_batch(env_ids, actions)
+            print("Stepping environments...")
+            ids2actions = {
+                env_ids[0]: "<think>Let me try going right first.</think><answer>Right</answer>",
+                env_ids[1]: "<think>I'll start by going down.</think><answer>Down</answer>"
+            }
+            results = client.step_batch(ids2actions)
             
             # Close environments
-            logger.info("Closing environments...")
+            print("Closing environments...")
             client.close_batch(env_ids)
             
-            logger.info("Done!")
+            print("Done!")
             
         except Exception as e:
-            logger.error(f"Error: {str(e)}")
+            print(f"Error: {str(e)}")
     else:
-        logger.error("Server not available")
+        print("Server not available")

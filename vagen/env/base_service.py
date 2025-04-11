@@ -6,119 +6,122 @@ from concurrent.futures import ThreadPoolExecutor
 class BaseService(ABC):
     """
     Abstract base class for environment services.
-    Focuses on batch operations for efficient parallel processing.
-    Single environment operations are implemented as convenience methods
-    that call the corresponding batch methods.
+    Implements batch operations for efficient parallel processing.
+    Single environment operations are provided as convenience methods
+    that invoke the corresponding batch methods.
     """
     
-    def __init__(self, max_workers: int = 10):
-        """
-        Initialize the BaseService.
-        
-        Args:
-            max_workers: Maximum number of worker threads for parallel processing
-        """
-        self.environments = {}  # Dictionary to store environment instances
-        self.env_configs = {}   # Dictionary to store environment configs
-        self.max_workers = max_workers
-    
     @abstractmethod
-    def create_environments_batch(self, configs: List[Dict[str, Any]]) -> List[str]:
+    def create_environments_batch(self, ids2configs: Dict[Any, Any]) -> None:
         """
-        Create multiple environments based on the provided configurations in parallel.
-        
+        Create multiple environments in parallel.
+
         Args:
-            configs: List of environment configurations
-            
+            ids2configs (Dict[Any, Any]): 
+                A dictionary where each key is an environment ID and the corresponding
+                value is the configuration for that environment.
+
         Returns:
-            List of environment IDs
-            
+            None
+
         Note:
-            Implementation should use parallel processing for efficiency.
-            Should handle errors gracefully and clean up any partially created environments.
+            The implementation should create all environments concurrently.
+            It should gracefully handle errors and perform cleanup of any partially created environments.
         """
         pass
-    
+
     @abstractmethod
-    def reset_batch(self, env_ids: List[str], seeds: Optional[List[Optional[int]]] = None) -> List[Tuple[Dict, Dict]]:
+    def reset_batch(self, ids2seeds: Dict[Any, Any]) -> Dict[Any, Tuple[Any, Any]]:
         """
         Reset multiple environments in parallel.
-        
+
         Args:
-            env_ids: List of environment IDs to reset
-            seeds: Optional list of seeds, one per environment (None for no seed)
-            
+            ids2seeds (Dict[Any, Any]):
+                A dictionary where each key is an environment ID and the corresponding
+                value is a seed value (or None for using default seeding behavior).
+
         Returns:
-            List of (observation, info) tuples
-            
+            Dict[Any, Tuple[Any, Any]]:
+                A dictionary mapping environment IDs to tuples of the form (observation, info),
+                where 'observation' is the initial state after reset, and 'info' contains additional details.
+
         Note:
-            Implementation should use parallel processing for efficiency.
-            If seeds is None, use default seeding behavior for all environments.
-            If seeds is provided but shorter than env_ids, remaining environments use None.
+            For environments with a None seed, the default seeding behavior should be applied.
         """
         pass
-    
+
     @abstractmethod
-    def step_batch(self, env_ids: List[str], actions: List[str]) -> List[Tuple[Dict, float, bool, Dict]]:
+    def step_batch(self, ids2actions: Dict[Any, Any]) -> Dict[Any, Tuple[Dict, float, bool, Dict]]:
         """
-        Take a step in multiple environments in parallel.
-        
+        Step through multiple environments in parallel.
+
         Args:
-            env_ids: List of environment IDs
-            actions: List of actions to take in each environment
-            
+            ids2actions (Dict[Any, Any]):
+                A dictionary where each key is an environment ID and the corresponding
+                value is the action to execute in that environment.
+
         Returns:
-            List of (observation, reward, done, info) tuples
-            
+            Dict[Any, Tuple[Dict, float, bool, Dict]]:
+                A dictionary mapping environment IDs to tuples of the form 
+                (observation, reward, done, info), where:
+                    - 'observation' is the new state of the environment after the action,
+                    - 'reward' is a float representing the reward received,
+                    - 'done' is a boolean indicating whether the environment is finished,
+                    - 'info' contains additional information or context.
+
         Note:
-            Implementation should use parallel processing for efficiency.
-            Length of env_ids and actions must match.
+            The implementation should process all steps in parallel while ensuring that 
+            each action is correctly applied to its corresponding environment.
         """
         pass
-    
+
     @abstractmethod
-    def compute_reward_batch(self, env_ids: List[str]) -> List[float]:
+    def compute_reward_batch(self, env_ids: List[str]) -> Dict[Any, float]:
         """
         Compute the total reward for multiple environments in parallel.
-        
+
         Args:
-            env_ids: List of environment IDs
-            
+            env_ids (List[str]): A list of environment IDs.
+
         Returns:
-            List of reward values
-            
+            Dict[Any, float]:
+                A dictionary mapping each environment ID to its computed total reward.
+
         Note:
-            Implementation should use parallel processing for efficiency.
+            The implementation should compute rewards concurrently.
         """
         pass
-    
+
     @abstractmethod
-    def get_system_prompts_batch(self, env_ids: List[str]) -> List[str]:
+    def get_system_prompts_batch(self, env_ids: List[str]) -> Dict[Any, str]:
         """
-        Get system prompts for multiple environments in parallel.
-        
+        Retrieve system prompts for multiple environments in parallel.
+
         Args:
-            env_ids: List of environment IDs
-            
+            env_ids (List[str]): A list of environment IDs.
+
         Returns:
-            List of system prompt strings
-            
+            Dict[Any, str]:
+                A dictionary mapping each environment ID to its corresponding system prompt string.
+
         Note:
-            Implementation should use parallel processing for efficiency.
+            The implementation should retrieve all system prompts concurrently.
         """
         pass
-    
+
     @abstractmethod
     def close_batch(self, env_ids: Optional[List[str]] = None) -> None:
         """
         Close multiple environments and clean up resources in parallel.
-        
+
         Args:
-            env_ids: Optional list of environment IDs to close. If None, close all environments.
-            
+            env_ids (Optional[List[str]]):
+                A list of environment IDs to close. If None, all environments should be closed.
+
+        Returns:
+            None
+
         Note:
-            Implementation should use parallel processing for efficiency.
-            Should handle errors gracefully during cleanup.
+            The implementation should perform cleanup concurrently and handle any errors gracefully.
         """
         pass
-    

@@ -1,44 +1,19 @@
 from flask import Flask, request, jsonify
-import logging
 import threading
 import time
 import importlib
 from typing import Dict, List, Tuple, Optional, Any, Type
 from vagen.env import REGISTERED_ENV
-
-
-import json
-import numpy as np
-from PIL import Image
-import base64
-from io import BytesIO
-from flask import Flask, jsonify
-
-class EnvJSONEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        elif isinstance(obj, (np.int_, np.intc, np.intp, np.int8, np.int16, np.int32, np.int64)):
-            return int(obj)
-        elif isinstance(obj, (np.float_, np.float16, np.float32, np.float64)):
-            return float(obj)
-        elif isinstance(obj, Image.Image):
-            buffer = BytesIO()
-            obj.save(buffer, format="PNG")
-            return {
-                "image_data": base64.b64encode(buffer.getvalue()).decode('utf-8'),
-                "_image_type": "PIL"
-            }
-        return super().default(obj)
+from vagen.env.base_service import BaseService
 
 class BatchEnvServer:
     """
     A unified server for handling batch environment operations through HTTP requests.
-    This server can work with any environment type registered in REGISTERED_ENV.
+    Uses environment services to handle operations and properly handle serialization.
+    Exposes only the standard BaseService interface.
     """
     
-    def __init__(self, host: str = "127.0.0.1", port: int = 5000, debug: bool = False, 
-                 logger: Optional[logging.Logger] = None):
+    def __init__(self, host: str = "127.0.0.1", port: int = 5000, debug: bool = False):
         """
         Initialize the BatchEnvServer.
         
@@ -46,19 +21,19 @@ class BatchEnvServer:
             host: Host address for the server
             port: Port to listen on
             debug: Whether to run Flask in debug mode
-            logger: Optional logger for server logs
         """
         self.host = host
         self.port = port
         self.debug = debug
-        self.logger = logger or logging.getLogger(self.__class__.__name__)
         
-        # Dictionary to store environment instances by ID
-        self.environments = {}
+        # Dictionary to store services by environment type
+        self.services = {}
+        
+        # Dictionary to track which service manages which environment ID
+        self.env_to_service = {}
         
         # Create Flask app
         self.app = Flask(__name__)
-        self.app.json_encoder = EnvJSONEncoder
         self._setup_routes()
         
         # Server state
@@ -75,46 +50,115 @@ class BatchEnvServer:
                 "status": "ok",
                 "message": "Environment server is running",
                 "registered_envs": list(REGISTERED_ENV.keys()),
-                "active_environments": len(self.environments)
+                "active_services": list(self.services.keys()),
+                "active_environments": len(self.env_to_service)
             }), 200
             
         @self.app.route('/environments', methods=['POST'])
-        def create_environments():
-            """Create environments endpoint"""
+        def create_environments_batch():
+            """Create environments endpoint - implements BaseService interface"""
             data = request.json
-            if not data or 'configs' not in data:
-                return jsonify({"error": "Missing required parameter: configs"}), 400
-                
-            configs = data['configs']
+            if not data or 'ids2configs' not in data:
+                return jsonify({"error": "Missing required parameter: ids2configs"}), 400
+                    
+            ids2configs = data['ids2configs']
             try:
-                env_ids = self._create_environments(configs)
-                return jsonify({"env_ids": env_ids}), 200
+                self._create_environments_batch(ids2configs)
+                return jsonify({"success": True}), 200
             except Exception as e:
-                self.logger.error(f"Error creating environments: {str(e)}")
+                return jsonify({"error": str(e)}), 500
+        
+        # Batch endpoints aligned with service interface
+        @self.app.route('/batch/reset', methods=['POST'])
+        def reset_batch():
+            """Reset multiple environments endpoint"""
+            data = request.json
+            if not data or 'ids2seeds' not in data:
+                return jsonify({"error": "Missing required parameter: ids2seeds"}), 400
+                
+            ids2seeds = data['ids2seeds']
+            try:
+                results = self._reset_batch(ids2seeds)
+                return jsonify({"results": results}), 200
+            except Exception as e:
                 return jsonify({"error": str(e)}), 500
                 
+        @self.app.route('/batch/step', methods=['POST'])
+        def step_batch():
+            """Step multiple environments endpoint"""
+            data = request.json
+            if not data or 'ids2actions' not in data:
+                return jsonify({"error": "Missing required parameter: ids2actions"}), 400
+                
+            ids2actions = data['ids2actions']
+            try:
+                results = self._step_batch(ids2actions)
+                return jsonify({"results": results}), 200
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+                
+        @self.app.route('/batch/reward', methods=['POST'])
+        def compute_reward_batch():
+            """Compute reward for multiple environments endpoint"""
+            data = request.json
+            if not data or 'env_ids' not in data:
+                return jsonify({"error": "Missing required parameter: env_ids"}), 400
+                
+            env_ids = data['env_ids']
+            try:
+                rewards = self._compute_reward_batch(env_ids)
+                return jsonify({"rewards": rewards}), 200
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+                
+        @self.app.route('/batch/system_prompt', methods=['POST'])
+        def get_system_prompts_batch():
+            """Get system prompts for multiple environments endpoint"""
+            data = request.json
+            if not data or 'env_ids' not in data:
+                return jsonify({"error": "Missing required parameter: env_ids"}), 400
+                
+            env_ids = data['env_ids']
+            try:
+                prompts = self._get_system_prompts_batch(env_ids)
+                return jsonify({"system_prompts": prompts}), 200
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+                
+        @self.app.route('/batch/close', methods=['POST'])
+        def close_batch():
+            """Close multiple environments endpoint"""
+            data = request.json
+            if not data or 'env_ids' not in data:
+                return jsonify({"error": "Missing required parameter: env_ids"}), 400
+                
+            env_ids = data['env_ids']
+            try:
+                self._close_batch(env_ids)
+                return jsonify({"status": "success"}), 200
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+        
+        # Individual environment endpoints (for backward compatibility)
         @self.app.route('/reset/<env_id>', methods=['POST'])
         def reset_environment(env_id):
-            """Reset environment endpoint"""
-            if env_id not in self.environments:
-                return jsonify({"error": f"Environment {env_id} not found"}), 404
-                
+            """Reset single environment endpoint"""
             data = request.json or {}
             seed = data.get('seed')
             
             try:
-                obs, info = self._reset_environment(env_id, seed)
+                results = self._reset_batch({env_id: seed})
+                if env_id not in results:
+                    return jsonify({"error": f"Environment {env_id} not found"}), 404
+                    
+                obs, info = results[env_id]
                 return jsonify({"observation": obs, "info": info}), 200
             except Exception as e:
-                self.logger.error(f"Error resetting environment {env_id}: {str(e)}")
                 return jsonify({"error": str(e)}), 500
                 
         @self.app.route('/step/<env_id>', methods=['POST'])
         def step_environment(env_id):
-            """Step environment endpoint"""
-            if env_id not in self.environments:
-                return jsonify({"error": f"Environment {env_id} not found"}), 404
-                
+            """Step single environment endpoint"""
             data = request.json
             if not data or 'action' not in data:
                 return jsonify({"error": "Missing required parameter: action"}), 400
@@ -122,7 +166,11 @@ class BatchEnvServer:
             action = data['action']
             
             try:
-                obs, reward, done, info = self._step_environment(env_id, action)
+                results = self._step_batch({env_id: action})
+                if env_id not in results:
+                    return jsonify({"error": f"Environment {env_id} not found"}), 404
+                    
+                obs, reward, done, info = results[env_id]
                 return jsonify({
                     "observation": obs,
                     "reward": reward,
@@ -130,95 +178,272 @@ class BatchEnvServer:
                     "info": info
                 }), 200
             except Exception as e:
-                self.logger.error(f"Error stepping environment {env_id}: {str(e)}")
                 return jsonify({"error": str(e)}), 500
                 
         @self.app.route('/reward/<env_id>', methods=['GET'])
         def compute_reward(env_id):
-            """Compute reward endpoint"""
-            if env_id not in self.environments:
-                return jsonify({"error": f"Environment {env_id} not found"}), 404
-                
+            """Compute reward for single environment endpoint"""
             try:
-                reward = self._compute_reward(env_id)
-                return jsonify({"reward": reward}), 200
+                rewards = self._compute_reward_batch([env_id])
+                if env_id not in rewards:
+                    return jsonify({"error": f"Environment {env_id} not found"}), 404
+                    
+                return jsonify({"reward": rewards[env_id]}), 200
             except Exception as e:
-                self.logger.error(f"Error computing reward for environment {env_id}: {str(e)}")
                 return jsonify({"error": str(e)}), 500
                 
         @self.app.route('/system_prompt/<env_id>', methods=['GET'])
         def get_system_prompt(env_id):
-            """Get system prompt endpoint"""
-            if env_id not in self.environments:
-                return jsonify({"error": f"Environment {env_id} not found"}), 404
-                
+            """Get system prompt for single environment endpoint"""
             try:
-                system_prompt = self._get_system_prompt(env_id)
-                return jsonify({"system_prompt": system_prompt}), 200
+                prompts = self._get_system_prompts_batch([env_id])
+                if env_id not in prompts:
+                    return jsonify({"error": f"Environment {env_id} not found"}), 404
+                    
+                return jsonify({"system_prompt": prompts[env_id]}), 200
             except Exception as e:
-                self.logger.error(f"Error getting system prompt for environment {env_id}: {str(e)}")
                 return jsonify({"error": str(e)}), 500
                 
         @self.app.route('/close/<env_id>', methods=['DELETE'])
         def close_environment(env_id):
-            """Close environment endpoint"""
-            if env_id not in self.environments:
-                return jsonify({"error": f"Environment {env_id} not found"}), 404
-                
+            """Close single environment endpoint"""
             try:
-                self._close_environment(env_id)
+                self._close_batch([env_id])
                 return jsonify({"status": "success"}), 200
             except Exception as e:
-                self.logger.error(f"Error closing environment {env_id}: {str(e)}")
                 return jsonify({"error": str(e)}), 500
+    
+    def _get_service_for_env_name(self, env_name: str) -> BaseService:
+        """
+        Get or create a service for the specified environment type.
         
-        # Add custom endpoints for environment-specific operations
-        # For example, for FrozenLake:
-        @self.app.route('/map/<env_id>', methods=['GET'])
-        def get_map(env_id):
-            """Get FrozenLake map endpoint"""
-            if env_id not in self.environments:
-                return jsonify({"error": f"Environment {env_id} not found"}), 404
+        Args:
+            env_name: Name of the environment type
+            
+        Returns:
+            Service instance for the environment type
+        """
+        if env_name not in self.services:
+            # Check if environment is registered
+            if env_name not in REGISTERED_ENV:
+                raise ValueError(f"Unknown environment type: {env_name}")
                 
-            env_data = self.environments[env_id]
-            if env_data["env_name"] != "frozenlake":
-                return jsonify({"error": "Environment is not a FrozenLake environment"}), 400
+            # Get the service class directly from REGISTERED_ENV
+            if "service_cls" not in REGISTERED_ENV[env_name]:
+                raise ValueError(f"No service class registered for environment type: {env_name}")
                 
+            service_class = REGISTERED_ENV[env_name]["service_cls"]
+            
             try:
-                env = env_data["env"]
-                if hasattr(env, "gym_env") and hasattr(env.gym_env, "desc"):
-                    # Convert bytes to strings for JSON serialization
-                    map_data = [[cell.decode('utf-8') for cell in row] for row in env.gym_env.desc]
-                    return jsonify({"map": map_data}), 200
-                else:
-                    return jsonify({"error": "Map not available"}), 404
+                # Create service instance
+                self.services[env_name] = service_class()
             except Exception as e:
-                self.logger.error(f"Error getting map for environment {env_id}: {str(e)}")
-                return jsonify({"error": str(e)}), 500
+                raise ValueError(f"Could not create service for environment type {env_name}: {str(e)}")
                 
-        @self.app.route('/player_position/<env_id>', methods=['GET'])
-        def get_player_position(env_id):
-            """Get FrozenLake player position endpoint"""
-            if env_id not in self.environments:
-                return jsonify({"error": f"Environment {env_id} not found"}), 404
+        return self.services[env_name]
+    
+    def _get_service_for_env(self, env_id: str) -> Tuple[BaseService, str]:
+        """
+        Get the service that manages the specified environment.
+        
+        Args:
+            env_id: Environment ID
+            
+        Returns:
+            Tuple of (service, environment_type)
+        """
+        if env_id not in self.env_to_service:
+            raise ValueError(f"Environment {env_id} not found")
+            
+        env_name = self.env_to_service[env_id]
+        service = self.services[env_name]
+        return service, env_name
+    
+    def _create_environments_batch(self, ids2configs: Dict[Any, Any]) -> None:
+        """
+        Create multiple environments in batch.
+        Implements BaseService.create_environments_batch.
+        
+        Args:
+            ids2configs: Dictionary mapping environment IDs to their configurations
+        """
+        # Process each config to determine which service should handle it
+        for env_id, config in ids2configs.items():
+            env_name = config.get("env_name")
+            if not env_name:
+                raise ValueError(f"Config for environment {env_id} is missing 'env_name'")
                 
-            env_data = self.environments[env_id]
-            if env_data["env_name"] != "frozenlake":
-                return jsonify({"error": "Environment is not a FrozenLake environment"}), 400
+            # Get or create the appropriate service
+            if env_name not in self.services:
+                self.services[env_name] = self._get_service_for_env_name(env_name)
                 
+            # Track which service manages this environment
+            self.env_to_service[env_id] = env_name
+        
+        # Group configs by service type
+        service_to_configs = {}
+        for env_id, config in ids2configs.items():
+            env_name = self.env_to_service[env_id]
+            if env_name not in service_to_configs:
+                service_to_configs[env_name] = {}
+            service_to_configs[env_name][env_id] = config
+        
+        
+        # Call create_environments_batch method on each service
+        for env_name, configs in service_to_configs.items():
+            service = self.services[env_name]
+            service.create_environments_batch(configs)
+    
+    
+    
+    def _reset_batch(self, ids2seeds: Dict[str, Any]) -> Dict[str, Tuple[Any, Any]]:
+        """
+        Reset multiple environments.
+        
+        Args:
+            ids2seeds: Dictionary mapping environment IDs to seeds
+            
+        Returns:
+            Dictionary mapping environment IDs to (observation, info) tuples
+        """
+        # Group environment IDs by service
+        service_groups = {}
+        for env_id, seed in ids2seeds.items():
             try:
-                env = env_data["env"]
-                if hasattr(env, "_get_player_position"):
-                    position = env._get_player_position()
-                    # 将位置转换为原生Python类型
-                    position = tuple(int(x) for x in position)
-                    return jsonify({"position": position}), 200
-                else:
-                    return jsonify({"error": "Player position not available"}), 404
-            except Exception as e:
-                self.logger.error(f"Error getting player position for environment {env_id}: {str(e)}")
-                return jsonify({"error": str(e)}), 500
+                service, env_name = self._get_service_for_env(env_id)
+                if env_name not in service_groups:
+                    service_groups[env_name] = (service, {})
+                service_groups[env_name][1][env_id] = seed
+            except ValueError as e:
+                print(f"Environment ID '{env_id}' not found: {e}")
+                pass
+        
+        # Reset environments through respective services
+        results = {}
+        for env_name, (service, group_ids2seeds) in service_groups.items():
+            service_results = service.reset_batch(group_ids2seeds)
+            results.update(service_results)
+        
+        return results
+    
+    def _step_batch(self, ids2actions: Dict[str, Any]) -> Dict[str, Tuple[Dict, float, bool, Dict]]:
+        """
+        Step multiple environments.
+        
+        Args:
+            ids2actions: Dictionary mapping environment IDs to actions
+            
+        Returns:
+            Dictionary mapping environment IDs to (observation, reward, done, info) tuples
+        """
+        # Group environment IDs by service
+        service_groups = {}
+        for env_id, action in ids2actions.items():
+            try:
+                service, env_name = self._get_service_for_env(env_id)
+                if env_name not in service_groups:
+                    service_groups[env_name] = (service, {})
+                service_groups[env_name][1][env_id] = action
+            except ValueError as e:
+                print(f"Environment ID '{env_id}' not found: {e}")
+                pass
+        
+        # Step environments through respective services
+        results = {}
+        for env_name, (service, group_ids2actions) in service_groups.items():
+            service_results = service.step_batch(group_ids2actions)
+            results.update(service_results)
+        
+        return results
+    
+    def _compute_reward_batch(self, env_ids: List[str]) -> Dict[str, float]:
+        """
+        Compute rewards for multiple environments.
+        
+        Args:
+            env_ids: List of environment IDs
+            
+        Returns:
+            Dictionary mapping environment IDs to reward values
+        """
+        # Group environment IDs by service
+        service_groups = {}
+        for env_id in env_ids:
+            try:
+                service, env_name = self._get_service_for_env(env_id)
+                if env_name not in service_groups:
+                    service_groups[env_name] = (service, [])
+                service_groups[env_name][1].append(env_id)
+            except ValueError as e:
+                print(f"Environment ID '{env_id}' not found: {e}")
+                pass
+        
+        # Compute rewards through respective services
+        results = {}
+        for env_name, (service, group_env_ids) in service_groups.items():
+            service_results = service.compute_reward_batch(group_env_ids)
+            results.update(service_results)
+        
+        return results
+    
+    def _get_system_prompts_batch(self, env_ids: List[str]) -> Dict[str, str]:
+        """
+        Get system prompts for multiple environments.
+        
+        Args:
+            env_ids: List of environment IDs
+            
+        Returns:
+            Dictionary mapping environment IDs to system prompt strings
+        """
+        # Group environment IDs by service
+        service_groups = {}
+        for env_id in env_ids:
+            try:
+                service, env_name = self._get_service_for_env(env_id)
+                if env_name not in service_groups:
+                    service_groups[env_name] = (service, [])
+                service_groups[env_name][1].append(env_id)
+            except ValueError:
+                print(f"Trying to get service for env_id: {env_id}")
+                print(f"Available env_ids: {list(self.env_to_service.keys())}")
+                # Environment not found, skip it
+                pass
+        
+        # Get system prompts through respective services
+        results = {}
+        for env_name, (service, group_env_ids) in service_groups.items():
+            service_results = service.get_system_prompts_batch(group_env_ids)
+            results.update(service_results)
+        
+        return results
+    
+    def _close_batch(self, env_ids: List[str]) -> None:
+        """
+        Close multiple environments.
+        
+        Args:
+            env_ids: List of environment IDs
+        """
+        # Group environment IDs by service
+        service_groups = {}
+        for env_id in env_ids:
+            try:
+                service, env_name = self._get_service_for_env(env_id)
+                if env_name not in service_groups:
+                    service_groups[env_name] = (service, [])
+                service_groups[env_name][1].append(env_id)
                 
+                # Remove from tracking
+                del self.env_to_service[env_id]
+            except ValueError as e:
+                print(f"Environment ID '{env_id}' not found: {e}")
+                pass
+        
+        # Close environments through respective services
+        for env_name, (service, group_env_ids) in service_groups.items():
+            service.close_batch(group_env_ids)
+    
     def _generate_env_id(self) -> str:
         """
         Generate a unique environment ID.
@@ -229,136 +454,6 @@ class BatchEnvServer:
         import uuid
         return str(uuid.uuid4())
     
-    def _create_environments(self, configs: List[Dict[str, Any]]) -> List[str]:
-        """
-        Create environments from configurations.
-        
-        Args:
-            configs: List of environment configurations
-            
-        Returns:
-            List of environment IDs
-        """
-        env_ids = []
-        
-        for config_dict in configs:
-            try:
-                # Get environment type
-                env_name = config_dict.get('env_name')
-                if not env_name or env_name not in REGISTERED_ENV:
-                    raise ValueError(f"Invalid or missing environment name: {env_name}")
-                
-                # Get configuration
-                env_config_dict = config_dict.get('env_config', {})
-                
-                # Create environment
-                env_cls = REGISTERED_ENV[env_name]['env_cls']
-                config_cls = REGISTERED_ENV[env_name]['config_cls']
-                env_config = config_cls(**env_config_dict)
-                env = env_cls(env_config)
-                
-                # Generate ID and store environment
-                env_id = self._generate_env_id()
-                self.environments[env_id] = {
-                    "env": env,
-                    "env_name": env_name,
-                    "config": env_config,
-                    "seed": env_config_dict.get('seed')
-                }
-                
-                env_ids.append(env_id)
-                
-            except Exception as e:
-                self.logger.error(f"Error creating environment: {str(e)}")
-                # Clean up any environments created so far
-                for env_id in env_ids:
-                    self._close_environment(env_id)
-                raise
-                
-        return env_ids
-    
-    def _reset_environment(self, env_id: str, seed: Optional[int] = None) -> Tuple[Dict, Dict]:
-        """
-        Reset an environment.
-        
-        Args:
-            env_id: Environment ID
-            seed: Optional seed for resetting
-            
-        Returns:
-            Tuple of (observation, info)
-        """
-        env_data = self.environments[env_id]
-        env = env_data['env']
-        
-        # Use the provided seed or the original seed from config
-        actual_seed = seed if seed is not None else env_data.get('seed')
-        
-        return env.reset(seed=actual_seed)
-    
-    def _step_environment(self, env_id: str, action: str) -> Tuple[Dict, float, bool, Dict]:
-        """
-        Take a step in an environment.
-        
-        Args:
-            env_id: Environment ID
-            action: Action to take
-            
-        Returns:
-            Tuple of (observation, reward, done, info)
-        """
-        env_data = self.environments[env_id]
-        env = env_data['env']
-        
-        return env.step(action)
-    
-    def _compute_reward(self, env_id: str) -> float:
-        """
-        Compute reward for an environment.
-        
-        Args:
-            env_id: Environment ID
-            
-        Returns:
-            Reward value
-        """
-        env_data = self.environments[env_id]
-        env = env_data['env']
-        
-        return env.compute_reward()
-    
-    def _get_system_prompt(self, env_id: str) -> str:
-        """
-        Get system prompt for an environment.
-        
-        Args:
-            env_id: Environment ID
-            
-        Returns:
-            System prompt string
-        """
-        env_data = self.environments[env_id]
-        env = env_data['env']
-        
-        return env.system_prompt()
-    
-    def _close_environment(self, env_id: str) -> None:
-        """
-        Close an environment.
-        
-        Args:
-            env_id: Environment ID
-        """
-        if env_id in self.environments:
-            env_data = self.environments[env_id]
-            env = env_data['env']
-            
-            # Close the environment
-            env.close()
-            
-            # Remove from environments dictionary
-            del self.environments[env_id]
-    
     def start(self, background: bool = True) -> None:
         """
         Start the server.
@@ -367,7 +462,7 @@ class BatchEnvServer:
             background: Whether to run the server in a background thread
         """
         if self.is_running:
-            self.logger.warning("Server is already running")
+            print("Server is already running")
             return
             
         if background:
@@ -385,12 +480,13 @@ class BatchEnvServer:
                     import requests
                     response = requests.get(f"http://{self.host}:{self.port}/health", timeout=1)
                     if response.status_code == 200:
-                        self.logger.info(f"Server started on http://{self.host}:{self.port}")
+                        print(f"Server started on http://{self.host}:{self.port}")
                         break
-                except Exception:
+                except Exception as e:
+                    print(f"Error while checking server health: {e}")
                     pass
             else:
-                self.logger.warning("Server may not have started properly")
+                print("Server may not have started properly")
         else:
             self.is_running = True
             self._run_server()
@@ -405,14 +501,8 @@ class BatchEnvServer:
             return
             
         # Close all environments
-        env_ids = list(self.environments.keys())
-        for env_id in env_ids:
-            try:
-                self._close_environment(env_id)
-            except Exception as e:
-                self.logger.error(f"Error closing environment {env_id}: {str(e)}")
-                
-        self.environments.clear()
+        env_ids = list(self.env_to_service.keys())
+        self._close_batch(env_ids)
         
         # Shut down the Flask server
         self.is_running = False
@@ -422,10 +512,11 @@ class BatchEnvServer:
             import requests
             try:
                 requests.post(f"http://{self.host}:{self.port}/shutdown")
-            except Exception:
+            except Exception as e:
+                print(f"Error while shutting down server: {e}")
                 pass
                 
-        self.logger.info("Server stopped")
+        print("Server stopped")
 
 
 def main():
@@ -441,22 +532,14 @@ def main():
     
     args = parser.parse_args()
     
-    # Configure logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    logger = logging.getLogger('BatchEnvServer')
-    
     # Create and start server
     server = BatchEnvServer(
         host=args.host,
         port=args.port,
-        debug=args.debug,
-        logger=logger
+        debug=args.debug
     )
     
-    logger.info(f"Starting Batch Environment Server on http://{args.host}:{args.port}")
+    print(f"Starting Batch Environment Server on http://{args.host}:{args.port}")
     server.start(background=False)
 
 
