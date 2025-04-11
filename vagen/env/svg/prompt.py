@@ -24,7 +24,7 @@ Process:
 
 Rewards:
 - Overall visual similarity: +5.0
-- Structural accuracy: +20.0
+- Structural accuracy: +10.0
 
 Please think step by step and provide the svg code.
 Your response should be in the format of <think>...</think><answer>...</answer>

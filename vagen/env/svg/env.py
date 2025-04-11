@@ -161,16 +161,13 @@ class SVGEnv(BaseEnv):
                 if self.config.code_weight is not None:
                     score_config["code_weight"] = self.config.code_weight
                 
-                try:
-                    scores = calculate_total_score(
-                        gt_im=self.gt_image,
-                        gen_im=gen_image,
-                        gt_code=self.gt_svg_code,
-                        gen_code=self.gen_svg_code,
-                        score_config=score_config
-                    )                
-                except Exception as e:
-                    print(f"Score calculation failed: {e}")
+                scores = calculate_total_score(
+                    gt_im=self.gt_image,
+                    gen_im=gen_image,
+                    gt_code=self.gt_svg_code,
+                    gen_code=self.gen_svg_code,
+                    score_config=score_config
+                ) 
                 
                 # Set metrics and update reward
                 self.reward += scores["total_score"]

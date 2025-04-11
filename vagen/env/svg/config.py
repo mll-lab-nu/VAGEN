@@ -22,6 +22,7 @@ class SVGConfig(BaseConfig):
     # Analysis mode for logging
     analysis_mode: bool = False
     
+    
     def config_id(self) -> str:
         """Generate a unique identifier for this configuration"""
         id_fields = [

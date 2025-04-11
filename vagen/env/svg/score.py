@@ -46,13 +46,15 @@ def calculate_code_efficiency(gt_code, gen_code):
     score = 0.8 * ratio
     return max(score, 0.0)
   
-_model_cache = {}
 
 def get_model(model_size, device="cuda"):
     cache_key = f"{model_size}_{device}"
-    if cache_key not in _model_cache:
-        _model_cache[cache_key] = DINOScoreCalculator(model_size=model_size, device=device)
-    return _model_cache[cache_key]
+    
+    with _model_cache_lock:
+        if cache_key not in _model_cache:
+            logger.info(f"CREATE NEW DINO MODEL：{model_size} on {device}")
+            _model_cache[cache_key] = DINOScoreCalculator(model_size=model_size, device=device)
+        return _model_cache[cache_key]
 
 #@TODO make it into class?
 def calculate_total_score(gt_im, gen_im, gt_code, gen_code, score_config):
@@ -77,6 +79,7 @@ def calculate_total_score(gt_im, gen_im, gt_code, gen_code, score_config):
     """
     model_size = score_config.get("model_size", "large")
     dino_only = score_config.get("dino_only", False)
+    dino_weight = score_config.get("dino_weight", 0)
 
     if score_config.dino_weight != 0:
         reward_model = get_model(model_size)
@@ -87,7 +90,6 @@ def calculate_total_score(gt_im, gen_im, gt_code, gen_code, score_config):
             'dino_score': dino_score,
             'total_score': dino_score
         }
-    
     
     
     default_weights = {

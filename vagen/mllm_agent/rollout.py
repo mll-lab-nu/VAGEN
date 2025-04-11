@@ -1,4 +1,3 @@
-
 from typing import List, Union, Optional, Dict
 import copy
 from collections import defaultdict
@@ -15,23 +14,44 @@ import verl.utils.torch_functional as verl_F
 from verl.utils.dataset.rl_dataset import process_image, collate_fn
 import vagen.env
 from vagen.env import REGISTERED_ENV
+from vagen.env.service import BatchEnvService
 
-    
 class QwenVLRolloutManger():
     def __init__(self,
                  actor_rollout_wg,
                  config,
                  tokenizer: PreTrainedTokenizer,
                  processor: Optional[ProcessorMixin] = None,
+                 server_url: Optional[str] = "http://localhost:5000"
                  ):
         self.tokenizer = tokenizer
         self.processor = processor
         self.config = config
         self.actor_rollout_wg = actor_rollout_wg
-        self.recorder= None # defaultdict(list) env_id:record
-        self.envs = None # dict env_id:EnvInterface
-        self.env_states = None # dict
-        self.batch_idx_to_env_id = None # dict
+        self.recorder = None  # defaultdict(list) env_id:record
+        self.envs = {}  # dict env_id:EnvInterface - only used for system_prompt and config access
+        self.env_states = None  # dict
+        self.batch_idx_to_env_id = None  # dict
+        self.env_ids = None  # list of active env IDs
+        
+        # Determine whether to use Ray or HTTP for environment service
+        use_ray = config.get("use_ray", True)
+        use_http = config.get("use_http", False)
+        num_workers = config.get("env_workers", 4)
+        
+        if use_http:
+            # Use HTTP-based environment service
+            self.env_service = BatchEnvService(
+                server_url=server_url,
+                use_ray=False,
+                num_workers=num_workers
+            )
+        else:
+            # Use Ray-based environment service
+            self.env_service = BatchEnvService(
+                num_workers=num_workers,
+                use_ray=use_ray
+            )
 
     @torch.no_grad()
     def _handle_special_tokens(self, llm_raw_response: str, prep_for_loss_mask: bool) -> str:
@@ -85,10 +105,7 @@ class QwenVLRolloutManger():
                 index += 1
 
             prompt_template = prompt_template.replace('<|placeholder|>',
-                                                        self.processor.image_token)
-            # print(f"[DEBUG] number of image_data in final trajectory: {len(image_data)}")
-            # number_of_image_tokens=prompt_template.count(self.processor.image_token)
-            # print(f"[DEBUG] number_of_image_tokens: {number_of_image_tokens}")
+                                                      self.processor.image_token)
         return prompt_template, row_dict, image_grid_thw, raw_prompt
     
     @torch.no_grad()
@@ -192,67 +209,20 @@ class QwenVLRolloutManger():
         Returns:
             Initial observations and info from all environments
         """
-        # Step 1: Sort environments into buckets by env_name and config
-        # Try to reuse environemnts with the same config and env_name
+        # Create new environments
+        self.env_ids = self.env_service.create_environments(env_configs)
         
-        env_buckets = defaultdict(set)
-        new_envs = {}
+        # Reset environments with seeds
+        seeds = [cfg["seed"] for cfg in env_configs]
+        observations_and_info = self.env_service.reset_batch(self.env_ids, seeds)
         
-        if self.envs is None:
-            self.envs = {}
-            
-        for env_id, env in self.envs.items():
-            env_config_id = env.config.config_id()
-            bucket_key = env_config_id
-            env_buckets[bucket_key].add(env_id)
-        
-        for i, cfg in enumerate(env_configs):
-            env_id = i
-            env_name = cfg["env_name"]
-            env_config = cfg["env_config"]
-            seed = cfg["seed"]
-            
-            # Create bucket key
-            config_instance= REGISTERED_ENV[env_name]["config_cls"](**env_config)
-            env_config_id = config_instance.config_id()
-            bucket_key = env_config_id
-            
-            # Check if we have an available environment with the same config
-            if bucket_key in env_buckets and env_buckets[bucket_key]:
-                old_env_id = env_buckets[bucket_key].pop()
-                new_envs[env_id] = {
-                    "env_instance":self.envs[old_env_id],
-                    "seed":seed,
-                }
-            else:
-                # don't initialize the environment here, close unused environments first
-                new_envs[env_id] = {
-                    "env_cls":REGISTERED_ENV[env_name]["env_cls"],
-                    "seed":seed,
-                    "config_instance":config_instance,
-                }
-        
-        # Close unused environments
-        for bucket_key, env_ids in env_buckets.items():
-            for env_id in env_ids:
-                self.envs[env_id].close()
-                del self.envs[env_id]
-
-        
-        # Step 2: Reset environments and collect observations/info
-        
-        if self.recorder is not None:
-            del self.recorder
+        # Initialize recorder and environment states
         self.recorder = defaultdict(list)
         initial_obs = {}
         initial_info = {}
-        for env_id, env_info in new_envs.items():
-            if "env_instance" in env_info:
-                self.envs[env_id] = env_info["env_instance"]
-            else:
-                assert "env_cls" in env_info
-                self.envs[env_id] = env_info["env_cls"](env_info["config_instance"])
-            obs, info = self.envs[env_id].reset(env_info["seed"])
+        
+        for i, (obs, info) in enumerate(observations_and_info):
+            env_id = self.env_ids[i]
             initial_obs[env_id] = obs
             initial_info[env_id] = info
             self.record(
@@ -263,7 +233,29 @@ class QwenVLRolloutManger():
                 info=info
             )
         
-        self.env_states = {env_id: {'step': 0, 'done': False,'metrics':{"turn_metrics":defaultdict(list),"traj_metrics":{}}} for env_id in self.envs}
+        # Get system prompts for each environment
+        system_prompts = self.env_service.get_system_prompts_batch(self.env_ids)
+        
+        # Store config info from env_configs for each environment
+        # This is used to access config parameters like image_placeholder
+        for i, cfg in enumerate(env_configs):
+            env_id = self.env_ids[i]
+            env_name = cfg["env_name"]
+            env_config = cfg["env_config"]
+            
+            # Create a simple config object to store relevant info
+            config_cls = REGISTERED_ENV[env_name]["config_cls"]
+            config_instance = config_cls(**env_config)
+            
+            # Store minimal environment info for accessing config and system prompt
+            self.envs[env_id] = {
+                "config": config_instance,
+                "system_prompt": system_prompts[i] if i < len(system_prompts) else "",
+                "env_name": env_name
+            }
+        
+        # Initialize environment states
+        self.env_states = {env_id: {'step': 0, 'done': False, 'metrics': {"turn_metrics": defaultdict(list), "traj_metrics": {}}} for env_id in self.env_ids}
         
         return initial_obs, initial_info
     
@@ -285,10 +277,17 @@ class QwenVLRolloutManger():
             'info': info,
             'obs_str': obs['obs_str'],
         }
-        image_placeholder = self.envs[env_id].config.get('image_placeholder', "<image>")
+        
+        # Process image data if present
         if 'multi_modal_data' in obs:
+            # Get image placeholder from env config
+            image_placeholder = "<image>"
+            if env_id in self.envs and hasattr(self.envs[env_id]["config"], "get"):
+                image_placeholder = self.envs[env_id]["config"].get('image_placeholder', "<image>")
+            
             if image_placeholder in obs['multi_modal_data']:
                 record_entry['image_data'] = [process_image(image) for image in obs['multi_modal_data'][image_placeholder]]
+        
         self.recorder[env_id].append(record_entry)
 
     @torch.no_grad()
@@ -324,7 +323,14 @@ class QwenVLRolloutManger():
         chat = []
         
         env_id = history[0]['env_id']
-        chat.append({"role": "system", "content": self.envs[env_id].system_prompt()})
+        system_prompt_text = ""
+        
+        # Get system prompt from stored environment info
+        if env_id in self.envs:
+            system_prompt_text = self.envs[env_id]["system_prompt"]
+        
+        # Add system prompt to chat
+        chat.append({"role": "system", "content": system_prompt_text})
 
         image_data=[]
         for i, record in enumerate(history):
@@ -428,9 +434,6 @@ class QwenVLRolloutManger():
                 - rest postion_ids: refer to vllm_rollout_spmd.py to check how to compute
 
         """
-
-
-
         # handle prompt, prompt=pad_token since we now have everything in response and compute a loss mask for them
         prompt_with_chat_template=self.tokenizer.pad_token 
         
@@ -537,7 +540,7 @@ class QwenVLRolloutManger():
         batch = []
         self.batch_idx_to_env_id = {}
         batch_idx = 0
-        for env_id in self.envs.keys():
+        for env_id in self.env_ids:
             if self.env_states[env_id]['done']:
                 continue
 
@@ -562,10 +565,18 @@ class QwenVLRolloutManger():
             Dictionary containing the results of the step
         """
         for step in range(self.config.max_turns):
+            # Get active env_ids (environments that are not done)
+            active_env_ids = [env_id for env_id in self.env_ids if not self.env_states[env_id]['done']]
+            
+            if not active_env_ids:
+                break
+                
             input_batch_dict = self.generate_batch_for_rollout(step, self.config.window_size)
             if input_batch_dict is None:
                 break
+                
             input_batch = DataProto.from_single_dict(input_batch_dict)
+            
             if 'multi_modal_data' in input_batch.non_tensor_batch.keys():
                 gen_batch = input_batch.pop(
                     batch_keys=['input_ids', 'attention_mask', 'position_ids'],
@@ -577,13 +588,10 @@ class QwenVLRolloutManger():
                     non_tensor_batch_keys=['raw_prompt_ids'],
                 )
 
-            # transform raw_prompt_ids to list instead of numpy array
-            # The reason is that when constructing raw_prompt_ids, if the all the list share the same length
-            # Numpy array will automatically transfer list to numpy array.
             raw_prompt_ids = gen_batch.non_tensor_batch['raw_prompt_ids']
             raw_prompt_ids_array = np.ndarray(shape=(len(raw_prompt_ids),), dtype=object)
             for i in range(len(raw_prompt_ids)):
-                if isinstance(raw_prompt_ids[i],list):
+                if isinstance(raw_prompt_ids[i], list):
                     raw_prompt_ids_array[i] = raw_prompt_ids[i]
                 else:
                     raw_prompt_ids_array[i] = raw_prompt_ids[i].tolist()
@@ -591,23 +599,38 @@ class QwenVLRolloutManger():
             
             output_batch = self.actor_rollout_wg.generate_sequences(gen_batch)
             
-            
-            
             responses_str = self.tokenizer.batch_decode(
                 output_batch.batch['responses'], 
                 skip_special_tokens=True
-            ) # seems here will remove special token like "<|im_end|>"
+            )
+            # Extract active environment IDs and actions
+            active_env_ids_list = []
+            active_env_actions = []
             
-            for batch_idx, env_id in self.batch_idx_to_env_id.items(): 
-                obs, reward, done, info = self.envs[env_id].step(responses_str[batch_idx])
+            for batch_idx, env_id in self.batch_idx_to_env_id.items():
+                if batch_idx < len(responses_str):
+                    active_env_ids_list.append(env_id)
+                    active_env_actions.append(responses_str[batch_idx])
+            
+            # Step environments in batch
+            step_results = self.env_service.step_batch(active_env_ids_list, active_env_actions)
+            
+            # Process step results and update environment states
+            for i, (obs, reward, done, info) in enumerate(step_results):
+                env_id = active_env_ids_list[i]
+                
+                # Update environment state
                 self.env_states[env_id]['step'] += 1
                 self.env_states[env_id]['done'] = done
+                
+                # Update metrics
                 self.env_states[env_id]['metrics']['traj_metrics'] = info['metrics'].get('traj_metrics', {})
-                for k,v in info['metrics']['turn_metrics'].items():
+                for k, v in info['metrics']['turn_metrics'].items():
                     self.env_states[env_id]['metrics']['turn_metrics'][k].append(v)
                 
+                # Record step results
                 self.record(env_id, obs, reward, done, info)
-        
+    
     @torch.no_grad()
     def generate_batch_for_update(self) -> DataProto:
         """
@@ -617,13 +640,13 @@ class QwenVLRolloutManger():
             batch (DataProto): batch of final trajectory of all environments
         """
         batch_list = []
-        for env_id in self.envs.keys():
+        for env_id in self.env_ids:
             row_dict = self._generate_input_for_uptate(
                 recording=self.recorder[env_id],
                 step=self.env_states[env_id]['step'],
                 window_size=None,
             )
-            row_dict['reward_model'] = {"style": "given", "ground_truth": {"reward": self.envs[env_id].compute_reward()}}
+            row_dict['reward_model'] = {"style": "given", "ground_truth": {"reward": self.env_service.compute_reward_batch([env_id])[0]}}
             batch_list.append(row_dict)
         batch_dict = collate_fn(batch_list)
         batch = DataProto.from_single_dict(batch_dict)
@@ -637,34 +660,58 @@ class QwenVLRolloutManger():
         Returns:
             Dictionary containing the recording of all environments
         """
+        # Compute final rewards for all environments
+        env_rewards = self.env_service.compute_reward_batch(self.env_ids)
+        
         env_info = []
-        for env_id, record in self.recorder.items():
-            config_id = self.envs[env_id].config.config_id()
-            step= self.env_states[env_id]['step']
-            output_rst = self._single_recording_to_prompt(record, self.env_states[env_id]['step'], window_size=None, is_final=False)
-            image= output_rst['image_data']
-            done = self.env_states[env_id]['done']
-            score = self.envs[env_id].compute_reward()
+        for i, env_id in enumerate(self.env_ids):
+            # Get environment config ID if available
+            config_id = "unknown"
+            if env_id in self.envs and hasattr(self.envs[env_id]["config"], "config_id"):
+                config_id = self.envs[env_id]["config"].config_id()
             
-            metrics={
-                "score": score,
-                "done": done,
+            step = self.env_states[env_id]['step']
+            
+            # Process recording to get output string and images
+            output_rst = self._single_recording_to_prompt(
+                self.recorder[env_id], 
+                step, 
+                window_size=None, 
+                is_final=False
+            )
+            
+            # Prepare metrics
+            metrics = {
+                "score": env_rewards[i],
+                "done": self.env_states[env_id]['done'],
                 "step": step,
             }
             
-            turn_metrics={
-                k: sum(v)/step if step != 0 else 0 for k, v in self.env_states[env_id]['metrics']['turn_metrics'].items()
+            # Calculate average turn metrics
+            turn_metrics = {
+                k: sum(v)/step if step > 0 else 0 
+                for k, v in self.env_states[env_id]['metrics']['turn_metrics'].items()
             }
-            traj_metrics=self.env_states[env_id]['metrics']['traj_metrics']
+            
+            # Get trajectory metrics
+            traj_metrics = self.env_states[env_id]['metrics']['traj_metrics']
+            
+            # Combine all metrics
             metrics.update(turn_metrics)
             metrics.update(traj_metrics)
+            
+            # Add environment info to results
             env_info.append({
                 "env_id": env_id,
                 "config_id": config_id,
-                "output_str": output_rst['prompt'],
-                "image_data": image,
+                "output_str": output_rst.get('prompt', ''),
+                "image_data": output_rst.get('image_data', []),
                 "metrics": metrics,
             })
+        
         return env_info
-            
-            
+    
+    def close(self):
+        """Close all environments"""
+        if self.env_ids:
+            self.env_service.close_batch(self.env_ids)
