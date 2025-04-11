@@ -68,18 +68,9 @@ class BatchEnvClient:
             raise ConnectionError(f"Failed to communicate with environment server: {str(e)}")
     
     def _process_batch_request(self, endpoint: str, items: List, data_key: str, 
-                               method: str = "POST") -> List:
+                           method: str = "POST") -> List:
         """
         Process a batch of requests in parallel using a thread pool.
-        
-        Args:
-            endpoint: API endpoint to call
-            items: List of items to process (environment IDs or other data)
-            data_key: Key for the data in the request
-            method: HTTP method for the request
-            
-        Returns:
-            List of results, one for each input item
         """
         results = [None] * len(items)
         
@@ -88,17 +79,15 @@ class BatchEnvClient:
             
             for i, item in enumerate(items):
                 if isinstance(item, tuple) and len(item) == 2:
-                    # Handle case where we have (env_id, data) pairs
                     env_id, data = item
                     future = executor.submit(
                         self._make_request, 
                         endpoint, 
                         method, 
-                        {data_key: data}, 
+                        data, 
                         env_id
                     )
                 else:
-                    # Handle case where we just have env_ids
                     future = executor.submit(
                         self._make_request,
                         endpoint,

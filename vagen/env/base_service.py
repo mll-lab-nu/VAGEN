@@ -1,233 +1,124 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Tuple, Optional, Any, Union
 import uuid
-import logging
+from concurrent.futures import ThreadPoolExecutor
 
 class BaseService(ABC):
     """
     Abstract base class for environment services.
-    Does not include network communication - just the core environment management.
+    Focuses on batch operations for efficient parallel processing.
+    Single environment operations are implemented as convenience methods
+    that call the corresponding batch methods.
     """
     
-    def __init__(self, logger: Optional[logging.Logger] = None):
+    def __init__(self, max_workers: int = 10):
         """
         Initialize the BaseService.
         
         Args:
-            logger: Optional logger for service logs
+            max_workers: Maximum number of worker threads for parallel processing
         """
-        self.logger = logger or logging.getLogger(self.__class__.__name__)
         self.environments = {}  # Dictionary to store environment instances
         self.env_configs = {}   # Dictionary to store environment configs
+        self.max_workers = max_workers
     
     @abstractmethod
-    def create_environment(self, config: Dict[str, Any]) -> str:
+    def create_environments_batch(self, configs: List[Dict[str, Any]]) -> List[str]:
         """
-        Create an environment with the given configuration.
-        
-        Args:
-            config: Environment configuration
-            
-        Returns:
-            Environment ID
-        """
-        pass
-    
-    def create_environments(self, configs: List[Dict[str, Any]]) -> List[str]:
-        """
-        Create multiple environments based on the provided configurations.
+        Create multiple environments based on the provided configurations in parallel.
         
         Args:
             configs: List of environment configurations
             
         Returns:
             List of environment IDs
-        """
-        env_ids = []
-        for config in configs:
-            try:
-                env_id = self.create_environment(config)
-                env_ids.append(env_id)
-            except Exception as e:
-                self.logger.error(f"Error creating environment: {str(e)}")
-                # Clean up environments created so far on error
-                for created_id in env_ids:
-                    self.close(created_id)
-                raise
-        return env_ids
-    
-    @abstractmethod
-    def reset(self, env_id: str, seed: Optional[int] = None) -> Tuple[Dict, Dict]:
-        """
-        Reset an environment.
-        
-        Args:
-            env_id: Environment ID
-            seed: Optional seed for resetting
             
-        Returns:
-            Tuple of (observation, info)
+        Note:
+            Implementation should use parallel processing for efficiency.
+            Should handle errors gracefully and clean up any partially created environments.
         """
         pass
     
-    def reset_batch(self, env_ids: List[str], seeds: Optional[List[int]] = None) -> List[Tuple[Dict, Dict]]:
+    @abstractmethod
+    def reset_batch(self, env_ids: List[str], seeds: Optional[List[Optional[int]]] = None) -> List[Tuple[Dict, Dict]]:
         """
-        Reset multiple environments.
+        Reset multiple environments in parallel.
         
         Args:
-            env_ids: List of environment IDs
-            seeds: Optional list of seeds, one per environment
+            env_ids: List of environment IDs to reset
+            seeds: Optional list of seeds, one per environment (None for no seed)
             
         Returns:
             List of (observation, info) tuples
-        """
-        results = []
-        for i, env_id in enumerate(env_ids):
-            seed = seeds[i] if seeds and i < len(seeds) else None
-            try:
-                result = self.reset(env_id, seed)
-                results.append(result)
-            except Exception as e:
-                self.logger.error(f"Error resetting environment {env_id}: {str(e)}")
-                results.append(({}, {"error": str(e)}))
-        return results
-    
-    @abstractmethod
-    def step(self, env_id: str, action: str) -> Tuple[Dict, float, bool, Dict]:
-        """
-        Take a step in an environment.
-        
-        Args:
-            env_id: Environment ID
-            action: Action to take
             
-        Returns:
-            Tuple of (observation, reward, done, info)
+        Note:
+            Implementation should use parallel processing for efficiency.
+            If seeds is None, use default seeding behavior for all environments.
+            If seeds is provided but shorter than env_ids, remaining environments use None.
         """
         pass
     
+    @abstractmethod
     def step_batch(self, env_ids: List[str], actions: List[str]) -> List[Tuple[Dict, float, bool, Dict]]:
         """
-        Take a step in multiple environments.
+        Take a step in multiple environments in parallel.
         
         Args:
             env_ids: List of environment IDs
-            actions: List of actions, one per environment
+            actions: List of actions to take in each environment
             
         Returns:
             List of (observation, reward, done, info) tuples
-        """
-        if len(env_ids) != len(actions):
-            raise ValueError("Number of environment IDs must match number of actions")
             
-        results = []
-        for env_id, action in zip(env_ids, actions):
-            try:
-                result = self.step(env_id, action)
-                results.append(result)
-            except Exception as e:
-                self.logger.error(f"Error stepping environment {env_id}: {str(e)}")
-                results.append(({}, 0.0, True, {"error": str(e)}))
-        return results
-    
-    @abstractmethod
-    def compute_reward(self, env_id: str) -> float:
-        """
-        Compute the total reward for an environment.
-        
-        Args:
-            env_id: Environment ID
-            
-        Returns:
-            Reward value
+        Note:
+            Implementation should use parallel processing for efficiency.
+            Length of env_ids and actions must match.
         """
         pass
     
+    @abstractmethod
     def compute_reward_batch(self, env_ids: List[str]) -> List[float]:
         """
-        Compute the total reward for multiple environments.
+        Compute the total reward for multiple environments in parallel.
         
         Args:
             env_ids: List of environment IDs
             
         Returns:
             List of reward values
-        """
-        results = []
-        for env_id in env_ids:
-            try:
-                reward = self.compute_reward(env_id)
-                results.append(reward)
-            except Exception as e:
-                self.logger.error(f"Error computing reward for environment {env_id}: {str(e)}")
-                results.append(0.0)
-        return results
-    
-    @abstractmethod
-    def get_system_prompt(self, env_id: str) -> str:
-        """
-        Get the system prompt for an environment.
-        
-        Args:
-            env_id: Environment ID
             
-        Returns:
-            System prompt string
+        Note:
+            Implementation should use parallel processing for efficiency.
         """
         pass
     
+    @abstractmethod
     def get_system_prompts_batch(self, env_ids: List[str]) -> List[str]:
         """
-        Get system prompts for multiple environments.
+        Get system prompts for multiple environments in parallel.
         
         Args:
             env_ids: List of environment IDs
             
         Returns:
             List of system prompt strings
-        """
-        results = []
-        for env_id in env_ids:
-            try:
-                prompt = self.get_system_prompt(env_id)
-                results.append(prompt)
-            except Exception as e:
-                self.logger.error(f"Error getting system prompt for environment {env_id}: {str(e)}")
-                results.append("")
-        return results
-    
-    @abstractmethod
-    def close(self, env_id: str) -> None:
-        """
-        Close an environment and clean up resources.
-        
-        Args:
-            env_id: Environment ID
+            
+        Note:
+            Implementation should use parallel processing for efficiency.
         """
         pass
     
+    @abstractmethod
     def close_batch(self, env_ids: Optional[List[str]] = None) -> None:
         """
-        Close multiple environments and clean up resources.
+        Close multiple environments and clean up resources in parallel.
         
         Args:
             env_ids: Optional list of environment IDs to close. If None, close all environments.
-        """
-        # If no env_ids provided, close all environments
-        if env_ids is None:
-            env_ids = list(self.environments.keys())
             
-        for env_id in env_ids:
-            try:
-                self.close(env_id)
-            except Exception as e:
-                self.logger.error(f"Error closing environment {env_id}: {str(e)}")
+        Note:
+            Implementation should use parallel processing for efficiency.
+            Should handle errors gracefully during cleanup.
+        """
+        pass
     
-    def _generate_env_id(self) -> str:
-        """
-        Generate a unique environment ID.
-        
-        Returns:
-            A unique environment ID string
-        """
-        return str(uuid.uuid4())
