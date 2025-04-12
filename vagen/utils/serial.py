@@ -123,3 +123,111 @@ def deserialize_observation(serialized_obs: Dict[str, Any]) -> Dict[str, Any]:
         deserialized_obs["multi_modal_data"] = deserialized_multi_modal
     
     return deserialized_obs
+
+
+
+def serialize_step_result(result_tuple: Tuple[Dict, float, bool, Dict]) -> Tuple[Dict, float, bool, Dict]:
+    """
+    Serialize the step result tuple by handling NumPy types.
+    
+    Args:
+        result_tuple: The original tuple (observation, reward, done, info).
+        
+    Returns:
+        A serialized tuple that can be safely JSON serialized.
+    """
+    observation, reward, done, info = result_tuple
+    
+    # Serialize the observation using the existing serialize_observation function.
+    serialized_observation = serialize_observation(observation)
+    
+    # Process the reward (it might be a NumPy floating-point number).
+    if hasattr(reward, 'item'):  # Check for a generic NumPy type.
+        serialized_reward = float(reward)
+    else:
+        serialized_reward = reward
+        
+    # Process done (it might be a NumPy boolean).
+    if hasattr(done, 'item'):
+        serialized_done = bool(done)
+    else:
+        serialized_done = done
+        
+    # Process the info dictionary.
+    serialized_info = serialize_dict(info)
+    
+    return (serialized_observation, serialized_reward, serialized_done, serialized_info)
+
+def serialize_dict(obj: Any) -> Any:
+    """
+    Recursively serialize objects that may contain NumPy types.
+    
+    Args:
+        obj: The object to be serialized.
+        
+    Returns:
+        The serialized object that can be safely JSON serialized.
+    """
+    if isinstance(obj, dict):
+        return {k: serialize_dict(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return type(obj)(serialize_dict(x) for x in obj)
+    elif hasattr(obj, 'dtype') and hasattr(obj, 'item'):  # Detect NumPy arrays and scalars.
+        if obj.ndim == 0:  # Scalar
+            if np.issubdtype(obj.dtype, np.floating):
+                return float(obj)
+            elif np.issubdtype(obj.dtype, np.integer):
+                return int(obj)
+            elif np.issubdtype(obj.dtype, np.bool_):
+                return bool(obj)
+            else:
+                return obj.item()  # Generic conversion.
+        else:  # Array
+            return serialize_dict(obj.tolist())
+    else:
+        return obj
+
+def deserialize_step_result(serialized_result: Tuple[Dict, float, bool, Dict]) -> Tuple[Dict, float, bool, Dict]:
+    """
+    Deserialize the step result tuple.
+    
+    Args:
+        serialized_result: The serialized tuple (observation, reward, done, info).
+        
+    Returns:
+        The deserialized tuple.
+    """
+    serialized_observation, reward, done, serialized_info = serialized_result
+    
+    # Process the observation using the existing deserialize_observation function.
+    observation = deserialize_observation(serialized_observation)
+    
+    # The info dictionary might contain objects that require special handling.
+    info = deserialize_dict(serialized_info)
+    
+    return (observation, reward, done, info)
+
+def deserialize_dict(obj: Any) -> Any:
+    """
+    Recursively deserialize any special objects in the dictionary.
+    
+    Args:
+        obj: The object to deserialize.
+        
+    Returns:
+        The deserialized object.
+    """
+    if isinstance(obj, dict):
+        # Check for special serialization markers.
+        if "__pil_image__" in obj:
+            # Process PIL images using the existing function.
+            return deserialize_pil_image(obj)
+        elif "__numpy_array__" in obj:
+            # Process NumPy arrays using the existing function.
+            return deserialize_numpy_array(obj)
+        else:
+            return {k: deserialize_dict(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return type(obj)(deserialize_dict(x) for x in obj)
+    else:
+        return obj

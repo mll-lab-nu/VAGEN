@@ -35,6 +35,7 @@ class SVGEnv(BaseEnv):
         self.gt_image = None
         self.gen_svg_code = None
         self.gen_image = None
+        self.dino_model = None
         
         # Initialize random number generator
         self.rng = random.Random()
@@ -76,7 +77,7 @@ class SVGEnv(BaseEnv):
         
         return self._render(init_obs=True), {}
 
-    def step(self, action_str: str) -> Tuple[Dict, float, bool, Dict]:
+    def step(self, action_str: str, dino_model=None) -> Tuple[Dict, float, bool, Dict]:
         """Execute a step in the environment"""
         # Parse LLM response
         rst = parse_llm_raw_response(
@@ -119,21 +120,11 @@ class SVGEnv(BaseEnv):
             # Invalid format - apply penalty
             self.reward += self.config.format_penalty
             
-            # Log failure if analysis mode is enabled
-            if hasattr(self, 'failure_logger'):
-                failure_info = {
-                    'img_id': self.img_id,
-                    'gt_svg_code': self.gt_svg_code,
-                    'gen_svg_code': action_str,
-                    'failure_reason': 'invalid_svg'
-                }
-                self.failure_logger.info(json.dumps(failure_info))
-                
-                done = True
-                info["metrics"] = metrics
-                self.total_reward += self.reward
-                self.gen_svg_code = None
-                return self._render(init_obs=False), self.reward, done, info
+            done = True
+            info["metrics"] = metrics
+            self.total_reward += self.reward
+            self.gen_svg_code = None
+            return self._render(init_obs=False), self.reward, done, info
         else:
             # Valid SVG code - apply format reward and process it
             self.reward += self.config.format_reward
@@ -144,59 +135,28 @@ class SVGEnv(BaseEnv):
                 # Process the generated SVG code
                 _, gen_image = process_and_rasterize_svg(self.gen_svg_code)
                 self.gen_image = gen_image
-                
                 # Calculate score
-                score_config = {
-                    "model_size": self.config.model_size,
-                    "dino_only": self.config.dino_only,
-                }
-                
-                # Add optional weights if set
-                if self.config.dino_weight is not None:
-                    score_config["dino_weight"] = self.config.dino_weight
-                if self.config.structural_weight is not None:
-                    score_config["structural_weight"] = self.config.structural_weight
-                if self.config.color_weight is not None:
-                    score_config["color_weight"] = self.config.color_weight
-                if self.config.code_weight is not None:
-                    score_config["code_weight"] = self.config.code_weight
-                
+                score_config = self.config.get_score_config()
+                print(f"score_config:{score_config}")
                 scores = calculate_total_score(
                     gt_im=self.gt_image,
                     gen_im=gen_image,
                     gt_code=self.gt_svg_code,
                     gen_code=self.gen_svg_code,
-                    score_config=score_config
+                    score_config=score_config,
+                    dino_model=dino_model
                 ) 
                 
                 # Set metrics and update reward
                 self.reward += scores["total_score"]
                 info["scores"] = scores
-                
                 # SVG generation is considered effective if score is above threshold
                 metrics["turn_metrics"]["action_is_effective"] = scores["total_score"] > 0
-                
-                # Log success if analysis mode is enabled
-                if hasattr(self, 'success_logger'):
-                    success_info = {
-                        'img_id': self.img_id,
-                        'gt_svg_code': self.gt_svg_code,
-                        'gen_svg_code': self.gen_svg_code,
-                        'scores': scores
-                    }
-                    self.success_logger.info(json.dumps(success_info))
                     
             except Exception as e:
-                # Error processing SVG - log failure
-                if hasattr(self, 'failure_logger'):
-                    failure_info = {
-                        'img_id': self.img_id,
-                        'gt_svg_code': self.gt_svg_code,
-                        'gen_svg_code': self.gen_svg_code,
-                        'failure_reason': str(e)
-                    }
-                    self.failure_logger.info(json.dumps(failure_info))
-                
+                import traceback
+                print(f"Error processing SVG: {e}")
+                traceback.print_exc()
                 # Reset actions and update metrics
                 self.valid_actions = []
                 metrics["turn_metrics"]["action_is_valid"] = False
@@ -299,6 +259,9 @@ class SVGEnv(BaseEnv):
             success_handler = logging.FileHandler(log_dir / 'success_cases.log')
             success_handler.setFormatter(logging.Formatter('%(message)s'))
             self.success_logger.addHandler(success_handler)
+    
+    def set_dino_model(self, model):
+        self.dino_model = model
 
 if __name__ == "__main__":
     config = SVGConfig(

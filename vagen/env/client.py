@@ -1,7 +1,7 @@
 from typing import Dict, List, Tuple, Optional, Any, Union
 import requests
 import time
-from vagen.utils.serial import deserialize_observation
+from vagen.utils.serial import deserialize_observation, deserialize_step_result
 
 class BatchEnvClient:
     """
@@ -54,8 +54,9 @@ class BatchEnvClient:
             response.raise_for_status()  # Raise an exception for 4XX/5XX responses
             return response.json()
             
-        except requests.exceptions.RequestException as e:
-            raise ConnectionError(f"Failed to communicate with server: {str(e)}")
+        except Exception as e:
+            print(f"Exception in _make_request: {str(e)}")
+            raise
     
     def check_server_health(self) -> Dict[str, Any]:
         """
@@ -146,8 +147,8 @@ class BatchEnvClient:
         
         # Deserialize observations
         deserialized_results = {}
-        for env_id, (observation, reward, done, info) in results.items():
-            deserialized_results[env_id] = (deserialize_observation(observation), reward, done, info)
+        for env_id, serialized_result  in results.items():
+            deserialized_results[env_id] = deserialize_step_result(serialized_result)
             
         return deserialized_results
     

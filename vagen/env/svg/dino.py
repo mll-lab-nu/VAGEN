@@ -4,8 +4,34 @@ from tqdm import tqdm
 from transformers import AutoModel, AutoImageProcessor
 from PIL import Image
 import torch.nn as nn
+import threading
+import logging
 
 # @TODO clean codes of this section
+
+_model_cache = {}
+_model_cache_lock = threading.Lock()
+
+def get_dino_model(model_size="small", device="cuda"):
+    """
+    Get or create a DINO model instance with singleton pattern
+    
+    Args:
+        model_size: Size of DINO model ('small', 'base', or 'large')
+        device: Device to run model on ('cuda' or 'cpu')
+        
+    Returns:
+        DINOScoreCalculator instance
+    """
+    # Use the actual DINOScoreCalculator implementation from your code
+    # with added singleton pattern
+    cache_key = f"{model_size}_{device}"
+    
+    with _model_cache_lock:
+        if cache_key not in _model_cache:
+            logging.info(f"Creating new DINO model: {model_size} on {device}")
+            _model_cache[cache_key] = DINOScoreCalculator(model_size=model_size, device=device)
+        return _model_cache[cache_key]
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
