@@ -12,7 +12,7 @@ class BaseService(ABC):
     """
     
     @abstractmethod
-    def create_environments_batch(self, ids2configs: Dict[Any, Any]) -> None:
+    def create_environments_batch(self, ids2configs: Dict[str, Any]) -> None:
         """
         Create multiple environments in parallel.
 
@@ -31,7 +31,7 @@ class BaseService(ABC):
         pass
 
     @abstractmethod
-    def reset_batch(self, ids2seeds: Dict[Any, Any]) -> Dict[Any, Tuple[Any, Any]]:
+    def reset_batch(self, ids2seeds: Dict[str, Any]) -> Dict[str, Tuple[Any, Any]]:
         """
         Reset multiple environments in parallel.
 
@@ -51,7 +51,7 @@ class BaseService(ABC):
         pass
 
     @abstractmethod
-    def step_batch(self, ids2actions: Dict[Any, Any]) -> Dict[Any, Tuple[Dict, float, bool, Dict]]:
+    def step_batch(self, ids2actions: Dict[str, Any]) -> Dict[str, Tuple[Dict, float, bool, Dict]]:
         """
         Step through multiple environments in parallel.
 
@@ -76,7 +76,7 @@ class BaseService(ABC):
         pass
 
     @abstractmethod
-    def compute_reward_batch(self, env_ids: List[str]) -> Dict[Any, float]:
+    def compute_reward_batch(self, env_ids: List[str]) -> Dict[str, float]:
         """
         Compute the total reward for multiple environments in parallel.
 
@@ -93,7 +93,7 @@ class BaseService(ABC):
         pass
 
     @abstractmethod
-    def get_system_prompts_batch(self, env_ids: List[str]) -> Dict[Any, str]:
+    def get_system_prompts_batch(self, env_ids: List[str]) -> Dict[str, str]:
         """
         Retrieve system prompts for multiple environments in parallel.
 
