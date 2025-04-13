@@ -15,23 +15,27 @@ import verl.utils.torch_functional as verl_F
 from verl.utils.dataset.rl_dataset import process_image, collate_fn
 import vagen.env
 from vagen.env import REGISTERED_ENV
-
+from vagen.env.client import BatchEnvClient
     
-class QwenVLRolloutManger():
+class QwenVLRolloutMangerService():
     def __init__(self,
                  actor_rollout_wg,
                  config,
                  tokenizer: PreTrainedTokenizer,
                  processor: Optional[ProcessorMixin] = None,
+                 split="train",
                  ):
+        self.split=split
         self.tokenizer = tokenizer
         self.processor = processor
         self.config = config
         self.actor_rollout_wg = actor_rollout_wg
         self.recorder= None # defaultdict(list) env_id:record
-        self.envs = None # dict env_id:EnvInterface
+        self.envs = None # dict env_id:env_config_instance
+        self.system_prompts = None # dict env_id:str
         self.env_states = None # dict
         self.batch_idx_to_env_id = None # dict
+        self.env_client = BatchEnvClient(base_url=self.config.base_url,timeout=self.config.timeout,max_workers=self.config.max_workers)
 
     @torch.no_grad()
     def _handle_special_tokens(self, llm_raw_response: str, prep_for_loss_mask: bool) -> str:
@@ -196,63 +200,66 @@ class QwenVLRolloutManger():
         # Try to reuse environemnts with the same config and env_name
         
         env_buckets = defaultdict(set)
-        new_envs = {}
         
         if self.envs is None:
-            self.envs = {}
+            self.envs = {} # This is now id:config_instance
             
-        for env_id, env in self.envs.items():
-            env_config_id = env.config.config_id()
+        for env_id, env_config_instance in self.envs.items():
+            env_config_id = env_config_instance.config_id()
             bucket_key = env_config_id
             env_buckets[bucket_key].add(env_id)
         
+        # Step1. collect envs which need to be reset and new env configs
+        ids2seeds_reset = {}
+        configs_to_create=[]
         for i, cfg in enumerate(env_configs):
-            env_id = i
-            env_name = cfg["env_name"]
-            env_config = cfg["env_config"]
-            seed = cfg["seed"]
-            
             # Create bucket key
-            config_instance= REGISTERED_ENV[env_name]["config_cls"](**env_config)
+            config_instance= REGISTERED_ENV[cfg["env_name"]]["config_cls"](**cfg["env_config"])
             env_config_id = config_instance.config_id()
             bucket_key = env_config_id
             
             # Check if we have an available environment with the same config
             if bucket_key in env_buckets and env_buckets[bucket_key]:
                 old_env_id = env_buckets[bucket_key].pop()
-                new_envs[env_id] = {
-                    "env_instance":self.envs[old_env_id],
-                    "seed":seed,
-                }
+                ids2seeds_reset[old_env_id] = cfg["seed"]
             else:
                 # don't initialize the environment here, close unused environments first
-                new_envs[env_id] = {
-                    "env_cls":REGISTERED_ENV[env_name]["env_cls"],
-                    "seed":seed,
-                    "config_instance":config_instance,
-                }
+                configs_to_create.append(cfg)
         
+        # Step 2: Collect ids which need to be closed
+        ids_to_close=[]
         # Close unused environments
         for bucket_key, env_ids in env_buckets.items():
             for env_id in env_ids:
-                self.envs[env_id].close()
-                del self.envs[env_id]
+                ids_to_close.append(env_id)
 
+        # Step 3: Close unused environments
+        self.env_client.close_batch(ids_to_close)
+        # Step 4: Create new environments
+        ids2configs_create = {}
+        id=0
+        for cfg in configs_to_create:
+            id+=1
+            while self.split+str(id) in self.envs:
+                id+=1
+            id_str = self.split+str(id)
+            ids2configs_create[id_str] = cfg
+            ids2seeds_reset[id_str] = cfg["seed"]
+            self.envs[id_str] = REGISTERED_ENV[cfg["env_name"]]["config_cls"](**cfg["env_config"])
+        self.env_client.create_environments_batch(ids2configs_create)
+        # Step 5: Reset environments
+        reset_results=self.env_client.reset_batch(ids2seeds_reset)
         
-        # Step 2: Reset environments and collect observations/info
         
         if self.recorder is not None:
             del self.recorder
         self.recorder = defaultdict(list)
         initial_obs = {}
         initial_info = {}
-        for env_id, env_info in new_envs.items():
-            if "env_instance" in env_info:
-                self.envs[env_id] = env_info["env_instance"]
-            else:
-                assert "env_cls" in env_info
-                self.envs[env_id] = env_info["env_cls"](env_info["config_instance"])
-            obs, info = self.envs[env_id].reset(env_info["seed"])
+        
+        
+        for env_id, rst in reset_results.items():
+            obs, info = rst
             initial_obs[env_id] = obs
             initial_info[env_id] = info
             self.record(
@@ -264,7 +271,7 @@ class QwenVLRolloutManger():
             )
         
         self.env_states = {env_id: {'step': 0, 'done': False,'metrics':{"turn_metrics":defaultdict(list),"traj_metrics":{}}} for env_id in self.envs}
-        
+        self.system_prompts=self.env_client.get_system_prompts_batch(list(self.envs.keys()))
         return initial_obs, initial_info
     
     @torch.no_grad()
@@ -285,7 +292,7 @@ class QwenVLRolloutManger():
             'info': info,
             'obs_str': obs['obs_str'],
         }
-        image_placeholder = self.envs[env_id].config.get('image_placeholder', "<image>")
+        image_placeholder = self.envs[env_id].get('image_placeholder', "<image>")
         if 'multi_modal_data' in obs:
             if image_placeholder in obs['multi_modal_data']:
                 record_entry['image_data'] = [process_image(image) for image in obs['multi_modal_data'][image_placeholder]]
@@ -324,7 +331,7 @@ class QwenVLRolloutManger():
         chat = []
         
         env_id = history[0]['env_id']
-        chat.append({"role": "system", "content": self.envs[env_id].system_prompt()})
+        chat.append({"role": "system", "content": self.system_prompts[env_id]})
 
         image_data=[]
         for i, record in enumerate(history):
@@ -598,8 +605,13 @@ class QwenVLRolloutManger():
                 skip_special_tokens=True
             ) # seems here will remove special token like "<|im_end|>"
             
+            ids2actions = {}
             for batch_idx, env_id in self.batch_idx_to_env_id.items(): 
-                obs, reward, done, info = self.envs[env_id].step(responses_str[batch_idx])
+                ids2actions[env_id] = responses_str[batch_idx]
+            
+            step_results = self.env_client.step_batch(ids2actions)
+            for env_id, rst in step_results.items():
+                obs, reward, done, info = rst
                 self.env_states[env_id]['step'] += 1
                 self.env_states[env_id]['done'] = done
                 self.env_states[env_id]['metrics']['traj_metrics'] = info['metrics'].get('traj_metrics', {})
@@ -617,13 +629,14 @@ class QwenVLRolloutManger():
             batch (DataProto): batch of final trajectory of all environments
         """
         batch_list = []
+        reward_rst=self.env_client.compute_reward_batch(list(self.envs.keys()))
         for env_id in self.envs.keys():
             row_dict = self._generate_input_for_uptate(
                 recording=self.recorder[env_id],
                 step=self.env_states[env_id]['step'],
                 window_size=None,
             )
-            row_dict['reward_model'] = {"style": "given", "ground_truth": {"reward": self.envs[env_id].compute_reward()}}
+            row_dict['reward_model'] = {"style": "given", "ground_truth": {"reward": reward_rst[env_id]}}
             batch_list.append(row_dict)
         batch_dict = collate_fn(batch_list)
         batch = DataProto.from_single_dict(batch_dict)
@@ -638,13 +651,15 @@ class QwenVLRolloutManger():
             Dictionary containing the recording of all environments
         """
         env_info = []
+        reward_rst=self.env_client.compute_reward_batch(list(self.envs.keys()))
         for env_id, record in self.recorder.items():
-            config_id = self.envs[env_id].config.config_id()
+            config_id = self.envs[env_id].config_id()
             step= self.env_states[env_id]['step']
             output_rst = self._single_recording_to_prompt(record, self.env_states[env_id]['step'], window_size=None, is_final=False)
             image= output_rst['image_data']
             done = self.env_states[env_id]['done']
-            score = self.envs[env_id].compute_reward()
+            score = reward_rst[env_id]
+            
             
             metrics={
                 "score": score,

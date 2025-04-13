@@ -1,3 +1,8 @@
+## General Server
+```
+# Start a Server
+python vagen/env/server.py
+```
 ### Navigation
 ```
 # Additional dependencies:
@@ -20,4 +25,33 @@ python vagen/env/navigation/startx.py 1
 # Additional dependencies:
 pip install gymnasium
 pip install "gymnasium[toy-text]"
+```
+
+### SVG
+```
+# Additional dependencies:
+pip install bs4
+pip install svgpathtools
+pip install cairosvg
+
+# Then run experiment of SVG simply copy the code below
+bash vagen/examples/debug_svg_vision_grpo/run.sh
+```
+
+### SVGDino
+```
+# Additional dependencies:
+pip install bs4
+pip install svgpathtools
+pip install cairosvg
+pip install flask
+
+# create server for reward model
+python vagen/env/svgdino/reward_model_server.py
+
+# test whether reward model server functions well
+python vagen/examples/debug_reward_model_server/reward_server_benchmark.py --concurrency 128 --environments 1000 --interactions 3
+
+# Then run experiment of SVG simply copy the code below
+bash vagen/examples/debug_svgdino_vision_grpo/run.sh
 ```

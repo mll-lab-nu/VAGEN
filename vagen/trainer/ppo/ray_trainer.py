@@ -41,7 +41,7 @@ from torch.utils.data import RandomSampler, SequentialSampler
 from torchdata.stateful_dataloader import StatefulDataLoader
 
 from vagen.mllm_agent.rollout import QwenVLRolloutManger
-
+from vagen.mllm_agent.rollout_service import QwenVLRolloutMangerService
 WorkerType = Type[Worker]
 
 
@@ -760,12 +760,21 @@ class RayPPOTrainer(object):
         # Lists to collect samples for the table
     
         if self.test_rollout_manager==None:
-            self.test_rollout_manager = QwenVLRolloutManger(
-                actor_rollout_wg=self.actor_rollout_wg,
-                config=self.config.rollout_manager,
-                tokenizer=self.tokenizer,
-                processor=self.processor, 
-            )
+            if self.config.rollout_manager.get("use_service",False):
+                self.test_rollout_manager =QwenVLRolloutMangerService(
+                    actor_rollout_wg=self.actor_rollout_wg,
+                    config=self.config.rollout_manager,
+                    tokenizer=self.tokenizer,
+                    processor=self.processor,
+                    split="val",
+                )
+            else:
+                self.test_rollout_manager =QwenVLRolloutManger(
+                    actor_rollout_wg=self.actor_rollout_wg,
+                    config=self.config.rollout_manager,
+                    tokenizer=self.tokenizer,
+                    processor=self.processor, 
+                )
         
         validation_rst=[]
         
@@ -1021,13 +1030,21 @@ class RayPPOTrainer(object):
         # we start from step 1
         self.global_steps += 1
 
-
-        rollout_manager = QwenVLRolloutManger(
-            actor_rollout_wg=self.actor_rollout_wg,
-            config=self.config.rollout_manager,
-            tokenizer=self.tokenizer,
-            processor=self.processor,
-        )
+        if self.config.rollout_manager.get("use_service",False):
+            rollout_manager = QwenVLRolloutMangerService(
+                actor_rollout_wg=self.actor_rollout_wg,
+                config=self.config.rollout_manager,
+                tokenizer=self.tokenizer,
+                processor=self.processor,
+                split="train",
+            )
+        else:
+            rollout_manager = QwenVLRolloutManger(
+                actor_rollout_wg=self.actor_rollout_wg,
+                config=self.config.rollout_manager,
+                tokenizer=self.tokenizer,
+                processor=self.processor,
+            )
 
         for epoch in range(self.config.trainer.total_epochs):
             for batch_dict in self.train_dataloader:
