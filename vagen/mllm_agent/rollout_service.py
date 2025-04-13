@@ -245,8 +245,8 @@ class QwenVLRolloutMangerService():
             id_str = self.split+str(id)
             ids2configs_create[id_str] = cfg
             ids2seeds_reset[id_str] = cfg["seed"]
-            self.envs[id_str] = REGISTERED_ENV[cfg["env_name"]]["env_cls"](**cfg["env_config"])
-        self.env_client.create_batch(ids2configs_create)
+            self.envs[id_str] = REGISTERED_ENV[cfg["env_name"]]["config_cls"](**cfg["env_config"])
+        self.env_client.create_environments_batch(ids2configs_create)
         # Step 5: Reset environments
         reset_results=self.env_client.reset_batch(ids2seeds_reset)
         
