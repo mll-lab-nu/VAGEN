@@ -24,7 +24,7 @@ python3 -m vagen.trainer.main_ppo \
     data.max_trajectory_length=1800 \
     data.image_key=images \
     data.truncation=error \
-    actor_rollout_ref.model.path=Qwen/Qwen2.5-0.5B-Instruct \
+    actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.actor.ppo_mini_batch_size=32 \
