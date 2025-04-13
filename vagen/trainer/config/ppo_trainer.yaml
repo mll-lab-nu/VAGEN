@@ -201,3 +201,7 @@ rollout_manager:
   use_gae_mask: True
   special_token_for_loss_mask: ['<|box_start|>', '<|box_end|>']
   truncation: ${data.truncation}
+  base_url: http://localhost:5000
+  use_service: False
+  timeout: 60
+  max_workers: 8
