@@ -5,9 +5,10 @@ from vagen.env.base_service import BaseService
 from vagen.env.svg.env import SVGEnv
 from vagen.env.svg.config import SVGConfig
 from vagen.utils.serial import serialize_observation, serialize_step_result
-from vagen.env.svg.score import calculate_total_score
+from vagen.env.svg.score import calculate_total_score, calculate_total_score_batch
 from vagen.env.svg.dino import get_dino_model
-from vagen.env.svg.svg_utils import process_and_rasterize_svg
+from vagen.env.svg.svg_utils import process_and_rasterize_svg, is_valid_svg
+from vagen.env.utils.context_utils import parse_llm_raw_response, convert_numpy_to_PIL
 import logging
 
 class SVGService(BaseService):
@@ -164,59 +165,71 @@ class SVGService(BaseService):
     
     def step_batch(self, ids2actions: Dict[Any, Any]) -> Dict[Any, Tuple[Dict, float, bool, Dict]]:
         """
-        Take a step in multiple SVG environments in parallel.
-        Computes SVG scores directly using the integrated DINO model.
+        Take a step in multiple SVG environments with optimized batch processing.
         
         Args:
-            ids2actions: A dictionary where each key is an environment ID and the corresponding
-                       value is the SVG action to execute in that environment.
+            ids2actions: A dictionary mapping environment IDs to actions
             
         Returns:
-            A dictionary mapping environment IDs to tuples of the form (observation, reward, done, info)
+            A dictionary mapping environment IDs to (observation, reward, done, info) tuples
         """
         results = {}
+        # Step 1: Process SVG actions for all environments
+        env_processing_results, error_results = self._process_svg_actions_batch(ids2actions)
+        results.update(error_results)
         
-        # Define worker function
-        def step_single_env(env_id, action):
-            try:
-                if env_id not in self.environments:
-                    return env_id, None, f"Environment {env_id} not found"
+        # Step 2: Collect valid images for batch processing
+        valid_env_ids = []
+        gt_images = []
+        gen_images = []
+        gt_codes = []
+        gen_codes = []
+        score_configs = []
+        
+        for env_id, result in env_processing_results.items():
+            if result["valid"] and result["gen_image"] is not None:
+                valid_env_ids.append(env_id)
+                gt_images.append(result["env"].gt_image)
+                gen_images.append(result["gen_image"])
+                gt_codes.append(result["env"].gt_svg_code)
+                gen_codes.append(result["gen_svg_code"])
+                score_configs.append(result["env"].config.get_score_config())
+        
+        # Step 3: Batch process scores if there are valid images
+        if valid_env_ids:
+            # Get DINO model
+            dino_model = self._get_dino_model()
+            
+            # Calculate all scores at once
+            batch_results = calculate_total_score_batch(
+                gt_images, gen_images, gt_codes, gen_codes, score_configs, dino_model
+            )
+            
+            # Process results directly using the index mapping
+            for i, env_id in enumerate(valid_env_ids):
+                result = env_processing_results[env_id]
+                env = result["env"]
+                scores = batch_results[i]
                 
-                env = self.environments[env_id]
+                # Update reward
+                env.reward += scores["total_score"]
+                env.total_reward += env.reward
                 
-                dino_model = self._get_dino_model()
-
-                observation, reward, done, info = env.step(action, dino_model=dino_model)
+                # Update metrics and prepare info
+                result["metrics"]["turn_metrics"]["action_is_effective"] = scores["total_score"] > 0
+                info = result["rst"].copy()
+                info["scores"] = scores
+                info["metrics"] = result["metrics"]
                 
+                # Update cache if needed
                 if env_id in self.cache:
-                    self.cache[env_id]['gen_image'] = getattr(env, 'gen_image', None)
-                    self.cache[env_id]['gen_svg_code'] = getattr(env, 'gen_svg_code', None)
-                    self.cache[env_id]['scores'] = info.get('scores', None)
+                    self.cache[env_id]['gen_image'] = env.gen_image
+                    self.cache[env_id]['gen_svg_code'] = env.gen_svg_code
+                    self.cache[env_id]['scores'] = scores
                 
-                serialized_result = serialize_step_result((observation, reward, done, info))
-                return env_id, serialized_result, None
-            
-            except Exception as e:
-                logging.error(f"Error in step_single_env for {env_id}: {str(e)}")
-                return env_id, None, str(e)
-        
-        # Use ThreadPoolExecutor for parallel step
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            # Submit all step tasks
-            futures = {
-                executor.submit(step_single_env, env_id, action): env_id 
-                for env_id, action in ids2actions.items()
-            }
-            
-            # Process results as they complete
-            for future in as_completed(futures):
-                env_id = futures[future]
-                env_id, result, error = future.result()
-                if error:
-                    logging.error(f"Error stepping environment {env_id}: {error}")
-                    results[env_id] = ({}, 0.0, True, {"error": error})
-                else:
-                    results[env_id] = result
+                # Create final result
+                observation = env._render(init_obs=False)
+                results[env_id] = serialize_step_result((observation, env.reward, False, info))
         
         return results
     
@@ -345,3 +358,133 @@ class SVGService(BaseService):
             self.environments.pop(env_id, None)
             self.env_configs.pop(env_id, None)
             self.cache.pop(env_id, None)
+    
+    def _process_svg_actions_batch(self, ids2actions):
+        """
+        Process SVG actions for all environments in parallel using ThreadPoolExecutor.
+        
+        Args:
+            ids2actions (Dict): A dictionary mapping environment IDs to actions
+        
+        Returns:
+            Dict: A dictionary of processing results keyed by environment ID
+            Dict: A dictionary of error results directly ready for return keyed by environment ID
+        """
+        env_processing_results = {}
+        error_results = {}
+        
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            def process_action(env_id, action):
+                try:
+                    if env_id not in self.environments:
+                        return env_id, None, f"Environment {env_id} not found"
+                    
+                    env = self.environments[env_id]
+                    # Parse and extract SVG code from action
+                    rst = parse_llm_raw_response(
+                        response=action,
+                        special_token_list=env.config.get('special_token_list', None),
+                        action_sep=env.config.get("action_sep", ","),
+                        max_actions=env.config.get("max_actions_per_step", 1)
+                    )
+                    # Handle SVG code extraction
+                    svg_code = None
+                    if not rst['actions']:
+                        svg_code = env._extract_svg_code(action)
+                        if svg_code and is_valid_svg(svg_code):
+                            rst['actions'] = [svg_code]
+                    else:
+                        svg_code = env._extract_svg_code(rst['actions'][0])
+                        if svg_code and is_valid_svg(svg_code):
+                            rst['actions'] = [svg_code]
+                        else:
+                            rst['actions'] = []
+                    
+                    # Initialize metrics
+                    metrics = {
+                        "turn_metrics": {
+                            "action_is_valid": rst['actions'] != [],
+                            "action_is_effective": False,
+                        },
+                        "traj_metrics": {
+                            "success": False,
+                        }
+                    }
+                    
+                    # Handle invalid SVG
+                    if not rst['actions']:
+                        env.reward = env.config.format_penalty
+                        env.total_reward += env.reward
+                        env.gen_svg_code = None
+                        env.valid_actions = []
+                        info = rst.copy()
+                        info["metrics"] = metrics
+                        return env_id, {
+                            "env": env,
+                            "gen_image": None,
+                            "gen_svg_code": None,
+                            "rst": rst,
+                            "metrics": metrics,
+                            "info": info,
+                            "valid": False,
+                            "done": True
+                        }, None
+                    
+                    # Process valid SVG
+                    env.reward = env.config.format_reward
+                    env.gen_svg_code = rst['actions'][0]
+                    env.valid_actions = rst['actions']
+                    
+                    try:
+                        # Process SVG to image but don't calculate score yet
+                        _, gen_image = process_and_rasterize_svg(env.gen_svg_code)
+                        env.gen_image = gen_image
+                        
+                        return env_id, {
+                            "env": env,
+                            "gen_image": gen_image,
+                            "gen_svg_code": env.gen_svg_code,
+                            "rst": rst,
+                            "metrics": metrics,
+                            "valid": True,
+                            "done": False
+                        }, None
+                        
+                    except Exception as e:
+                        logging.error(f"Error processing SVG for {env_id}: {e}")
+                        env.valid_actions = []
+                        metrics["turn_metrics"]["action_is_valid"] = False
+                        info = rst.copy()
+                        info["metrics"] = metrics
+                        return env_id, {
+                            "env": env,
+                            "gen_image": None,
+                            "gen_svg_code": None,
+                            "rst": rst,
+                            "metrics": metrics,
+                            "info": info,
+                            "valid": False,
+                            "done": True
+                        }, None
+                
+                except Exception as e:
+                    logging.error(f"Error in action processing for {env_id}: {e}")
+                    return env_id, None, str(e)
+            
+            # Submit all action processing tasks
+            futures = {
+                executor.submit(process_action, env_id, action): env_id 
+                for env_id, action in ids2actions.items()
+            }
+            
+            # Process results as they complete
+            for future in as_completed(futures):
+                env_id = futures[future]
+                env_id, result, error = future.result()
+                if error:
+                    logging.error(f"Error processing action for environment {env_id}: {error}")
+                    error_results[env_id] = ({}, 0.0, True, {"error": error})
+                else:
+                    env_processing_results[env_id] = result
+        
+        return env_processing_results, error_results

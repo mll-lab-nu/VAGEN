@@ -6,6 +6,8 @@ from PIL import Image
 import torch.nn as nn
 import threading
 import logging
+from typing import Dict, List, Tuple, Optional, Any, Union
+
 
 # @TODO clean codes of this section
 
@@ -124,6 +126,19 @@ class DINOScoreCalculator(BaseMetric):
         return AutoModel.from_pretrained(model_size), AutoImageProcessor.from_pretrained(model_size)
 
     def process_input(self, image, processor):
+        if isinstance(image, list):
+            if all(isinstance(img, Image.Image) for img in image):
+                with torch.no_grad():
+                    inputs = processor(images=image, return_tensors="pt").to(self.device)
+                    outputs = self.model(**inputs)
+                    features = outputs.last_hidden_state.mean(dim=1)
+                return features
+            else:
+                features_list = []
+                for img in image:
+                    features_list.append(self.process_input(img, processor))
+                return torch.cat(features_list, dim=0)
+        
         if isinstance(image, str):
             image = Image.open(image)
         if isinstance(image, Image.Image):
@@ -148,3 +163,30 @@ class DINOScoreCalculator(BaseMetric):
         sim = (sim + 1) / 2
 
         return sim
+    
+    def calculate_batch_scores(self, gt_images: List[Any], gen_images: List[Any]) -> List[float]:
+        """
+        Calculate similarity scores for multiple image pairs in a single batch
+        
+        Args:
+            gt_images: List of ground truth images (PIL Images, file paths, or tensors)
+            gen_images: List of generated images (PIL Images, file paths, or tensors)
+            
+        Returns:
+            List of similarity scores (float values between 0-1)
+        """      
+        if not gt_images: 
+            return []
+        
+        gt_features = self.process_input(gt_images, self.processor)
+        
+        gen_features = self.process_input(gen_images, self.processor)
+        
+        cos = nn.CosineSimilarity(dim=1)
+        similarities = cos(gt_features, gen_features)
+        
+        scores = [(sim.item() + 1) / 2 for sim in similarities]
+        
+        return scores
+    
+    

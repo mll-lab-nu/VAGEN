@@ -9,6 +9,7 @@ class SVGConfig(BaseConfig):
     data_dir: str = "vagen/env/svg/data"
     seed: int = 16
     split: str = "train"
+    action_sep: str = "~~"
     # Score configuration
     model_size: str = "small"  # 'small', 'base', or 'large'
     dino_only: bool = False
