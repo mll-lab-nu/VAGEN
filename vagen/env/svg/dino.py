@@ -13,25 +13,18 @@ from typing import Dict, List, Tuple, Optional, Any, Union
 
 _model_cache = {}
 _model_cache_lock = threading.Lock()
+_model_counter = 0  
 
 def get_dino_model(model_size="small", device="cuda"):
-    """
-    Get or create a DINO model instance with singleton pattern
-    
-    Args:
-        model_size: Size of DINO model ('small', 'base', or 'large')
-        device: Device to run model on ('cuda' or 'cpu')
-        
-    Returns:
-        DINOScoreCalculator instance
-    """
-    # Use the actual DINOScoreCalculator implementation from your code
-    # with added singleton pattern
+    global _model_counter
     cache_key = f"{model_size}_{device}"
     
     with _model_cache_lock:
         if cache_key not in _model_cache:
-            logging.info(f"Creating new DINO model: {model_size} on {device}")
+            _model_counter += 1
+            import os
+            pid = os.getpid()
+            logging.info(f"Process {pid}: Created DINO model #{_model_counter}: {model_size} on {device}")
             _model_cache[cache_key] = DINOScoreCalculator(model_size=model_size, device=device)
         return _model_cache[cache_key]
 

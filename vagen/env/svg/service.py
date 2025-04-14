@@ -231,6 +231,49 @@ class SVGService(BaseService):
                 observation = env._render(init_obs=False)
                 results[env_id] = serialize_step_result((observation, env.reward, False, info))
         
+        # Step 4: Process invalid or failed generations
+        for env_id, result in env_processing_results.items():
+            if env_id not in results:
+                env = result["env"]
+                
+                info = result["rst"].copy() if "rst" in result else {}
+                
+                if "metrics" not in info:
+                    info["metrics"] = {"turn_metrics": {}, "traj_metrics": {}}
+                elif "turn_metrics" not in info["metrics"]:
+                    info["metrics"]["turn_metrics"] = {}
+                elif "traj_metrics" not in info["metrics"]:
+                    info["metrics"]["traj_metrics"] = {}
+                    
+                info["metrics"]["turn_metrics"]["action_is_valid"] = False
+                info["metrics"]["turn_metrics"]["action_is_effective"] = False
+                
+                if "scores" not in info:
+                    info["scores"] = {
+                        "dino_score": 0.0,
+                        "structural_score": 0.0,
+                        "total_score": 0.0
+                    }
+                
+                reward = 0.0
+                
+                if hasattr(env.config, "format_penalty"):
+                    reward = env.config.format_penalty
+                    
+                env.reward = reward
+                env.total_reward += reward
+                env.gen_svg_code = None
+                env.gen_image = None
+                
+                observation = env._render(init_obs=False)
+                
+                if env_id in self.cache:
+                    self.cache[env_id]['gen_image'] = None
+                    self.cache[env_id]['gen_svg_code'] = None
+                    self.cache[env_id]['scores'] = info["scores"]
+                
+                results[env_id] = serialize_step_result((observation, reward, False, info))
+        
         return results
     
     def compute_reward_batch(self, env_ids: List[str]) -> Dict[Any, float]:
@@ -329,6 +372,8 @@ class SVGService(BaseService):
         # If no env_ids provided, close all environments
         if env_ids is None:
             env_ids = list(self.environments.keys())
+        logging.info(f"Environments {env_id} needs to close")
+
         
         # Define worker function
         def close_single_env(env_id):
@@ -358,6 +403,7 @@ class SVGService(BaseService):
             self.environments.pop(env_id, None)
             self.env_configs.pop(env_id, None)
             self.cache.pop(env_id, None)
+            logging.info(f"Environment {env_id} closed successfully")
     
     def _process_svg_actions_batch(self, ids2actions):
         """
@@ -387,23 +433,32 @@ class SVGService(BaseService):
                         action_sep=env.config.get("action_sep", ","),
                         max_actions=env.config.get("max_actions_per_step", 1)
                     )
+                    
                     # Handle SVG code extraction
                     svg_code = None
+                    svg_is_valid = False
+                    
+                    # First, try to extract SVG code from the response
                     if not rst['actions']:
                         svg_code = env._extract_svg_code(action)
-                        if svg_code and is_valid_svg(svg_code):
+                        if svg_code:
+                            svg_is_valid = is_valid_svg(svg_code)
+                            # Even if SVG is invalid, still keep it for training purposes
                             rst['actions'] = [svg_code]
                     else:
                         svg_code = env._extract_svg_code(rst['actions'][0])
-                        if svg_code and is_valid_svg(svg_code):
+                        if svg_code:
+                            svg_is_valid = is_valid_svg(svg_code)
+                            # Always keep extracted SVG code regardless of validity
                             rst['actions'] = [svg_code]
                         else:
                             rst['actions'] = []
                     
-                    # Initialize metrics
+                    # Initialize metrics - track validity separately from action presence
                     metrics = {
                         "turn_metrics": {
-                            "action_is_valid": rst['actions'] != [],
+                            "action_is_valid": rst['actions'] != [],  # Action exists
+                            "svg_is_valid": svg_is_valid,  # SVG syntax is valid
                             "action_is_effective": False,
                         },
                         "traj_metrics": {
@@ -411,7 +466,7 @@ class SVGService(BaseService):
                         }
                     }
                     
-                    # Handle invalid SVG
+                    # Handle case where no SVG code could be extracted
                     if not rst['actions']:
                         env.reward = env.config.format_penalty
                         env.total_reward += env.reward
@@ -427,48 +482,54 @@ class SVGService(BaseService):
                             "metrics": metrics,
                             "info": info,
                             "valid": False,
-                            "done": True
+                            "done": False  # Changed from True to False to allow training to continue
                         }, None
                     
-                    # Process valid SVG
-                    env.reward = env.config.format_reward
+                    # Process SVG (valid or invalid)
+                    env.reward = env.config.format_reward if svg_is_valid else env.config.format_penalty
+                    env.total_reward += env.reward
                     env.gen_svg_code = rst['actions'][0]
                     env.valid_actions = rst['actions']
                     
                     try:
-                        # Process SVG to image but don't calculate score yet
-                        _, gen_image = process_and_rasterize_svg(env.gen_svg_code)
-                        env.gen_image = gen_image
+                        # Try to rasterize SVG, use a blank image as fallback
+                        try:
+                            _, gen_image = process_and_rasterize_svg(env.gen_svg_code)
+                            env.gen_image = gen_image
+                        except Exception as e:
+                            logging.error(f"Error rasterizing SVG for {env_id}: {e}")
+                            # Create a blank white image as fallback
+                            env.gen_image = Image.new('RGB', (256, 256), color='white')
                         
                         return env_id, {
                             "env": env,
-                            "gen_image": gen_image,
+                            "gen_image": env.gen_image,
                             "gen_svg_code": env.gen_svg_code,
                             "rst": rst,
                             "metrics": metrics,
-                            "valid": True,
+                            "valid": True,  # Consider it valid for processing even if SVG is invalid
                             "done": False
                         }, None
                         
                     except Exception as e:
-                        logging.error(f"Error processing SVG for {env_id}: {e}")
-                        env.valid_actions = []
-                        metrics["turn_metrics"]["action_is_valid"] = False
+                        logging.error(f"Error in SVG processing pipeline for {env_id}: {e}")
+                        # Even if processing fails, don't mark as done
                         info = rst.copy()
                         info["metrics"] = metrics
+                        info["error"] = str(e)
                         return env_id, {
                             "env": env,
                             "gen_image": None,
-                            "gen_svg_code": None,
+                            "gen_svg_code": env.gen_svg_code,
                             "rst": rst,
                             "metrics": metrics,
                             "info": info,
                             "valid": False,
-                            "done": True
+                            "done": False  # Changed from True to False to allow training to continue
                         }, None
                 
                 except Exception as e:
-                    logging.error(f"Error in action processing for {env_id}: {e}")
+                    logging.error(f"Unexpected error in action processing for {env_id}: {e}")
                     return env_id, None, str(e)
             
             # Submit all action processing tasks
@@ -483,7 +544,8 @@ class SVGService(BaseService):
                 env_id, result, error = future.result()
                 if error:
                     logging.error(f"Error processing action for environment {env_id}: {error}")
-                    error_results[env_id] = ({}, 0.0, True, {"error": error})
+                    # Return error but don't mark as done
+                    error_results[env_id] = ({}, 0.0, False, {"error": error})
                 else:
                     env_processing_results[env_id] = result
         

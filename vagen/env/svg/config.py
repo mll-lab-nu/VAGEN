@@ -5,9 +5,9 @@ from typing import Optional, List, Union, Dict
 @dataclass
 class SVGConfig(BaseConfig):
     """Configuration for the SVG environment"""
-    dataset_name: str = "starvector/svg-emoji-simple"
+    dataset_name: str = "starvector/svg-icons-simple"
     data_dir: str = "vagen/env/svg/data"
-    seed: int = 16
+    seed: int = 42
     split: str = "train"
     action_sep: str = "~~"
     # Score configuration

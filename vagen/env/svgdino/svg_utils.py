@@ -57,17 +57,18 @@ def use_placeholder():
     VOID_SVF = "Exception Placeholder"
     return VOID_SVF
  
-def process_and_rasterize_svg(svg_string, resolution=256, dpi = 128, scale=2):
+def process_and_rasterize_svg(svg_string, resolution=256, dpi=128, scale=2):
     try:
-        svgstr2paths(svg_string) # This will raise an exception if the svg is still not valid
+        svgstr2paths(svg_string) 
         out_svg = svg_string
     except:
         try:
             svg = clean_svg(svg_string)
-            svgstr2paths(svg) # This will raise an exception if the svg is still not valid
+            svgstr2paths(svg)  # Try again with cleaned SVG
             out_svg = svg
         except Exception as e:
-            out_svg = use_placeholder()
+            print(f"SVG processing failed: {e}")
+            out_svg = """<svg width="{0}" height="{0}" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="white"/></svg>""".format(resolution)
 
     raster_image = rasterize_svg(out_svg, resolution, dpi, scale)
     return out_svg, raster_image

@@ -21,7 +21,7 @@ python3 -m vagen.trainer.main_ppo \
     data.train_batch_size=16 \
     data.max_prompt_length=1024 \
     data.max_response_length=648 \
-    data.max_trajectory_length=1672 \
+    data.max_trajectory_length=3600 \
     data.image_key=images \
     data.truncation=error \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \
@@ -58,7 +58,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
     trainer.project_name='vagen_new' \
-    trainer.experiment_name='aico_svg_vision' \
+    trainer.experiment_name='aico_svg_vision_service' \
     trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \
     trainer.save_freq=70 \
