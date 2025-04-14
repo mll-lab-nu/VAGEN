@@ -137,7 +137,6 @@ class SVGEnv(BaseEnv):
                 self.gen_image = gen_image
                 # Calculate score
                 score_config = self.config.get_score_config()
-                print(f"score_config:{score_config}")
                 scores = calculate_total_score(
                     gt_im=self.gt_image,
                     gen_im=gen_image,
