@@ -10,6 +10,7 @@ python -m vagen.env.create_dataset \
     --yaml_path "$SCRIPT_DIR/env_config.yaml" \
     --train_path "data/svg-vision-debug/train.parquet" \
     --test_path "data/svg-vision-debug/test.parquet" \
+    --force_gen
 
 # max_trajectory_length = max_prompt_length + max_response_length
 
@@ -64,8 +65,8 @@ python3 -m vagen.trainer.main_ppo \
     trainer.save_freq=70 \
     trainer.test_freq=20 \
     trainer.total_training_steps=200 \
-    rollout_manager.max_turns=3 \
-    rollout_manager.window_size=5 \
+    rollout_manager.max_turns=2 \
+    rollout_manager.window_size=3 \
     rollout_manager.use_multi_turn_reward=False \
     rollout_manager.use_loss_mask=True \
     rollout_manager.use_gae_mask=True \
