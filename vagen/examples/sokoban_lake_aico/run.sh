@@ -8,16 +8,16 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 python -m vagen.env.create_dataset \
     --yaml_path "$SCRIPT_DIR/env_config.yaml" \
-    --train_path "data/frozenlake-vision-debug/train.parquet" \
-    --test_path "data/frozenlake-vision-debug/test.parquet" \
+    --train_path "data/sokoban-vision-debug/train.parquet" \
+    --test_path "data/sokoban-vision-debug/test.parquet" \
 
 # max_trajectory_length = max_prompt_length + max_response_length
 
 python3 -m vagen.trainer.main_ppo \
     algorithm.adv_estimator=masked_gae \
     algorithm.high_level_gamma=0.95 \
-    data.train_files=data/frozenlake-vision-debug/train.parquet \
-    data.val_files=data/frozenlake-vision-debug/test.parquet \
+    data.train_files=data/sokoban-vision-debug/train.parquet \
+    data.val_files=data/sokoban-vision-debug/test.parquet \
     data.train_batch_size=64 \
     data.max_prompt_length=1024 \
     data.max_response_length=128 \
@@ -58,7 +58,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
     trainer.project_name='vagen_new' \
-    trainer.experiment_name='aico_frozenlake_vision' \
+    trainer.experiment_name='aico_sokoban_vision' \
     trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \
     trainer.save_freq=70 \
@@ -72,4 +72,4 @@ python3 -m vagen.trainer.main_ppo \
     trainer.val_before_train=True \
     trainer.val_generations_to_log_to_wandb=8 \
     rollout_manager.n_trajectory=2 \
-    2>&1 | tee aico_frozenlake_vision.log
+    2>&1 | tee aico_sokoban_vision.log
