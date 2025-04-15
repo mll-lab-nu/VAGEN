@@ -88,7 +88,7 @@ cd ../
 
 # vagen
 git clone https://github.com/RAGEN-AI/VAGEN.git
-cd vagen
+cd VAGEN
 bash scripts/install.sh
 ```
 
@@ -98,7 +98,7 @@ bash scripts/install.sh
 # To reproduce our reults, first go to release branch of verl
 cd ../verl
 git checkout release
-cd ../vagen
+cd ../VAGEN
 
 wandb login # login into wandb
 
@@ -114,6 +114,57 @@ bash vagen/examples/release_experiments/mask_gae.sh # aico - loss mask
 bash vagen/examples/release_experiments/mask_loss.sh # aico - gae mask
 ```
 Each run takes ~4 hours to reach 150 steps on 4 H100s. You can decrease testing frequency to speed up training. Training might be unstable due to loss spikes; we recommend restoring from the latest checkpoint when encountering such cases. We will resolve this issue in future work (see roadmap).
+
+## Service and Environment Architecture
+We introduce a new service-based architecture that addresses the challenges of managing multiple embodied environments for VLM agent training. This design enables efficient parallel processing across distributed systems, providing better scalability, standardization, and the ability to seamlessly integrate both rule-based rewards and reward models within the same framework
+
+### Directory Structure
+```
+vagen/
+├── env/
+│   ├── base_service.py        # Abstract base class defining the service interface
+│   ├── client.py              # Client for interacting with environment server
+│   ├── server.py              # Server implementation for hosting environments
+│   └── REGISTERED_ENV         # Registry mapping environment names to services
+├── utils/
+|   ├── serial.py              # Handle observation serilization from service to client
+```
+
+### Component Hierarchy
+```
+BaseService (ABC)
+├── **Batch Methods**
+    ├── create_environments_batch()
+    ├── reset_batch()
+    ├── step_batch()
+    ├── compute_reward_batch()
+    ├── get_system_prompts_batch()
+    └── close_batch()
+
+BatchEnvClient
+├── **HTTP Communication**
+├── **Batch Methods**
+└── **Convenience Methods**
+
+BatchEnvServer
+├── **Service Management**
+├── **Request Routing**
+├── **Batch Method Implementation**
+└── **Server Management**
+```
+
+### New Service Development
+To develop a new environment service, you only need to:
+
+- Create a service class that inherits from `BaseService`
+- Register the service with `REGISTERED_ENV`
+
+The FrozenLake service example demonstrates how to:
+- Handle batch operations
+
+The SVG service example demonstrates how to:
+- Integrate Reward Models (like DINO) directly within the service
+- Combine rule-based rewards with model-based rewards
 
 ## Algorithm Settings
 

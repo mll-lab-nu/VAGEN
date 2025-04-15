@@ -3,65 +3,7 @@ import base64
 import numpy as np
 from typing import Any, Dict, List, Tuple, Optional, Union
 
-def serialize_pil_image(img) -> str:
-    """
-    Serialize a PIL Image to a base64 string.
-    
-    Args:
-        img: PIL Image object
-        
-    Returns:
-        Base64 encoded string of the image
-    """
-    buffer = io.BytesIO()
-    img.save(buffer, format="PNG")
-    img_str = base64.b64encode(buffer.getvalue()).decode('utf-8')
-    return {"__pil_image__": img_str}
-
-def deserialize_pil_image(serialized_data: Dict[str, str]):
-    """
-    Deserialize a base64 string back to a PIL Image.
-    
-    Args:
-        serialized_data: Dictionary with "__pil_image__" key containing base64 string
-        
-    Returns:
-        PIL Image object
-    """
-    from PIL import Image
-    img_data = base64.b64decode(serialized_data["__pil_image__"])
-    return Image.open(io.BytesIO(img_data))
-
-def serialize_numpy_array(arr) -> Dict[str, Any]:
-    """
-    Serialize a numpy array to a serializable format.
-    
-    Args:
-        arr: Numpy array
-        
-    Returns:
-        Dictionary with serialized array data
-    """
-    return {
-        "__numpy_array__": {
-            "data": arr.tolist(),
-            "dtype": str(arr.dtype),
-            "shape": arr.shape
-        }
-    }
-
-def deserialize_numpy_array(serialized_data: Dict[str, Any]):
-    """
-    Deserialize data back to a numpy array.
-    
-    Args:
-        serialized_data: Dictionary with "__numpy_array__" key
-        
-    Returns:
-        Numpy array
-    """
-    array_data = serialized_data["__numpy_array__"]
-    return np.array(array_data["data"], dtype=np.dtype(array_data["dtype"])).reshape(array_data["shape"])
+# -------------- serialize and deserialize observation --------------
 
 def serialize_observation(observation: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -124,8 +66,7 @@ def deserialize_observation(serialized_obs: Dict[str, Any]) -> Dict[str, Any]:
     
     return deserialized_obs
 
-
-
+# -------------- serialize and deserialize step (obs, reward, done, info) --------------
 def serialize_step_result(result_tuple: Tuple[Dict, float, bool, Dict]) -> Tuple[Dict, float, bool, Dict]:
     """
     Serialize the step result tuple by handling NumPy types.
@@ -158,6 +99,88 @@ def serialize_step_result(result_tuple: Tuple[Dict, float, bool, Dict]) -> Tuple
     
     return (serialized_observation, serialized_reward, serialized_done, serialized_info)
 
+def deserialize_step_result(serialized_result: Tuple[Dict, float, bool, Dict]) -> Tuple[Dict, float, bool, Dict]:
+    """
+    Deserialize the step result tuple.
+    
+    Args:
+        serialized_result: The serialized tuple (observation, reward, done, info).
+        
+    Returns:
+        The deserialized tuple.
+    """
+    serialized_observation, reward, done, serialized_info = serialized_result
+    
+    # Process the observation using the existing deserialize_observation function.
+    observation = deserialize_observation(serialized_observation)
+    
+    # The info dictionary might contain objects that require special handling.
+    info = deserialize_dict(serialized_info)
+    
+    return (observation, reward, done, info)
+
+# -------------- utils for previous functions --------------
+
+def serialize_pil_image(img) -> str:
+    """
+    Serialize a PIL Image to a base64 string.
+    
+    Args:
+        img: PIL Image object
+        
+    Returns:
+        Base64 encoded string of the image
+    """
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    img_str = base64.b64encode(buffer.getvalue()).decode('utf-8')
+    return {"__pil_image__": img_str}
+
+def deserialize_pil_image(serialized_data: Dict[str, str]):
+    """
+    Deserialize a base64 string back to a PIL Image.
+    
+    Args:
+        serialized_data: Dictionary with "__pil_image__" key containing base64 string
+        
+    Returns:
+        PIL Image object
+    """
+    from PIL import Image
+    img_data = base64.b64decode(serialized_data["__pil_image__"])
+    return Image.open(io.BytesIO(img_data))
+
+def serialize_numpy_array(arr) -> Dict[str, Any]:
+    """
+    Serialize a numpy array to a serializable format.
+    
+    Args:
+        arr: Numpy array
+        
+    Returns:
+        Dictionary with serialized array data
+    """
+    return {
+        "__numpy_array__": {
+            "data": arr.tolist(),
+            "dtype": str(arr.dtype),
+            "shape": arr.shape
+        }
+    }
+
+def deserialize_numpy_array(serialized_data: Dict[str, Any]):
+    """
+    Deserialize data back to a numpy array.
+    
+    Args:
+        serialized_data: Dictionary with "__numpy_array__" key
+        
+    Returns:
+        Numpy array
+    """
+    array_data = serialized_data["__numpy_array__"]
+    return np.array(array_data["data"], dtype=np.dtype(array_data["dtype"])).reshape(array_data["shape"])
+
 def serialize_dict(obj: Any) -> Any:
     """
     Recursively serialize objects that may contain NumPy types.
@@ -186,26 +209,6 @@ def serialize_dict(obj: Any) -> Any:
             return serialize_dict(obj.tolist())
     else:
         return obj
-
-def deserialize_step_result(serialized_result: Tuple[Dict, float, bool, Dict]) -> Tuple[Dict, float, bool, Dict]:
-    """
-    Deserialize the step result tuple.
-    
-    Args:
-        serialized_result: The serialized tuple (observation, reward, done, info).
-        
-    Returns:
-        The deserialized tuple.
-    """
-    serialized_observation, reward, done, serialized_info = serialized_result
-    
-    # Process the observation using the existing deserialize_observation function.
-    observation = deserialize_observation(serialized_observation)
-    
-    # The info dictionary might contain objects that require special handling.
-    info = deserialize_dict(serialized_info)
-    
-    return (observation, reward, done, info)
 
 def deserialize_dict(obj: Any) -> Any:
     """
