@@ -5,9 +5,6 @@ python vagen/env/server.py --debug
 ```
 ### Navigation
 ```
-# Additional dependencies:
-pip install ai2thor==5.0.0
-pip install numpy==1.25.1
 
 # For headless servers, additional setup is required:
 # Install required packages
@@ -16,20 +13,4 @@ apt-get install -y xorg xserver-xorg-core xserver-xorg-video-dummy
 
 # Start X server in a tmux window
 python vagen/env/navigation/startx.py 1
-```
-
-### FrozenLake
-```
-# Additional dependencies:
-pip install gymnasium
-pip install "gymnasium[toy-text]"
-```
-
-### SVG
-```
-# Additional dependencies:
-pip install bs4
-pip install svgpathtools
-pip install cairosvg
-pip install flask
 ```
