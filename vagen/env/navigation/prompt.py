@@ -21,7 +21,7 @@ Achieve the human instruction: +10.0
 
 Please think step by step and provide the actions you want to take.
 
-You can provide a list of actions, separated by commas. For example: moveahead, moveright, rotateright.
+You can provide a list of actions, separated by commas. 
 Your reponse should be in the format of <think>...</think><answer>...</answer>
 e.g.
 <think>I can see from the sight the target object is right in the top left of me, I will move forward, then move left to access it.</think><answer>moveahead, moveahead,moveahead,moveahead,moveahead,moveleft,moveleft</answer>
@@ -49,6 +49,8 @@ Format correct: +0.5
 Achieve the human instruction: +10.0
 
 The instruction will be provided with each observation. Look at the image carefully and navigate to complete the instruction.
+e.g.
+<think>I can see from the sight the target object is right in the top left of me, I will move forward, then move left to access it.</think><answer>moveahead, moveahead,moveahead,moveahead,moveahead,moveleft,moveleft</answer>
 """
 
 init_observation_template = """
