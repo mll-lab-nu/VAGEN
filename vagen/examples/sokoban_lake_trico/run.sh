@@ -8,21 +8,20 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 python -m vagen.env.create_dataset \
     --yaml_path "$SCRIPT_DIR/env_config.yaml" \
-    --train_path "data/svg-vision-debug/train.parquet" \
-    --test_path "data/svg-vision-debug/test.parquet" \
-    --force_gen
+    --train_path "data/sokoban-vision-debug/train.parquet" \
+    --test_path "data/sokoban-vision-debug/test.parquet" \
 
 # max_trajectory_length = max_prompt_length + max_response_length
 
 python3 -m vagen.trainer.main_ppo \
     algorithm.adv_estimator=bi_level_gae \
-    algorithm.high_level_gamma=1.0 \
-    data.train_files=data/svg-vision-debug/train.parquet \
-    data.val_files=data/svg-vision-debug/test.parquet \
+    algorithm.high_level_gamma=0.95 \
+    data.train_files=data/sokoban-vision-debug/train.parquet \
+    data.val_files=data/sokoban-vision-debug/test.parquet \
     data.train_batch_size=128 \
     data.max_prompt_length=1024 \
-    data.max_response_length=648 \
-    data.max_trajectory_length=1800 \
+    data.max_response_length=128 \
+    data.max_trajectory_length=2048 \
     data.image_key=images \
     data.truncation=error \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \
@@ -59,18 +58,18 @@ python3 -m vagen.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
     trainer.project_name='vagen_new' \
-    trainer.experiment_name='trico_svg_vision_service' \
+    trainer.experiment_name='trico_sokoban_vision' \
     trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \
     trainer.save_freq=70 \
     trainer.test_freq=20 \
     trainer.total_training_steps=200 \
-    rollout_manager.max_turns=2 \
-    rollout_manager.window_size=3 \
-    rollout_manager.use_multi_turn_reward=False \
+    rollout_manager.max_turns=3 \
+    rollout_manager.window_size=5 \
+    rollout_manager.use_multi_turn_reward=True \
     rollout_manager.use_loss_mask=True \
     rollout_manager.use_gae_mask=True \
     trainer.val_before_train=True \
     trainer.val_generations_to_log_to_wandb=8 \
     rollout_manager.n_trajectory=1 \
-    2>&1 | tee trico_frozenlake_vision.log
+    2>&1 | tee trico_sokoban_vision.log
