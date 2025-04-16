@@ -1,0 +1,27 @@
+site_name: VAGEN
+site_description: VAGEN is a multi-turn reinforcement learning framework designed specifically for training VLM Agents. VAGEN leverages the TRICO algorithm to efficiently train VLMs for visual agentic tasks.
+site_author: Kangrui Wang, Yaning Gao
+
+# Material theme settings
+theme:
+  name: material
+  palette:
+    primary: indigo
+    accent: indigo
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - toc.integrate
+
+# Copyright footer
+copyright: Copyright © 2025, VAGEN Team
+
+# Additional settings
+markdown_extensions:
+  - admonition
+  - codehilite
+  - footnotes
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
