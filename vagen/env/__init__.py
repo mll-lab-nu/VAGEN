@@ -1,7 +1,6 @@
 from .sokoban import SokobanEnv,SokobanConfig
 from .frozenlake import FrozenLakeEnv,FrozenLakeConfig, FrozenLakeService
 from .navigation import NavigationEnv, NavigationConfig
-from .svgdino import SVGDINOEnv, SVGDINOConfig
 from .svg import SVGEnv, SVGConfig, SVGService
 
 REGISTERED_ENV = {
@@ -23,8 +22,5 @@ REGISTERED_ENV = {
         "config_cls": SVGConfig,
         "service_cls": SVGService
     },
-    "svgdino": {
-        "env_cls": SVGDINOEnv,
-        "config_cls": SVGDINOConfig,
-    }
+    
 }

@@ -8,7 +8,7 @@ from ai2thor.platform import CloudRendering
 from typing import Dict, List, Tuple, Optional, Any
 from vagen.env.utils.env_utils import NoLoggerWarnings, set_seed
 from vagen.env.utils.context_utils import parse_llm_raw_response, convert_numpy_to_PIL
-from .config import NavigationConfig
+from .env_config import NavigationConfig
 from .prompt import system_prompt_text, system_prompt_vision, init_observation_template, action_template
 
 

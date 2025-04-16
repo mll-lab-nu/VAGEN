@@ -1,2 +1,2 @@
 from .env import NavigationEnv
-from .config import NavigationConfig
+from .env_config import NavigationConfig

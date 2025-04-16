@@ -7,7 +7,7 @@ from vagen.env.utils.env_utils import NoLoggerWarnings, set_seed
 from vagen.env.utils.context_utils import parse_llm_raw_response,convert_numpy_to_PIL
 import numpy as np
 from .prompt import system_prompt_text, system_prompt_vision, init_observation_template, action_template
-from .config import SokobanConfig
+from .env_config import SokobanConfig
 class SokobanEnv(BaseEnv):
     GRID_LOOKUP = {
         0: " # \t",  # wall
