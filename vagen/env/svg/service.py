@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import torch
 from vagen.env.base_service import BaseService
 from vagen.env.svg.env import SVGEnv
-from vagen.env.svg.config import SVGConfig
+from vagen.env.svg.env_config import SVGConfig
 from vagen.utils.serial import serialize_observation, serialize_step_result
 from vagen.env.svg.score import calculate_total_score, calculate_total_score_batch
 from vagen.env.svg.dino import get_dino_model

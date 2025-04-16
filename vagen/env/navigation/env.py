@@ -8,7 +8,7 @@ from ai2thor.platform import CloudRendering
 from typing import Dict, List, Tuple, Optional, Any
 from vagen.env.utils.env_utils import NoLoggerWarnings, set_seed
 from vagen.env.utils.context_utils import parse_llm_raw_response, convert_numpy_to_PIL
-from .config import NavigationConfig
+from .env_config import NavigationConfig
 from .prompt import system_prompt_text, system_prompt_vision, init_observation_template, action_template
 
 
@@ -173,6 +173,7 @@ class NavigationEnv(BaseEnv):
         self.img_paths = []
         self.total_reward = 0
         
+        
         return self._render(init_obs=True), {}
     
     def step(self, action_str: str):
@@ -322,14 +323,16 @@ class NavigationEnv(BaseEnv):
         # Format the template
         if init_obs:
             obs_str = init_observation_template.format(
-                observation=img_placeholder
+                observation=img_placeholder,
+                instruction=self.episode_language_instruction,
             )
         else:
             obs_str = action_template.format(
                 valid_action=self.valid_actions,
                 observation=img_placeholder,
                 reward=self.reward,
-                done=self.measure_success()[0]
+                done=self.measure_success()[0],
+                instruction=self.episode_language_instruction,
             )
         
         return {

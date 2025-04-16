@@ -1,4 +1,4 @@
-from vagen.env.base_config import BaseConfig
+from vagen.env.base_env_config import BaseConfig
 from dataclasses import dataclass, fields,field
 from typing import Optional, List, Union
 

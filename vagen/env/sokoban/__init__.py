@@ -1,2 +1,2 @@
 from .env import SokobanEnv
-from .config import SokobanConfig
+from .env_config import SokobanConfig

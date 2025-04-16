@@ -1,19 +1,19 @@
-from typing import Dict, List, Tuple, Optional, Any, Union
+from typing import Dict, List, Tuple, Optional, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from vagen.env.base_service import BaseService
-from vagen.env.frozenlake.env import FrozenLakeEnv
-from vagen.env.frozenlake.env_config import FrozenLakeConfig
+from vagen.env.navigation.env import NavigationEnv
+from vagen.env.navigation.env_config import NavigationConfig
 from vagen.utils.serial import serialize_observation
 
-class FrozenLakeService(BaseService):
+class NavigationService(BaseService):
     """
-    Service class for FrozenLake environments.
+    Service class for Navigation environments based on AI2-THOR.
     Implements batch operations with parallel processing for efficiency.
     """
     
     def __init__(self, max_workers: int = 10):
         """
-        Initialize the FrozenLakeService.
+        Initialize the NavigationService.
         
         Args:
             max_workers: Maximum number of worker threads for parallel processing
@@ -22,33 +22,33 @@ class FrozenLakeService(BaseService):
         self.environments = {}
         self.env_configs = {}
     
-    def create_environments_batch(self, ids2configs: Dict[Any, Any]) -> None:
+    def create_environments_batch(self, ids2configs: Dict[str, Any]) -> None:
         """
-        Create multiple FrozenLake environments in parallel.
+        Create multiple Navigation environments in parallel.
         
         Args:
             ids2configs: A dictionary where each key is an environment ID and the corresponding
                         value is the configuration for that environment.
                 Each config should contain:
-                - env_name: Should be "frozenlake"
-                - env_config: FrozenLake specific configuration
+                - env_name: Should be "navigation"
+                - env_config: Navigation specific configuration
         """
         # Define worker function
         def create_single_env(env_id, config):
             # Verify environment type
-            env_name = config.get('env_name', 'frozenlake')
-            if env_name != 'frozenlake':
-                return env_id, None, f"Expected environment type 'frozenlake', got '{env_name}'"
+            env_name = config.get('env_name', 'navigation')
+            if env_name != 'navigation':
+                return env_id, None, f"Expected environment type 'navigation', got '{env_name}'"
             
             try:
-                # Get FrozenLake specific configuration
+                # Get Navigation specific configuration
                 env_config_dict = config.get('env_config', {})
                 
                 # Create environment config
-                env_config = FrozenLakeConfig(**env_config_dict)
+                env_config = NavigationConfig(**env_config_dict)
                 
                 # Create environment
-                env = FrozenLakeEnv(env_config)
+                env = NavigationEnv(env_config)
                 
                 return env_id, (env, env_config), None
             except Exception as e:
@@ -74,9 +74,9 @@ class FrozenLakeService(BaseService):
                 self.environments[env_id] = env
                 self.env_configs[env_id] = env_config
     
-    def reset_batch(self, ids2seeds: Dict[Any, Any]) -> Dict[Any, Tuple[Any, Any]]:
+    def reset_batch(self, ids2seeds: Dict[str, Any]) -> Dict[str, Tuple[Any, Any]]:
         """
-        Reset multiple FrozenLake environments in parallel.
+        Reset multiple Navigation environments in parallel.
         
         Args:
             ids2seeds: A dictionary where each key is an environment ID and the corresponding
@@ -120,9 +120,9 @@ class FrozenLakeService(BaseService):
         
         return results
     
-    def step_batch(self, ids2actions: Dict[Any, Any]) -> Dict[Any, Tuple[Dict, float, bool, Dict]]:
+    def step_batch(self, ids2actions: Dict[str, Any]) -> Dict[str, Tuple[Dict, float, bool, Dict]]:
         """
-        Take a step in multiple FrozenLake environments in parallel.
+        Take a step in multiple Navigation environments in parallel.
         
         Args:
             ids2actions: A dictionary where each key is an environment ID and the corresponding
@@ -166,9 +166,9 @@ class FrozenLakeService(BaseService):
         
         return results
     
-    def compute_reward_batch(self, env_ids: List[str]) -> Dict[Any, float]:
+    def compute_reward_batch(self, env_ids: List[str]) -> Dict[str, float]:
         """
-        Compute the total reward for multiple FrozenLake environments in parallel.
+        Compute the total reward for multiple Navigation environments in parallel.
         
         Args:
             env_ids: A list of environment IDs
@@ -209,9 +209,9 @@ class FrozenLakeService(BaseService):
         
         return results
     
-    def get_system_prompts_batch(self, env_ids: List[str]) -> Dict[Any, str]:
+    def get_system_prompts_batch(self, env_ids: List[str]) -> Dict[str, str]:
         """
-        Get system prompts for multiple FrozenLake environments in parallel.
+        Get system prompts for multiple Navigation environments in parallel.
         
         Args:
             env_ids: A list of environment IDs
@@ -254,7 +254,7 @@ class FrozenLakeService(BaseService):
     
     def close_batch(self, env_ids: Optional[List[str]] = None) -> None:
         """
-        Close multiple FrozenLake environments and clean up resources in parallel.
+        Close multiple Navigation environments and clean up resources in parallel.
         
         Args:
             env_ids: Optional list of environment IDs to close. If None, close all environments.
@@ -290,5 +290,3 @@ class FrozenLakeService(BaseService):
         for env_id in env_ids:
             self.environments.pop(env_id, None)
             self.env_configs.pop(env_id, None)
-    
-    
