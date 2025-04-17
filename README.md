@@ -95,10 +95,11 @@ bash scripts/install.sh
 ## Reproduce Experiments
 
 ```bash
-# To reproduce our reults, first go to release branch of verl
+# To reproduce our reults, please go to release branch of verl and v25.3.25 of vagen
 cd ../verl
 git checkout release
 cd ../VAGEN
+git checkout v25.3.25
 
 wandb login # login into wandb
 
