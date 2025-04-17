@@ -7,7 +7,7 @@ from gymnasium.envs.toy_text.frozen_lake import FrozenLakeEnv as GymFrozenLakeEn
 from vagen.env.utils.env_utils import NoLoggerWarnings, set_seed
 from vagen.env.utils.context_utils import parse_llm_raw_response, convert_numpy_to_PIL
 from .prompt import system_prompt_text, system_prompt_vision, init_observation_template, action_template
-from .env_config import FrozenLakeConfig
+from .env_config import FrozenLakeEnvConfig
 from .utils import generate_random_map, is_valid
 
 class FrozenLakeEnv(BaseEnv):
@@ -36,7 +36,7 @@ class FrozenLakeEnv(BaseEnv):
         "Up": 3,
     }
 
-    def __init__(self, config: FrozenLakeConfig):
+    def __init__(self, config: FrozenLakeEnvConfig):
         BaseEnv.__init__(self)
         self.config = config
        
@@ -208,7 +208,7 @@ class FrozenLakeEnv(BaseEnv):
 
 
 if __name__ == "__main__":
-    config = FrozenLakeConfig()
+    config = FrozenLakeEnvConfig()
     env = FrozenLakeEnv(config)
     print(env.system_prompt())
     obs, info = env.reset()

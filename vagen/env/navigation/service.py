@@ -2,8 +2,8 @@ from typing import Dict, List, Tuple, Optional, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from vagen.env.base_service import BaseService
 from vagen.env.navigation.env import NavigationEnv
-from vagen.env.navigation.env_config import NavigationConfig
-from vagen.utils.serial import serialize_observation
+from vagen.env.navigation.env_config import NavigationEnvConfig
+from vagen.server.serial import serialize_observation
 
 class NavigationService(BaseService):
     """
@@ -45,7 +45,7 @@ class NavigationService(BaseService):
                 env_config_dict = config.get('env_config', {})
                 
                 # Create environment config
-                env_config = NavigationConfig(**env_config_dict)
+                env_config = NavigationEnvConfig(**env_config_dict)
                 
                 # Create environment
                 env = NavigationEnv(env_config)

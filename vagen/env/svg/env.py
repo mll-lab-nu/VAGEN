@@ -2,7 +2,7 @@ from vagen.env.base_env import BaseEnv
 from vagen.env.svg.svg_utils import (process_and_rasterize_svg, is_valid_svg, load_svg_dataset)
 from vagen.env.svg.score import calculate_total_score
 from vagen.env.utils.context_utils import parse_llm_raw_response, convert_numpy_to_PIL
-from .env_config import SVGConfig
+from .env_config import SvgEnvConfig
 from .prompt import system_prompt, init_observation_template, action_template
 
 import os
@@ -16,7 +16,7 @@ from pathlib import Path
 from datasets import Dataset
 
 class SVGEnv(BaseEnv):
-    def __init__(self, config: SVGConfig):
+    def __init__(self, config: SvgEnvConfig):
         BaseEnv.__init__(self)
         self.config = config
         
@@ -263,7 +263,7 @@ class SVGEnv(BaseEnv):
         self.dino_model = model
 
 if __name__ == "__main__":
-    config = SVGConfig(
+    config = SvgEnvConfig(
         dataset_name="starvector/svg-emoji-simple",
         data_dir="vagen/env/svg/data",
         split="test",

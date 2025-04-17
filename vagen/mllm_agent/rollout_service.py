@@ -15,7 +15,7 @@ import verl.utils.torch_functional as verl_F
 from verl.utils.dataset.rl_dataset import process_image, collate_fn
 import vagen.env
 from vagen.env import REGISTERED_ENV
-from vagen.env.client import BatchEnvClient
+from vagen.server.client import BatchEnvClient
     
 class QwenVLRolloutMangerService():
     def __init__(self,

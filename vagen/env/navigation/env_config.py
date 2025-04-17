@@ -1,8 +1,8 @@
-from vagen.env.base_env_config import BaseConfig
+from vagen.env.base_env_config import BaseEnvConfig
 from dataclasses import dataclass, field, fields
 
 @dataclass
-class NavigationConfig(BaseConfig):
+class NavigationEnvConfig(BaseEnvConfig):
     """Configuration class for the Navigation environment."""
     resolution: int = 300
     eval_set: str = 'base'
@@ -20,8 +20,8 @@ class NavigationConfig(BaseConfig):
         id_fields = ["resolution", "eval_set", "exp_name", "down_sample_ratio", 
                     "fov", "multiview", "visual_env", "max_actions_per_step"]
         id_str = ",".join([f"{field.name}={getattr(self, field.name)}" for field in fields(self) if field.name in id_fields])
-        return f"NavigationConfig({id_str})"
+        return f"NavigationEnvConfig({id_str})"
 
 if __name__ == "__main__":
-    config = NavigationConfig()
+    config = NavigationEnvConfig()
     print(config.config_id())

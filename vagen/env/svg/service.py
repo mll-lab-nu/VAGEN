@@ -3,8 +3,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import torch
 from vagen.env.base_service import BaseService
 from vagen.env.svg.env import SVGEnv
-from vagen.env.svg.env_config import SVGConfig
-from vagen.utils.serial import serialize_observation, serialize_step_result
+from vagen.env.svg.env_config import SvgEnvConfig
+from vagen.server.serial import serialize_observation, serialize_step_result
 from vagen.env.svg.score import calculate_total_score, calculate_total_score_batch
 from vagen.env.svg.dino import get_dino_model
 from vagen.env.svg.svg_utils import process_and_rasterize_svg, is_valid_svg
@@ -73,7 +73,7 @@ class SVGService(BaseService):
                 env_config_dict = config.get('env_config', {})
                 
                 # Create environment config
-                env_config = SVGConfig(**env_config_dict)
+                env_config = SvgEnvConfig(**env_config_dict)
                                 
                 # Create environment
                 env = SVGEnv(env_config)

@@ -32,7 +32,7 @@ def create_dataset_from_yaml(yaml_file_path: str, force_gen=False,seed=42,train_
         test_size:100
     ```
     
-    If the environment config class (e.g., SokobanConfig, FrozenLakeConfig) has a 
+    If the environment config class (e.g., SokobanEnvConfig, FrozenLakeEnvConfig) has a 
     generate_seeds(size) method, it will be used to generate seeds for that environment.
     """
     

@@ -1,9 +1,11 @@
 from typing import Dict, List, Tuple, Optional, Any, Union
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from vagen.env.base_service import BaseService
-from vagen.env.frozenlake.env import FrozenLakeEnv
-from vagen.env.frozenlake.env_config import FrozenLakeConfig
-from vagen.utils.serial import serialize_observation
+from vagen.server.serial import serialize_observation
+
+from .env import FrozenLakeEnv
+from .env_config import FrozenLakeEnvConfig
+from .service_config import FrozenLakeServiceConfig
 
 class FrozenLakeService(BaseService):
     """
@@ -11,14 +13,14 @@ class FrozenLakeService(BaseService):
     Implements batch operations with parallel processing for efficiency.
     """
     
-    def __init__(self, max_workers: int = 10):
+    def __init__(self, config:FrozenLakeServiceConfig):
         """
         Initialize the FrozenLakeService.
         
         Args:
             max_workers: Maximum number of worker threads for parallel processing
         """
-        self.max_workers = max_workers
+        self.max_workers = config.get('max_workers', 10)
         self.environments = {}
         self.env_configs = {}
     
@@ -45,7 +47,7 @@ class FrozenLakeService(BaseService):
                 env_config_dict = config.get('env_config', {})
                 
                 # Create environment config
-                env_config = FrozenLakeConfig(**env_config_dict)
+                env_config = FrozenLakeEnvConfig(**env_config_dict)
                 
                 # Create environment
                 env = FrozenLakeEnv(env_config)

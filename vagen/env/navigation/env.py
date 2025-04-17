@@ -8,7 +8,7 @@ from ai2thor.platform import CloudRendering
 from typing import Dict, List, Tuple, Optional, Any
 from vagen.env.utils.env_utils import NoLoggerWarnings, set_seed
 from vagen.env.utils.context_utils import parse_llm_raw_response, convert_numpy_to_PIL
-from .env_config import NavigationConfig
+from .env_config import NavigationEnvConfig
 from .prompt import system_prompt_text, system_prompt_vision, init_observation_template, action_template
 
 
@@ -45,7 +45,7 @@ class NavigationEnv(BaseEnv):
         "Tilt the camera downward by 30 degrees.",
     ]
 
-    def __init__(self, config: NavigationConfig):
+    def __init__(self, config: NavigationEnvConfig):
         """Initialize the Navigation environment.
         
         Args:
@@ -371,7 +371,7 @@ class NavigationEnv(BaseEnv):
 if __name__ == "__main__":
     # Example usage
     import os
-    config = NavigationConfig()
+    config = NavigationEnvConfig()
     env = NavigationEnv(config)
     print(env.system_prompt())
     

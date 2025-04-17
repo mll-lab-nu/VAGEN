@@ -1,9 +1,9 @@
-from vagen.env.base_env_config import BaseConfig
+from vagen.env.base_env_config import BaseEnvConfig
 from dataclasses import dataclass, fields, field
 from typing import Optional, List, Union, Dict
 
 @dataclass
-class SVGConfig(BaseConfig):
+class SvgEnvConfig(BaseEnvConfig):
     """Configuration for the SVG environment"""
     dataset_name: str = "starvector/svg-icons-simple"
     data_dir: str = "vagen/env/svg/data"
@@ -45,7 +45,7 @@ class SVGConfig(BaseConfig):
             if value is not None:
                 id_str += f",{field_name}={value}"
                 
-        return f"SVGConfig({id_str})"
+        return f"SvgEnvConfig({id_str})"
     
     def get_score_config(self) -> Dict:
         """Get the score configuration dictionary"""
@@ -69,7 +69,7 @@ class SVGConfig(BaseConfig):
 
 if __name__ == "__main__":
     # Example usage
-    config = SVGConfig(
+    config = SvgEnvConfig(
         dataset_name="starvector/svg-emoji-simple",
         data_dir="data/svg",
         model_size="small",

@@ -5,6 +5,8 @@ import importlib
 from typing import Dict, List, Tuple, Optional, Any, Type
 from vagen.env import REGISTERED_ENV
 from vagen.env.base_service import BaseService
+import hydra
+from omegaconf import DictConfig
 
 class BatchEnvServer:
     """
@@ -13,7 +15,7 @@ class BatchEnvServer:
     Exposes only the standard BaseService interface.
     """
     
-    def __init__(self, host: str = "127.0.0.1", port: int = 5000, debug: bool = False):
+    def __init__(self, config):
         """
         Initialize the BatchEnvServer.
         
@@ -22,9 +24,9 @@ class BatchEnvServer:
             port: Port to listen on
             debug: Whether to run Flask in debug mode
         """
-        self.host = host
-        self.port = port
-        self.debug = debug
+        self.host = config.server.host
+        self.port = config.server.port
+        self.debug = config.server.debug
         
         # Dictionary to store services by environment type
         self.services = {}
@@ -440,27 +442,19 @@ class BatchEnvServer:
         print("Server stopped")
 
 
-def main():
+@hydra.main(version_base=None, config_path="./", config_name="server")
+def main(cfg: DictConfig):
     """
     Main function to start the batch environment server.
+    Uses Hydra for configuration management.
+    
+    Args:
+        cfg: Configuration object from Hydra
     """
-    import argparse
+    # Create and start server with configuration
+    server = BatchEnvServer(cfg)
     
-    parser = argparse.ArgumentParser(description='Batch Environment Server')
-    parser.add_argument('--host', type=str, default='127.0.0.1', help='Host address')
-    parser.add_argument('--port', type=int, default=5000, help='Port number')
-    parser.add_argument('--debug', action='store_true', help='Run in debug mode')
-    
-    args = parser.parse_args()
-    
-    # Create and start server
-    server = BatchEnvServer(
-        host=args.host,
-        port=args.port,
-        debug=args.debug
-    )
-    
-    print(f"Starting Batch Environment Server on http://{args.host}:{args.port}")
+    print(f"Starting Batch Environment Server on http://{cfg.server.host}:{cfg.server.port}")
     server.start(background=False)
 
 

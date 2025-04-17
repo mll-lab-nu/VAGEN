@@ -1,7 +1,7 @@
 from typing import Dict, List, Tuple, Optional, Any, Union
 import requests
 import time
-from vagen.utils.serial import deserialize_observation, deserialize_step_result
+from vagen.server.serial import deserialize_observation, deserialize_step_result
 
 class BatchEnvClient:
     """

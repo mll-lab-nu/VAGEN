@@ -7,7 +7,7 @@ from vagen.env.utils.env_utils import NoLoggerWarnings, set_seed
 from vagen.env.utils.context_utils import parse_llm_raw_response,convert_numpy_to_PIL
 import numpy as np
 from .prompt import system_prompt_text, system_prompt_vision, init_observation_template, action_template
-from .env_config import SokobanConfig
+from .env_config import SokobanEnvConfig
 class SokobanEnv(BaseEnv):
     GRID_LOOKUP = {
         0: " # \t",  # wall
@@ -27,7 +27,7 @@ class SokobanEnv(BaseEnv):
         "Right":4,
     }
 
-    def __init__(self, config:SokobanConfig):
+    def __init__(self, config:SokobanEnvConfig):
         BaseEnv.__init__(self)
         self.config=config
         self.env=GymSokobanEnv(
@@ -161,7 +161,7 @@ if __name__ == "__main__":
     kwargs = {
         'render_mode': 'vision',
     }
-    config = SokobanConfig(**kwargs)
+    config = SokobanEnvConfig(**kwargs)
     env = SokobanEnv(config)
     print(env.system_prompt())
     obs, info = env.reset()
