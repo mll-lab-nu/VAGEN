@@ -11,9 +11,10 @@ class NavigationEnvConfig(BaseEnvConfig):
     fov: int = 100
     multiview: bool = False
     visual_env: bool = True
-    max_actions_per_step: int = 1
+    max_actions_per_step: int = 10
     max_action_penalty: float = -0.1
     format_reward: float = 0.5
+    gpu_device: int = 0
 
     def config_id(self) -> str:
         """Generate a unique identifier for this configuration."""

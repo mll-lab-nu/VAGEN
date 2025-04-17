@@ -197,7 +197,7 @@ class BatchEnvServer:
                 raise ValueError(f"No service class registered for environment type: {env_name}")
                 
             service_class = REGISTERED_ENV[env_name]["service_cls"]
-            service_config = REGISTERED_ENV[env_name].get("service_config", BaseServiceConfig)(**self.config.get(env_name, {}))
+            service_config = REGISTERED_ENV[env_name].get("service_config_cls", BaseServiceConfig)(**self.config.get(env_name, {}))
             self.services[env_name] = service_class(service_config)
                 
         return self.services[env_name]
@@ -455,7 +455,6 @@ def main(cfg: DictConfig):
     """
     # Create and start server with configuration
     server = BatchEnvServer(cfg)
-    breakpoint()
     print(f"Starting Batch Environment Server on http://{cfg.server.host}:{cfg.server.port}")
     server.start(background=False)
 

@@ -3,4 +3,4 @@ from dataclasses import dataclass, fields,field
 
 @dataclass
 class NavigationServiceConfig(BaseServiceConfig):
-    devices=[0]
+    devices: list = field(default_factory=lambda: [0])
