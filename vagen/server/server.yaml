@@ -1,0 +1,17 @@
+defaults:
+  - _self_
+
+server:
+  host: 127.0.0.1
+  port: 5000
+  debug: false
+
+frozenlake:
+  max_workers: 5
+svg:
+  max_workers: 10
+  model_size: "small"
+navigation:
+  max_workers: 10
+  devices: [0,1,2,3]
+

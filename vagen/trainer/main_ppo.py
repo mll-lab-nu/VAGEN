@@ -16,7 +16,6 @@ Note that we don't combine the main with ray_trainer as ray_trainer is used by o
 """
 from vagen.trainer.ppo.ray_trainer import RayPPOTrainer
 from vagen.utils.compute_score import compute_score
-from vagen.trainer.ppo.ray_trainer import AdvantageEstimator
 
 import ray
 import hydra
