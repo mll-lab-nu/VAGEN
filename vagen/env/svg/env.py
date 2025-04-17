@@ -41,10 +41,6 @@ class SVGEnv(BaseEnv):
         self.rng = random.Random()
         if hasattr(self.config, "seed") and self.config.seed is not None:
             self.rng.seed(self.config.seed)
-        
-        # Set up analysis logging if enabled
-        if self.config.analysis_mode:
-            self._setup_analysis_logging()
     
 
     def reset(self, seed=None) -> Tuple[Dict, Dict]:
@@ -190,15 +186,7 @@ class SVGEnv(BaseEnv):
         
     def close(self):
         """Close the environment and clean up resources"""
-        if hasattr(self, 'failure_logger'):
-            for handler in self.failure_logger.handlers:
-                handler.close()
-                self.failure_logger.removeHandler(handler)
-                
-        if hasattr(self, 'success_logger'):
-            for handler in self.success_logger.handlers:
-                handler.close()
-                self.success_logger.removeHandler(handler)
+        pass
     
     def _render(self, init_obs=False):
         """Render the current state of the environment"""
@@ -236,77 +224,28 @@ class SVGEnv(BaseEnv):
             "multi_modal_data": multi_modal_data,
         }
     
-    def _setup_analysis_logging(self):
-        """Set up logging for analysis mode"""
-        log_dir = Path(self.config.data_dir) / 'analysis_logs'
-        os.makedirs(log_dir, exist_ok=True)
-        
-        # Failure logger
-        self.failure_logger = logging.getLogger(f'svg_failure_{id(self)}')
-        self.failure_logger.setLevel(logging.INFO)
-        
-        if not self.failure_logger.handlers:
-            failure_handler = logging.FileHandler(log_dir / 'failure_cases.log')
-            failure_handler.setFormatter(logging.Formatter('%(message)s'))
-            self.failure_logger.addHandler(failure_handler)
-        
-        # Success logger
-        self.success_logger = logging.getLogger(f'svg_success_{id(self)}')
-        self.success_logger.setLevel(logging.INFO)
-        
-        if not self.success_logger.handlers:
-            success_handler = logging.FileHandler(log_dir / 'success_cases.log')
-            success_handler.setFormatter(logging.Formatter('%(message)s'))
-            self.success_logger.addHandler(success_handler)
-    
     def set_dino_model(self, model):
         self.dino_model = model
 
 if __name__ == "__main__":
-    config = SvgEnvConfig(
-        dataset_name="starvector/svg-emoji-simple",
-        data_dir="vagen/env/svg/data",
-        split="test",
-        model_size="small"
-    )
+    config = SvgEnvConfig()
     
-    try:
-        env = SVGEnv(config)
-        print(f"Successfully loaded dataset")
-        
-        # Test with seed
-        seed = 42
-        obs, info = env.reset(seed=seed)
-        print(f"Testing with seed {seed}")
-        
-        # Example SVG action
-        action = """<think>
-        The image appears to be a simple emoji face with two eyes and a smile.
-        I'll create an SVG with:
-        1. A circle for the face
-        2. Two circles for the eyes
-        3. A path for the smile
-        </think>
-        <answer>
-        <svg width="100" height="100" viewBox="0 0 100 100">
-          <circle cx="50" cy="50" r="40" fill="yellow"/>
-          <circle cx="35" cy="40" r="5" fill="black"/>
-          <circle cx="65" cy="40" r="5" fill="black"/>
-          <path d="M30 60 Q50 75 70 60" stroke="black" stroke-width="3" fill="none"/>
-        </svg>
-        </answer>"""
-        
-        obs, reward, done, info = env.step(action)
-        print(f"Reward: {reward}")
-        print(f"Done: {done}")
-        print(f"obs:{obs}")
-        print(f"Score components: {info.get('scores', {})}")
-        
-        # Test with another seed to verify determinism
-        seed = 123
-        obs, info = env.reset(seed=seed)
-        print(f"\nTesting with seed {seed}")
-        
-        env.close()
-    except Exception as e:
-        print(f"Error: {e}")
+    env = SVGEnv(config)
+    print(env.system_prompt())
+    
+    obs, info = env.reset()
+    print(obs["obs_str"])
+    
+    action = """<answer>
+    <svg width="100" height="100" viewBox="0 0 100 100">
+      <path d="M30 60 Q50 75 70 60" stroke="black" stroke-width="3" fill="none"/>
+    </svg>
+    </answer>"""
+    
+    obs, reward, done, info = env.step(action)
+    print(f"Reward: {reward}")
+    print(f"Done: {done}")
+    print(obs["obs_str"])
+    
+    print(f"Total reward: {env.compute_reward()}")
+    env.close()

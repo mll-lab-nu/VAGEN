@@ -15,14 +15,9 @@ class SvgEnvConfig(BaseEnvConfig):
     dino_only: bool = False
     dino_weight: Optional[float] = None
     structural_weight: Optional[float] = None
-    color_weight: Optional[float] = None
-    code_weight: Optional[float] = None
     # Reward configuration
     format_reward: float = 0.5
     format_penalty: float = 0.0
-    # Analysis mode for logging
-    analysis_mode: bool = False
-    
     
     def config_id(self) -> str:
         """Generate a unique identifier for this configuration"""
@@ -39,7 +34,7 @@ class SvgEnvConfig(BaseEnvConfig):
                           if field.name in id_fields])
         
         # Add optional fields if they're set
-        optional_fields = ["dino_weight", "structural_weight", "color_weight", "code_weight"]
+        optional_fields = ["dino_weight", "structural_weight"]
         for field_name in optional_fields:
             value = getattr(self, field_name)
             if value is not None:
@@ -59,23 +54,13 @@ class SvgEnvConfig(BaseEnvConfig):
             score_config["dino_weight"] = self.dino_weight
         if self.structural_weight is not None:
             score_config["structural_weight"] = self.structural_weight
-        if self.color_weight is not None:
-            score_config["color_weight"] = self.color_weight
-        if self.code_weight is not None:
-            score_config["code_weight"] = self.code_weight
             
         return score_config
 
 
 if __name__ == "__main__":
     # Example usage
-    config = SvgEnvConfig(
-        dataset_name="starvector/svg-emoji-simple",
-        data_dir="data/svg",
-        model_size="small",
-        dino_only=False,
-        dino_weight=5.0
-    )
+    config = SvgEnvConfig()
     
     print(config.config_id())
     print(config.get_score_config())

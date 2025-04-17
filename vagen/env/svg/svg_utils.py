@@ -99,6 +99,7 @@ def rasterize_svg(svg_string, resolution=224, dpi = 128, scale=2):
 
 
 
+# -------------- download/pre-load dataset --------------
 
 def load_svg_dataset(data_dir, dataset_name, split):
     """Load the SVG dataset from local files or HuggingFace"""
