@@ -5,10 +5,6 @@ from typing import Optional, List, Union
 class BaseServiceConfig(ABC):
     max_workers: int = 10
     
-    
-    def __init__(self, **kwargs):
-        pass
-    
     def get(self, key, default=None):
         """
         Get the value of a config key.

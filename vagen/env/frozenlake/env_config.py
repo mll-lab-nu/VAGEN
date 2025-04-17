@@ -13,7 +13,7 @@ class FrozenLakeEnvConfig(BaseEnvConfig):
     min_actions_to_succeed: int = 5
     
     def config_id(self) -> str:
-        id_fields=["is_slippery", "size", "p", "render_mode", "max_actions_per_step", "min_actions_to_succeed"]
+        id_fields=["is_slippery", "size", "p", "render_mode", "max_actions_per_step", "min_actions_to_succeed","format_reward"]
         id_str = ",".join([f"{field.name}={getattr(self, field.name)}" for field in fields(self) if field.name in id_fields])
         return f"FrozenLakeEnvConfig({id_str})"
 

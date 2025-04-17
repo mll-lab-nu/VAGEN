@@ -11,9 +11,6 @@ class BaseEnvConfig(ABC):
     def config_id(self) -> str: # config identifier, wandb and mllm rollout manager use this to identify the config
         pass
     
-    def __init__(self, **kwargs):
-        pass
-    
     def get(self, key, default=None):
         """
         Get the value of a config key.

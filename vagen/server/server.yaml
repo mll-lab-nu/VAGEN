@@ -7,7 +7,7 @@ server:
   debug: false
 
 frozenlake:
-  max_workers: 10
+  max_workers: 5
 navigation:
   max_workers: 10
 svg:

@@ -454,9 +454,8 @@ def main(cfg: DictConfig):
         cfg: Configuration object from Hydra
     """
     # Create and start server with configuration
-    breakpoint()
     server = BatchEnvServer(cfg)
-    
+    breakpoint()
     print(f"Starting Batch Environment Server on http://{cfg.server.host}:{cfg.server.port}")
     server.start(background=False)
 

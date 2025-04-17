@@ -4,6 +4,7 @@ from vagen.env.base.base_service import BaseService
 from vagen.env.navigation.env import NavigationEnv
 from vagen.env.navigation.env_config import NavigationEnvConfig
 from vagen.server.serial import serialize_observation
+from .service_config import NavigationServiceConfig
 
 class NavigationService(BaseService):
     """
@@ -11,14 +12,15 @@ class NavigationService(BaseService):
     Implements batch operations with parallel processing for efficiency.
     """
     
-    def __init__(self, max_workers: int = 10):
+    def __init__(self, config:NavigationServiceConfig):
         """
         Initialize the NavigationService.
         
         Args:
             max_workers: Maximum number of worker threads for parallel processing
         """
-        self.max_workers = max_workers
+        self.max_workers = config.max_workers
+        self.device_status={device_id:set() for device_id in config.devices}
         self.environments = {}
         self.env_configs = {}
     
@@ -54,6 +56,12 @@ class NavigationService(BaseService):
             except Exception as e:
                 return env_id, None, str(e)
         
+        for i, env_id in enumerate(ids2configs.keys()):
+            # Select GPU with the least load
+            selected_gpu = min(self.device_status, key=lambda x: len(self.device_status[x]))
+            ids2configs[env_id]['gpu_device'] = selected_gpu
+            self.device_status[selected_gpu].add(env_id)
+            
         # Use ThreadPoolExecutor for parallel creation
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             # Submit all environment creation tasks
@@ -290,3 +298,4 @@ class NavigationService(BaseService):
         for env_id in env_ids:
             self.environments.pop(env_id, None)
             self.env_configs.pop(env_id, None)
+            self.device_status.pop(env_id, None)

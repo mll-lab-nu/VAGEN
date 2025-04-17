@@ -3,4 +3,4 @@ from dataclasses import dataclass, fields,field
 
 @dataclass
 class NavigationServiceConfig(BaseServiceConfig):
-    pass
+    devices=[0]

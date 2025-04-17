@@ -65,7 +65,8 @@ class NavigationEnv(BaseEnv):
             "width": self.resolution,
             "height": self.resolution,
             "fieldOfView": config.fov,
-            "platform": CloudRendering
+            "platform": CloudRendering,
+            "gpu_device": config.get('gpu_device', 0),
         }
         
         # Initialize AI2-THOR controller
