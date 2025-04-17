@@ -6,3 +6,10 @@ server:
   port: 5000
   debug: false
 
+frozenlake:
+  max_workers: 10
+navigation:
+  max_workers: 10
+svg:
+  max_workers: 10
+

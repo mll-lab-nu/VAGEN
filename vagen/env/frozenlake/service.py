@@ -1,6 +1,6 @@
 from typing import Dict, List, Tuple, Optional, Any, Union
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from vagen.env.base_service import BaseService
+from vagen.env.base.base_service import BaseService
 from vagen.server.serial import serialize_observation
 
 from .env import FrozenLakeEnv

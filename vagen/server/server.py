@@ -4,7 +4,7 @@ import time
 import importlib
 from typing import Dict, List, Tuple, Optional, Any, Type
 from vagen.env import REGISTERED_ENV
-from vagen.env.base_service import BaseService
+from vagen.env.base.base_service import BaseService
 import hydra
 from omegaconf import DictConfig
 

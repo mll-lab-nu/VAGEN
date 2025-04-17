@@ -1,4 +1,4 @@
-from vagen.env.base_env import BaseEnv
+from vagen.env.base.base_env import BaseEnv
 import ai2thor.controller
 import numpy as np
 import time

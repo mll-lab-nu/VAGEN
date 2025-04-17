@@ -1,4 +1,4 @@
-from vagen.env.base_env import BaseEnv
+from vagen.env.base.base_env import BaseEnv
 import gym
 from gym_sokoban.envs.sokoban_env import SokobanEnv as GymSokobanEnv
 from .utils import generate_room

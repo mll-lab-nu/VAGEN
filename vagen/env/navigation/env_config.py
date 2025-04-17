@@ -1,4 +1,4 @@
-from vagen.env.base_env_config import BaseEnvConfig
+from vagen.env.base.base_env_config import BaseEnvConfig
 from dataclasses import dataclass, field, fields
 
 @dataclass

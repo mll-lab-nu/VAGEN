@@ -1,4 +1,4 @@
-from vagen.env.base_env import BaseEnv
+from vagen.env.base.base_env import BaseEnv
 import numpy as np
 import copy
 from typing import Dict, List, Optional, Tuple, Any

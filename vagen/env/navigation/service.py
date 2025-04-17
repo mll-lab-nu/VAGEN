@@ -1,6 +1,6 @@
 from typing import Dict, List, Tuple, Optional, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from vagen.env.base_service import BaseService
+from vagen.env.base.base_service import BaseService
 from vagen.env.navigation.env import NavigationEnv
 from vagen.env.navigation.env_config import NavigationEnvConfig
 from vagen.server.serial import serialize_observation

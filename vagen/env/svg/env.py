@@ -1,4 +1,4 @@
-from vagen.env.base_env import BaseEnv
+from vagen.env.base.base_env import BaseEnv
 from vagen.env.svg.svg_utils import (process_and_rasterize_svg, is_valid_svg, load_svg_dataset)
 from vagen.env.svg.score import calculate_total_score
 from vagen.env.utils.context_utils import parse_llm_raw_response, convert_numpy_to_PIL
