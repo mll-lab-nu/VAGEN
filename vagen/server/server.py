@@ -28,6 +28,7 @@ class BatchEnvServer:
         self.host = config.server.host
         self.port = config.server.port
         self.debug = config.server.debug
+        self.config=config
         
         # Dictionary to store services by environment type
         self.services = {}
