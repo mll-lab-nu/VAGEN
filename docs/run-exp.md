@@ -59,4 +59,4 @@ The following environments are currently registered:
 - SVG: An environment that generate svg code fot provided image. Supports reward model integration
 - Navigation: An environment of visual navigation task for embodied AI
 
-For information on creating new environment services, please refer to our "[Create your Own Environment](create-env.md)" guide.
+For information on creating new environment, please refer to our "[Create your Own Environment](create-env.md)" guide.
