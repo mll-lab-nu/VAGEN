@@ -33,20 +33,13 @@ class SVGService(BaseService):
         self.cache = {}
         
         # Load the DINO model directly in the service
-<<<<<<< HEAD
-        self.model_size = model_size
-=======
         # This allows all environments to share the same model instance
         self.model_size = self.config.model_size
->>>>>>> 20619f61ee3e637ecfa735949676ca4cb0a58dc9
         self.dino_model = None  # Will be loaded on first use
         
         # Store device for model inference
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-<<<<<<< HEAD
-=======
-        logging.info(f"SVGService initialized with {self.max_workers} workers, model_size={self.model_size}, device={self.device}")
->>>>>>> 20619f61ee3e637ecfa735949676ca4cb0a58dc9
+        print(f"SVGService initialized with {self.max_workers} workers, model_size={self.model_size}, device={self.device}")
     
     def _get_dino_model(self):
         """
