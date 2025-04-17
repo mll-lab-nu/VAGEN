@@ -3,4 +3,4 @@ from dataclasses import dataclass, fields,field
 
 @dataclass
 class SVGServiceConfig(BaseServiceConfig):
-    pass
+    model_size="small"

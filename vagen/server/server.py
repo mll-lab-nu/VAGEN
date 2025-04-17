@@ -5,6 +5,7 @@ import importlib
 from typing import Dict, List, Tuple, Optional, Any, Type
 from vagen.env import REGISTERED_ENV
 from vagen.env.base.base_service import BaseService
+from vagen.env.base.base_service_config import BaseServiceConfig
 import hydra
 from omegaconf import DictConfig
 
@@ -196,7 +197,8 @@ class BatchEnvServer:
                 raise ValueError(f"No service class registered for environment type: {env_name}")
                 
             service_class = REGISTERED_ENV[env_name]["service_cls"]
-            self.services[env_name] = service_class()
+            service_config = REGISTERED_ENV[env_name].get("service_config", BaseServiceConfig)(**self.config.get(env_name, {}))
+            self.services[env_name] = service_class(service_config)
                 
         return self.services[env_name]
     
@@ -452,6 +454,7 @@ def main(cfg: DictConfig):
         cfg: Configuration object from Hydra
     """
     # Create and start server with configuration
+    breakpoint()
     server = BatchEnvServer(cfg)
     
     print(f"Starting Batch Environment Server on http://{cfg.server.host}:{cfg.server.port}")

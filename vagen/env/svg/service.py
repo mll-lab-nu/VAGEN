@@ -9,7 +9,7 @@ from vagen.env.svg.score import calculate_total_score, calculate_total_score_bat
 from vagen.env.svg.dino import get_dino_model
 from vagen.env.svg.svg_utils import process_and_rasterize_svg, is_valid_svg
 from vagen.env.utils.context_utils import parse_llm_raw_response, convert_numpy_to_PIL
-from PIL import Image
+from .service_config import SVGServiceConfig
 
 class SVGService(BaseService):
     """
@@ -18,7 +18,7 @@ class SVGService(BaseService):
     Integrates DINO scoring model directly within the service.
     """
     
-    def __init__(self, max_workers: int = 10, model_size: str = "small"):
+    def __init__(self, config: SVGServiceConfig):
         """
         Initialize the SVGService.
         
@@ -26,17 +26,27 @@ class SVGService(BaseService):
             max_workers: Maximum number of worker threads for parallel processing
             model_size: Size of the DINO model to use ("small", "base", or "large")
         """
-        self.max_workers = max_workers
+        self.config= config
+        self.max_workers = self.config.max_workers
         self.environments = {}
         self.env_configs = {}
         self.cache = {}
         
         # Load the DINO model directly in the service
+<<<<<<< HEAD
         self.model_size = model_size
+=======
+        # This allows all environments to share the same model instance
+        self.model_size = self.config.model_size
+>>>>>>> 20619f61ee3e637ecfa735949676ca4cb0a58dc9
         self.dino_model = None  # Will be loaded on first use
         
         # Store device for model inference
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+<<<<<<< HEAD
+=======
+        logging.info(f"SVGService initialized with {self.max_workers} workers, model_size={self.model_size}, device={self.device}")
+>>>>>>> 20619f61ee3e637ecfa735949676ca4cb0a58dc9
     
     def _get_dino_model(self):
         """

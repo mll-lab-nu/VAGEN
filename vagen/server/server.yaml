@@ -12,4 +12,5 @@ navigation:
   max_workers: 10
 svg:
   max_workers: 10
+  model_size: "small"
 

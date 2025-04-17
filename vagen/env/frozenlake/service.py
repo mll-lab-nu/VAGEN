@@ -5,7 +5,7 @@ from vagen.server.serial import serialize_observation
 
 from .env import FrozenLakeEnv
 from .env_config import FrozenLakeEnvConfig
-from .service_config import FrozenLakeServiceConfig
+from ..base.base_service_config import BaseServiceConfig
 
 class FrozenLakeService(BaseService):
     """
@@ -13,7 +13,7 @@ class FrozenLakeService(BaseService):
     Implements batch operations with parallel processing for efficiency.
     """
     
-    def __init__(self, config:FrozenLakeServiceConfig):
+    def __init__(self, config:BaseServiceConfig):
         """
         Initialize the FrozenLakeService.
         
