@@ -40,7 +40,7 @@ VAGEN addresses these challenges by focusing optimization on the most critical d
 
 ## News
 
-**[2025/05]** We've introduced a new modular design for environments and services in VAGEN:
+**[2025/04]** We've introduced a new modular design for environments and services in VAGEN:
 - Enhanced environment framework for easier creation of custom environments
 - New service architecture for efficient distributed training
 - Check out our new guides:
