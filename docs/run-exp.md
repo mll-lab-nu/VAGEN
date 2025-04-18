@@ -1,8 +1,8 @@
-# Run Experiments
+# Installation and Run Experiments
 
-This guide provides instructions for running experiments with VAGEN, a multi-turn reinforcement learning framework for training VLM Agents. VAGEN leverages the TRICO algorithm to efficiently train VLMs for visual agentic tasks.
+This guide provides instructions for installing environment and running experiments with VAGEN, a multi-turn reinforcement learning framework for training VLM Agents. VAGEN leverages the TRICO algorithm to efficiently train VLMs for visual agentic tasks.
 
-## Prerequisites
+## Installation
 
 Before running experiments, ensure you have set up the environment properly:
 
@@ -33,12 +33,11 @@ wandb login
 
 ## Running Experiments
 ### Basic Approach
-The simplest way to reproduce our experiments is to use the provided scripts:
+The simplest way to run an experiments is to use the provided scripts:
 ```
 # run one of the experiment scripts
-bash vagen/examples/release_experiments/grpo.sh  # rico-grpo
-bash vagen/examples/release_experiments/mask_gae_mask_loss_turnwise_reward_bi_level.sh  # trico
-bash vagen/examples/release_experiments/mask_gae_mask_loss.sh  # aico
+bash vagen/examples/frozen_lake_aico/run.sh  #aico-frozenlake
+bash vagen/examples/frozen_lake_trico/run.sh  #trico-frozenlake
 ```
 
 **Handling Training Instabilities**
@@ -47,7 +46,7 @@ Each run takes approximately 4 hours to reach 150 steps on 4 H100s. You can decr
 ### Service Approach
 The simplest way to reproduce our experiments is to use the provided scripts:
 ```
-# EXPERIMENT TOBE ADDED
+bash vagen/examples/frozen_lake_aico_service/run.sh  # aico-frozenlake
 ```
 
 ## Support Environments
@@ -59,4 +58,6 @@ The following environments are currently registered:
 - SVG: An environment that generate svg code fot provided image. Supports reward model integration
 - Navigation: An environment of visual navigation task for embodied AI
 
-For information on creating new environment services, please refer to our "[Create your Own Environment](create-env.md)" guide.
+For information on creating new environment, please refer to our "[Create your Own Environment](create-env.md)" guide.
+
+For information on creating service for new enviornment, please refer to our "[Create your Own Service](create-service.md) guide"

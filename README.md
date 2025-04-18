@@ -38,40 +38,14 @@ Traditional RL frameworks for LLM agents treat all tokens in a trajectory equall
 
 VAGEN addresses these challenges by focusing optimization on the most critical decision-making tokens and creating a more nuanced reward structure across interaction turns.
 
-## Experimental Results
-Our experiments on visual Sokoban using a Qwen-VL 3B model show:
-- TRICO significantly outperforms RICO in visual agentic tasks
-- Both selective token masking and cross-turn credit assignment contribute to performance gains
-- AICO (Action-centric Interaction Chain Optimization), which uses only selective token masking, outperforms TRICO on simple tasks
-- TRICO demonstrates superior exploration capabilities on more complex problems
+## News
 
-<img width="800" alt="image" src="./public/1.png" />
-
-<img width="800" alt="image" src="./public/2.png" />
-
-<img width="800" alt="image" src="./public/3.png" />
-  
-
-## Comparison of Algorithms
-
-| **Feature** | **PPO** | **RICO** | **TRICO (Ours)** |
-| --- | --- | --- | --- |
-| **Sequence Structure** | Single response | Multiple turn interaction | Multiple turn interaction |
-| **LM output** | No special structure | `<think>...</think><ans>...</ans>` | `<think>...</think><ans>...</ans><eoa>` |
-| **Discounting** | Single discount rate | Single discount rate | Bi-level discounting |
-| **Optimization** | All tokens equally | All tokens equally | Selective token optimization |
-
-## Training Configuration
-
-We used the following settings in our experiments:
-
-- **Model**: Qwen 2.5 VL-instruction 3B
-- **Environment**: Visual Sokoban (puzzle-solving task)
-- **Rewards**: Box on target (+1.0), All boxes placed (+10.0), Format correct (+0.5), Step penalty (-0.1)
-- **Hyperparameters**: `γ_turn`=0.95, `γ_token`=1.0, KL penalty=0.001, Actor LR=1e-6, Critic LR=1e-5
-
-
-----
+**[2025/05]** We've introduced a new modular design for environments and services in VAGEN:
+- Enhanced environment framework for easier creation of custom environments
+- New service architecture for efficient distributed training
+- Check out our new guides:
+  - [Creating Environments](docs/creating_environments.md): Learn how to build custom environments
+  - [Service Architecture](docs/service_architecture.md): Understand our scalable training infrastructure
 
 ## Installation
 
@@ -91,114 +65,58 @@ git clone https://github.com/RAGEN-AI/VAGEN.git
 cd VAGEN
 bash scripts/install.sh
 ```
-
-## Reproduce Experiments
-
-```bash
-# To reproduce our reults, please go to release branch of verl and v25.3.25 of vagen
-cd ../verl
-git checkout release
-cd ../VAGEN
-git checkout v25.3.25
-
-wandb login # login into wandb
-
-# Then, you can run
-bash vagen/examples/release_experiments/gae.sh # rico-gae
-bash vagen/examples/release_experiments/grpo_mask_loss.sh # rico-grpo + loss mask
-bash vagen/examples/release_experiments/grpo.sh # rico-grpo
-bash vagen/examples/release_experiments/mask_gae_mask_loss_bi_level.sh # trico - turn reward
-bash vagen/examples/release_experiments/mask_gae_mask_loss_turnwise_gae.sh # trico - turn reward - bi-level gae + turn-level gae
-bash vagen/examples/release_experiments/mask_gae_mask_loss_turnwise_reward_bi_level.sh # trico
-bash vagen/examples/release_experiments/mask_gae_mask_loss.sh # aico
-bash vagen/examples/release_experiments/mask_gae.sh # aico - loss mask
-bash vagen/examples/release_experiments/mask_loss.sh # aico - gae mask
+## Examples
 ```
-Each run takes ~4 hours to reach 150 steps on 4 H100s. You can decrease testing frequency to speed up training. Training might be unstable due to loss spikes; we recommend restoring from the latest checkpoint when encountering such cases. We will resolve this issue in future work (see roadmap).
+# Login to wandb
+wandb login
 
-## Service and Environment Architecture
-We introduce a new service-based architecture that addresses the challenges of managing multiple embodied environments for VLM agent training. This design enables efficient parallel processing across distributed systems, providing better scalability, standardization, and the ability to seamlessly integrate both rule-based rewards and reward models within the same framework
+# Then, you can run different environments and algorithms:
 
-### Directory Structure
+# Frozen Lake Environment
+bash vagen/examples/frozen_lake_aico/run.sh         # AICO without service
+bash vagen/examples/frozen_lake_aico_service/run.sh # AICO with service
+bash vagen/examples/frozen_lake_trico/run.sh        # TRICO without service
+
+# SVG Generation
+bash vagen/examples/svg_aico/run.sh                 # AICO without service
+bash vagen/examples/svg_trico/run.sh                # TRICO without service
 ```
-vagen/
-├── env/
-│   ├── base_service.py        # Abstract base class defining the service interface
-│   ├── client.py              # Client for interacting with environment server
-│   ├── server.py              # Server implementation for hosting environments
-│   └── REGISTERED_ENV         # Registry mapping environment names to services
-├── utils/
-|   ├── serial.py              # Handle observation serilization from service to client
-```
+## How to Add New Environment
 
-### Component Hierarchy
-```
-BaseService (ABC)
-├── **Batch Methods**
-    ├── create_environments_batch()
-    ├── reset_batch()
-    ├── step_batch()
-    ├── compute_reward_batch()
-    ├── get_system_prompts_batch()
-    └── close_batch()
+VAGEN supports creating custom environments for agent training, which could simply inherit from `BaseEnv` and `BaseEnvConfig` classes to implement your environment.
 
-BatchEnvClient
-├── **HTTP Communication**
-├── **Batch Methods**
-└── **Convenience Methods**
+For detailed instructions, see our [Creating Environments](docs/create-env.md) guide. You may also want to check our [Creating Service](docs/create-service.md) for scaling your environments.
 
-BatchEnvServer
-├── **Service Management**
-├── **Request Routing**
-├── **Batch Method Implementation**
-└── **Server Management**
-```
+## How to Add New Model
 
-### New Service Development
-To develop a new environment service, you only need to:
+VAGEN supports integration with various language models. To add a new model:
 
-- Create a service class that inherits from `BaseService`
-- Register the service with `REGISTERED_ENV`
+1. Define model interface in the mllm_agent architecture
+2. Implement model-specific adapters and handlers
+3. Configure the model in your training scripts
 
-The FrozenLake service example demonstrates how to:
-- Handle batch operations
+For detailed implementation examples, refer to our code architecture documentation based on the [VERL architecture](https://verl.readthedocs.io/en/latest/index.html).
 
-The SVG service example demonstrates how to:
-- Integrate Reward Models (like DINO) directly within the service
-- Combine rule-based rewards with model-based rewards
+## Experimental Results
+> To reproduce our experiment, please refer to document: [Reproduce Experiments](docs/reproduce-exp.md)
 
-## Algorithm Settings
 
-| Setting           | GRPO | GAE | Bi-Level GAE | Turn-Wise GAE | Masked-GAE |
-|-------------------|------|-----|--------------|---------------|------------|
-| with_loss_mask    | ✓    | ✓   | ✓            | ✓             | ✓          |
-| multi-turn-reward | ✗    | ✓   | ✓            | ✓             | ✓          |
-| with_gae_mask     | ✗    | ✗   | ✓            | ✓             | ✓          |
+Our experiments on visual Sokoban using a Qwen-VL 3B model show:
+- TRICO significantly outperforms RICO in visual agentic tasks
+- Both selective token masking and cross-turn credit assignment contribute to performance gains
+- AICO (Action-centric Interaction Chain Optimization), which uses only selective token masking, outperforms TRICO on simple tasks
+- TRICO demonstrates superior exploration capabilities on more complex problems
 
-### Algorithm Options
+<img width="800" alt="image" src="./public/1.png" />
 
-- **GRPO**: Whether to use GRPO
-  - `algorithm.adv_estimator=grpo`
-- **GAE**: Whether to use GAE
-  - `algorithm.adv_estimator=gae`
-- **Bi-Level-GAE**: Whether to use multi-turn GAE (first estimates turn-level advantage, then estimates advantage in each turn)
-  - `algorithm.adv_estimator=bi_level_gae`
-- **Turn-Wise-GAE**: Whether to use turn-aware GAE (each turn will have only one same advantage estimation)
-  - `algorithm.adv_estimator=turn_wise_gae`
-- **Masked-GAE**: Whether to use masked GAE (skips observation tokens from environment when estimating advantages)
-  - `algorithm.adv_estimator=masked_gae`
+<img width="800" alt="image" src="./public/2.png" />
 
-### Configuration Settings
+<img width="800" alt="image" src="./public/3.png" />
 
-- **multi-turn-reward**: Whether to use multi-turn reward (gives step reward for last token of each turn, instead of summing all rewards for last token of whole trajectory)
-  - `rollout_manager.use_multi_turn_reward=True`
-- **with_loss_mask**: Whether to use loss mask to only calculate the loss of tokens output by the models
-  - `rollout_manager.use_loss_mask=True`
-- **with_loss_mask**: Whether to use gae mask to only calculate the gae of tokens output by the models
-  - `rollout_manager.use_gae_mask=True`
 
- ## Cases
-  We present several cases selected from validation steps during training models with AICO and TRICO, as shown below. You can view all the cases in our [Experiment Log](https://api.wandb.ai/links/ragen-V/nlb40e7l).
+
+## Cases
+We present several cases selected from validation steps during training models with AICO and TRICO, as shown below. You can view all the cases in our [Experiment Log](https://api.wandb.ai/links/ragen-V/nlb40e7l).
 
 ### Cases from AICO Training
 <img width="1107" alt="image (4)" src="https://github.com/user-attachments/assets/995ec921-faf8-4832-a4c0-1c2ce559a55c" />

@@ -1,45 +1,47 @@
 # Welcome to VAGEN Documentation!
 
+## Introduction
 VAGEN is a multi-turn reinforcement learning framework designed for training Visual Language Model (VLM) agents efficiently.
 
-## Quick Navigation
+## Document Structure
 
-- [Run Experiment](run-exp.md)
-- [Create your Own Environment](create-env.md)
-- [Configuration](config.md)
+### Quick Strat
+- [Installation and Run Experiment](run-exp.md): Get VAGEN up and running
 
-Use the links above to explore the core functionalities of the project.
+### Configurations
+- [General Configuration](general-config.md): Understanding VAGEN's configuration system
+- [Algorithm Configuration](algo-config.md): Configure different algorithms
 
-## Algorithm Settings
+### Environments
+- [Create your Own Environment](create-env.md): Build custom environments
+- [Create your Own Service](create-service.md): Scale your training infrastructure
+- [How to add Reward Model](reward-model.md): Add custom reward model
 
-VAGEN supports several advantage estimation algorithms, each with different properties for training VLM agents. The table below summarizes which features are enabled by default with each algorithm:
+### Experiments
+- [Reproduce Experiments](reproduce-exp.md): Reproduce our experiments
 
-| Setting           | GRPO | GAE | Bi-Level GAE | Turn-Wise GAE | Masked-GAE |
-|-------------------|------|-----|--------------|---------------|------------|
-| with_loss_mask    | ✓    | ✓   | ✓            | ✓             | ✓          |
-| multi-turn-reward | ✗    | ✓   | ✓            | ✓             | ✓          |
-| with_gae_mask     | ✗    | ✗   | ✓            | ✓             | ✓          |
 
-### Algorithm Configurations
-#### RICO (Traditional RL)
+#### Comparison of Algorithms
+
+| **Feature** | **PPO** | **RICO** | **TRICO (Ours)** |
+| --- | --- | --- | --- |
+| **Sequence Structure** | Single response | Multiple turn interaction | Multiple turn interaction |
+| **LM output** | No special structure | `<think>...</think><ans>...</ans>` | `<think>...</think><ans>...</ans><eoa>` |
+| **Discounting** | Single discount rate | Single discount rate | Bi-level discounting |
+| **Optimization** | All tokens equally | All tokens equally | Selective token optimization |
+
+
+## Citation
+
+If you find VAGEN useful, we appreciate it if you could cite our work at:
+
+```bibtex
+@misc{VAGEN,
+  title={VAGEN: Training VLM Agents with Multi-Turn Reinforcement Learning},
+  author={Kangrui Wang* and Pingyue Zhang* and Zihan Wang* and Qineng Wang* and Linjie Li* and Zhengyuan Yang and Chi Wan and Yiping Lu and Manling Li},
+  year={2025},
+}
 ```
-algorithm.adv_estimator=grpo
-rollout_manager.use_loss_mask=True
-rollout_manager.use_gae_mask=False
-rollout_manager.use_multi_turn_reward=False
-```
-#### AICO (Action-centric Optimization)
-```
-algorithm.adv_estimator=masked_gae
-rollout_manager.use_loss_mask=True
-rollout_manager.use_gae_mask=True
-rollout_manager.use_multi_turn_reward=False
-```
-#### TRICO (Turn-aware Optimization)
-```
-algorithm.adv_estimator=bi_level_gae
-algorithm.high_level_gamma=0.95
-rollout_manager.use_loss_mask=True
-rollout_manager.use_gae_mask=True
-rollout_manager.use_multi_turn_reward=True
-```
+
+## License
+Licensed under the MIT License. 
