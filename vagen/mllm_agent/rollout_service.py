@@ -17,7 +17,7 @@ import vagen.env
 from vagen.env import REGISTERED_ENV
 from vagen.server.client import BatchEnvClient
     
-class QwenVLRolloutMangerService():
+class QwenVLRolloutManagerService():
     def __init__(self,
                  actor_rollout_wg,
                  config,
