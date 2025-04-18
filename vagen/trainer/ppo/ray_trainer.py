@@ -40,8 +40,8 @@ from verl.utils.dataset.rl_dataset import RLHFDataset, collate_fn
 from torch.utils.data import RandomSampler, SequentialSampler
 from torchdata.stateful_dataloader import StatefulDataLoader
 
-from vagen.mllm_agent.rollout import QwenVLRolloutManger
-from vagen.mllm_agent.rollout_service import QwenVLRolloutMangerService
+from vagen.mllm_agent.rollout import QwenVLRolloutManager
+from vagen.mllm_agent.rollout_service import QwenVLRolloutManagerService
 WorkerType = Type[Worker]
 
 
@@ -761,7 +761,7 @@ class RayPPOTrainer(object):
     
         if self.test_rollout_manager==None:
             if self.config.rollout_manager.get("use_service",False):
-                self.test_rollout_manager =QwenVLRolloutMangerService(
+                self.test_rollout_manager =QwenVLRolloutManagerService(
                     actor_rollout_wg=self.actor_rollout_wg,
                     config=self.config.rollout_manager,
                     tokenizer=self.tokenizer,
@@ -769,7 +769,7 @@ class RayPPOTrainer(object):
                     split="val",
                 )
             else:
-                self.test_rollout_manager =QwenVLRolloutManger(
+                self.test_rollout_manager =QwenVLRolloutManager(
                     actor_rollout_wg=self.actor_rollout_wg,
                     config=self.config.rollout_manager,
                     tokenizer=self.tokenizer,
@@ -1031,7 +1031,7 @@ class RayPPOTrainer(object):
         self.global_steps += 1
 
         if self.config.rollout_manager.get("use_service",False):
-            rollout_manager = QwenVLRolloutMangerService(
+            rollout_manager = QwenVLRolloutManagerService(
                 actor_rollout_wg=self.actor_rollout_wg,
                 config=self.config.rollout_manager,
                 tokenizer=self.tokenizer,
@@ -1039,7 +1039,7 @@ class RayPPOTrainer(object):
                 split="train",
             )
         else:
-            rollout_manager = QwenVLRolloutManger(
+            rollout_manager = QwenVLRolloutManager(
                 actor_rollout_wg=self.actor_rollout_wg,
                 config=self.config.rollout_manager,
                 tokenizer=self.tokenizer,

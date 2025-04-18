@@ -17,7 +17,7 @@ import vagen.env
 from vagen.env import REGISTERED_ENV
 
     
-class QwenVLRolloutManger():
+class QwenVLRolloutManager():
     def __init__(self,
                  actor_rollout_wg,
                  config,
