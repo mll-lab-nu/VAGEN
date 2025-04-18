@@ -35,8 +35,8 @@ We used the following settings in our experiments:
 Make sure your are in the right branch (v25.3.25) and use same setting before reproduce the experiment. The result should be similar as follow:
 
 
-<img width="800" alt="image" src="./public/1.png" />
+<img width="800" alt="image" src="../public/1.png" />
 
-<img width="800" alt="image" src="./public/2.png" />
+<img width="800" alt="image" src="../public/2.png" />
 
-<img width="800" alt="image" src="./public/3.png" />
+<img width="800" alt="image" src="../public/3.png" />
