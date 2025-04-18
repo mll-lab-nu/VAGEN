@@ -54,31 +54,29 @@ BatchEnvServer
 Create a new class that inherits from `BaseService`. This class must implement all required methods for interacting with environments:
 
 ```python
-from vagen.env.base_service import BaseService
-
 class MyNewService(BaseService):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Initialize your environment-specific components here
         
-    def create_environments_batch(self, env_ids, **kwargs):
+    def create_environments_batch(self, ids2configs: Dict[str, Any]) -> None:
         # Initialize batch of environments
         # Return initialization status
         
-    def reset_batch(self, env_ids, **kwargs):
+    def reset_batch(self, ids2seeds: Dict[str, Any]) -> Dict[str, Tuple[Any, Any]]:
         # Reset environments and return observations
         
-    def step_batch(self, env_ids, actions, **kwargs):
+    def step_batch(self, ids2actions: Dict[str, Any]) -> Dict[str, Tuple[Dict, float, bool, Dict]]:
         # Process actions and return (observations, dones)
         
-    def compute_reward_batch(self, env_ids, **kwargs):
+    def compute_reward_batch(self, env_ids: List[str]) -> Dict[str, float]:
         # Calculate rewards for each environment
         # Return rewards and any additional info
         
-    def get_system_prompts_batch(self, env_ids, **kwargs):
+    def get_system_prompts_batch(self, env_ids: List[str]) -> Dict[str, str]:
         # Return system prompts for each environment
         
-    def close_batch(self, env_ids, **kwargs):
+    def close_batch(self, env_ids: Optional[List[str]] = None) -> None:
         # Clean up resources for environments
 ```
 ### Step 2: Observation Serialization
