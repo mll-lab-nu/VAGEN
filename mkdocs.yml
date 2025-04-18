@@ -9,9 +9,31 @@ theme:
     primary: indigo
     accent: indigo
   features:
-    - navigation.tabs
-    - navigation.sections
-    - toc.integrate
+    - header.autohide
+    - navigation.instant
+  icon:
+    repo: fontawesome/brands/github
+  repo_url: https://github.com/RAGEN-AI/VAGEN/tree/main
+  repo_name: RAGEN-AI/VAGEN
+
+
+plugins:
+  - search
+
+
+# Left Navigation bar
+nav:
+  - Home: index.md
+  - Quick Start:
+      - Installation and Run Experiment: run-exp.md
+  - Configurations:
+      - General Configuration: configs/general-config.md
+      - Algorithm Configuration: configs/algo-config.md
+  - Environments:
+      - Create Environment: envs/create-env.md
+      - Create Service: envs/create-service.md
+  - Experiments:
+      - Reproduce Experiments: reproduce-exp.md
 
 # Copyright footer
 copyright: Copyright © 2025, VAGEN Team
