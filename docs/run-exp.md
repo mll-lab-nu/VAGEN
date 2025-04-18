@@ -22,37 +22,35 @@ git clone https://github.com/RAGEN-AI/VAGEN.git
 cd VAGEN
 bash scripts/install.sh
 
-# go to release branch of verl
-cd ../verl
-git checkout release
-cd ../VAGEN
-
 # Login to wandb for experiment tracking
 wandb login
 ```
 
 ## Running Experiments
+
 ### Basic Approach
-The simplest way to run an experiments is to use the provided scripts:
 ```
 # run one of the experiment scripts
-bash vagen/examples/frozen_lake_aico/run.sh  #aico-frozenlake
-bash vagen/examples/frozen_lake_trico/run.sh  #trico-frozenlake
+bash vagen/examples/frozen_lake_aico/run.sh  
+bash vagen/examples/frozen_lake_trico/run.sh  
+bash vagen/examples/sokoban_aico/run.sh 
+bash vagen/examples/sokoban_trico/run.sh  
 ```
-
-**Handling Training Instabilities**
-Each run takes approximately 4 hours to reach 150 steps on 4 H100s. You can decrease testing frequency to speed up training. Note that training might be unstable due to loss spikes; we recommend restoring from the latest checkpoint when encountering such cases.
 
 ### Service Approach
-The simplest way to reproduce our experiments is to use the provided scripts:
+1. Start the server process in a tmux session 
 ```
-bash vagen/examples/frozen_lake_aico_service/run.sh  # aico-frozenlake
+python vagen/server/server.py
 ```
 
-## Support Environments
-The following environments are currently registered:
-> NOTICE: SVG and Navigation envs are commented in `env/__init__.py`for better package management. Please comment them out for future use, and refer `vagen/env/README.md` to install dependencies
+2. After the server is running, open new terminal to run the training processe:
+```
+bash vagen/examples/frozen_lake_aico_service/run.sh
+bash vagen/examples/svg_aico/run.sh
+bash vagen/examples/svg_trico/run.sh
+```
 
+## Support Environment
 - FrozenLake: A simple grid-based environment
 - Sokoban: A visual puzzle-solving environment with box pushing
 - SVG: An environment that generate svg code fot provided image. Supports reward model integration
