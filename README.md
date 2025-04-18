@@ -44,8 +44,8 @@ VAGEN addresses these challenges by focusing optimization on the most critical d
 - Enhanced environment framework for easier creation of custom environments
 - New service architecture for efficient distributed training
 - Check out our new guides:
-  - [Creating Environments](docs/creating_environments.md): Learn how to build custom environments
-  - [Service Architecture](docs/service_architecture.md): Understand our scalable training infrastructure
+  - [Creating Environments](docs/create-env.md): New environment protocal.
+  - [Creating Services](docs/create-service.md): We now support hosting environments in a seperate process
 
 ## Installation
 
@@ -72,30 +72,26 @@ wandb login
 
 # Then, you can run different environments and algorithms:
 
+#Run a server process in a saperate tmux session if you want to train in env-as-service mode
+python vagen/server/server.py
+
 # Frozen Lake Environment
 bash vagen/examples/frozen_lake_aico/run.sh         # AICO without service
-bash vagen/examples/frozen_lake_aico_service/run.sh # AICO with service
 bash vagen/examples/frozen_lake_trico/run.sh        # TRICO without service
+bash vagen/examples/frozen_lake_aico_service/run.sh # AICO with service
 
 # SVG Generation
 bash vagen/examples/svg_aico/run.sh                 # AICO without service
 bash vagen/examples/svg_trico/run.sh                # TRICO without service
 ```
-## How to Add New Environment
+## How to Add New Environment and Services
 
-VAGEN supports creating custom environments for agent training, which could simply inherit from `BaseEnv` and `BaseEnvConfig` classes to implement your environment.
-
-For detailed instructions, see our [Creating Environments](docs/create-env.md) guide. You may also want to check our [Creating Service](docs/create-service.md) for scaling your environments.
+See our [Creating Environments](./docs/create-env.md) guide. You may also want to check our [Creating Service](./docs/create-service.md) for scaling your environments.
 
 ## How to Add New Model
 
-VAGEN supports integration with various language models. To add a new model:
-
-1. Define model interface in the mllm_agent architecture
-2. Implement model-specific adapters and handlers
-3. Configure the model in your training scripts
-
-For detailed implementation examples, refer to our code architecture documentation based on the [VERL architecture](https://verl.readthedocs.io/en/latest/index.html).
+1. Refer to [VERL](https://verl.readthedocs.io/en/latest/index.html) for adding new MLLM.
+2. Refer to [QwenVLRolloutManager](./vagen/mllm_agent/rollout.py) to understand how rollout works. In most cases, you can use QwenVLRolloutManager directly with only minor modifications to the model's special tokens
 
 ## Experimental Results
 > To reproduce our experiment, please refer to document: [Reproduce Experiments](docs/reproduce-exp.md)
