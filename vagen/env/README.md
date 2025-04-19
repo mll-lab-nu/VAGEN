@@ -16,6 +16,8 @@ python vagen/env/navigation/startx.py 1
 ```
 
 ### Manipulation
+```
 pip install --upgrade mani_skill
 python -m mani_skill.utils.download_asset "PickSingleYCB-v1"
 python -m mani_skill.utils.download_asset partnet_mobility_cabinet
+```
