@@ -11,7 +11,16 @@ from .env_config import FrozenLakeEnvConfig
 from .utils import generate_random_map, is_valid
 
 class FrozenLakeEnv(BaseEnv):
-    # Map gym state in integer
+    """
+    FrozenLake Environment for training and evaluating language models as agents.
+    
+    This environment implements a grid-world where an agent must navigate from a starting
+    position to a goal while avoiding holes in the ice. It is designed specifically for
+    Large Language Models (LLMs) as agents, providing structured observations and handling
+    text-based actions.
+    """
+    
+    # Map gym state characters to integer representation
     MAP_LOOKUP = {
         b"P": 0,  # player
         b"F": 1,  # frozen
@@ -19,7 +28,7 @@ class FrozenLakeEnv(BaseEnv):
         b"G": 3,  # goal
     }
 
-    # Define rules to transform to rendered text observation of the environment
+    # Define text representations for rendering the environment
     GRID_LOOKUP = {
         0: " P \t",  # player
         1: " _ \t",  # frozen
@@ -29,6 +38,7 @@ class FrozenLakeEnv(BaseEnv):
         5: " √ \t",  # player on goal
     }
 
+    # Map action strings to Gymnasium action integers
     ACTION_LOOKUP = {
         "Left": 0,
         "Down": 1,
@@ -37,26 +47,50 @@ class FrozenLakeEnv(BaseEnv):
     }
 
     def __init__(self, config: FrozenLakeEnvConfig):
+        """
+        Initialize the FrozenLake environment.
+        
+        Args:
+            config (FrozenLakeEnvConfig): Configuration parameters for the environment
+                including map size, slipperiness, rendering mode, etc.
+        """
         BaseEnv.__init__(self)
         self.config = config
        
-        
+        # Generate a random map if none is provided, otherwise use the provided map
         if self.config.desc is None:
             random_map = generate_random_map(size=self.config.size, p=self.config.p)
         else:
             random_map = np.asarray(copy.deepcopy(self.config.desc), dtype="c")
             
+        # Initialize the underlying Gymnasium environment
         self.gym_env = GymFrozenLakeEnv(
             desc=random_map,
             is_slippery=self.config.is_slippery
         )
         
+        # Initialize episode state
         self.total_reward = 0
         self.valid_actions = []
         self.reward = 0
 
     def reset(self, seed=None):
-        """Reset the environment with seed"""
+        """
+        Reset the environment to an initial state.
+        
+        This method resets the underlying Gymnasium environment and initializes
+        tracking variables. If a seed is provided, it ensures deterministic
+        environment generation.
+        
+        Args:
+            seed (Optional[int]): Random seed for environment generation
+                                  If None, a random seed is used
+        
+        Returns:
+            Tuple[Dict, Dict]: 
+                - obs: Dictionary containing observation string and optional image data
+                - info: Empty dictionary for initial state
+        """
         with NoLoggerWarnings():
             with set_seed(seed):
                 self.gym_env.reset(seed=seed)
@@ -64,6 +98,29 @@ class FrozenLakeEnv(BaseEnv):
         return self._render(init_obs=True), {}
 
     def step(self, action_str: str):
+        """
+        Take a step in the environment based on the agent's action.
+        
+        This method:
+        1. Parses the raw LLM response to extract actions
+        2. Executes each valid action in sequence
+        3. Calculates rewards and metrics
+        4. Generates the next observation
+        
+        The action string is expected to be the raw output from an LLM, which 
+        may contain special tokens for thought processes or other structured content.
+        
+        Args:
+            action_str (str): Raw string from LLM containing actions
+        
+        Returns:
+            Tuple[Dict, float, bool, Dict]:
+                - obs: Dictionary with observation string and optional image data
+                - reward: Numeric reward for the step
+                - done: Boolean indicating if episode is complete
+                - info: Dictionary containing metrics and parsed action data
+        """
+        # Parse the LLM's raw response to extract actions
         rst = parse_llm_raw_response(
             response=action_str,
             special_token_list=self.config.special_token_list,
@@ -74,86 +131,130 @@ class FrozenLakeEnv(BaseEnv):
         action_list = rst['actions']
         prev_player_position = self._get_player_position()
         
+        # Initialize metrics for this step
         metrics = {
             "turn_metrics": {
-                "action_is_valid": len(action_list) != 0,
-                "action_is_effective": False,
+                "action_is_valid": len(action_list) != 0,  # True if at least one valid action was parsed
+                "action_is_effective": False,  # Will be updated after actions are executed
             },
             "traj_metrics": {
-                "success": False,
+                "success": False,  # Will be set to True if agent reaches goal
             },
         }
         
+        # Reset step-specific state
         self.reward = 0
         self.valid_actions = []
         done = False
         info = {}
-        info.update(rst)
+        info.update(rst)  # Include parsed action data in info
         
+        # Execute each action in the list until done or all actions processed
         for action in action_list:
             if action in self.ACTION_LOOKUP:
+                # Convert string action to integer and execute in gym environment
                 action_int = self.ACTION_LOOKUP[action]
                 _, step_reward, terminated, _, _ = self.gym_env.step(action_int)
                 self.reward += step_reward
                 self.valid_actions.append(action)
-                done=self._finished()
+                done = self._finished()
                 assert terminated == done
                 if done:
+                    # If episode is done and successful, add bonus reward
                     if self._success():
                         metrics["traj_metrics"]['success'] = True
-                        self.reward += 9
+                        self.reward += 9  # Bonus reward for reaching goal
                     break
             else:
+                # If an invalid action is encountered, mark actions as invalid and stop
                 metrics["turn_metrics"]['action_is_valid'] = False
                 break
         
+        # Add format reward if actions were valid
         if metrics["turn_metrics"]['action_is_valid']:
             self.reward += self.config.format_reward
         
+        # Add metrics to info dictionary
         info["metrics"] = metrics
+        
+        # Check if position changed to determine if action was effective
         metrics["turn_metrics"]['action_is_effective'] = not np.array_equal(prev_player_position, self._get_player_position())
+        
+        # Update total reward for the episode
         self.total_reward += self.reward
         
+        # Generate observation, return result tuple
         return self._render(init_obs=False), self.reward, done, info
 
     def system_prompt(self):
-        """Return the system prompt based on render mode"""
+        """
+        Get the system prompt for the environment.
+        
+        Returns a prompt explaining the environment to the LLM agent,
+        with different prompts for text and vision modes.
+        
+        Returns:
+            str: System prompt string with environment description and instructions
+        """
         if self.config.render_mode == 'vision':
             return system_prompt_vision.format(max_actions_per_step=self.config.max_actions_per_step)
         else:
             return system_prompt_text.format(max_actions_per_step=self.config.max_actions_per_step)
 
     def compute_reward(self):
-        """Return the total reward collected so far"""
+        """
+        Get the cumulative reward for the episode.
+        
+        Returns:
+            float: Total reward accumulated during the current episode
+        """
         return self.total_reward
 
     def close(self):
-        """Close the environment"""
         self.gym_env.close()
 
-
     def _get_player_position(self):
-        """Get the current player position"""
         return (self.gym_env.s // self.gym_env.ncol, self.gym_env.s % self.gym_env.ncol)  # (row, col)
 
     def _render(self, init_obs=False):
-        """Render the environment"""
+        """
+        Render the environment as an observation.
+        
+        This method creates either a text representation or an image of the environment
+        state, depending on the configured render mode. It formats the observation string
+        based on whether this is the initial observation or a subsequent one.
+        
+        Args:
+            init_obs (bool): If True, create initial observation; otherwise create a
+                            step observation that includes action results
+        
+        Returns:
+            Dict: Observation dictionary containing:
+                - "obs_str": String observation for the LLM
+                - "multi_modal_data": Optional dictionary with image data for vision mode
+        """
         multi_modal_data = None
         
+        # Generate either vision or text representation
         if self.config.render_mode == 'vision':
+            # For vision mode, generate an image of the environment
             img_placeholder = self.config.image_placeholder
             multi_modal_data = {
                 img_placeholder: [convert_numpy_to_PIL(self.gym_env._render_gui(mode='rgb_array'))]
             }
-            img_str = img_placeholder
+            img_str = img_placeholder  # In the text, just use the placeholder
         else:
+            # For text mode, generate a text grid representation
             room_state = self._get_text_representation()
             lookup = lambda cell: self.GRID_LOOKUP.get(cell, "?")
             img_str = "\n".join("".join(lookup(cell) for cell in row) for row in room_state)
         
+        # Format the observation string using the appropriate template
         if init_obs:
+            # Initial observation doesn't include action results
             obs_str = init_observation_template.format(observation=img_str)
         else:
+            # Subsequent observations include action results
             obs_str = action_template.format(
                 valid_action=self.valid_actions,
                 observation=img_str,
@@ -161,6 +262,7 @@ class FrozenLakeEnv(BaseEnv):
                 done=self._finished(),
             )
         
+        # Return observation dictionary with appropriate fields
         if multi_modal_data is not None:
             return {
                 "obs_str": obs_str,
@@ -172,66 +274,69 @@ class FrozenLakeEnv(BaseEnv):
             }
 
     def _get_text_representation(self):
-        """Get the text representation of the environment"""
         room_state = copy.deepcopy(self.gym_env.desc)
         
-        # Replace the position of start 'S' with 'F'
         position_S = np.where(room_state == b'S')
         room_state[position_S] = b'F'
         
-        # Convert characters to internal representation
         room_state = np.vectorize(lambda x: self.MAP_LOOKUP.get(x, 0))(room_state)
         
-        # Add player position
         position_P = self._get_player_position()
         player_cell = room_state[position_P]
         
-        # Handle special cases: player on goal or hole
         if self.gym_env.desc[position_P] == b'H':
             room_state[position_P] = 4  # player in hole
         elif self.gym_env.desc[position_P] == b'G':
             room_state[position_P] = 5  # player on goal
         else:
-            room_state[position_P] = 0  # normal player
+            room_state[position_P] = 0  # normal player on frozen tile
             
         return room_state
 
     def _success(self):
-        """Check if the agent has reached the goal"""
         player_pos = self._get_player_position()
         return self.gym_env.desc[player_pos] == b'G'
     
     def _finished(self):
-        """Check if the episode is done"""
         player_pos = self._get_player_position()
         return self.gym_env.desc[player_pos] in [b'G', b'H']
 
 
 if __name__ == "__main__":
+    """
+    Example usage of the FrozenLake environment.
+    
+    This code demonstrates how to create an instance of the environment,
+    reset it, and interact with it using manual input actions.
+    """
     config = FrozenLakeEnvConfig()
     env = FrozenLakeEnv(config)
+    
     print(env.system_prompt())
     obs, info = env.reset()
     print(obs["obs_str"])
-    i=0
+    
+    i = 0
     import os
     if config.render_mode == 'vision':
         os.makedirs("./test_frozenlake", exist_ok=True)
         img = obs["multi_modal_data"][config.image_placeholder][0]
         img.save(f"./test_frozenlake/frozenlake_{i}.png")
+    
     while True:
         i += 1
         action = input("Enter action (Left, Down, Right, Up): ")
         action = f"<think>Let me try this direction.</think><answer>{action}</answer>"
+        
         obs, reward, done, info = env.step(action)
         print(obs["obs_str"])
+        
         if config.render_mode == 'vision':
-            # save the image
             img = obs["multi_modal_data"][config.image_placeholder][0]
             img.save(f"./test_frozenlake/frozenlake_{i}.png")
+        
         if done:
             break
-        
     
     print(f"Total reward: {env.compute_reward()}")
     print(info)

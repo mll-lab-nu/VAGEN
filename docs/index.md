@@ -9,13 +9,12 @@ VAGEN is a multi-turn reinforcement learning framework designed for training Vis
 - [Installation and Run Experiment](run-exp.md): Get VAGEN up and running
 
 ### Configurations
-- [General Configuration](general-config.md): Understanding VAGEN's configuration system
-- [Algorithm Configuration](algo-config.md): Configure different algorithms
+- [General Configuration](configs/general-config.md): Understanding VAGEN's configuration system
+- [Algorithm Configuration](configs/algo-config.md): Configure different algorithms
 
 ### Environments
-- [Create your Own Environment](create-env.md): Build custom environments
-- [Create your Own Service](create-service.md): Scale your training infrastructure
-- [How to add Reward Model](reward-model.md): Add custom reward model
+- [Create your Own Environment](envs/create-env.md): Build custom environments
+- [Create your Own Service](envs/create-service.md): Scale your training infrastructure
 
 ### Experiments
 - [Reproduce Experiments](reproduce-exp.md): Reproduce our experiments

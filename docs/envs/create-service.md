@@ -100,7 +100,7 @@ REGISTERED_ENV["my_new_env"] = MyNewService
 ```
 
 ### Step 4: Define your env config and script
-> Please refer to `[Configuration](config.md)`
+> Please refer to "[Configuration](../configs/general-config.md)"
 Define your env config and running script in `examples/`
 
 
