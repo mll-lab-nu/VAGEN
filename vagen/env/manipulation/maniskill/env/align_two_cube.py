@@ -40,7 +40,7 @@ class AlignTwoCubeEnv(BaseEnv):
     }
     
     def instruction(self):
-        return "Please align the cubes in the y-axis, which means the x-coordinates of both cubes should be 0"
+        return "Please align the cubes in the y-axis, which means the x-coordinates of both cubes should be 0 (+-10mm)"
     
     @property
     def _default_sensor_configs(self):
@@ -113,8 +113,8 @@ class AlignTwoCubeEnv(BaseEnv):
         
         x_tolerance = 0.01
 
-        is_red_cube_at_x0 = torch.abs(pos_A[..., 0]) <= x_tolerance
-        is_green_cube_at_x0 = torch.abs(pos_B[..., 0]) <= x_tolerance
+        is_red_cube_at_x0 = (torch.abs(pos_A[..., 0]) <= x_tolerance) & (torch.abs(pos_A[..., 2]) <= 0.05)
+        is_green_cube_at_x0 = (torch.abs(pos_B[..., 0]) <= x_tolerance) & (torch.abs(pos_B[..., 2]) <= 0.05)
 
        
         success = is_red_cube_at_x0 & is_green_cube_at_x0

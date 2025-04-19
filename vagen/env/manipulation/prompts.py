@@ -7,10 +7,9 @@ You can command the robot using the following actions:
 2. place(x, y, z) # To place the object currently held by the robot's gripper at the target position (x,y,z).
 3. push(x1, y1, z1, x2, y2, z2) # To push an object from position (x1,y1,z1) to (x2,y2,z2).
 
-Note: the coordinates (x, y, z) are in millimeters and are all integers.
-
-Your response MUST be in the following format:
-<think>Your step-by-step reasoning process goes here. Analyze the instruction, identify relevant objects and their coordinates (if possible from the visual input), and determine which action is needed and with what parameters. Explain *why* you chose this action.</think><answer>The single action command to execute next, formatted exactly as defined above (e.g., pick(0.5, -0.1, 0.05) or place(0.3, 0.2, 0.1) or push(0.1, 0.1, 0.0, 0.4, 0.1, 0.0)).</answer>
+Note: 
+1. The coordinates (x, y, z) are in millimeters and are all integers.
+2. Please ensure that the coordinates are within the workspace limits.
 
 Please think step by step and provide the actions you want to take. Please give one action at a time.
 Your reponse should be in the format of <think>...</think><answer>...</answer>, and the answer should be in the format of pick(x, y, z) or place(x, y, z) or push(x1, y1, z1, x2, y2, z2), where x,y,z are integers.
@@ -22,6 +21,9 @@ init_observation_template = """
 [Initial Observation]:
 {observation}
 Human Instruction: {instruction}
+x_workspace_limit: {x_workspace}
+y_workspace_limit: {y_workspace}
+z_workspace_limit: {z_workspace}
 Object positions: 
 {object_positions}
 Other information:
@@ -34,6 +36,9 @@ action_template = """After your answer, the extracted valid action is {valid_act
 After that, the observation is:
 {observation}
 Human Instruction: {instruction}
+x_workspace_limit: {x_workspace}
+y_workspace_limit: {y_workspace}
+z_workspace_limit: {z_workspace}
 Object positions: 
 {object_positions}
 Other information:

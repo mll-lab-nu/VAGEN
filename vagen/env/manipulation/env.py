@@ -3,17 +3,16 @@ import numpy as np
 import copy
 from typing import Dict, List, Optional, Tuple, Any
 from gymnasium.utils import seeding
-from gymnasium.envs.toy_text.frozen_lake import manipulationEnv as GymmanipulationEnv
-from vagen.env.utils.env_utils import NoLoggerWarnings, set_seed
 from vagen.env.utils.context_utils import parse_llm_raw_response, convert_numpy_to_PIL
 from .env_config import ManipulationEnvConfig
-from .maniskill.utils import build_env, handel_info
+from .maniskill.utils import build_env, handel_info, get_workspace_limits
 from .prompts import system_prompt, init_observation_template, action_template
+import vagen.env.manipulation.maniskill.env
 
 class ManipulationEnv(BaseEnv):
     def __init__(self, config: ManipulationEnvConfig):
         self.config = config
-        self.env=build_env(config.env_id,record_dir=None)
+        self.env=build_env(config.env_id,record_dir='./test')
     
     def reset(self, seed: Optional[int] = None) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         self.total_reward = 0
@@ -27,7 +26,7 @@ class ManipulationEnv(BaseEnv):
         rst = parse_llm_raw_response(
             response=action_str,
             special_token_list=self.config.special_token_list,
-            action_sep=self.config.action_sep,
+            action_sep='|',
             max_actions=1
         )
         output_info={}
@@ -44,10 +43,15 @@ class ManipulationEnv(BaseEnv):
         }
         if metrics["turn_metrics"]['action_is_valid']:
             reward += self.config.format_reward
-        new_obs, rews, terminated, truncated, info = self.env.step(action)
-        done = terminated or truncated
+        if action is not None:
+            _, _, terminated, truncated, info = self.env.step(action)
+        else:
+            info=self.last_info
+            terminated, truncated = False, False
         if info['is_success']:
             metrics["traj_metrics"]['success'] = True
+        done= terminated or truncated
+        info["action_is_valid"] = action is not None
         obs=self._render(info,init_obs=False,valid_action=valid_action)
         output_info["metrics"] = metrics
         self.total_reward += reward
@@ -84,12 +88,27 @@ class ManipulationEnv(BaseEnv):
         new_info=handel_info(info.copy())
         object_positions=new_info['obj_positions']
         other_information=new_info['other_info']
-        instruction=self.env.instruction
+        instruction=self.env.instruction()
         img_placeholder = self.config.image_placeholder
+        x_workspace, y_workspace, z_workspace = get_workspace_limits(self.env)
+        
         if init_obs:
-            obs_str = init_observation_template.format(observation=img_placeholder, instruction=instruction, object_positions=object_positions, other_information=other_information)
+            obs_str = init_observation_template.format(observation=img_placeholder, 
+                                                       instruction=instruction, 
+                                                       object_positions=object_positions, 
+                                                       other_information=other_information,
+                                                       x_workspace=x_workspace,
+                                                       y_workspace=y_workspace,
+                                                       z_workspace=z_workspace)
         else:
-            obs_str = action_template.format(valiad_action=valid_action,observation=img_placeholder, instruction=instruction, object_positions=object_positions, other_information=other_information)
+            obs_str = action_template.format(valid_action=valid_action,
+                                             observation=img_placeholder, 
+                                             instruction=instruction, 
+                                             object_positions=object_positions, 
+                                             other_information=other_information,
+                                             x_workspace=x_workspace,
+                                             y_workspace=y_workspace,
+                                             z_workspace=z_workspace)
         multi_modal_data = None
         if self.config.render_mode == "vision":
             img=self.env.render()
@@ -113,9 +132,7 @@ class ManipulationEnv(BaseEnv):
         action_array = np.zeros(9)
         
         # Workspace boundaries
-        workspace_x = self.env.workspace_x
-        workspace_y = self.env.workspace_y
-        workspace_z = self.env.workspace_z
+        workspace_x, workspace_y, workspace_z = get_workspace_limits(self.env)
         
         # Check if the string is empty or None
         if not action_str:
@@ -148,15 +165,15 @@ class ManipulationEnv(BaseEnv):
             
             # Apply workspace constraints and scale
             # First point (x,y,z)
-            params[0] = np.clip(params[0], workspace_x[0]*1000, workspace_x[1]*1000)
-            params[1] = np.clip(params[1], workspace_y[0]*1000, workspace_y[1]*1000)
-            params[2] = np.clip(params[2], workspace_z[0]*1000, workspace_z[1]*1000)
+            params[0] = np.clip(params[0], workspace_x[0], workspace_x[1])
+            params[1] = np.clip(params[1], workspace_y[0], workspace_y[1])
+            params[2] = np.clip(params[2], workspace_z[0], workspace_z[1])
             
             # Second point (x1,y1,z1) if it exists (for push)
             if action_name == "push":
-                params[3] = np.clip(params[3], workspace_x[0]*1000, workspace_x[1]*1000)
-                params[4] = np.clip(params[4], workspace_y[0]*1000, workspace_y[1]*1000)
-                params[5] = np.clip(params[5], workspace_z[0]*1000, workspace_z[1]*1000)
+                params[3] = np.clip(params[3], workspace_x[0], workspace_x[1])
+                params[4] = np.clip(params[4], workspace_y[0], workspace_y[1])
+                params[5] = np.clip(params[5], workspace_z[0], workspace_z[1])
             
             # Fill the coordinate dimensions (after dividing by 1000 as in your modified function)
             for i in range(len(params)):
