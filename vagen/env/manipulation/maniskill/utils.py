@@ -22,6 +22,7 @@ def build_env(env_id, control_mode="pd_ee_pose", stage=0, record_dir='./test'):
                           max_steps_per_video=1,
                           controll_mode=control_mode,
                           )
+    env.is_params_scaled = False
     return env
 
 

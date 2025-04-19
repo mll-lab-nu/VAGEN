@@ -59,6 +59,9 @@ class PutAppleInDrawerEnv(BaseEnv):
         pose = sapien_utils.look_at([1.0, 0.3, 1.0], [-0.5, -0.2, 0.35])
         return CameraConfig("render_camera", pose, 2048, 2048, 1, 0.01, 100)
 
+    def instruction(self):
+        return "Please put the apple in the drawer and close the drawer."
+    
     def _load_scene(self, options: dict):
         # Build ground plane
         self.ground = build_ground(self.scene)

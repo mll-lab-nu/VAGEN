@@ -55,6 +55,9 @@ class StackThreeCubeEnv(BaseEnv):
             "render_camera", pose=pose, width=2048, height=2048, fov=0.63, near=0.01, far=100
         )
 
+    def instruction(self):
+        return "Please stack the red cube on top of the green cube, and the purple cube on top of the red cube."
+    
     def _load_scene(self, options: dict):
         self.table_scene = TableSceneBuilder(
             env=self, robot_init_qpos_noise=self.robot_init_qpos_noise
@@ -121,7 +124,7 @@ class StackThreeCubeEnv(BaseEnv):
         for name in self.object_list:
             info[f"is_{name}_grasped"] = self.agent.is_grasping(self.object_list[name])[0]
             info[f"{name}_pos"] = self.object_list[name].pose.p[0]
-        
+        info["cube_size"]=torch.ones_like(info["red_cube_pos"])*40
         info["gripper_pos"] = self.agent.tcp.pose.p[0]
         return info
 

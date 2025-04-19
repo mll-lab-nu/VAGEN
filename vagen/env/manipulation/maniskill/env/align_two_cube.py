@@ -25,7 +25,7 @@ class AlignTwoCubeEnv(BaseEnv):
     def __init__(self, stage=0,*args, robot_uids="panda", robot_init_qpos_noise=0.02, **kwargs):
         self.stage=stage
         self.workspace_x=[-0.10, 0.15]
-        self.workspace_y=[-0.15, 0.15]
+        self.workspace_y=[-0.2, 0.2]
         self.workspace_z=[0.01, 0.2]
         self.robot_init_qpos_noise = robot_init_qpos_noise
                 
@@ -36,7 +36,11 @@ class AlignTwoCubeEnv(BaseEnv):
         return {
         0 : "pick",
         1 : "place",
+        2: "push",
     }
+    
+    def instruction(self):
+        return "Please align the cubes in the y-axis, which means the x-coordinates of both cubes should be 0"
     
     @property
     def _default_sensor_configs(self):

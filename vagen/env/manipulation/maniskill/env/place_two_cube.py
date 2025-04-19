@@ -37,8 +37,12 @@ class PlaceTwoCubeEnv(BaseEnv):
         return {
         0 : "pick",
         1 : "place",
+        2 : "push",
     }
 
+    def instruction(self):
+        return "Please place cubeA at goalA and cubeB at goalB."
+        
     @property
     def _default_sensor_configs(self):
         pose = sapien_utils.look_at(eye=[0.3, 0, 0.6], target=[-0.1, 0, 0.1])
