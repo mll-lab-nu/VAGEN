@@ -14,7 +14,7 @@ bash vagen/examples/release_experiments/gae.sh # rico-gae
 bash vagen/examples/release_experiments/grpo_mask_loss.sh # rico-grpo + loss mask
 bash vagen/examples/release_experiments/grpo.sh # rico-grpo
 bash vagen/examples/release_experiments/mask_gae_mask_loss_bi_level.sh # trico - turn reward
-bash vagen/examples/release_experiments/mask_gae_mask_loss_turnwise_gae.sh # trico - turn reward - bi-level gae + turn-level gae
+bash vagen/examples/release_experiments/mask_gae_mask_loss_turnwise_gae.sh # trico - turn reward - bi-level gae
 bash vagen/examples/release_experiments/mask_gae_mask_loss_turnwise_reward_bi_level.sh # trico
 bash vagen/examples/release_experiments/mask_gae_mask_loss.sh # aico
 bash vagen/examples/release_experiments/mask_gae.sh # aico - loss mask
