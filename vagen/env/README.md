@@ -15,6 +15,7 @@ apt-get install -y xorg xserver-xorg-core xserver-xorg-video-dummy
 python vagen/env/navigation/startx.py 1
 ```
 
-### Maniskill
+### Manipulation
+pip install --upgrade mani_skill
 python -m mani_skill.utils.download_asset "PickSingleYCB-v1"
 python -m mani_skill.utils.download_asset partnet_mobility_cabinet
