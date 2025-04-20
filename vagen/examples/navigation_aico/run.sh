@@ -73,4 +73,5 @@ python3 -m vagen.trainer.main_ppo \
     trainer.val_before_train=True \
     trainer.val_generations_to_log_to_wandb=4 \
     rollout_manager.n_trajectory=1 \
+    rollout_manager.use_service=True \
     2>&1 | tee aico_navigation_vision.log
