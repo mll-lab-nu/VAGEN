@@ -19,10 +19,12 @@ class PrimitiveSkillEnv(BaseEnv):
         self.env=build_env(config.env_id,record_dir=record_dir)
     
     def reset(self, seed: Optional[int] = None) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-        self.total_reward = 0
         _, info=self.env.reset(seed=seed)
         obs=self._render(info,init_obs=True)
         self.last_info=info
+        self.initial_reward=self._compute_reward()
+        self.total_reward = 0
+        self.steps=0
         return obs, {}
     
     def step(self,action_str):
@@ -52,6 +54,7 @@ class PrimitiveSkillEnv(BaseEnv):
                 _, _, terminated, truncated, info = self.env.step(parsed_action)
                 valid_actions.append(action)
                 self.last_info = info
+                self.steps+=1
             else:
                 info=self.last_info
                 terminated, truncated = False, False
@@ -79,9 +82,9 @@ class PrimitiveSkillEnv(BaseEnv):
     def close(self):
         self.env.close()
     
-    def compute_reward(self):
+    def _compute_reward(self):
         if self.last_info.get("success", False):
-            return 10+self.total_reward
+            return 10
         
         # Find the highest successful stage
         max_stage = -1
@@ -96,7 +99,10 @@ class PrimitiveSkillEnv(BaseEnv):
                 except (ValueError, IndexError):
                     # Skip keys that don't follow the expected format
                     continue
-        return (max_stage + 1) * 2+self.total_reward
+        return (max_stage + 1) * 2
+    
+    def compute_reward(self):
+        return self._compute_reward()+self.total_reward-self.initial_reward-self.steps*0.1
     
     
     def _render(self,info,init_obs=False,valid_actions=None):
