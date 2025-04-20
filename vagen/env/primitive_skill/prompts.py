@@ -11,10 +11,11 @@ Note:
 1. The coordinates (x, y, z) are in millimeters and are all integers.
 2. Please ensure that the coordinates are within the workspace limits.
 
-Please think step by step and provide the actions you want to take. Please give one action at a time.
-Your reponse should be in the format of <think>...</think><answer>...</answer>, and the answer should be in the format of pick(x, y, z) or place(x, y, z) or push(x1, y1, z1, x2, y2, z2), where x,y,z are integers.
+Please think step by step and provide the actions you want to take.
+You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}. 
+Your reponse should be in the format of <think>...</think><answer>...</answer>.
 e.g.
-<think>The robot is now holding the cubeA. I should place it on the targtA, which is located at (200,241,534). I should use the 'place' action with the target coordinates of the red plate.</think><answer>place(200,341,534)</answer>
+<think>The next step should be picking up cubeA and place it at the targetA. I should use the 'pick' and 'place' action with the coordinates of the cubeA and targetA.</think><answer>pick(-80,100,20){action_sep}place(200,341,534)</answer>
 """
 
 init_observation_template = """
@@ -28,11 +29,11 @@ Object positions:
 {object_positions}
 Other information:
 {other_information}
-Decide your next action.
+Decide your next action(s), you can propose at most {max_action} actions.
 Your reponse should be in the format of <think>...</think><answer>...</answer>
 """
 
-action_template = """After your answer, the extracted valid action is {valid_action}.
+action_template = """After your answer, the extracted valid action(s) is {valid_actions}.
 After that, the observation is:
 {observation}
 Human Instruction: {instruction}
@@ -43,6 +44,6 @@ Object positions:
 {object_positions}
 Other information:
 {other_information}
-Decide your next action.
+Decide your next action(s), you can propose at most {max_action} actions.
 Your reponse should be in the format of <think>...</think><answer>...</answer>
 """

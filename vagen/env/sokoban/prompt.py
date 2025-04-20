@@ -27,7 +27,8 @@ system_prompt_vision = """You are a Sokoban solver.
 Sokoban Quick Guide
 Goal: Push all boxes onto targets.
 
-Actions you can take: Up, Down, Left, Right. You can take up to {max_actions_per_step} action(s) at a time.
+Actions you can take: Up, Down, Left, Right. 
+You can take up to {max_actions_per_step} action(s) at a time, seperated by {action_sep}.
 
 Rewards:
 Box on target: +1.0

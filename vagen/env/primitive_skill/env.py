@@ -26,40 +26,49 @@ class PrimitiveSkillEnv(BaseEnv):
         rst = parse_llm_raw_response(
             response=action_str,
             special_token_list=self.config.special_token_list,
-            action_sep='|',
-            max_actions=1
+            action_sep=self.config.action_sep,
+            max_actions=self.config.max_actions_per_step,
         )
         output_info={}
         output_info.update(rst)
-        action =self._parse_action(rst['actions'][0]) if len(rst['actions']) > 0 else None
-        valid_action=rst['actions'][0] if len(rst['actions']) > 0 else ""
+        valid_actions = []
         metrics = {
             "turn_metrics": {
-                "action_is_valid": action is not None,  # True if at least one valid action was parsed
+                "action_is_valid": True,  # True if at least one valid action was parsed
             },
             "traj_metrics": {
                 "success": False,  # Will be set to True if agent reaches goal
             },
         }
+        for action in rst['actions']:
+            parsed_action = self._parse_action(action)
+            if parsed_action is not None:
+                _, _, terminated, truncated, info = self.env.step(parsed_action)
+                valid_actions.append(action)
+                self.last_info = info
+            else:
+                info=self.last_info
+                terminated, truncated = False, False
+                metrics["turn_metrics"]['action_is_valid'] = False
+                break
+            if truncated or terminated:
+                break
         if metrics["turn_metrics"]['action_is_valid']:
             reward += self.config.format_reward
-        if action is not None:
-            _, _, terminated, truncated, info = self.env.step(action)
-        else:
-            info=self.last_info
-            terminated, truncated = False, False
         if info['is_success']:
             metrics["traj_metrics"]['success'] = True
         done= terminated or truncated
-        info["action_is_valid"] = action is not None
-        obs=self._render(info,init_obs=False,valid_action=valid_action)
+        info["action_is_valid"] = metrics["turn_metrics"]['action_is_valid']
+        obs=self._render(info,init_obs=False,valid_actions=valid_actions)
         output_info["metrics"] = metrics
         self.total_reward += reward
-        self.last_info = info
         return obs,reward,done,output_info
     
     def system_prompt(self):
-        return system_prompt
+        return system_prompt.format(
+            max_actions_per_step=self.config.max_actions_per_step,
+            action_sep=self.config.action_sep,
+        )
     
     def close(self):
         self.env.close()
@@ -84,7 +93,7 @@ class PrimitiveSkillEnv(BaseEnv):
         return (max_stage + 1) * 2+self.total_reward
     
     
-    def _render(self,info,init_obs=False,valid_action=None):
+    def _render(self,info,init_obs=False,valid_actions=None):
         new_info=handel_info(info.copy())
         object_positions=new_info['obj_positions']
         other_information=new_info['other_info']
@@ -99,16 +108,18 @@ class PrimitiveSkillEnv(BaseEnv):
                                                        other_information=other_information,
                                                        x_workspace=x_workspace,
                                                        y_workspace=y_workspace,
-                                                       z_workspace=z_workspace)
+                                                       z_workspace=z_workspace,
+                                                       max_action=self.config.max_actions_per_step)
         else:
-            obs_str = action_template.format(valid_action=valid_action,
+            obs_str = action_template.format(valid_actions=valid_actions,
                                              observation=img_placeholder, 
                                              instruction=instruction, 
                                              object_positions=object_positions, 
                                              other_information=other_information,
                                              x_workspace=x_workspace,
                                              y_workspace=y_workspace,
-                                             z_workspace=z_workspace)
+                                             z_workspace=z_workspace,
+                                             max_action=self.config.max_actions_per_step)
         multi_modal_data = None
         if self.config.render_mode == "vision":
             img=self.env.render()
