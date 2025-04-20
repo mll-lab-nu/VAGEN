@@ -14,4 +14,6 @@ svg:
 navigation:
   max_workers: 10
   devices: [0,1,2,3]
+primitive_skill:
+  max_workers: 10
 

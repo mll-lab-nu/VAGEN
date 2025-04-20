@@ -347,7 +347,7 @@ class NavigationEnv(BaseEnv):
         Returns:
             System prompt string
         """
-        if self.config.visual_env:
+        if self.config.render_mode == "vision":
             return system_prompt_vision.format(
                 max_actions_per_step=self.config.max_actions_per_step,
                 action_sep=self.config.action_sep

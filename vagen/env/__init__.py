@@ -2,7 +2,7 @@ from .sokoban import SokobanEnv,SokobanEnvConfig
 from .frozenlake import FrozenLakeEnv,FrozenLakeEnvConfig, FrozenLakeService
 from .navigation import NavigationEnv, NavigationEnvConfig, NavigationServiceConfig, NavigationService
 from .svg import SVGEnv, SvgEnvConfig, SVGService
-
+from .primitive_skill import PrimitiveSkillEnv, PrimitiveSkillEnvConfig, PrimitiveSkillService
 REGISTERED_ENV = {
     "sokoban": {
         "env_cls": SokobanEnv,
@@ -24,4 +24,9 @@ REGISTERED_ENV = {
         "config_cls": SvgEnvConfig,
         "service_cls": SVGService
     },
+    "primitive_skill": {
+        "env_cls": PrimitiveSkillEnv,
+        "config_cls": PrimitiveSkillEnvConfig,
+        "service_cls": PrimitiveSkillService
+    }
 }

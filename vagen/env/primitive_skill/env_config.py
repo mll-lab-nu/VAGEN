@@ -8,6 +8,8 @@ class PrimitiveSkillEnvConfig(BaseEnvConfig):
     render_mode: str = "vision" # vision, text
     max_actions_per_step: int = 2
     action_sep:str= field(default='|')
+    record_video: bool = field(default=False)
+    video_record_dir: str = field(default='./test')
     
     def config_id(self) -> str:
         id_fields=["env_id","render_mode","max_actions_per_step"]

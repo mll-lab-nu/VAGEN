@@ -12,14 +12,18 @@ import vagen.env.primitive_skill.maniskill.env
 class PrimitiveSkillEnv(BaseEnv):
     def __init__(self, config: PrimitiveSkillEnvConfig):
         self.config = config
-        self.env=build_env(config.env_id,record_dir='./test')
+        if self.config.record_video:
+            record_dir = self.config.video_record_dir
+        else:
+            record_dir = None
+        self.env=build_env(config.env_id,record_dir=record_dir)
     
     def reset(self, seed: Optional[int] = None) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         self.total_reward = 0
         _, info=self.env.reset(seed=seed)
         obs=self._render(info,init_obs=True)
         self.last_info=info
-        return obs, info
+        return obs, {}
     
     def step(self,action_str):
         reward=0
@@ -34,12 +38,14 @@ class PrimitiveSkillEnv(BaseEnv):
         valid_actions = []
         metrics = {
             "turn_metrics": {
-                "action_is_valid": True,  # True if at least one valid action was parsed
+                "action_is_valid": False,  # True if at least one valid action was parsed
             },
             "traj_metrics": {
                 "success": False,  # Will be set to True if agent reaches goal
             },
         }
+        info=self.last_info
+        terminated, truncated = False, False
         for action in rst['actions']:
             parsed_action = self._parse_action(action)
             if parsed_action is not None:
@@ -49,10 +55,10 @@ class PrimitiveSkillEnv(BaseEnv):
             else:
                 info=self.last_info
                 terminated, truncated = False, False
-                metrics["turn_metrics"]['action_is_valid'] = False
                 break
             if truncated or terminated:
                 break
+        metrics["turn_metrics"]['action_is_valid'] = len(valid_actions) > 0 and len(valid_actions)==len(rst['actions'])
         if metrics["turn_metrics"]['action_is_valid']:
             reward += self.config.format_reward
         if info['is_success']:
@@ -162,7 +168,7 @@ class PrimitiveSkillEnv(BaseEnv):
                 action_array[2] = 1
             else:
                 # Invalid action name
-                return np.zeros(9)
+                return None
             
             # Extract parameters
             params_str = action_str.split('(')[1].split(')')[0]
@@ -204,7 +210,7 @@ if __name__ == "__main__":
     This code demonstrates how to create an instance of the environment,
     reset it, and interact with it using manual input actions.
     """
-    config = PrimitiveSkillEnvConfig()
+    config = PrimitiveSkillEnvConfig(record_video=True, video_record_dir="./test_manipulation_video")
     env = PrimitiveSkillEnv(config)
     
     print(env.system_prompt())
