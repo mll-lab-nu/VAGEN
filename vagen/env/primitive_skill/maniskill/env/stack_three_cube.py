@@ -124,7 +124,7 @@ class StackThreeCubeEnv(BaseEnv):
         for name in self.object_list:
             info[f"is_{name}_grasped"] = self.agent.is_grasping(self.object_list[name])[0]
             info[f"{name}_pos"] = self.object_list[name].pose.p[0]
-        info["cube_size"]=torch.ones_like(info["red_cube_pos"])*40
+        info["cube_size"]=torch.ones_like(info["red_cube_pos"])*0.04
         info["gripper_pos"] = self.agent.tcp.pose.p[0]
         return info
 

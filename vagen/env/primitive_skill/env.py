@@ -106,6 +106,7 @@ class PrimitiveSkillEnv(BaseEnv):
     
     
     def _render(self,info,init_obs=False,valid_actions=None):
+        print("info",info)
         new_info=handel_info(info.copy())
         object_positions=new_info['obj_positions']
         other_information=new_info['other_info']
@@ -216,7 +217,8 @@ if __name__ == "__main__":
     This code demonstrates how to create an instance of the environment,
     reset it, and interact with it using manual input actions.
     """
-    config = PrimitiveSkillEnvConfig(record_video=True, video_record_dir="./test_manipulation_video")
+    # AlignTwoCube,PlaceTwoCube,PutAppleInDrawer,StackThreeCube
+    config = PrimitiveSkillEnvConfig(record_video=True, video_record_dir="./test_manipulation_video",env_id="AlignTwoCube", render_mode="vision")
     env = PrimitiveSkillEnv(config)
     
     print(env.system_prompt())

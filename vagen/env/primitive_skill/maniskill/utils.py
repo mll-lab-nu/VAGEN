@@ -39,9 +39,11 @@ def handel_info(info):
             # convert to cm round to 2 decimal places
             obj_positions[k] = tuple(np.round(v*1000, 0).astype(int))
         elif k.endswith('_value'):
-            obj_positions[k] = np.round(v*1000, 0).astype(int).item()
+            other_info[k] = np.round(v*1000, 0).astype(int).item()
+        elif k.endswith('_size'):
+            other_info[k] = tuple(np.round(v*1000, 0).astype(int))
         else:
-            if isinstance(v, np.ndarray):
+            if isinstance(v, np.ndarray) and v.ndim == 0:
                 other_info[k] = v.item()
             else:
                 other_info[k] = v
