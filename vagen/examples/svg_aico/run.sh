@@ -73,4 +73,4 @@ python3 -m vagen.trainer.main_ppo \
     trainer.val_before_train=True \
     trainer.val_generations_to_log_to_wandb=8 \
     rollout_manager.n_trajectory=1 \
-    2>&1 | tee aico_frozenlake_vision.log
+    2>&1 | tee aico_svg_vision.log

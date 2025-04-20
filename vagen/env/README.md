@@ -8,11 +8,13 @@ python vagen/env/server.py --debug
 
 # For headless servers, additional setup is required:
 # Install required packages
-apt-get install -y pciutils
-apt-get install -y xorg xserver-xorg-core xserver-xorg-video-dummy
-
+#apt-get install -y pciutils
+#apt-get install -y xorg xserver-xorg-core xserver-xorg-video-dummy
 # Start X server in a tmux window
-python vagen/env/navigation/startx.py 1
+#python vagen/env/navigation/startx.py 1
+
+sudo apt-get -y install libvulkan1
+sudo apt install vulkan-tools
 ```
 
 ### Manipulation
