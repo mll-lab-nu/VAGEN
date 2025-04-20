@@ -44,8 +44,8 @@ VAGEN addresses these challenges by focusing optimization on the most critical d
 - Enhanced environment framework for easier creation of custom environments
 - New service architecture for efficient distributed training
 - Check out our new guides:
-  - [Creating Environments](docs/create-env.md): New environment protocal.
-  - [Creating Services](docs/create-service.md): We now support hosting environments in a seperate process
+  - [Creating Environments](./docs/envs/create-env.md): New environment protocal.
+  - [Creating Services](./docs/envs/create-service.md): We now support hosting environments in a seperate process
 
 ## Installation
 
@@ -86,7 +86,7 @@ bash vagen/examples/svg_trico/run.sh                # TRICO without service
 ```
 ## How to Add New Environment and Services
 
-See our [Creating Environments](./docs/create-env.md) guide. You may also want to check our [Creating Service](./docs/create-service.md) for scaling your environments.
+See our [Creating Environments](./docs/envs/create-env.md) guide. You may also want to check our [Creating Service](./docs/envs/create-service.md) for scaling your environments.
 
 ## How to Add New Model
 
