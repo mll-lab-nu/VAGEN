@@ -73,12 +73,14 @@ class AlignTwoCubeEnv(BaseEnv):
 
             xyz = torch.zeros((b, 3))
             xyz[:, 2] = 0.02
-            region =[[self.workspace_x[0]+0.1,self.workspace_y[0]],[self.workspace_x[1],self.workspace_y[1]]]
-            sampler = randomization.UniformPlacementSampler(bounds=region, batch_size=b)
+            region_1 =[[self.workspace_x[0],self.workspace_y[0]],[self.workspace_x[0]+0.05,self.workspace_y[1]]]
+            sampler_1 = randomization.UniformPlacementSampler(bounds=region_1, batch_size=b)
+            region_2 =[[0.05,self.workspace_y[0]],[self.workspace_x[1],self.workspace_y[1]]]
+            sampler_2 = randomization.UniformPlacementSampler(bounds=region_2, batch_size=b)
             radius = torch.linalg.norm(torch.tensor([0.02, 0.02])) + 0.02
             
-            red_cube_xy = sampler.sample(radius, 100)
-            green_cube_xy = sampler.sample(radius, 100, verbose=False)
+            red_cube_xy = sampler_1.sample(radius, 100)
+            green_cube_xy = sampler_2.sample(radius, 100, verbose=False)
             
             
             
