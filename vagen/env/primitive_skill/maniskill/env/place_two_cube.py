@@ -95,7 +95,7 @@ class PlaceTwoCubeEnv(BaseEnv):
             # Place cubes at random positions
             xyz = torch.zeros((b, 3))
             xyz[:, 2] = 0.02
-            region = [[self.workspace_x[0], self.workspace_y[0]], [self.workspace_x[1], self.workspace_y[1]]]
+            region = [[self.workspace_x[0], self.workspace_y[0]], [self.workspace_x[1], -0.02]] 
             sampler = randomization.UniformPlacementSampler(bounds=region, batch_size=b)
             radius = torch.linalg.norm(torch.tensor([0.02, 0.02])) + 0.02
 

@@ -2,5 +2,6 @@ env1:
     env_name: primitive_skill 
     env_config:
         render_mode: text
+        env_id: "PlaceTwoCube" # AlignTwoCube,PlaceTwoCube,PutAppleInDrawer,StackThreeCube
     train_size: 10000  
     test_size: 32

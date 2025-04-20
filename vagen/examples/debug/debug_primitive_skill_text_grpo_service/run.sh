@@ -10,6 +10,7 @@ python -m vagen.env.create_dataset \
     --yaml_path "$SCRIPT_DIR/env_config.yaml" \
     --train_path "data/navigation-vision-debug/train.parquet" \
     --test_path "data/navigation-vision-debug/test.parquet" \
+    --force_gen
 
 # max_trajectory_length = max_prompt_length + max_response_length
 
