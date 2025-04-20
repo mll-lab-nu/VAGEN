@@ -56,7 +56,7 @@ class StackThreeCubeEnv(BaseEnv):
         )
 
     def instruction(self):
-        return "Please stack the red cube on top of the green cube, and the purple cube on top of the red cube."
+        return "Please stack the red cube on top of the green cube, and then stack purple cube on top of the red cube."
     
     def _load_scene(self, options: dict):
         self.table_scene = TableSceneBuilder(

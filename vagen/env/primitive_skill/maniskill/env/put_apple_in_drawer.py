@@ -27,7 +27,7 @@ class PutAppleInDrawerEnv(BaseEnv):
     handle_types = ["prismatic"]  # We are interested in prismatic joints (drawers)
     min_open_frac = 0.6  # Fraction of the drawer's range to be open
     skill_config={
-        "home_pos": (0.0,0.0,0.5),
+        "home_pos": (0.0,0.0,0.65),
     }
     model_id = "ycb:013_apple"
     def __init__(self, stage=0, *args, robot_uids="panda", robot_init_qpos_noise=0.02, drawer_id=1016, **kwargs):
@@ -35,8 +35,8 @@ class PutAppleInDrawerEnv(BaseEnv):
         self.cur_stage = 0
         self.robot_init_qpos_noise = robot_init_qpos_noise
         self.workspace_x = [-0.5, -0.1]  # Adjusted workspace X range
-        self.workspace_y = [-0.57, 0.2]
-        self.workspace_z = [0.01, 0.47]
+        self.workspace_y = [-0.6, 0.2]
+        self.workspace_z = [0.01, 0.65]
         self.drawer_id = drawer_id
         self.reward_components = ["success", "afford"]
         super().__init__(*args, robot_uids=robot_uids, **kwargs)
@@ -150,7 +150,7 @@ class PutAppleInDrawerEnv(BaseEnv):
         info["drawer_handle_pos"] = drawer_link.pose.p.to(self.device)[0] + np.array([0, 0.37, -0.3])
         info["drawer_pos"] = drawer_link.pose.p.to(self.device)[0] + np.array([0, 0.2, -0.3])
 
-        info["drawer_open_offset"] = (info["drawer_handle_pos"][1] - np.array([0.5, -0.63,  0.2]))[1]
+        info["drawer_open_value"] = (info["drawer_handle_pos"][1] - np.array([0.5, -0.63,  0.2]))[1]
         
      
         return info
@@ -189,7 +189,7 @@ class PutAppleInDrawerEnv(BaseEnv):
             is_apple_in_drawer = within_xy & within_z
             
             # Check if drawer is closed
-            is_drawer_closed = (info["drawer_open_offset"] <= 0.1)
+            is_drawer_closed = (info["drawer_open_value"] <= 0.1)
             return is_apple_in_drawer & is_drawer_closed & (~info["is_apple_grasped"])
 
         info["stage0_success"] = stage0_success(info)

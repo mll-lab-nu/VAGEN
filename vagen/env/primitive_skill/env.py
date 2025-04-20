@@ -4,13 +4,13 @@ import copy
 from typing import Dict, List, Optional, Tuple, Any
 from gymnasium.utils import seeding
 from vagen.env.utils.context_utils import parse_llm_raw_response, convert_numpy_to_PIL
-from .env_config import ManipulationEnvConfig
+from .env_config import PrimitiveSkillEnvConfig
 from .maniskill.utils import build_env, handel_info, get_workspace_limits
 from .prompts import system_prompt, init_observation_template, action_template
-import vagen.env.manipulation.maniskill.env
+import vagen.env.primitive_skill.maniskill.env
 
-class ManipulationEnv(BaseEnv):
-    def __init__(self, config: ManipulationEnvConfig):
+class PrimitiveSkillEnv(BaseEnv):
+    def __init__(self, config: PrimitiveSkillEnvConfig):
         self.config = config
         self.env=build_env(config.env_id,record_dir='./test')
     
@@ -193,8 +193,8 @@ if __name__ == "__main__":
     This code demonstrates how to create an instance of the environment,
     reset it, and interact with it using manual input actions.
     """
-    config = ManipulationEnvConfig()
-    env = ManipulationEnv(config)
+    config = PrimitiveSkillEnvConfig()
+    env = PrimitiveSkillEnv(config)
     
     print(env.system_prompt())
     obs, info = env.reset()

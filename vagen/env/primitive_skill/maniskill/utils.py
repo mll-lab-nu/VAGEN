@@ -4,7 +4,7 @@ import mani_skill.envs
 from tqdm.notebook import tqdm
 from mani_skill.utils.wrappers import RecordEpisode
 from mani_skill.utils.wrappers.gymnasium import CPUGymWrapper
-from vagen.env.manipulation.maniskill.skill_wrapper import SkillGymWrapper
+from vagen.env.primitive_skill.maniskill.skill_wrapper import SkillGymWrapper
 import numpy as np
 import os
 
@@ -38,8 +38,13 @@ def handel_info(info):
         if k.endswith('_pos'):
             # convert to cm round to 2 decimal places
             obj_positions[k] = tuple(np.round(v*1000, 0).astype(int))
+        elif k.endswith('_value'):
+            obj_positions[k] = np.round(v*1000, 0).astype(int).item()
         else:
-            other_info[k] = v
+            if isinstance(v, np.ndarray):
+                other_info[k] = v.item()
+            else:
+                other_info[k] = v
     return {
         'obj_positions': obj_positions,
         'other_info': other_info
