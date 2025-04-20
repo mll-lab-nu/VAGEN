@@ -6,13 +6,15 @@ from vagen.server.serial import serialize_observation
 from .env import PrimitiveSkillEnv
 from .env_config import PrimitiveSkillEnvConfig
 from ..base.base_service_config import BaseServiceConfig
-
+import threading
+from mani_skill.utils.building.articulations.partnet_mobility import _load_partnet_mobility_dataset, PARTNET_MOBILITY
 class PrimitiveSkillService(BaseService):
     """
     Service class for PrimitiveSkill environments.
     Implements batch operations with parallel processing for efficiency.
     """
-    
+    _dataset_lock = threading.Lock()
+     
     def __init__(self, config: BaseServiceConfig):
         """
         Initialize the PrimitiveSkillService.
@@ -24,6 +26,14 @@ class PrimitiveSkillService(BaseService):
         self.max_workers = config.get('max_workers', 10)
         self.environments = {}
         self.env_configs = {}
+    
+    def _ensure_dataset_initialized(self):
+        """
+        Ensure the PartNet Mobility dataset is initialized in a thread-safe manner.
+        """
+        with self._dataset_lock:
+            if PARTNET_MOBILITY is None or "model_urdf_paths" not in PARTNET_MOBILITY:
+                _load_partnet_mobility_dataset()
     
     def create_environments_batch(self, ids2configs: Dict[Any, Any]) -> None:
         """
@@ -37,25 +47,23 @@ class PrimitiveSkillService(BaseService):
                 - env_config: PrimitiveSkill specific configuration
         """
         # Define worker function
+        self._ensure_dataset_initialized()
         def create_single_env(env_id, config):
             # Verify environment type
+            
             env_name = config.get('env_name', 'primitive_skill')
             if env_name != 'primitive_skill':
                 return env_id, None, f"Expected environment type 'primitive_skill', got '{env_name}'"
             
-            try:
-                # Get PrimitiveSkill specific configuration
-                env_config_dict = config.get('env_config', {})
+            env_config_dict = config.get('env_config', {})
                 
-                # Create environment config
-                env_config = PrimitiveSkillEnvConfig(**env_config_dict)
-                
-                # Create environment
-                env = PrimitiveSkillEnv(env_config)
-                
-                return env_id, (env, env_config), None
-            except Exception as e:
-                return env_id, None, str(e)
+            # Create environment config
+            env_config = PrimitiveSkillEnvConfig(**env_config_dict)
+            
+            # Create environment
+            env = PrimitiveSkillEnv(env_config)
+            
+            return env_id, (env, env_config), None
         
         # Use ThreadPoolExecutor for parallel creation
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -92,16 +100,10 @@ class PrimitiveSkillService(BaseService):
         
         # Define worker function
         def reset_single_env(env_id, seed):
-            try:
-                if env_id not in self.environments:
-                    return env_id, None, f"Environment {env_id} not found"
-                
-                env = self.environments[env_id]
-                observation, info = env.reset(seed=seed)
-                serialized_observation = serialize_observation(observation)
-                return env_id, (serialized_observation, info), None
-            except Exception as e:
-                return env_id, None, str(e)
+            env = self.environments[env_id]
+            observation, info = env.reset(seed=seed)
+            serialized_observation = serialize_observation(observation)
+            return env_id, (serialized_observation, info), None
         
         # Use ThreadPoolExecutor for parallel reset
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -138,16 +140,10 @@ class PrimitiveSkillService(BaseService):
         
         # Define worker function
         def step_single_env(env_id, action):
-            try:
-                if env_id not in self.environments:
-                    return env_id, None, f"Environment {env_id} not found"
-                
-                env = self.environments[env_id]
-                observation, reward, done, info = env.step(action)
-                serialized_observation = serialize_observation(observation)
-                return env_id, (serialized_observation, reward, done, info), None
-            except Exception as e:
-                return env_id, None, str(e)
+            env = self.environments[env_id]
+            observation, reward, done, info = env.step(action)
+            serialized_observation = serialize_observation(observation)
+            return env_id, (serialized_observation, reward, done, info), None
         
         # Use ThreadPoolExecutor for parallel step
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -183,14 +179,8 @@ class PrimitiveSkillService(BaseService):
         
         # Define worker function
         def compute_reward_single_env(env_id):
-            try:
-                if env_id not in self.environments:
-                    return env_id, None, f"Environment {env_id} not found"
-                
-                env = self.environments[env_id]
-                return env_id, env.compute_reward(), None
-            except Exception as e:
-                return env_id, None, str(e)
+            env = self.environments[env_id]
+            return env_id, env.compute_reward(), None
         
         # Use ThreadPoolExecutor for parallel computation
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -226,14 +216,8 @@ class PrimitiveSkillService(BaseService):
         
         # Define worker function
         def get_system_prompt_single_env(env_id):
-            try:
-                if env_id not in self.environments:
-                    return env_id, None, f"Environment {env_id} not found"
-                
-                env = self.environments[env_id]
-                return env_id, env.system_prompt(), None
-            except Exception as e:
-                return env_id, None, str(e)
+            env = self.environments[env_id]
+            return env_id, env.system_prompt(), None
         
         # Use ThreadPoolExecutor for parallel retrieval
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -268,15 +252,8 @@ class PrimitiveSkillService(BaseService):
         
         # Define worker function
         def close_single_env(env_id):
-            try:
-                if env_id not in self.environments:
-                    return f"Environment {env_id} not found"
-                
-                env = self.environments[env_id]
-                env.close()
-                return None
-            except Exception as e:
-                return str(e)
+            env = self.environments[env_id]
+            env.close()
         
         # Use ThreadPoolExecutor for parallel closing
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:

@@ -106,7 +106,6 @@ class PrimitiveSkillEnv(BaseEnv):
     
     
     def _render(self,info,init_obs=False,valid_actions=None):
-        print("info",info)
         new_info=handel_info(info.copy())
         object_positions=new_info['obj_positions']
         other_information=new_info['other_info']

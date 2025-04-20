@@ -232,8 +232,10 @@ class QwenVLRolloutManagerService():
         for bucket_key, env_ids in env_buckets.items():
             for env_id in env_ids:
                 ids_to_close.append(env_id)
+                self.envs.pop(env_id)
 
         # Step 3: Close unused environments
+        #print(f"[DEBUG] ids_to_close: {ids_to_close}")
         self.env_client.close_batch(ids_to_close)
         # Step 4: Create new environments
         ids2configs_create = {}
@@ -246,8 +248,10 @@ class QwenVLRolloutManagerService():
             ids2configs_create[id_str] = cfg
             ids2seeds_reset[id_str] = cfg["seed"]
             self.envs[id_str] = REGISTERED_ENV[cfg["env_name"]]["config_cls"](**cfg["env_config"])
+        #print(f"[DEBUG] ids2configs_create: {ids2configs_create}")
         self.env_client.create_environments_batch(ids2configs_create)
         # Step 5: Reset environments
+        #print(f"[DEBUG] ids2seeds_reset: {ids2seeds_reset}")
         reset_results=self.env_client.reset_batch(ids2seeds_reset)
         
         
