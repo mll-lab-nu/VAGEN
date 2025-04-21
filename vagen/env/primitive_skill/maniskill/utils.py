@@ -11,7 +11,7 @@ import os
 
 
 def build_env(env_id, control_mode="pd_ee_delta_pose", stage=0, record_dir='./test'):
-    env_kwargs = dict(obs_mode="state", control_mode=control_mode, render_mode="rgb_array", sim_backend="cpu")
+    env_kwargs = dict(obs_mode="state", control_mode=control_mode, render_mode="rgb_array", sim_backend="cpu",render_backend="gpu")
     env = gym.make(env_id, num_envs=1, enable_shadow=True, stage=stage, **env_kwargs)
     env = CPUGymWrapper(env)
     env = SkillGymWrapper(env,

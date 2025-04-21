@@ -8,7 +8,7 @@ import logging
 import multiprocessing as mp
 from queue import Empty
 from functools import partial
-import torch
+
 from vagen.env.base.base_service import BaseService
 from vagen.server.serial import serialize_observation
 
@@ -16,6 +16,7 @@ from .env import PrimitiveSkillEnv
 from .env_config import PrimitiveSkillEnvConfig
 from ..base.base_service_config import BaseServiceConfig
 from mani_skill.utils.building.articulations.partnet_mobility import _load_partnet_mobility_dataset, PARTNET_MOBILITY
+
 
 
 class PrimitiveSkillService(BaseService):
@@ -34,7 +35,6 @@ class PrimitiveSkillService(BaseService):
                 max_process_workers: Maximum number of process workers (default: number of CPU cores)
                 max_thread_workers: Maximum number of thread workers per process (default: 4)
                 spawn_method: Multiprocessing start method ('fork' or 'spawn', default: 'fork')
-                devices: List of GPU device IDs to distribute processes across (default: [0])
         """
         # Get the number of CPU cores available
         cpu_count = os.cpu_count() or 4
@@ -45,10 +45,6 @@ class PrimitiveSkillService(BaseService):
         self.timeout = config.get('timeout', 120)  # Timeout for commands
         # Set multiprocessing start method
         self.spawn_method = config.get('spawn_method', 'fork')
-        
-        # Get GPU devices and assign them to processes
-        self.devices = config.get('devices', [0])
-        self.process_to_device = self._assign_devices_to_processes()
         
         # Set up environment mappings
         self.environments = {}  # Mapping from env_id to process_id
@@ -67,23 +63,6 @@ class PrimitiveSkillService(BaseService):
         # Initialize communication queues
         self._setup_mp_queues()
     
-    def _assign_devices_to_processes(self):
-        """
-        Assign GPU devices to worker processes in a balanced way.
-        
-        Returns:
-            Dictionary mapping process IDs to GPU device IDs
-        """
-        process_to_device = {}
-        num_devices = len(self.devices)
-        
-        for pid in range(self.max_process_workers):
-            # Assign devices in a round-robin fashion
-            device_idx = pid % num_devices
-            process_to_device[pid] = self.devices[device_idx]
-            
-        return process_to_device
-    
     def _setup_mp_queues(self):
         """
         Set up multiprocessing queues for communication between main process and workers.
@@ -96,7 +75,7 @@ class PrimitiveSkillService(BaseService):
             self.task_queues.append(mp.Queue())
             self.result_queues.append(mp.Queue())
     
-    def _worker_process(self, process_id, task_queue, result_queue, max_thread_workers, device_id):
+    def _worker_process(self, process_id, task_queue, result_queue, max_thread_workers):
         """
         Worker process function that handles environment operations.
         
@@ -105,18 +84,7 @@ class PrimitiveSkillService(BaseService):
             task_queue: Queue for receiving tasks
             result_queue: Queue for sending results
             max_thread_workers: Maximum number of thread workers
-            device_id: GPU device ID to use for this process
         """
-        # Set CUDA device for this process
-        if torch.cuda.is_available():
-            try:
-                torch.cuda.set_device(device_id)
-                result_queue.put((-1, "info", f"Process {process_id} using CUDA device {device_id}"))
-            except Exception as e:
-                result_queue.put((-1, "error", f"Process {process_id} failed to set CUDA device {device_id}: {str(e)}"))
-        else:
-            result_queue.put((-1, "warning", f"Process {process_id} cannot set CUDA device: CUDA not available"))
-        
         # Dictionary to store environments in this process
         local_environments = {}
         local_env_configs = {}
@@ -285,19 +253,16 @@ class PrimitiveSkillService(BaseService):
         Start worker processes that will handle environment operations.
         """
         for i in range(self.max_process_workers):
-            # Get the device ID for this process
-            device_id = self.process_to_device[i]
-            
             # Create and start process
             p = mp.Process(
                 target=self._worker_process,
-                args=(i, self.task_queues[i], self.result_queues[i], self.max_thread_workers, device_id),
+                args=(i, self.task_queues[i], self.result_queues[i], self.max_thread_workers),
                 daemon=True
             )
             p.start()
             self.processes.append(p)
             
-            self.logger.info(f"Started worker process {i} with PID {p.pid} on GPU device {device_id}")
+            self.logger.info(f"Started worker process {i} with PID {p.pid}")
     
     def _assign_to_process(self, env_id):
         """
