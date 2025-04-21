@@ -6,6 +6,8 @@ export PYTHONHASHSEED=0
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+# run python -m vagen.server.server host=127.0.0.1 port=5001 in a tmux session first
+
 python -m vagen.env.create_dataset \
     --yaml_path "$SCRIPT_DIR/env_config.yaml" \
     --train_path "data/primitive_skill-vision-debug/train.parquet" \
@@ -19,7 +21,7 @@ python3 -m vagen.trainer.main_ppo \
     algorithm.high_level_gamma=0.95 \
     data.train_files=data/primitive_skill-vision-debug/train.parquet \
     data.val_files=data/primitive_skill-vision-debug/test.parquet \
-    data.train_batch_size=64 \
+    data.train_batch_size=32 \
     data.val_batch_size=32 \
     data.max_prompt_length=1024 \
     data.max_response_length=128 \
@@ -76,4 +78,5 @@ python3 -m vagen.trainer.main_ppo \
     rollout_manager.n_trajectory=2 \
     rollout_manager.use_service=True \
     rollout_manager.timeout=240 \
+    rollout_manager.base_url="http://localhost:5001" \
     2>&1 | tee aico_primitive_skill_vision.log
