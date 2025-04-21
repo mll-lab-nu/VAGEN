@@ -64,7 +64,10 @@ cd ../
 git clone https://github.com/RAGEN-AI/VAGEN.git
 cd VAGEN
 bash scripts/install.sh
+# This script installs dependencies for Frozenlake and Sokoban, for other environments, please refer to vagen/env/README.md and uncomment the registration in vagen/env/__init__.py
 ```
+
+
 ## Examples
 
 **Note:** VAGEN currently supports several environments: sokoban, frozenlake, svg, navigation, and primitive skill. 
