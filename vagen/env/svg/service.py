@@ -36,6 +36,9 @@ class SVGService(BaseService):
         # This allows all environments to share the same model instance
         self.model_size = self.config.model_size
         self.dino_model = None  # Will be loaded on first use
+
+        # Add DreamSim model support
+        self.dreamsim_model = None  # Will be loaded on first use if enabled
         
         # Store device for model inference
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -49,6 +52,16 @@ class SVGService(BaseService):
         if self.dino_model is None:
             self.dino_model = get_dino_model(self.model_size, self.device)
         return self.dino_model
+
+    def _get_dreamsim_model(self):
+        """
+        Get or initialize the DreamSim model.
+        Uses lazy loading to avoid loading the model until needed.
+        """
+        if self.dreamsim_model is None:
+            from vagen.env.svg.dreamsim import get_dreamsim_model
+            self.dreamsim_model = get_dreamsim_model(self.device)
+        return self.dreamsim_model
     
     def create_environments_batch(self, ids2configs: Dict[Any, Any]) -> None:
         """
@@ -181,10 +194,11 @@ class SVGService(BaseService):
         if valid_env_ids:
             # Get DINO model
             dino_model = self._get_dino_model()
-            
+            dreamsim_model = self._get_dreamsim_model()
+
             # Calculate all scores at once
             batch_results = calculate_total_score_batch(
-                gt_images, gen_images, gt_codes, gen_codes, score_configs, dino_model
+                gt_images, gen_images, gt_codes, gen_codes, score_configs, dino_model, dreamsim_model
             )
             
             # Process results directly using the index mapping

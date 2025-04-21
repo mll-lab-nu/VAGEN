@@ -3,6 +3,12 @@
 # Start a General Server in debug mode
 python vagen/env/server.py --debug
 ```
+
+### SVG
+```
+sudo apt-get update && sudo apt-get install -y libcairo2
+```
+
 ### Navigation
 ```
 
@@ -19,6 +25,8 @@ sudo apt install vulkan-tools
 
 ### Manipulation
 ```
+#sudo apt-get update && sudo apt-get install -y libx11-6
+#sudo apt-get update && sudo apt-get install -y libgl1-mesa-glx
 pip install --upgrade mani_skill
 python -m mani_skill.utils.download_asset "PickSingleYCB-v1"
 python -m mani_skill.utils.download_asset partnet_mobility_cabinet
