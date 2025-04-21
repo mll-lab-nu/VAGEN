@@ -40,5 +40,6 @@ echo "Installing SVG dependencies"
 pip install "bs4"
 pip install "svgpathtools"
 pip install "cairosvg"
+pip install "dreamsim"
 
 echo "Installation complete!"

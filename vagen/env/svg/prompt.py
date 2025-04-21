@@ -5,22 +5,10 @@ system_prompt = """You are a precise SVG code generator. You will be given an im
 SVG Quick Guide
 Goal: Transform the provided image into precise SVG code that replicates the image.
 
-Basic SVG Elements:
-- <rect> for rectangles and squares
-- <circle> for circles
-- <ellipse> for ellipses
-- <line> for straight lines
-- <polyline> for connected lines
-- <polygon> for closed shapes
-- <path> for complex shapes and curves
-- <text> for text elements
-- <g> for grouping elements
-
 Process:
 1. First analyze the image carefully, identifying distinct visual elements
-2. Break down complex shapes into basic SVG elements when possible
-3. Identify colors, dimensions, positions, and relationships between elements
-4. Generate accurate SVG code that reproduces the image
+2. Identify colors, dimensions, positions, and relationships between elements
+3. Generate accurate SVG code that reproduces the image
 
 Rewards:
 - Overall visual similarity: +5.0
