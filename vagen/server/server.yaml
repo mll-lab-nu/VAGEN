@@ -7,13 +7,13 @@ server:
   debug: false
 
 frozenlake:
-  max_workers: 20
+  max_workers: 48
 svg:
-  max_workers: 20
+  max_workers: 48
   model_size: "small"
 navigation:
-  max_workers: 20
-  devices: [4,5,6,7]
+  max_workers: 48
+  devices: [0,1,2,3]
 primitive_skill:
-  max_workers: 20
+  max_workers: 48
 

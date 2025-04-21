@@ -20,6 +20,7 @@ python3 -m vagen.trainer.main_ppo \
     data.train_files=data/primitive_skill-vision-debug/train.parquet \
     data.val_files=data/primitive_skill-vision-debug/test.parquet \
     data.train_batch_size=64 \
+    data.val_batch_size=32 \
     data.max_prompt_length=1024 \
     data.max_response_length=128 \
     data.max_trajectory_length=2400 \
@@ -72,6 +73,7 @@ python3 -m vagen.trainer.main_ppo \
     rollout_manager.use_gae_mask=True \
     trainer.val_before_train=True \
     trainer.val_generations_to_log_to_wandb=8 \
-    rollout_manager.n_trajectory=1 \
+    rollout_manager.n_trajectory=2 \
     rollout_manager.use_service=True \
+    rollout_manager.timeout=240 \
     2>&1 | tee aico_primitive_skill_vision.log

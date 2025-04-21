@@ -19,7 +19,8 @@ python3 -m vagen.trainer.main_ppo \
     algorithm.high_level_gamma=0.95 \
     data.train_files=data/navigation-vision-debug/train.parquet \
     data.val_files=data/navigation-vision-debug/test.parquet \
-    data.train_batch_size=32 \
+    data.train_batch_size=64 \
+    data.val_batch_size=16 \
     data.max_prompt_length=1024 \
     data.max_response_length=128 \
     data.max_trajectory_length=2400 \
@@ -72,6 +73,7 @@ python3 -m vagen.trainer.main_ppo \
     rollout_manager.use_gae_mask=True \
     trainer.val_before_train=True \
     trainer.val_generations_to_log_to_wandb=4 \
-    rollout_manager.n_trajectory=1 \
+    rollout_manager.n_trajectory=2 \
     rollout_manager.use_service=True \
+    rollout_manager.timeout=240 \
     2>&1 | tee aico_navigation_vision.log
