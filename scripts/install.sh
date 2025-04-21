@@ -32,14 +32,14 @@ echo "Installing Frozenlake dependencies"
 pip install 'gymnasium'
 pip install "gymnasium[toy-text]"
 
-echo "Installing Navigation dependencies"
-pip install ai2thor==5.0.0
-pip install numpy==1.25.1
+# echo "Installing Navigation dependencies"
+# pip install ai2thor==5.0.0
+# pip install numpy==1.25.1
 
-echo "Installing SVG dependencies"
-pip install "bs4"
-pip install "svgpathtools"
-pip install "cairosvg"
-pip install "dreamsim"
+# echo "Installing SVG dependencies"
+# pip install "bs4"
+# pip install "svgpathtools"
+# pip install "cairosvg"
+# pip install "dreamsim"
 
 echo "Installation complete!"
