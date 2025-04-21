@@ -217,7 +217,18 @@ if __name__ == "__main__":
     reset it, and interact with it using manual input actions.
     """
     # AlignTwoCube,PlaceTwoCube,PutAppleInDrawer,StackThreeCube
-    config = PrimitiveSkillEnvConfig(record_video=True, video_record_dir="./test_manipulation_video",env_id="AlignTwoCube", render_mode="vision")
+    
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Test Navigation Environment")
+    parser.add_argument(
+        "--env_id",
+        type=str,
+        default="AlignTwoCube",
+    )
+    args = parser.parse_args()
+    
+    config = PrimitiveSkillEnvConfig(record_video=True, video_record_dir="./test_manipulation_video",env_id=args.env_id, render_mode="vision")
     env = PrimitiveSkillEnv(config)
     
     print(env.system_prompt())
