@@ -5,7 +5,7 @@ from typing import Dict, List, Optional, Tuple, Any
 from gymnasium.utils import seeding
 from vagen.env.utils.context_utils import parse_llm_raw_response, convert_numpy_to_PIL
 from .env_config import PrimitiveSkillEnvConfig
-from .maniskill.utils import build_env, handel_info, get_workspace_limits
+from .maniskill.utils import build_env, handle_info, get_workspace_limits
 from .prompts import system_prompt, init_observation_template, action_template
 import vagen.env.primitive_skill.maniskill.env
 
@@ -71,6 +71,8 @@ class PrimitiveSkillEnv(BaseEnv):
         obs=self._render(info,init_obs=False,valid_actions=valid_actions)
         output_info["metrics"] = metrics
         self.total_reward += reward
+        if isinstance(done, np.ndarray):
+            done = done.item()
         return obs,reward,done,output_info
     
     def system_prompt(self):
@@ -106,7 +108,7 @@ class PrimitiveSkillEnv(BaseEnv):
     
     
     def _render(self,info,init_obs=False,valid_actions=None):
-        new_info=handel_info(info.copy())
+        new_info=handle_info(info.copy())
         object_positions=new_info['obj_positions']
         other_information=new_info['other_info']
         instruction=self.env.instruction()

@@ -26,27 +26,37 @@ def build_env(env_id, control_mode="pd_ee_delta_pose", stage=0, record_dir='./te
     return env
 
 
-def handel_info(info):
-    obj_positions={}
-    other_info={}
+def handle_info(info):
+    obj_positions = {}
+    other_info = {}
+    
+    # Remove specific keys
     info.pop('is_success', None)
     info.pop('num_timesteps', None)
     info.pop('elapsed_steps', None)
-    info.pop('skill_success',None)
-    info.pop('reward_components',None)
-    for k,v in info.items():
+    info.pop('skill_success', None)
+    info.pop('reward_components', None)
+    
+    for k, v in info.items():
         if k.endswith('_pos'):
-            # convert to cm round to 2 decimal places
-            obj_positions[k] = tuple(np.round(v*1000, 0).astype(int))
+            # Convert position arrays to integer tuples in cm
+            obj_positions[k] = tuple(np.round(v * 1000, 0).astype(int).tolist())
         elif k.endswith('_value'):
-            other_info[k] = np.round(v*1000, 0).astype(int).item()
+            # Convert value arrays to integers in cm
+            other_info[k] = np.round(v * 1000, 0).astype(int).item()
         elif k.endswith('_size'):
-            other_info[k] = tuple(np.round(v*1000, 0).astype(int))
+            # Convert size arrays to integer tuples in cm
+            other_info[k] = tuple(np.round(v * 1000, 0).astype(int).tolist())
         else:
-            if isinstance(v, np.ndarray) and v.ndim == 0:
-                other_info[k] = v.item()
+            # Handle all other cases
+            if isinstance(v, np.ndarray):
+                if v.ndim == 0:  # Scalar array
+                    other_info[k] = v.item()
+                else:  # Multi-dimensional array
+                    other_info[k] = tuple(v.flatten().tolist())
             else:
                 other_info[k] = v
+    
     return {
         'obj_positions': obj_positions,
         'other_info': other_info
