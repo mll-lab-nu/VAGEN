@@ -13,7 +13,7 @@ pip install "cairosvg"
 pip install "dreamsim"
 
 # Probably you also need:
-apt-get update && apt-get install -y libcairo2
+sudo apt-get update && sudo apt-get install -y libcairo2
 ```
 
 ### Navigation
