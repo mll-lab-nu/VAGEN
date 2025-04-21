@@ -22,8 +22,8 @@ pip install ai2thor==5.0.0
 pip install numpy==1.25.1
 
 # Refer to https://github.com/EmbodiedBench/EmbodiedBench, probably you also need:
-apt-get -y install libvulkan1
-apt install vulkan-tools
+sudo apt-get update && sudo apt-get -y install libvulkan1
+sudo apt install vulkan-tools
 ```
 
 Below is outdated for backup purpose:
@@ -43,6 +43,6 @@ python -m mani_skill.utils.download_asset "PickSingleYCB-v1"
 python -m mani_skill.utils.download_asset partnet_mobility_cabinet
 
 # Refer to https://github.com/haosulab/ManiSkill, probably you also need:
-apt-get update && apt-get install -y libx11-6
-apt-get update && apt-get install -y libgl1-mesa-glx
+sudo apt-get update && sudo apt-get install -y libx11-6
+sudo apt-get update && sudo apt-get install -y libgl1-mesa-glx
 ```
