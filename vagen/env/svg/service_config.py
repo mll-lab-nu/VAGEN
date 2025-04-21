@@ -3,5 +3,5 @@ from dataclasses import dataclass, fields,field
 
 @dataclass
 class SVGServiceConfig(BaseServiceConfig):
-    model_size="small"
-    max_workers=5
+    model_size:str ="small"
+    max_workers:int =5

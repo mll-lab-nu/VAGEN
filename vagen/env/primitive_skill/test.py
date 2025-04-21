@@ -7,7 +7,7 @@ import statistics
 
 from vagen.env.primitive_skill.service import PrimitiveSkillService
 from vagen.env.primitive_skill.env_config import PrimitiveSkillEnvConfig
-from vagen.env.primitive_skill.service_config import PrimitiveSkillConfig
+from vagen.env.primitive_skill.service_config import PrimitiveSkillServiceConfig
 
 def generate_random_action():
     """Generate a random action string (pick, place, or push with random coordinates)."""
@@ -63,7 +63,7 @@ def main(num_envs=32, num_steps=3,max_process_workers=8,max_thread_workers=8):
             }
     
     # Create service configuration with higher number of workers for parallelism
-    service_config = PrimitiveSkillConfig(max_process_workers=max_process_workers, max_thread_workers=max_thread_workers)
+    service_config = PrimitiveSkillServiceConfig(max_process_workers=max_process_workers, max_thread_workers=max_thread_workers)
     service = PrimitiveSkillService(service_config)
     
     # Timing dictionary
