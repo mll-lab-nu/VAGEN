@@ -57,7 +57,7 @@ class PutAppleInDrawerEnv(BaseEnv):
     @property
     def _default_human_render_camera_configs(self):
         pose = sapien_utils.look_at([1.0, 0.3, 1.0], [-0.5, -0.2, 0.35])
-        return CameraConfig("render_camera", pose, 2048, 2048, 1, 0.01, 100)
+        return CameraConfig("render_camera", pose, 300, 300, 1, 0.01, 100)
 
     def instruction(self):
         return "Please put the apple in the drawer and close the drawer."
@@ -113,7 +113,7 @@ class PutAppleInDrawerEnv(BaseEnv):
             xyz = torch.zeros((b, 3), device=self.device)
             xyz[:, 2] = apple_height  # Use apple's actual height
             sampler = randomization.UniformPlacementSampler(bounds=[
-                [self.workspace_x[0]+0.35, self.workspace_y[0]+0.5],
+                [self.workspace_x[0]+0.35, self.workspace_y[0]+0.7],
                 [self.workspace_x[1], self.workspace_y[1]]
             ], batch_size=b)
             apple_xy = sampler.sample(0.04, 100)  # Adjust radius based on apple size if needed
