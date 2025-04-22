@@ -21,13 +21,13 @@ python3 -m vagen.trainer.main_ppo \
     algorithm.high_level_gamma=0.95 \
     data.train_files=data/navigation-vision-debug/train.parquet \
     data.val_files=data/navigation-vision-debug/test.parquet \
-    data.train_batch_size=32 \
+    data.train_batch_size=64 \
     data.val_batch_size=16 \
     data.max_prompt_length=1024 \
     data.max_response_length=128 \
     data.max_trajectory_length=2400 \
     data.image_key=images \
-    data.truncation=left \
+    data.truncation=error \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=True \
@@ -42,7 +42,7 @@ python3 -m vagen.trainer.main_ppo \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \
     actor_rollout_ref.rollout.tensor_model_parallel_size=2 \
     actor_rollout_ref.rollout.name=vllm \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.2 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.1 \
     actor_rollout_ref.rollout.enable_chunked_prefill=False \
     actor_rollout_ref.rollout.enforce_eager=False \
     actor_rollout_ref.rollout.free_cache_engine=False \
@@ -75,7 +75,8 @@ python3 -m vagen.trainer.main_ppo \
     rollout_manager.use_gae_mask=True \
     trainer.val_before_train=True \
     trainer.val_generations_to_log_to_wandb=4 \
-    rollout_manager.n_trajectory=2 \
+    rollout_manager.n_trajectory=1 \
     rollout_manager.use_service=True \
     rollout_manager.timeout=240 \
+    rollout_manager.base_url="http://localhost:5001" \
     2>&1 | tee aico_navigation_vision.log
