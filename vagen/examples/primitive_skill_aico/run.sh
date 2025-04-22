@@ -25,7 +25,7 @@ python3 -m vagen.trainer.main_ppo \
     data.val_batch_size=32 \
     data.max_prompt_length=1024 \
     data.max_response_length=128 \
-    data.max_trajectory_length=2400 \
+    data.max_trajectory_length=2600 \
     data.image_key=images \
     data.truncation=left \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \
@@ -40,9 +40,9 @@ python3 -m vagen.trainer.main_ppo \
     actor_rollout_ref.actor.fsdp_config.param_offload=False \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \
-    actor_rollout_ref.rollout.tensor_model_parallel_size=2 \
+    actor_rollout_ref.rollout.tensor_model_parallel_size=4 \
     actor_rollout_ref.rollout.name=vllm \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.2 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.1 \
     actor_rollout_ref.rollout.enable_chunked_prefill=False \
     actor_rollout_ref.rollout.enforce_eager=False \
     actor_rollout_ref.rollout.free_cache_engine=False \
@@ -78,5 +78,5 @@ python3 -m vagen.trainer.main_ppo \
     rollout_manager.n_trajectory=2 \
     rollout_manager.use_service=True \
     rollout_manager.timeout=240 \
-    rollout_manager.base_url="http://localhost:5001" \
+    rollout_manager.base_url="http://localhost:5000" \
     2>&1 | tee aico_primitive_skill_vision.log

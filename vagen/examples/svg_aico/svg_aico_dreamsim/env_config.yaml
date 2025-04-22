@@ -16,4 +16,4 @@ env2:
         structural_weight: 0.0
         dreamsim_weight: 5.0
     train_size: 0
-    test_size: 64
+    test_size: 128
