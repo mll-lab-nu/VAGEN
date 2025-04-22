@@ -190,6 +190,8 @@ class SVGService(BaseService):
                 
                 # Update metrics and prepare info
                 result["metrics"]["turn_metrics"]["action_is_effective"] = scores["total_score"] > 0
+                result["metrics"]["turn_metrics"]["dino_score"] = scores["dino_score"]
+                result["metrics"]["turn_metrics"]["dreamsim_score"] = scores["dreamsim_score"]
                 info = result["rst"].copy()
                 info["scores"] = scores
                 info["metrics"] = result["metrics"]
@@ -413,6 +415,8 @@ class SVGService(BaseService):
                         "action_is_valid": rst['actions'] != [],  # Action exists
                         "svg_is_valid": svg_is_valid,  # SVG syntax is valid
                         "action_is_effective": False,
+                        "dino_score": 0.0,
+                        "dreamsim_score": 0.0,
                     },
                     "traj_metrics": {
                         "success": False,
