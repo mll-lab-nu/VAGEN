@@ -22,6 +22,7 @@ class StackThreeCubeEnv(BaseEnv):
     SUPPORTED_ROBOTS = ["panda", "xmate3_robotiq", "fetch"]
     agent: Union[Panda, Xmate3Robotiq, Fetch]
     skill_config=None
+    vlm_info_keys=['cube_size']
 
     def __init__(self, stage=0,*args, robot_uids="panda", robot_init_qpos_noise=0.02, **kwargs):
         self.stage=stage
@@ -145,7 +146,8 @@ class StackThreeCubeEnv(BaseEnv):
         def stage3_success(info):
             purple_not_grasped = ~info["is_purple_cube_grasped"]
             purple_on_red = (torch.linalg.norm(info["purple_cube_pos"][:2] - info["red_cube_pos"][:2]) < self.cube_size/2) and (info["purple_cube_pos"][2] > (info["red_cube_pos"][2] + self.cube_size/2))
-            return purple_on_red and purple_not_grasped
+            
+            return purple_on_red and purple_not_grasped and stage1_success(info)
         
         info["stage0_success"] = stage0_success(info)
         info["stage1_success"] = stage1_success(info)

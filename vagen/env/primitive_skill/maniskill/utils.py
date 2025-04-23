@@ -26,16 +26,16 @@ def build_env(env_id, control_mode="pd_ee_delta_pose", stage=0, record_dir='./te
     return env
 
 
-def handle_info(info,mask_success=False):
+def handle_info(info,mask_success=False,env=None):
     obj_positions = {}
     other_info = {}
     
+    # HARD-CODED POPLIST
+    pop_list_1=['is_success', 'num_timesteps', 'elapsed_steps', 'skill_success', 'reward_components']
     # Remove specific keys
-    info.pop('is_success', None)
-    info.pop('num_timesteps', None)
-    info.pop('elapsed_steps', None)
-    info.pop('skill_success', None)
-    info.pop('reward_components', None)
+    for k in pop_list_1:
+        if k in info:
+            info.pop(k)
     
     for k, v in info.items():
         if k.endswith('_pos'):
@@ -57,14 +57,21 @@ def handle_info(info,mask_success=False):
             else:
                 other_info[k] = v
     
+    
     if mask_success:
-       for k in other_info.keys():
-            if "success" in k:
-                other_info.pop(k)
+        final_info = {}
+        for k in env.vlm_info_keys:
+            if k in other_info:
+                final_info[k] = other_info[k]
+        if not final_info:
+            final_info = "No other information needed"
+    else:
+        final_info = {}
+        final_info.update(other_info)
     
     return {
         'obj_positions': obj_positions,
-        'other_info': other_info
+        'other_info': str(final_info)
     }
     
 def get_workspace_limits(env):

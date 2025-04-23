@@ -21,7 +21,7 @@ from collections import defaultdict
 class PutAppleInDrawerEnv(BaseEnv):
     SUPPORTED_ROBOTS = ["panda", "xmate3_robotiq", "fetch"]
     agent: Union[Panda, Xmate3Robotiq, Fetch]
-
+    vlm_info_keys=["drawer_open_value"]
     # Asset configuration and constants
     DRAWER_ASSET_ID = "partnet_mobility_cabinet"
     handle_types = ["prismatic"]  # We are interested in prismatic joints (drawers)

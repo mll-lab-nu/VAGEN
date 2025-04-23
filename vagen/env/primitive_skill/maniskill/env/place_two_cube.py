@@ -22,6 +22,7 @@ class PlaceTwoCubeEnv(BaseEnv):
     SUPPORTED_ROBOTS = ["panda", "xmate3_robotiq", "fetch"]
     agent: Union[Panda, Xmate3Robotiq, Fetch]
     skill_config=None
+    vlm_info_keys=[]
 
     def __init__(self, stage=0,*args, robot_uids="panda", robot_init_qpos_noise=0.02, **kwargs):
         self.stage=stage
