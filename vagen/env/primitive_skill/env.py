@@ -108,7 +108,7 @@ class PrimitiveSkillEnv(BaseEnv):
     
     
     def _render(self,info,init_obs=False,valid_actions=None):
-        new_info=handle_info(info.copy())
+        new_info=handle_info(info.copy(),mask_success=self.config.mask_success)
         object_positions=new_info['obj_positions']
         other_information=new_info['other_info']
         instruction=self.env.instruction()

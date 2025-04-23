@@ -28,6 +28,7 @@ sudo apt install vulkan-tools
 
 Below is outdated for backup purpose:
 ```
+# export CUDA_VISIBLE_DEVICES
 # For headless servers, additional setup is required:
 # Install required packages
 apt-get install -y pciutils

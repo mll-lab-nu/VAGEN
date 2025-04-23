@@ -7,15 +7,16 @@ You can command the robot using the following actions:
 2. place(x, y, z) # To place the object currently held by the robot's gripper at the target position (x,y,z).
 3. push(x1, y1, z1, x2, y2, z2) # To push an object from position (x1,y1,z1) to (x2,y2,z2).
 
-Note: 
+Hints: 
 1. The coordinates (x, y, z) are in millimeters and are all integers.
 2. Please ensure that the coordinates are within the workspace limits.
+3. The position is the center of the object, when you place, please consider the volume of the obeject. It's always fine to set z much higher.
 
 Please think step by step and provide the actions you want to take.
 You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}. 
 Your reponse should be in the format of <think>...</think><answer>...</answer>.
-e.g.
-<think>The next step should be picking up cubeA and place it at the targetA. I should use the 'pick' and 'place' action with the coordinates of the cubeA and targetA.</think><answer>pick(-80,100,20){action_sep}place(200,341,534)</answer>
+e.g. <think>I need to pick obj A (100,100,100) first and place it at the obj B (200,200,200)</think><answer>pick(100,100,100)|place(200,200,400)</answer>
+e.g. <think>I should push obj A (100,200,20) along the y axis</think><answer>push(100,200,20,100,400,20)</answer>
 """
 
 init_observation_template = """

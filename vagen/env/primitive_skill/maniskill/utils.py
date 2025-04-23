@@ -26,7 +26,7 @@ def build_env(env_id, control_mode="pd_ee_delta_pose", stage=0, record_dir='./te
     return env
 
 
-def handle_info(info):
+def handle_info(info,mask_success=False):
     obj_positions = {}
     other_info = {}
     
@@ -56,6 +56,11 @@ def handle_info(info):
                     other_info[k] = tuple(v.flatten().tolist())
             else:
                 other_info[k] = v
+    
+    if mask_success:
+       for k in other_info.keys():
+            if "success" in k:
+                other_info.pop(k)
     
     return {
         'obj_positions': obj_positions,

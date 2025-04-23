@@ -10,6 +10,7 @@ class PrimitiveSkillEnvConfig(BaseEnvConfig):
     action_sep:str= field(default='|')
     record_video: bool = field(default=False)
     video_record_dir: str = field(default='./test')
+    mask_success: bool = field(default=False)
     
     def config_id(self) -> str:
         id_fields=["env_id","render_mode","max_actions_per_step"]

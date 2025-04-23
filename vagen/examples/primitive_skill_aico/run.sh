@@ -6,7 +6,7 @@ export PYTHONHASHSEED=0
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-# run python -m vagen.server.server server.host=127.0.0.1 server.port=5001 in a tmux session first
+# run python -m vagen.server.server server.host=127.0.0.1 server.port=5000 in a tmux session first
 
 python -m vagen.env.create_dataset \
     --yaml_path "$SCRIPT_DIR/env_config.yaml" \
@@ -25,9 +25,9 @@ python3 -m vagen.trainer.main_ppo \
     data.val_batch_size=32 \
     data.max_prompt_length=1024 \
     data.max_response_length=128 \
-    data.max_trajectory_length=2600 \
+    data.max_trajectory_length=3000 \
     data.image_key=images \
-    data.truncation=left \
+    data.truncation=error \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=True \
@@ -37,8 +37,8 @@ python3 -m vagen.trainer.main_ppo \
     actor_rollout_ref.actor.kl_loss_coef=0.001 \
     actor_rollout_ref.actor.kl_loss_type=mse \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
-    actor_rollout_ref.actor.fsdp_config.param_offload=False \
-    actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
+    actor_rollout_ref.actor.fsdp_config.param_offload=True \
+    actor_rollout_ref.actor.fsdp_config.optimizer_offload=True \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \
     actor_rollout_ref.rollout.tensor_model_parallel_size=4 \
     actor_rollout_ref.rollout.name=vllm \
