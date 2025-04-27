@@ -1,6 +1,7 @@
 import os
 import time
 import logging
+import threading
 import multiprocessing as mp
 from queue import Empty
 from concurrent.futures import ThreadPoolExecutor
@@ -60,6 +61,19 @@ class ALFWorldService(BaseService):
         # Thread pool for potential intra-process parallelism
         thread_pool = ThreadPoolExecutor(max_workers=max_thread_workers)
         running = True
+        
+        #@ TODO revise this
+        def send_heartbeat():
+            while running:
+                try:
+                    result_queue.put((-999, "heartbeat", process_id))
+                    time.sleep(120)
+                except:
+                    pass
+        
+        heartbeat_thread = threading.Thread(target=send_heartbeat, daemon=True)
+        heartbeat_thread.start()
+    
         while running:
             try:
                 command, task_id, args = task_queue.get()
@@ -179,6 +193,13 @@ class ALFWorldService(BaseService):
         while True:
             try:
                 rid, status, result = self.result_queues[pid].get(timeout=self.timeout)
+                
+                #@ TODO revise this
+                if rid == -999 and status == "heartbeat":
+                    last_heartbeat = time.time()
+                    self.logger.debug(f"Received heartbeat from worker {pid}")
+                    continue
+            
                 if rid != task_id:
                     continue
                 if status == 'success':
