@@ -1,0 +1,6 @@
+env1:
+    env_name: alfworld  
+    env_config:
+        render_mode: text
+    train_size: 10  
+    test_size: 4

@@ -2,6 +2,10 @@ from .sokoban import SokobanEnv,SokobanEnvConfig
 from .frozenlake import FrozenLakeEnv,FrozenLakeEnvConfig, FrozenLakeService
 # from .navigation import NavigationEnv, NavigationEnvConfig, NavigationServiceConfig, NavigationService
 # from .svg import SVGEnv, SvgEnvConfig, SVGService, SVGServiceConfig
+# from .primitive_skill import PrimitiveSkillEnv, PrimitiveSkillEnvConfig, PrimitiveSkillService, PrimitiveSkillConfig
+from .alfworld import ALFWorldEnv, ALFWorldEnvConfig
+# from .navigation import NavigationEnv, NavigationEnvConfig, NavigationServiceConfig, NavigationService
+# from .svg import SVGEnv, SvgEnvConfig, SVGService, SVGServiceConfig
 # from .primitive_skill import PrimitiveSkillEnv, PrimitiveSkillEnvConfig, PrimitiveSkillService, PrimitiveSkillServiceConfig
 
 REGISTERED_ENV = {
@@ -30,6 +34,10 @@ REGISTERED_ENV = {
     #     "env_cls": PrimitiveSkillEnv,
     #     "config_cls": PrimitiveSkillEnvConfig,
     #     "service_cls": PrimitiveSkillService,
-    #     "service_config_cls": PrimitiveSkillServiceConfig
-    # }
+    #     "service_config_cls": PrimitiveSkillConfig
+    # },
+    "alfworld": {
+        "env_cls": ALFWorldEnv,
+        "config_cls": ALFWorldEnvConfig,
+    },
 }
