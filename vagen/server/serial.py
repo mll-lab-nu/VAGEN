@@ -68,34 +68,27 @@ def deserialize_observation(serialized_obs: Dict[str, Any]) -> Dict[str, Any]:
 
 # -------------- serialize and deserialize step (obs, reward, done, info) --------------
 def serialize_step_result(result_tuple: Tuple[Dict, float, bool, Dict]) -> Tuple[Dict, float, bool, Dict]:
-    """
-    Serialize the step result tuple by handling NumPy types.
-    
-    Args:
-        result_tuple: The original tuple (observation, reward, done, info).
-        
-    Returns:
-        A serialized tuple that can be safely JSON serialized.
-    """
+    """Serialize step result tuple handling NumPy types and custom objects."""
     observation, reward, done, info = result_tuple
     
-    # Serialize the observation using the existing serialize_observation function.
     serialized_observation = serialize_observation(observation)
     
-    # Process the reward (it might be a NumPy floating-point number).
-    if hasattr(reward, 'item'):  # Check for a generic NumPy type.
+    # Handle reward (might be a NumPy float)
+    if hasattr(reward, 'item'):
         serialized_reward = float(reward)
     else:
         serialized_reward = reward
         
-    # Process done (it might be a NumPy boolean).
+    # Handle done flag (might be a NumPy boolean)
+    if isinstance(done, (list, tuple, np.ndarray)):
+        done = done[0]
     if hasattr(done, 'item'):
         serialized_done = bool(done)
     else:
         serialized_done = done
         
-    # Process the info dictionary.
-    serialized_info = serialize_dict(info)
+    # Handle info dictionary
+    serialized_info = serialize_info(info)
     
     return (serialized_observation, serialized_reward, serialized_done, serialized_info)
 
@@ -181,21 +174,17 @@ def deserialize_numpy_array(serialized_data: Dict[str, Any]):
     array_data = serialized_data["__numpy_array__"]
     return np.array(array_data["data"], dtype=np.dtype(array_data["dtype"])).reshape(array_data["shape"])
 
+def serialize_info(info: Dict[str, Any]) -> Dict[str, Any]:
+    """Serialize info dictionary that might contain various types including Proposition objects."""
+    return serialize_dict(info)
+
 def serialize_dict(obj: Any) -> Any:
-    """
-    Recursively serialize objects that may contain NumPy types.
-    
-    Args:
-        obj: The object to be serialized.
-        
-    Returns:
-        The serialized object that can be safely JSON serialized.
-    """
+    """Recursively serialize objects that may contain NumPy types or custom objects."""
     if isinstance(obj, dict):
         return {k: serialize_dict(v) for k, v in obj.items()}
     elif isinstance(obj, (list, tuple)):
         return type(obj)(serialize_dict(x) for x in obj)
-    elif hasattr(obj, 'dtype') and hasattr(obj, 'item'):  # Detect NumPy arrays and scalars.
+    elif hasattr(obj, 'dtype') and hasattr(obj, 'item'):  # Detect NumPy arrays and scalars
         if obj.ndim == 0:  # Scalar
             if np.issubdtype(obj.dtype, np.floating):
                 return float(obj)
@@ -204,9 +193,18 @@ def serialize_dict(obj: Any) -> Any:
             elif np.issubdtype(obj.dtype, np.bool_):
                 return bool(obj)
             else:
-                return obj.item()  # Generic conversion.
+                return obj.item()  # Generic conversion
         else:  # Array
             return serialize_dict(obj.tolist())
+    # Handle Proposition objects
+    elif obj.__class__.__name__ == 'Proposition':
+        return str(obj)
+    # Handle other possible custom types
+    elif hasattr(obj, '__dict__'):
+        try:
+            return str(obj)
+        except Exception as e:
+            return f"serialize error: <{obj.__class__.__name__} object> cannot be serilized ({e})"
     else:
         return obj
 

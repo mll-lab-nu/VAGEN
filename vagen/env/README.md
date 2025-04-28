@@ -31,3 +31,19 @@ pip install --upgrade mani_skill
 python -m mani_skill.utils.download_asset "PickSingleYCB-v1"
 python -m mani_skill.utils.download_asset partnet_mobility_cabinet
 ```
+
+### ALFWorld
+```
+pip install ai2thor==2.1.0
+pip install alfworld==0.3.2
+pip3 install numpy==1.23.5
+pip3 install protobuf==3.20.3
+pip3 install pydantic==1.10.14
+pip3 install pydantic-core==2.16.3
+pip3 uninstall frozenlist gradio murmurhash preshed spacy srsly thinc weasel aiosignal annotated-types blis catalogue cloudpathlib cymem
+
+# Set the data path and download before running the server
+export ALFWORLD_DATA=<storage_path>
+alfworld-download
+python vagen/env/server.py
+```

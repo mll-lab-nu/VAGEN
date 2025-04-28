@@ -205,19 +205,6 @@ class ALFWorldEnv(BaseEnv):
                 reward=self.total_reward
             )
         
-        # Add response format instructions based on config
-        if not self.config.action_only_prompt:
-            obs_str += (
-                "\nYour response should be a valid JSON: \n{\n"
-                "\"thoughts\": \"your reasoning\", \n"
-                "\"action\": \"chosen_action\"\n}"
-            )
-        else:
-            obs_str += (
-                "\nYour response should be a valid JSON: \n{\n"
-                "\"action\": \"chosen_action\"\n}"
-            )
-        
         # For text mode, just return the observation string
         if self.config.render_mode == "text":
             return {
