@@ -10,7 +10,7 @@ from vagen.env.base.base_service import BaseService
 from vagen.env.alfworld.env import ALFWorldEnv
 from vagen.env.alfworld.env_config import ALFWorldEnvConfig
 from vagen.env.alfworld.service_config import ALFWorldServiceConfig
-from vagen.server.serial import serialize_observation, serialize_step_result
+from vagen.server.serial import serialize_observation, serialize_step_result, serialize_info
 
 class ALFWorldService(BaseService):
     """
@@ -55,42 +55,54 @@ class ALFWorldService(BaseService):
         """
         Target function run in each subprocess to manage ALFWorldEnv instances.
         """
-        local_envs = {}
+        local_environments = {}
+        local_env_configs = {}
         # Thread pool for potential intra-process parallelism
         thread_pool = ThreadPoolExecutor(max_workers=max_thread_workers)
         running = True
         while running:
             try:
                 command, task_id, args = task_queue.get()
-                if command == 'create':
-                    env_id, cfg_dict = args
+                if command == "create":
+                    env_id, config = args 
                     try:
-                        cfg = ALFWorldEnvConfig(**cfg_dict)
-                        env = ALFWorldEnv(cfg)
-                        local_envs[env_id] = env
-                        result_queue.put((task_id, 'success', env_id))
+                        env_name = config.get('env_name', 'alfworld')
+                        if env_name != 'alfworld':
+                            result_queue.put((task_id, "error", f"Expected environment type 'alfworld', got '{env_name}'"))
+                            continue
+                        
+                        env_config_dict = config.get('env_config', {})
+                        env_config = ALFWorldEnvConfig(**env_config_dict)
+                        
+                        env = ALFWorldEnv(env_config)
+                        
+                        local_environments[env_id] = env
+                        local_env_configs[env_id] = env_config
+                        
+                        result_queue.put((task_id, "success", env_id))
                     except Exception as e:
-                        result_queue.put((task_id, 'error', str(e)))
+                        result_queue.put((task_id, "error", f"Error creating environment {env_id}: {str(e)}"))
 
                 elif command == 'reset':
                     env_id, seed = args
-                    if env_id not in local_envs:
+                    if env_id not in local_environments:
                         result_queue.put((task_id, 'error', f"Env {env_id} not found"))
                         continue
                     try:
-                        obs, info = local_envs[env_id].reset(seed)
+                        obs, info = local_environments[env_id].reset(seed)
+                        s_info = serialize_info(info)
                         s_obs = serialize_observation(obs)
-                        result_queue.put((task_id, 'success', (s_obs, info)))
+                        result_queue.put((task_id, 'success', (s_obs, s_info)))
                     except Exception as e:
                         result_queue.put((task_id, 'error', str(e)))
 
                 elif command == 'step':
                     env_id, action = args
-                    if env_id not in local_envs:
+                    if env_id not in local_environments:
                         result_queue.put((task_id, 'error', f"Env {env_id} not found"))
                         continue
                     try:
-                        obs, reward, done, info = local_envs[env_id].step(action)
+                        obs, reward, done, info = local_environments[env_id].step(action)
                         serialized = serialize_step_result((obs, reward, done, info))
                         result_queue.put((task_id, 'success', serialized))
                     except Exception as e:
@@ -98,34 +110,35 @@ class ALFWorldService(BaseService):
 
                 elif command == 'compute_reward':
                     env_id = args
-                    if env_id not in local_envs:
+                    if env_id not in local_environments:
                         result_queue.put((task_id, 'error', f"Env {env_id} not found"))
                         continue
                     try:
-                        r = local_envs[env_id].compute_reward()
+                        r = local_environments[env_id].compute_reward()
                         result_queue.put((task_id, 'success', r))
                     except Exception as e:
                         result_queue.put((task_id, 'error', str(e)))
 
                 elif command == 'system_prompt':
                     env_id = args
-                    if env_id not in local_envs:
+                    if env_id not in local_environments:
                         result_queue.put((task_id, 'error', f"Env {env_id} not found"))
                         continue
                     try:
-                        p = local_envs[env_id].system_prompt()
+                        p = local_environments[env_id].system_prompt()
                         result_queue.put((task_id, 'success', p))
                     except Exception as e:
                         result_queue.put((task_id, 'error', str(e)))
 
                 elif command == 'close':
                     env_id = args
-                    if env_id in local_envs:
+                    if env_id in local_environments:
                         try:
-                            local_envs[env_id].close()
+                            local_environments[env_id].close()
                         except:
                             pass
-                        local_envs.pop(env_id, None)
+                        local_environments.pop(env_id, None)
+                        local_env_configs.pop(env_id, None)
                     result_queue.put((task_id, 'success', True))
 
                 elif command == 'exit':

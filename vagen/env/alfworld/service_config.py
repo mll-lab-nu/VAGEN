@@ -12,4 +12,4 @@ class ALFWorldServiceConfig(BaseServiceConfig):
     """
     max_workers: int = 10
     max_thread_workers: int = 4
-    timeout: int = 120
+    timeout: int = 1200

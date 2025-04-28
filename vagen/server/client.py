@@ -9,7 +9,7 @@ class BatchEnvClient:
     Uses dictionary-based interface to match the server API and service interface.
     """
     
-    def __init__(self, base_url: str, timeout: int = 60, max_workers: int = 10):
+    def __init__(self, base_url: str, timeout: int = 600, max_workers: int = 10):
         """
         Initialize the BatchEnvClient.
         
