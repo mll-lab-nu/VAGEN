@@ -2,24 +2,15 @@ dataset:
   data_path: '$ALFWORLD_DATA/json_2.1.1/train'
   eval_id_data_path: '$ALFWORLD_DATA/json_2.1.1/valid_seen'    # null/None to disable
   eval_ood_data_path: '$ALFWORLD_DATA/json_2.1.1/valid_unseen' # null/None to disable
-<<<<<<< HEAD
   num_train_games: 1                                          # max training games (<=0 indicates full dataset)
   num_eval_games: 1                                           # max evaluation games (<=0 indicates full dataset)
-=======
-  num_train_games: 10                                          # max training games (<=0 indicates full dataset)
-  num_eval_games: 2                                           # max evaluation games (<=0 indicates full dataset)
->>>>>>> 581e528 (init alfworld)
 
 logic:
   domain: '$ALFWORLD_DATA/logic/alfred.pddl'                   # PDDL domain file that defines the world dynamics
   grammar: '$ALFWORLD_DATA/logic/alfred.twl2'                  # Grammar file that defines the text feedbacks
 
 env:
-<<<<<<< HEAD
   type: 'AlfredThorEnv'                                        # 'AlfredTWEnv' or 'AlfredThorEnv' or 'AlfredHybrid'
-=======
-  type: 'AlfredThorEnv'                                          # 'AlfredTWEnv' or 'AlfredThorEnv' or 'AlfredHybrid'
->>>>>>> 581e528 (init alfworld)
   regen_game_files: False                                      # check if game is solvable by expert and save to game.tw-pddl file
   domain_randomization: False                                  # shuffle Textworld print order and object id nums
   task_types: [1, 2, 3, 4, 5, 6]                               # task-type ids: 1 - Pick & Place, 2 - Examine in Light, 3 - Clean & Place, 4 - Heat & Place, 5 - Cool & Place, 6 - Pick Two & Place
