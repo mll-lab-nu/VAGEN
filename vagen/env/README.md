@@ -84,5 +84,7 @@ pip3 uninstall frozenlist gradio murmurhash preshed spacy srsly thinc weasel aio
 # Set the data path and download before running the server
 export ALFWORLD_DATA=<storage_path>
 alfworld-download
+
+# on a new window, start a startx port and then start server
 python vagen/env/server.py
 ```
