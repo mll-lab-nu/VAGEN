@@ -21,11 +21,13 @@ class ALFWorldEnv(BaseEnv):
         with open(self.config.alf_config_path) as reader:
             alf_config = yaml.safe_load(reader)
         
-        # @TODO Force TextWorld environment type
-        alf_config['env']['type'] = 'AlfredTWEnv'
+        if self.config.render_mode == "vision":
+            alf_config['env']['type'] = 'AlfredThorEnv'
+            env = alfworld.agents.environment.AlfredThorEnv(alf_config)
+        else:
+            alf_config['env']['type'] = 'AlfredTWEnv'
+            env = alfworld.agents.environment.AlfredTWEnv(alf_config)
         
-        # Initialize TextWorld environment
-        env = alfworld.agents.environment.AlfredTWEnv(alf_config, train_eval='train')
         self.env = env.init_env(batch_size=1)
         
         # Track state
@@ -34,14 +36,8 @@ class ALFWorldEnv(BaseEnv):
         self.valid_actions = []
     
     def step(self, llm_raw_response):
-        """Process LLM response and take a step in the environment
+        """Process LLM response and take a step in the environment."""
         
-        Args:
-            llm_raw_response: Raw text response from LLM
-            
-        Returns:
-            Observation, reward, done, info
-        """
         # Parse LLM response
         parsed = parse_llm_raw_response(
             response=llm_raw_response,
@@ -50,8 +46,31 @@ class ALFWorldEnv(BaseEnv):
             max_actions=self.config.max_actions_per_step
         )
         
-        # Extract and process action
+        # Extract actions and process them
         action_list = parsed['actions']
+        legal_action = False
+        for i in range(len(action_list)):
+            action_list[i] = action_list[i].lower()
+            if len(action_list[i]) == 0:
+                print("Action is empty!!!!")
+                # If action is empty, choose a random action from the action list
+                action_list[i] = self.prev_admissible_commands[random.randint(0, len(self.prev_admissible_commands)-1)]
+            else:
+                action_index = action_list[i].find('"action":')
+                if action_index == -1:
+                    string = action_list[i][-30:]
+                else:
+                    string = action_list[i][action_index:]
+                for act in self.prev_admissible_commands:
+                    if act in string:
+                        action_list[i] = act
+                        legal_action = True
+                        break
+                # If not a valid action, randomly pick an action
+                if not legal_action:
+                    action_list[i] = self.prev_admissible_commands[random.randint(0, len(self.prev_admissible_commands)-1)]
+        
+        # Use the first valid action from the action list
         action_text = action_list[0] if action_list else ""
         
         # Store valid action for observation formatting
@@ -63,14 +82,13 @@ class ALFWorldEnv(BaseEnv):
         # Take the step in ALFWorld env
         obs, reward, done, infos = self.env.step([action_text])
         
+        # Render the environment and track the action effectiveness
+        observation = self._render(obs, infos)  # Add render here to capture observation
+        
         # Simple tracking of state change (text environments don't have position)
         action_is_effective = len(obs[0]) > 10  # Basic check if we got a meaningful observation
         
-        # Build observation and info
-        observation = self._render(obs, infos)
-        
         # Check if metrics are available in infos
-        # Some environments might not provide all metrics
         success = False
         goal_condition_rate = 0.0
         
@@ -97,13 +115,21 @@ class ALFWorldEnv(BaseEnv):
             "llm_response": parsed
         }
         
-        # Update total reward
+        # Compute reward with a penalty for illegal actions
         if isinstance(reward, tuple):
             reward_value = reward[0]
         elif isinstance(reward, (list, np.ndarray)):
             reward_value = reward[0]
         else:
             reward_value = reward
+        
+        if reward_value is None:
+            reward_value = 0  # Handle None rewards
+        
+        # Add penalty if the action is illegal
+        if not legal_action:
+            reward_value -= 1  # Apply penalty for illegal action
+        
         self.total_reward += reward_value
         
         # Update admissible commands for next step
@@ -206,15 +232,13 @@ class ALFWorldEnv(BaseEnv):
             )
         
         # For text mode, just return the observation string
-        if self.config.render_mode == "text":
-            return {
-                "obs_str": obs_str
-            }
-        # @TODO
-        else:
+        if self.config.render_mode == "vision":
+            img = self.env.get_frames()[0]
             img_placeholder = self.config.image_placeholder
             return {
                 "obs_str": obs_str,
-                "multi_modal_data": {
-                }
+                "multi_modal_data": {img_placeholder: [convert_numpy_to_PIL(img)]}
             }
+        else:
+            return {"obs_str": obs_str}
+            
