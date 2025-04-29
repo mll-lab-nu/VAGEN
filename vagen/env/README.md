@@ -86,5 +86,6 @@ export ALFWORLD_DATA=<storage_path>
 alfworld-download
 
 # on a new window, start a startx port and then start server
+python vagen/env/alfworld/startx.py
 python vagen/env/server.py
 ```
