@@ -110,13 +110,19 @@ def start(display=0, width=1280, height=1024):
     buses = []
     for r in pci_records():
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> a8c743f (alfworld update)
         if r.get('Vendor') == 'NVIDIA Corporation' and (
             r.get('Class','').startswith('VGA') or 
             r.get('Class','').startswith('3D')
         ):
+<<<<<<< HEAD
 =======
         if r.get('Vendor') == 'NVIDIA Corporation' and r.get('Class','').startswith('VGA'):
 >>>>>>> 6b8f828 (alfworld update)
+=======
+>>>>>>> a8c743f (alfworld update)
             slot = r['Slot']  # e.g. '01:00.0'
             parts = re.split(r'[:\.]', slot)
             buses.append('PCI:' + ':'.join(str(int(x,16)) for x in parts))
@@ -131,14 +137,19 @@ def start(display=0, width=1280, height=1024):
         f.write(conf)
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     # launch Xorg in the foreground
 =======
     # launch Xorg silently
 >>>>>>> 6b8f828 (alfworld update)
+=======
+    # launch Xorg in the foreground
+>>>>>>> a8c743f (alfworld update)
     cmd = (
         f"Xorg -noreset +extension GLX +extension RANDR +extension RENDER "
         f"-config {path} :{display}"
     )
+<<<<<<< HEAD
 <<<<<<< HEAD
     process = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     print(f"Started Xorg on DISPLAY=:{display}")
@@ -155,12 +166,26 @@ def start(display=0, width=1280, height=1024):
     print(f"Xorg is running on DISPLAY=:{display}. You can stop it by killing the process.")
 =======
     subprocess.Popen(shlex.split(cmd), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+=======
+    process = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+>>>>>>> a8c743f (alfworld update)
     print(f"Started Xorg on DISPLAY=:{display}")
-
+    
+    # wait for Xorg process to complete (or manually stop it)
+    out, err = process.communicate()
+    
+    if process.returncode != 0:
+        print(f"Error starting Xorg: {err.decode()}")
+        return
+    
     # export DISPLAY for this process
     os.environ['DISPLAY'] = f":{display}"
+<<<<<<< HEAD
 
 >>>>>>> 6b8f828 (alfworld update)
+=======
+    print(f"Xorg is running on DISPLAY=:{display}. You can stop it by killing the process.")
+>>>>>>> a8c743f (alfworld update)
 
 if __name__ == '__main__':
     import sys
