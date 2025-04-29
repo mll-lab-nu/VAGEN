@@ -70,3 +70,26 @@ alfworld-download
 python vagen/env/alfworld/startx.py 0
 python vagen/server/server.py
 ```
+
+### ALFWorld
+```
+pip install ai2thor==2.1.0
+pip install alfworld==0.3.2
+pip3 install numpy==1.23.5
+pip3 install protobuf==3.20.3
+pip3 install pydantic==2.10.6
+pip3 install pydantic-core==2.16.3
+pip3 uninstall frozenlist gradio murmurhash preshed spacy srsly thinc weasel aiosignal annotated-types blis catalogue cloudpathlib cymem
+
+#skip this two install if you already installed in navigation
+apt-get install -y pciutils
+apt-get install -y xorg xserver-xorg-core xserver-xorg-video-dummy
+
+# Set the data path and download before running the server
+export ALFWORLD_DATA=<storage_path>
+alfworld-download
+
+# on a new window, start a startx port and then start server
+python vagen/env/alfworld/startx.py 0
+python vagen/server/server.py
+```
