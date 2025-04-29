@@ -204,5 +204,5 @@ rollout_manager:
   truncation: ${data.truncation}
   base_url: http://localhost:5000
   use_service: False
-  timeout: 180
+  timeout: 1200
   max_workers: 8
