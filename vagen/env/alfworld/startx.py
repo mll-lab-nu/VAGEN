@@ -109,7 +109,10 @@ def start(display=0, width=1280, height=1024):
     # find NVIDIA GPUs
     buses = []
     for r in pci_records():
-        if r.get('Vendor') == 'NVIDIA Corporation' and r.get('Class','').startswith('VGA'):
+        if r.get('Vendor') == 'NVIDIA Corporation' and (
+            r.get('Class','').startswith('VGA') or 
+            r.get('Class','').startswith('3D')
+        ):
             slot = r['Slot']  # e.g. '01:00.0'
             parts = re.split(r'[:\.]', slot)
             buses.append('PCI:' + ':'.join(str(int(x,16)) for x in parts))
@@ -123,17 +126,24 @@ def start(display=0, width=1280, height=1024):
     with os.fdopen(fd, 'w') as f:
         f.write(conf)
 
-    # launch Xorg silently
+    # launch Xorg in the foreground
     cmd = (
         f"Xorg -noreset +extension GLX +extension RANDR +extension RENDER "
         f"-config {path} :{display}"
     )
-    subprocess.Popen(shlex.split(cmd), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    process = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     print(f"Started Xorg on DISPLAY=:{display}")
-
+    
+    # wait for Xorg process to complete (or manually stop it)
+    out, err = process.communicate()
+    
+    if process.returncode != 0:
+        print(f"Error starting Xorg: {err.decode()}")
+        return
+    
     # export DISPLAY for this process
     os.environ['DISPLAY'] = f":{display}"
-
+    print(f"Xorg is running on DISPLAY=:{display}. You can stop it by killing the process.")
 
 if __name__ == '__main__':
     import sys

@@ -1,5 +1,3 @@
-# prompt.py
-
 system_prompt_text = """You are an ALFRED household robot designed to perform household tasks in a text-based environment.
 
 Task Guide:
@@ -26,7 +24,7 @@ system_prompt_vision = """You are an ALFRED household robot designed to perform 
 Task Guide:
 You should follow the human instruction and complete tasks in a household environment.
 
-You can take up to {max_actions_per_step} action(s) at a time, chosen from the available actions list.
+You can take up to {max_actions_per_step} action(s) at a time, seperated by {action_sep}. Chosen from the available actions list.
 
 Rewards:
 - Correct format: +0.5

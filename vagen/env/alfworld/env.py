@@ -7,6 +7,7 @@ from .prompt import system_prompt_text, system_prompt_vision, init_observation_t
 import alfworld.agents.environment
 import numpy as np
 import torch
+import random
 
 class ALFWorldEnv(BaseEnv):
     """ALFWorld environment adapter that maps the BaseEnv interface to ALFWorld interface"""
@@ -151,7 +152,6 @@ class ALFWorldEnv(BaseEnv):
         """
         # Handle seed manually if provided @TODO figure out better random way
         if seed is not None:
-            import random
             random.seed(seed)
             
             np.random.seed(seed)
@@ -216,6 +216,11 @@ class ALFWorldEnv(BaseEnv):
         # Format the list of admissible commands
         commands_text = "\n".join([f"'{s}'" for s in self.prev_admissible_commands]) if self.prev_admissible_commands else ""
         
+        if self.config.render_mode == "vision":
+            img = self.env.get_frames()[0]
+            img_placeholder = self.config.image_placeholder
+            observation_text = f"{img_placeholder}\n{observation_text}"
+
         # Select appropriate template based on whether this is initial observation
         if init_obs:
             obs_str = init_observation_template.format(
@@ -233,8 +238,6 @@ class ALFWorldEnv(BaseEnv):
         
         # For text mode, just return the observation string
         if self.config.render_mode == "vision":
-            img = self.env.get_frames()[0]
-            img_placeholder = self.config.image_placeholder
             return {
                 "obs_str": obs_str,
                 "multi_modal_data": {img_placeholder: [convert_numpy_to_PIL(img)]}
