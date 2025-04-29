@@ -1,0 +1,7 @@
+env1:
+    env_name: primitive_skill 
+    env_config:
+        render_mode: vision
+        alf_config_path: "${env:ALFWORLD_DATA}/alf-config.yaml"
+    train_size: 3000
+    test_size: 8

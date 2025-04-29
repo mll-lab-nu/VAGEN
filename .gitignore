@@ -121,3 +121,7 @@ tests/e2e/toy_examples/deepspeed/synchronous/output.txt
 log*
 
 **logs
+
+# analysis folder
+svg_analysis_results/
+temp/
