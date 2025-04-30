@@ -5,8 +5,9 @@ from typing import Dict, List, Optional, Tuple, Any
 from gymnasium.utils import seeding
 from gymnasium.envs.toy_text.frozen_lake import FrozenLakeEnv as GymFrozenLakeEnv
 from vagen.env.utils.env_utils import NoLoggerWarnings, set_seed
-from vagen.env.utils.context_utils import parse_llm_raw_response, convert_numpy_to_PIL
-from .prompt import system_prompt_text, system_prompt_vision, init_observation_template, action_template
+from vagen.env.utils.context_utils import convert_numpy_to_PIL
+from vagen.env.utils.parse_utils import parse_function_map
+from .prompt import system_prompt, init_observation_template, action_template,format_prompt
 from .env_config import FrozenLakeEnvConfig
 from .utils import generate_random_map, is_valid
 
@@ -73,6 +74,9 @@ class FrozenLakeEnv(BaseEnv):
         self.total_reward = 0
         self.valid_actions = []
         self.reward = 0
+        self.format_prompt = format_prompt[self.config.prompt_format].format(
+            max_actions_per_step=self.config.max_actions_per_step,action_sep=self.config.action_sep)
+        self.parse_func= parse_function_map[self.config.prompt_format.rstrip("_symbol")]
 
     def reset(self, seed=None):
         """
@@ -121,7 +125,7 @@ class FrozenLakeEnv(BaseEnv):
                 - info: Dictionary containing metrics and parsed action data
         """
         # Parse the LLM's raw response to extract actions
-        rst = parse_llm_raw_response(
+        rst = self.parse_func(
             response=action_str,
             special_token_list=self.config.special_token_list,
             action_sep=self.config.action_sep,
@@ -171,7 +175,7 @@ class FrozenLakeEnv(BaseEnv):
                 break
         
         # Add format reward if actions were valid
-        if metrics["turn_metrics"]['action_is_valid']:
+        if metrics["turn_metrics"]['action_is_valid'] and rst["format_correct"]:
             self.reward += self.config.format_reward
         
         # Add metrics to info dictionary
@@ -196,10 +200,8 @@ class FrozenLakeEnv(BaseEnv):
         Returns:
             str: System prompt string with environment description and instructions
         """
-        if self.config.render_mode == 'vision':
-            return system_prompt_vision.format(max_actions_per_step=self.config.max_actions_per_step,action_sep=self.config.action_sep)
-        else:
-            return system_prompt_text.format(max_actions_per_step=self.config.max_actions_per_step,action_sep=self.config.action_sep)
+        
+        return system_prompt+'\n'+self.format_prompt
 
     def compute_reward(self):
         """
@@ -252,15 +254,13 @@ class FrozenLakeEnv(BaseEnv):
         # Format the observation string using the appropriate template
         if init_obs:
             # Initial observation doesn't include action results
-            obs_str = init_observation_template.format(observation=img_str)
+            obs_str = init_observation_template.format(observation=img_str)+"\n"+ self.format_prompt
         else:
             # Subsequent observations include action results
             obs_str = action_template.format(
                 valid_action=self.valid_actions,
                 observation=img_str,
-                reward=self.reward,
-                done=self._finished(),
-            )
+            )+"\n"+ self.format_prompt
         
         # Return observation dictionary with appropriate fields
         if multi_modal_data is not None:
