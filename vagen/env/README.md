@@ -64,6 +64,10 @@ apt-get install -y xorg xserver-xorg-core xserver-xorg-video-dummy
 
 # Set the data path and download before running the server
 export ALFWORLD_DATA=<storage_path>
+# or you can add this path into bashrc
+# echo 'export ALFWORLD_DATA=<storage_path>' >> ~/.bashrc
+
+# download dataset
 alfworld-download
 
 # on a new window, start a startx port and then start server

@@ -9,7 +9,7 @@ class ALFWorldEnvConfig(BaseEnvConfig):
     alf_config_path: str = "path/to/alf-config.yaml"
     max_actions_per_step: int = 1
     action_only_prompt: bool = False
-    render_mode: str = "text"  # @TODO Only "text" mode is supported for now
+    render_mode: str = "vision"
 
     def __post_init__(self):
         # Expand any ${env:VAR} or $VAR references in the path

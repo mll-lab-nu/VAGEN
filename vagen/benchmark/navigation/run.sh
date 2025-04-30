@@ -3,16 +3,17 @@
 
 # Create required directories
 mkdir -p benchmark_results
+mkdir -p data
 
-# Generate datasets
 echo "Generating datasets for benchmark..."
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-# Generate ALFWorld vision mode dataset
+# Generate dataset
 python -m vagen.env.create_dataset \
     --yaml_path "$SCRIPT_DIR/dataset_config.yaml" \
-    --train_path data/alfworld-vision-benchmark/train.parquet \
-    --test_path data/alfworld-vision-benchmark/test.parquet \
+    --train_path data/navigation-vision-benchmark/train.parquet \
+    --test_path data/navigation-vision-benchmark/test.parquet \
+    --force_gen
 
 # Run environment service benchmark
 
