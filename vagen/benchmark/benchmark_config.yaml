@@ -1,0 +1,44 @@
+# Service Benchmark Configuration
+
+# Server configuration
+server:
+  base_url: http://localhost:5000
+  timeout: 600
+  max_workers: 48
+
+# Benchmark parameters
+benchmark:
+  # Service functions to benchmark
+  functions: 
+    - create_environments_batch
+    - reset_batch
+    - step_batch
+    - compute_reward_batch
+    - get_system_prompts_batch
+    - close_batch
+  
+  # Number of iterations for statistical significance
+  iterations: 3
+  
+  # Number of steps to perform for step_batch
+  step_count: 5
+  
+  # Batch sizes to test
+  batch_sizes: [1, 2, 4, 8, 16, 32, 64, 128]
+  
+  # Directory to save benchmark results
+  output_dir: benchmark_results
+
+# Dataset configurations - use paths to your actual dataset files
+datasets:
+  # ALFWorld with vision mode
+  - name: alfworld-vision
+    train_path: /home/yaning/workspace/vagen/data/alfworld-vision-benchmark/train.parquet
+    test_path: /home/yaning/workspace/vagen/data/alfworld-vision-benchmark/test.parquet
+    use_split: both  # Use both train and test datasets
+
+  # Uncomment and adjust for additional environments
+  # - name: frozenlake
+  #   train_path: /home/yaning/workspace/vagen/data/frozenlake-benchmark/train.parquet
+  #   test_path: /home/yaning/workspace/vagen/data/frozenlake-benchmark/test.parquet
+  #   use_split: both
