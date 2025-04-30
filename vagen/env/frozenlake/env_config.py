@@ -11,6 +11,10 @@ class FrozenLakeEnvConfig(BaseEnvConfig):
     render_mode: str = "vision"  # "text" or "vision"
     max_actions_per_step: int = 3
     min_actions_to_succeed: int = 5
+    prompt_format: str = "free_think" 
+    # "free_think", "no_think", "grounding", "worldmodeling", "grounding_worldmodeling"
+    # "grounding_symbol", "worldmodeling_symbol", "grounding_worldmodeling_symbol"
+    use_accuracy_reward: bool = False
     
     def config_id(self) -> str:
         id_fields=["is_slippery", "size", "p", "render_mode", "max_actions_per_step", "min_actions_to_succeed","format_reward"]

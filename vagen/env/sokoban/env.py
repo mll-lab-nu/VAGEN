@@ -4,9 +4,10 @@ from gym_sokoban.envs.sokoban_env import SokobanEnv as GymSokobanEnv
 from .utils import generate_room
 from typing import Dict
 from vagen.env.utils.env_utils import NoLoggerWarnings, set_seed
-from vagen.env.utils.context_utils import parse_llm_raw_response,convert_numpy_to_PIL
+from vagen.env.utils.context_utils import convert_numpy_to_PIL
 import numpy as np
-from .prompt import system_prompt_text, system_prompt_vision, init_observation_template, action_template
+from vagen.env.utils.parse_utils import parse_function_map
+from .prompt import system_prompt, init_observation_template, action_template,format_prompt
 from .env_config import SokobanEnvConfig
 class SokobanEnv(BaseEnv):
     GRID_LOOKUP = {
@@ -35,6 +36,9 @@ class SokobanEnv(BaseEnv):
             max_steps=self.config.get('max_steps', 100),
             num_boxes=self.config.get('num_boxes', 3),
         )
+        self.format_prompt = format_prompt[self.config.prompt_format].format(
+            max_actions_per_step=self.config.max_actions_per_step,action_sep=self.config.action_sep)
+        self.parse_func= parse_function_map[self.config.prompt_format.rstrip("_symbol")]
         
     def reset(self, seed=None):
         with NoLoggerWarnings():
@@ -58,7 +62,7 @@ class SokobanEnv(BaseEnv):
         return self._render(init_obs=True), {}
     
     def step(self, action_str: str):
-        rst=parse_llm_raw_response(
+        rst=self.parse_func(
             response=action_str,
             special_token_list=self.config.get('special_token_list', None),
             action_sep=self.config.get('action_sep', ','),
@@ -96,7 +100,7 @@ class SokobanEnv(BaseEnv):
             else:
                 metrics['turn_metrics']['action_is_valid'] = False
                 break
-        if metrics['turn_metrics']['action_is_valid']:
+        if metrics['turn_metrics']['action_is_valid'] and rst["format_correct"]:
             self.reward += self.config.format_reward
         info["metrics"] = metrics
         metrics['turn_metrics']['action_is_effective'] = not np.array_equal(prev_player_position, self.env.player_position)
@@ -105,10 +109,7 @@ class SokobanEnv(BaseEnv):
         return self._render(init_obs=False), self.reward, done, info
     
     def system_prompt(self):
-        if self.config.render_mode == 'vision':
-            return system_prompt_vision.format(max_actions_per_step=self.config.max_actions_per_step, action_sep=self.config.action_sep)
-        else:
-            return system_prompt_text.format(max_actions_per_step=self.config.max_actions_per_step,action_sep=self.config.action_sep)
+        return system_prompt+"\n"+self.format_prompt
     
     
     def compute_reward(self):
@@ -133,15 +134,13 @@ class SokobanEnv(BaseEnv):
             img_str = "\n".join("".join(lookup(cell) for cell in row) for row in room_state)
         
         if init_obs:
-            obs_str = init_observation_template.format(observation=img_str)
+            obs_str = init_observation_template.format(observation=img_str)+"\n"+self.format_prompt
             
         else:
             obs_str = action_template.format(
                 valid_action=self.valid_actions,
                 observation=img_str,
-                reward=self.reward,
-                done=self._success(),
-            )
+            )+"\n"+self.format_prompt
         
         if multi_modal_data is not None:
             return {
