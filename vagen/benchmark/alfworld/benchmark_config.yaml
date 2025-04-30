@@ -28,13 +28,12 @@ benchmark:
   output_dir: benchmark_results
 
 datasets:
-  # ALFWorld with vision mode
-  # - name: alfworld-vision
-  #   train_path: data/alfworld-vision-benchmark/train.parquet
-  #   test_path: data/alfworld-vision-benchmark/test.parquet
-  #   use_split: both
-
-  - name: navigation
-    train_path: data/navigation-benchmark/train.parquet
-    test_path: data/navigation-benchmark/test.parquet
+  - name: alfworld-vision
+    train_path: data/alfworld-vision-benchmark/train.parquet
+    test_path: data/alfworld-vision-benchmark/test.parquet
     use_split: both
+
+  # - name: navigation
+  #   train_path: data/navigation-benchmark/train.parquet
+  #   test_path: data/navigation-benchmark/test.parquet
+  #   use_split: both
