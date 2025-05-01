@@ -22,7 +22,7 @@ benchmark:
   step_count: 5
   
   # Batch sizes to test
-  batch_sizes: [8]
+  batch_sizes: [128]
   
   # Directory to save benchmark results
   output_dir: benchmark_results
@@ -32,8 +32,3 @@ datasets:
     train_path: data/alfworld-vision-benchmark/train.parquet
     test_path: data/alfworld-vision-benchmark/test.parquet
     use_split: both
-
-  # - name: navigation
-  #   train_path: data/navigation-benchmark/train.parquet
-  #   test_path: data/navigation-benchmark/test.parquet
-  #   use_split: both

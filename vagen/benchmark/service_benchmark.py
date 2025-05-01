@@ -1,14 +1,3 @@
-#!/usr/bin/env python3
-"""
-Service Benchmark
-
-A benchmark tool to measure the performance of BaseService functions 
-(create_environments_batch, reset_batch, step_batch, etc.) with different batch sizes.
-
-Usage:
-    python service_benchmark.py --config benchmark_config.yaml
-"""
-
 import argparse
 import time
 import json

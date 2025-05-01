@@ -22,13 +22,13 @@ benchmark:
   step_count: 5
   
   # Batch sizes to test
-  batch_sizes: [8]
+  batch_sizes: [128]
   
   # Directory to save benchmark results
   output_dir: benchmark_results
 
 datasets:
-  - name: navigation
-    train_path: data/navigation-vision-benchmark/train.parquet
-    test_path: data/navigation-vision-benchmark/test.parquet
+  - name: frozenlake-vision
+    train_path: data/frozenlake-vision-benchmark/train.parquet
+    test_path: data/frozenlake-vision-benchmark/test.parquet
     use_split: both
