@@ -82,13 +82,13 @@ wandb login
 python vagen/server/server.py
 
 # Frozen Lake Environment
-bash vagen/examples/frozen_lake_aico/run.sh         # AICO without service
-bash vagen/examples/frozen_lake_trico/run.sh        # TRICO without service
-bash vagen/examples/frozen_lake_aico_service/run.sh # AICO with service
+bash scripts/examples/frozen_lake_aico/run.sh         # AICO without service
+bash scripts/examples/frozen_lake_trico/run.sh        # TRICO without service
+bash scripts/examples/frozen_lake_aico_service/run.sh # AICO with service
 
 # SVG Generation
-bash vagen/examples/svg_aico/run.sh                 # AICO without service
-bash vagen/examples/svg_trico/run.sh                # TRICO without service
+bash scripts/examples/svg_aico/run.sh                 # AICO without service
+bash scripts/examples/svg_trico/run.sh                # TRICO without service
 ```
 ## How to Add New Environment and Services
 
