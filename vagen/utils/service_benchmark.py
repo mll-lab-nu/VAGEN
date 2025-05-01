@@ -1,14 +1,3 @@
-#!/usr/bin/env python3
-"""
-Service Benchmark
-
-A benchmark tool to measure the performance of BaseService functions 
-(create_environments_batch, reset_batch, step_batch, etc.) with different batch sizes.
-
-Usage:
-    python service_benchmark.py --config benchmark_config.yaml
-"""
-
 import argparse
 import time
 import json
@@ -58,7 +47,7 @@ def benchmark_service(config_path):
     
     # Get benchmark parameters
     benchmark_config = config.get('benchmark', {})
-    batch_sizes = benchmark_config.get('batch_sizes', [1, 2, 4, 8, 16, 32, 64, 128])
+    batch_sizes = benchmark_config.get('batch_sizes', [128])
     iterations = benchmark_config.get('iterations', 3)
     step_count = benchmark_config.get('step_count', 5)
     output_dir = benchmark_config.get('output_dir', 'benchmark_results')
@@ -124,6 +113,8 @@ def benchmark_service(config_path):
                     all_env_configs.setdefault(name, []).append(env_config)
             except Exception as e:
                 print(f"Failed to load test dataset from {test_path}: {e}")
+    
+
     
     # Dictionary to store all benchmark results
     results = {}
@@ -271,13 +262,14 @@ def benchmark_service(config_path):
     
     print(f"\nResults saved to {results_file}")
     
-    # Generate plots
-    generate_plots(results, output_dir, timestamp)
-    
-    # Print summary
-    print_summary(results)
+    # Generate plots if we have results
+    if results:
+        generate_plots(results, output_dir, timestamp, functions)
+        print_summary(results, functions)
+    else:
+        print("\nNo benchmark results to plot or summarize.")
 
-def generate_plots(results, output_dir, timestamp):
+def generate_plots(results, output_dir, timestamp, functions):
     """
     Generate plots from benchmark results.
     
@@ -285,20 +277,23 @@ def generate_plots(results, output_dir, timestamp):
         results: Dictionary of benchmark results
         output_dir: Directory to save plots
         timestamp: Timestamp string for filenames
+        functions: List of functions that were benchmarked
     """
     # Create directory for plots
     plots_dir = os.path.join(output_dir, 'plots')
     os.makedirs(plots_dir, exist_ok=True)
     
     # Plot for each function
-    functions = next(iter(results.values()))['timings'].keys()
-    
     for func in functions:
         plt.figure(figsize=(12, 8))
         
         # Plot total time
         plt.subplot(2, 1, 1)
         for env_name, env_results in results.items():
+            # Skip if this function wasn't benchmarked for this environment
+            if func not in env_results['timings'] or not env_results['timings'][func]:
+                continue
+                
             batch_sizes = env_results['batch_sizes']
             timings = env_results['timings'][func]
             plt.plot(batch_sizes, timings, 'o-', label=env_name)
@@ -314,6 +309,10 @@ def generate_plots(results, output_dir, timestamp):
         # Plot time per environment
         plt.subplot(2, 1, 2)
         for env_name, env_results in results.items():
+            # Skip if this function wasn't benchmarked for this environment
+            if func not in env_results['per_env_timings'] or not env_results['per_env_timings'][func]:
+                continue
+                
             batch_sizes = env_results['batch_sizes']
             per_env_timings = env_results['per_env_timings'][func]
             plt.plot(batch_sizes, per_env_timings, 'o-', label=env_name)
@@ -337,6 +336,10 @@ def generate_plots(results, output_dir, timestamp):
         plt.subplot(len(functions), 1, i+1)
         
         for env_name, env_results in results.items():
+            # Skip if this function wasn't benchmarked for this environment
+            if func not in env_results['timings'] or not env_results['timings'][func]:
+                continue
+                
             batch_sizes = env_results['batch_sizes']
             timings = env_results['timings'][func]
             throughput = [size / time for size, time in zip(batch_sizes, timings)]
@@ -353,23 +356,25 @@ def generate_plots(results, output_dir, timestamp):
     plt.savefig(os.path.join(plots_dir, f"throughput_{timestamp}.png"))
     plt.close()
 
-def print_summary(results):
+def print_summary(results, functions):
     """
     Print a summary of the benchmark results.
     
     Args:
         results: Dictionary of benchmark results
+        functions: List of functions that were benchmarked
     """
     print("\n===== Summary =====")
-    
-    # Get list of all functions
-    functions = next(iter(results.values()))['timings'].keys()
     
     for env_name, env_results in results.items():
         print(f"\n{env_name}:")
         batch_sizes = env_results['batch_sizes']
         
         for func in functions:
+            # Skip if this function wasn't benchmarked for this environment
+            if func not in env_results['timings'] or not env_results['timings'][func]:
+                continue
+                
             timings = env_results['timings'][func]
             per_env_timings = env_results['per_env_timings'][func]
             

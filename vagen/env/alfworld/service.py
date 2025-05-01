@@ -4,7 +4,7 @@ import logging
 import threading
 import multiprocessing as mp
 from queue import Empty
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
 from vagen.env.base.base_service import BaseService
@@ -208,14 +208,56 @@ class ALFWorldService(BaseService):
             except Empty:
                 raise TimeoutError(f"Timeout {command} for {env_id}")
 
-    def create_environments_batch(self, ids2configs):
+    def create_environments_batch(self, ids2configs):        
         if not self.processes:
             self._start_worker_processes()
+        
+        # Group environments by assigned process
+        by_pid = {}
         for env_id, cfg in ids2configs.items():
             pid = self._assign_to_process(env_id)
-            self._send_command(pid, 'create', env_id, (env_id, cfg))
+            by_pid.setdefault(pid, []).append((env_id, cfg))
+            # Store assigned process ID and config for later use
             self.environments[env_id] = pid
             self.env_configs[env_id] = cfg
+        
+        # Define function to create environments within a process group
+        def _create_group(pid, group):
+            results = {}
+            
+            # Define single environment creation function
+            def _create_single_env(env_id, cfg):
+                try:
+                    result = self._send_command(pid, 'create', env_id, (env_id, cfg))
+                    return env_id, result, None
+                except Exception as e:
+                    error_msg = f"Error creating environment {env_id}: {str(e)}"
+                    self.logger.error(error_msg)
+                    return env_id, None, error_msg
+            
+            # Process environments sequentially within each process group
+            for env_id, cfg in group:
+                env_id, result, error = _create_single_env(env_id, cfg)
+                if error:
+                    # Using dict.pop with a default (None) to prevent KeyError
+                    self.environments.pop(env_id, None)
+                    self.env_configs.pop(env_id, None)
+                    results[env_id] = f"Error: {error}"
+                else:
+                    results[env_id] = result
+                    
+            return results
+        
+        # Use ThreadPoolExecutor to parallelize across processes
+        with ThreadPoolExecutor(max_workers=self.max_process_workers) as exe:
+            futures = []
+            # Submit creation tasks for each process group
+            for pid, group in by_pid.items():
+                futures.append(exe.submit(_create_group, pid, group))
+            
+            # Wait for all futures to complete
+            for future in as_completed(futures):
+                future.result()
 
     def reset_batch(self, ids2seeds):
         results = {}
@@ -235,22 +277,59 @@ class ALFWorldService(BaseService):
                 results.update(futures.result())
         return results
 
-    def step_batch(self, ids2actions):
+    def step_batch(self, ids2actions):        
         results = {}
         by_pid = {}
+        
+        # Group environments by process ID
         for env_id, action in ids2actions.items():
             pid = self.environments.get(env_id)
             by_pid.setdefault(pid, []).append((env_id, action))
+        
+        # Define function to handle stepping environments in each process
         def _step_group(pid, group):
             out = {}
-            for env_id, action in group:
-                res = self._send_command(pid, 'step', env_id, (env_id, action))
-                out[env_id] = res
+            
+            # Use ThreadPoolExecutor for parallel steps within each process group
+            with ThreadPoolExecutor(max_workers=min(len(group), self.max_thread_workers)) as local_exe:
+                step_futures = {}
+                
+                # Function to step a single environment
+                def _step_single_env(env_id, action):
+                    try:
+                        result = self._send_command(pid, 'step', env_id, (env_id, action))
+                        return env_id, result, None
+                    except Exception as e:
+                        error_msg = f"Error stepping environment {env_id}: {str(e)}"
+                        self.logger.error(error_msg)
+                        return env_id, None, error_msg
+                
+                # Submit all environments in this group
+                for env_id, action in group:
+                    step_futures[local_exe.submit(_step_single_env, env_id, action)] = env_id
+                
+                # Process results as they complete
+                for future in as_completed(step_futures):
+                    env_id, result, error = future.result()
+                    if error:
+                        out[env_id] = ({}, 0.0, True, {"error": error})
+                    else:
+                        out[env_id] = result
+            
             return out
+        
+        # Use ThreadPoolExecutor to parallelize across processes
         with ThreadPoolExecutor(max_workers=self.max_process_workers) as exe:
+            futures = []
+            
+            # Submit stepping tasks for each process group
             for pid, group in by_pid.items():
-                futures = exe.submit(_step_group, pid, group)
-                results.update(futures.result())
+                futures.append(exe.submit(_step_group, pid, group))
+            
+            # Process results as they complete
+            for future in as_completed(futures):
+                results.update(future.result())
+        
         return results
 
     def compute_reward_batch(self, env_ids):
