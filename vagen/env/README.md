@@ -54,8 +54,7 @@ pip install ai2thor==2.1.0
 pip install alfworld==0.3.2
 pip3 install numpy==1.23.5
 pip3 install protobuf==3.20.3
-pip3 install pydantic==2.10.6
-pip3 install pydantic-core==2.16.3
+pip3 install "pydantic<2.0.0"
 pip3 uninstall frozenlist gradio murmurhash preshed spacy srsly thinc weasel aiosignal annotated-types blis catalogue cloudpathlib cymem
 
 #skip this two install if you already installed in navigation
