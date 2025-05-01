@@ -125,3 +125,4 @@ log*
 # analysis folder
 svg_analysis_results/
 temp/
+benchmark_result/

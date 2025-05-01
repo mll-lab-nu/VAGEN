@@ -22,7 +22,7 @@ benchmark:
   step_count: 5
   
   # Batch sizes to test
-  batch_sizes: [128]
+  batch_sizes: [8]
   
   # Directory to save benchmark results
   output_dir: benchmark_results

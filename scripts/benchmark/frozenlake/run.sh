@@ -2,8 +2,8 @@
 # Setup script for environment service benchmark
 
 # Create required directories
-mkdir -p benchmark_results
-mkdir -p data
+mkdir benchmark_results
+mkdir data
 
 echo "Generating datasets for benchmark..."
 
@@ -27,6 +27,6 @@ mkdir -p benchmark_results
 
 # Run benchmark
 echo "Running service benchmark"
-python -m vagen.benchmark.service_benchmark --config "$SCRIPT_DIR/benchmark_config.yaml"
+python -m vagen.utils.service_benchmark --config "$SCRIPT_DIR/benchmark_config.yaml"
 
 echo "Benchmark complete. Results saved to benchmark_results directory."
