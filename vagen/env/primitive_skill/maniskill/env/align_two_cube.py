@@ -22,6 +22,7 @@ class AlignTwoCubeEnv(BaseEnv):
     agent: Union[Panda, Xmate3Robotiq, Fetch]
     skill_config=None
     vlm_info_keys=[]
+    state_keys=["red_cube_position", "green_cube_position"]
 
     def __init__(self, stage=0,*args, robot_uids="panda", robot_init_qpos_noise=0.02, **kwargs):
         self.stage=stage
@@ -29,7 +30,8 @@ class AlignTwoCubeEnv(BaseEnv):
         self.workspace_y=[-0.2, 0.2]
         self.workspace_z=[0.01, 0.2]
         self.robot_init_qpos_noise = robot_init_qpos_noise
-                
+        self.region_1 = np.array([[0.1, -0.2], [0.15, 0.1]])
+        self.region_2 = np.array([[0.1, 0.1], [0.15, 0.2]])
         super().__init__(*args, robot_uids=robot_uids, **kwargs)
 
     @property
@@ -45,12 +47,12 @@ class AlignTwoCubeEnv(BaseEnv):
     
     @property
     def _default_sensor_configs(self):
-        pose = sapien_utils.look_at(eye=[0.3, 0, 0.6], target=[-0.1, 0, 0.1])
+        pose = sapien_utils.look_at(eye=[1, 0.0, 0.6], target=[-0.2, 0.0, 0.2])
         return [CameraConfig("base_camera", pose, 300, 300, np.pi / 2, 0.01, 100)]
 
     @property
     def _default_human_render_camera_configs(self):
-        pose = sapien_utils.look_at([0.6, 0.7, 0.6], [0.0, 0.0, 0.35])
+        pose = sapien_utils.look_at([1, 0.0, 0.6], [-0.2, 0.0, 0.2])
         return CameraConfig("render_camera", pose, 300,300, 1, 0.01, 100)
 
     def _load_scene(self, options: dict):
@@ -74,10 +76,8 @@ class AlignTwoCubeEnv(BaseEnv):
 
             xyz = torch.zeros((b, 3))
             xyz[:, 2] = 0.02
-            region_1 =[[self.workspace_x[0],self.workspace_y[0]],[self.workspace_x[0]+0.05,self.workspace_y[1]]]
-            sampler_1 = randomization.UniformPlacementSampler(bounds=region_1, batch_size=b)
-            region_2 =[[0.05,self.workspace_y[0]],[self.workspace_x[1],self.workspace_y[1]]]
-            sampler_2 = randomization.UniformPlacementSampler(bounds=region_2, batch_size=b)
+            sampler_1 = randomization.UniformPlacementSampler(bounds=self.region_1, batch_size=b)
+            sampler_2 = randomization.UniformPlacementSampler(bounds=self.region_2, batch_size=b)
             radius = torch.linalg.norm(torch.tensor([0.02, 0.02])) + 0.02
             
             red_cube_xy = sampler_1.sample(radius, 100)
@@ -127,8 +127,8 @@ class AlignTwoCubeEnv(BaseEnv):
             "is_red_cube_at_x0": is_red_cube_at_x0,
             "is_green_cube_grasped": is_green_cube_grasped,
             "is_green_cube_at_x0": is_green_cube_at_x0,
-            "red_cube_pos": pos_A,
-            "green_cube_pos": pos_B,
+            "red_cube_position": pos_A,
+            "green_cube_position": pos_B,
             "stage_0_success": is_red_cube_at_x0,
             "stage_1_success": is_green_cube_at_x0,
             "success": success.bool(),
@@ -139,8 +139,8 @@ class AlignTwoCubeEnv(BaseEnv):
     def _get_obs_extra(self, info: Dict):
         assert "state" in self.obs_mode
         obs = dict(
-            red_cube_pos=info["red_cube_pos"],
-            green_cube_pos=info["green_cube_pos"],
+            red_cube_position=info["red_cube_position"],
+            green_cube_position=info["green_cube_position"],
             is_red_cube_at_x0=info["is_red_cube_at_x0"],
             is_green_cube_at_x0=info["is_green_cube_at_x0"],
         )

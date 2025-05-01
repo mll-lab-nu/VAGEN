@@ -7,7 +7,7 @@ from gymnasium.envs.toy_text.frozen_lake import FrozenLakeEnv as GymFrozenLakeEn
 from vagen.env.utils.env_utils import NoLoggerWarnings, set_seed
 from vagen.env.utils.context_utils import convert_numpy_to_PIL
 from vagen.env.utils.parse_utils import parse_function_map
-from .prompt import system_prompt, init_observation_template, action_template,format_prompt
+from .prompt import system_prompt, init_observation_template, action_template, format_prompt
 from .env_config import FrozenLakeEnvConfig
 from .utils import generate_random_map, is_valid
 
@@ -74,9 +74,11 @@ class FrozenLakeEnv(BaseEnv):
         self.total_reward = 0
         self.valid_actions = []
         self.reward = 0
-        self.format_prompt = format_prompt[self.config.prompt_format].format(
-            max_actions_per_step=self.config.max_actions_per_step,action_sep=self.config.action_sep)
-        self.parse_func= parse_function_map[self.config.prompt_format.rstrip("_symbol")]
+        
+        # Store the format prompt function for later use
+        self.format_prompt_func = format_prompt[self.config.prompt_format]
+        
+        self.parse_func = parse_function_map[self.config.prompt_format.rstrip("_symbol")]
 
     def reset(self, seed=None):
         """
@@ -200,8 +202,14 @@ class FrozenLakeEnv(BaseEnv):
         Returns:
             str: System prompt string with environment description and instructions
         """
+        # Get format prompt with examples for system prompt
+        format_prompt_text = self.format_prompt_func(
+            max_actions_per_step=self.config.max_actions_per_step,
+            action_sep=self.config.action_sep,
+            add_example=True  # Always true for system prompt
+        )
         
-        return system_prompt+'\n'+self.format_prompt
+        return system_prompt() + '\n' + format_prompt_text
 
     def compute_reward(self):
         """
@@ -237,6 +245,13 @@ class FrozenLakeEnv(BaseEnv):
         """
         multi_modal_data = None
         
+        # Get format prompt without examples for action/init templates
+        format_prompt_text = self.format_prompt_func(
+            max_actions_per_step=self.config.max_actions_per_step,
+            action_sep=self.config.action_sep,
+            add_example=False  # No examples for action and init obs
+        )
+        
         # Generate either vision or text representation
         if self.config.render_mode == 'vision':
             # For vision mode, generate an image of the environment
@@ -254,13 +269,13 @@ class FrozenLakeEnv(BaseEnv):
         # Format the observation string using the appropriate template
         if init_obs:
             # Initial observation doesn't include action results
-            obs_str = init_observation_template.format(observation=img_str)+"\n"+ self.format_prompt
+            obs_str = init_observation_template(img_str) + "\n" + format_prompt_text
         else:
             # Subsequent observations include action results
-            obs_str = action_template.format(
+            obs_str = action_template(
                 valid_action=self.valid_actions,
                 observation=img_str,
-            )+"\n"+ self.format_prompt
+            ) + "\n" + format_prompt_text
         
         # Return observation dictionary with appropriate fields
         if multi_modal_data is not None:

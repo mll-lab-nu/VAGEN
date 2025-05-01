@@ -7,8 +7,14 @@ from vagen.env.utils.env_utils import NoLoggerWarnings, set_seed
 from vagen.env.utils.context_utils import convert_numpy_to_PIL
 import numpy as np
 from vagen.env.utils.parse_utils import parse_function_map
-from .prompt import system_prompt, init_observation_template, action_template,format_prompt
+from .prompt import (
+    system_prompt, 
+    init_observation_template, 
+    action_template,
+    format_prompt
+)
 from .env_config import SokobanEnvConfig
+
 class SokobanEnv(BaseEnv):
     GRID_LOOKUP = {
         0: " # \t",  # wall
@@ -36,9 +42,14 @@ class SokobanEnv(BaseEnv):
             max_steps=self.config.get('max_steps', 100),
             num_boxes=self.config.get('num_boxes', 3),
         )
-        self.format_prompt = format_prompt[self.config.prompt_format].format(
-            max_actions_per_step=self.config.max_actions_per_step,action_sep=self.config.action_sep)
-        self.parse_func= parse_function_map[self.config.prompt_format.rstrip("_symbol")]
+        
+        # Get the appropriate format prompt function
+        self.format_prompt_func = format_prompt[self.config.prompt_format]
+        
+        # Call the function with add_example=True for system prompt
+    
+        
+        self.parse_func = parse_function_map[self.config.prompt_format.rstrip("_symbol")]
         
     def reset(self, seed=None):
         with NoLoggerWarnings():
@@ -109,8 +120,12 @@ class SokobanEnv(BaseEnv):
         return self._render(init_obs=False), self.reward, done, info
     
     def system_prompt(self):
-        return system_prompt+"\n"+self.format_prompt
-    
+        format_prompt=self.format_prompt_func(
+            max_actions_per_step=self.config.max_actions_per_step,
+            action_sep=self.config.action_sep,
+            add_example=True  # Always true for system prompt
+        )
+        return system_prompt() + "\n" + format_prompt
     
     def compute_reward(self):
         return self.total_reward
@@ -118,10 +133,18 @@ class SokobanEnv(BaseEnv):
     def close(self):
         self.env.close()
     
-    
-    def _render(self,init_obs=False):
+    def _render(self, init_obs=False):
         assert self.config.render_mode in ['text', 'vision']
         multi_modal_data = None
+        
+        # Get the appropriate format prompt function for action/init templates (with add_example=False)
+        
+        format_prompt = self.format_prompt_func(
+            max_actions_per_step=self.config.max_actions_per_step,
+            action_sep=self.config.action_sep,
+            add_example=False  # No examples for action and init obs
+        )
+        
         if self.config.render_mode == 'vision':
             img_placeholder=self.config.get("image_placeholder", "<image>")
             multi_modal_data={
@@ -134,13 +157,12 @@ class SokobanEnv(BaseEnv):
             img_str = "\n".join("".join(lookup(cell) for cell in row) for row in room_state)
         
         if init_obs:
-            obs_str = init_observation_template.format(observation=img_str)+"\n"+self.format_prompt
-            
+            obs_str = init_observation_template(img_str) + "\n" + format_prompt
         else:
-            obs_str = action_template.format(
+            obs_str = action_template(
                 valid_action=self.valid_actions,
                 observation=img_str,
-            )+"\n"+self.format_prompt
+            ) + "\n" + format_prompt
         
         if multi_modal_data is not None:
             return {
@@ -151,9 +173,9 @@ class SokobanEnv(BaseEnv):
             return {
                 "obs_str": obs_str,
             }
+    
     def _success(self):
         return self.env.boxes_on_target == self.env.num_boxes
-    
     
     
 if __name__ == "__main__":
@@ -184,7 +206,6 @@ if __name__ == "__main__":
         if done:
             break
         
-    
     print(f"Total reward: {env.compute_reward()}")
     print(info)
     env.close()
