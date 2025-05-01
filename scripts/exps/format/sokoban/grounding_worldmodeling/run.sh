@@ -26,7 +26,7 @@ python3 -m vagen.trainer.main_ppo \
     data.val_files=data/$EXPERIMENT_NAME/test.parquet \
     data.train_batch_size=128 \
     data.max_prompt_length=1024 \
-    data.max_response_length=256 \
+    data.max_response_length=150 \
     data.max_trajectory_length=2400 \
     data.image_key=images \
     data.truncation=error \
@@ -67,7 +67,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.experiment_name=$EXPERIMENT_NAME \
     trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \
-    trainer.save_freq=70 \
+    trainer.save_freq=90 \
     trainer.test_freq=20 \
     trainer.total_training_steps=200 \
     rollout_manager.max_turns=3 \
