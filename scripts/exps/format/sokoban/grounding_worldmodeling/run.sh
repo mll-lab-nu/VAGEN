@@ -26,8 +26,8 @@ python3 -m vagen.trainer.main_ppo \
     data.val_files=data/$EXPERIMENT_NAME/test.parquet \
     data.train_batch_size=128 \
     data.max_prompt_length=1024 \
-    data.max_response_length=128 \
-    data.max_trajectory_length=2048 \
+    data.max_response_length=256 \
+    data.max_trajectory_length=2400 \
     data.image_key=images \
     data.truncation=error \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \
