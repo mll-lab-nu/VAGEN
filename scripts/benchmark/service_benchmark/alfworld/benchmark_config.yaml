@@ -27,6 +27,9 @@ benchmark:
   # Directory to save benchmark results
   output_dir: benchmark_results
 
+  # Valid commands for testing (optional, environment-specific)
+  valid_commands: ["Left", "Right", "Up", "Down"]
+
 datasets:
   - name: alfworld-vision
     train_path: data/alfworld-vision-benchmark/train.parquet
