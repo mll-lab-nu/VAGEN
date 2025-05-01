@@ -3,39 +3,77 @@ import numpy as np
 import copy
 from typing import Dict, List, Optional, Tuple, Any
 from gymnasium.utils import seeding
-from vagen.env.utils.context_utils import parse_llm_raw_response, convert_numpy_to_PIL
+from vagen.env.utils.context_utils import convert_numpy_to_PIL
+from vagen.env.utils.parse_utils import parse_function_map
 from .env_config import PrimitiveSkillEnvConfig
 from .maniskill.utils import build_env, handle_info, get_workspace_limits
-from .prompts import system_prompt, init_observation_template, action_template
+from .prompts import system_prompt, init_observation_template, action_template, format_prompt
 import vagen.env.primitive_skill.maniskill.env
 
 class PrimitiveSkillEnv(BaseEnv):
     def __init__(self, config: PrimitiveSkillEnvConfig):
+        """
+        Initialize the PrimitiveSkill environment.
+        
+        Args:
+            config (PrimitiveSkillEnvConfig): Configuration parameters for the environment
+        """
+        BaseEnv.__init__(self)
         self.config = config
         if self.config.record_video:
             record_dir = self.config.video_record_dir
         else:
             record_dir = None
-        self.env=build_env(config.env_id,record_dir=record_dir)
+        self.env = build_env(config.env_id, record_dir=record_dir)
+        
+        # Store the format prompt function for later use based on the configuration
+        self.format_prompt_func = format_prompt[self.config.prompt_format]
+        self.parse_func = parse_function_map[self.config.prompt_format]
+        # Define the state keys for the environment
+        self.state_keys = self.env.state_keys
     
     def reset(self, seed: Optional[int] = None) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-        _, info=self.env.reset(seed=seed)
-        obs=self._render(info,init_obs=True)
-        self.last_info=info
-        self.initial_reward=self._compute_reward()
+        """
+        Reset the environment to an initial state.
+        
+        Args:
+            seed (Optional[int]): Random seed for environment generation
+                                  If None, a random seed is used
+        
+        Returns:
+            Tuple[Dict, Dict]: 
+                - obs: Dictionary containing observation string and optional image data
+                - info: Empty dictionary for initial state
+        """
+        _, info = self.env.reset(seed=seed)
+        obs = self._render(info, init_obs=True)
+        self.last_info = info
+        self.initial_reward = self._compute_reward()
         self.total_reward = 0
-        self.steps=0
+        self.steps = 0
         return obs, {}
     
-    def step(self,action_str):
-        reward=0
-        rst = parse_llm_raw_response(
-            response=action_str,
+    def step(self, action_str):
+        """
+        Take a step in the environment based on the agent's action.
+        
+        Args:
+            action_str (str): Raw string from LLM containing actions
+        
+        Returns:
+            Tuple[Dict, float, bool, Dict]:
+                - obs: Dictionary with observation string and optional image data
+                - reward: Numeric reward for the step
+                - done: Boolean indicating if episode is complete
+                - info: Dictionary containing metrics and parsed action data
+        """
+        reward = 0
+        rst = self.parse_func( response=action_str,
             special_token_list=self.config.special_token_list,
             action_sep=self.config.action_sep,
-            max_actions=self.config.max_actions_per_step,
-        )
-        output_info={}
+            max_actions=self.config.max_actions_per_step)
+        
+        output_info = {}
         output_info.update(rst)
         valid_actions = []
         metrics = {
@@ -46,45 +84,76 @@ class PrimitiveSkillEnv(BaseEnv):
                 "success": False,  # Will be set to True if agent reaches goal
             },
         }
-        info=self.last_info
+        
+        info = self.last_info
         terminated, truncated = False, False
+        
+        
+        # Execute each action in the list
         for action in rst['actions']:
             parsed_action = self._parse_action(action)
             if parsed_action is not None:
                 _, _, terminated, truncated, info = self.env.step(parsed_action)
                 valid_actions.append(action)
                 self.last_info = info
-                self.steps+=1
+                self.steps += 1
             else:
-                info=self.last_info
+                info = self.last_info
                 terminated, truncated = False, False
                 break
             if truncated or terminated:
                 break
-        metrics["turn_metrics"]['action_is_valid'] = len(valid_actions) > 0 and len(valid_actions)==len(rst['actions'])
-        if metrics["turn_metrics"]['action_is_valid']:
+        
+        # Check if actions were valid and format was correct
+        metrics["turn_metrics"]['action_is_valid'] = len(valid_actions) > 0 and len(valid_actions) == len(rst['actions'])
+        if metrics["turn_metrics"]['action_is_valid'] and rst["format_correct"]:
             reward += self.config.format_reward
-        if info['is_success']:
+        # Check for success
+        if info.get('is_success', False):
             metrics["traj_metrics"]['success'] = True
-        done= terminated or truncated
+        
+        done = terminated or truncated
         info["action_is_valid"] = metrics["turn_metrics"]['action_is_valid']
-        obs=self._render(info,init_obs=False,valid_actions=valid_actions)
+        
+        obs = self._render(info, init_obs=False, valid_actions=valid_actions)
         output_info["metrics"] = metrics
+        
         self.total_reward += reward
         if isinstance(done, np.ndarray):
             done = done.item()
-        return obs,reward,done,output_info
+            
+        return obs, reward, done, output_info
     
     def system_prompt(self):
-        return system_prompt.format(
+        """
+        Get the system prompt for the environment.
+        
+        Returns:
+            str: System prompt string with environment description and instructions
+        """
+        # Get format prompt with examples for system prompt
+        format_prompt_text = self.format_prompt_func(
             max_actions_per_step=self.config.max_actions_per_step,
             action_sep=self.config.action_sep,
+            state_keys=self.state_keys,
+            add_example=True  # Always true for system prompt
         )
+        
+        return system_prompt() + '\n' + format_prompt_text
     
     def close(self):
+        """
+        Close the environment and clean up resources.
+        """
         self.env.close()
     
     def _compute_reward(self):
+        """
+        Calculate the reward based on environment state.
+        
+        Returns:
+            float: Computed reward value
+        """
         if self.last_info.get("success", False):
             return 10
         
@@ -104,42 +173,83 @@ class PrimitiveSkillEnv(BaseEnv):
         return (max_stage + 1) * 2
     
     def compute_reward(self):
-        return self._compute_reward()+self.total_reward-self.initial_reward-self.steps*0.1
+        """
+        Get the cumulative reward for the episode.
+        
+        Returns:
+            float: Total reward accumulated during the current episode
+        """
+        return self._compute_reward() + self.total_reward - self.initial_reward - self.steps * 0.1
     
+    def _get_current_state(self):
+        """
+        Get a representation of the current state for comparison.
+        
+        Returns:
+            dict: Dictionary representation of important state components
+        """
+        # This is a simple implementation - customize based on your environment
+        return {k: v for k, v in self.last_info.items() if k.endswith('_position')}
     
-    def _render(self,info,init_obs=False,valid_actions=None):
-        new_info=handle_info(info.copy(),mask_success=self.config.mask_success,env=self.env)
-        object_positions=new_info['obj_positions']
-        other_information=new_info['other_info']
-        instruction=self.env.instruction()
+    def _render(self, info, init_obs=False, valid_actions=None):
+        """
+        Render the environment as an observation.
+        
+        Args:
+            info (dict): Environment info dictionary
+            init_obs (bool): If True, create initial observation
+            valid_actions (list): List of valid actions executed (for step observations)
+        
+        Returns:
+            Dict: Observation dictionary containing observation string and optional image data
+        """
+        new_info = handle_info(info.copy(), mask_success=self.config.mask_success, env=self.env)
+        object_positions = new_info['obj_positions']
+        other_information = new_info['other_info']
+        instruction = self.env.instruction()
         img_placeholder = self.config.image_placeholder
         x_workspace, y_workspace, z_workspace = get_workspace_limits(self.env)
         
+        # Get format prompt without examples for action/init templates
+        format_prompt_text = self.format_prompt_func(
+            max_actions_per_step=self.config.max_actions_per_step,
+            action_sep=self.config.action_sep,
+            state_keys=self.state_keys,
+            add_example=False  # No examples for action and init obs
+        )
+        
         if init_obs:
-            obs_str = init_observation_template.format(observation=img_placeholder, 
-                                                       instruction=instruction, 
-                                                       object_positions=object_positions, 
-                                                       other_information=other_information,
-                                                       x_workspace=x_workspace,
-                                                       y_workspace=y_workspace,
-                                                       z_workspace=z_workspace,
-                                                       max_action=self.config.max_actions_per_step)
+            # Initial observation
+            obs_str = init_observation_template(
+                observation=img_placeholder,
+                instruction=instruction,
+                x_workspace=x_workspace,
+                y_workspace=y_workspace,
+                z_workspace=z_workspace,
+                object_positions=object_positions,
+                other_information=other_information
+            ) + "\n" + format_prompt_text
         else:
-            obs_str = action_template.format(valid_actions=valid_actions,
-                                             observation=img_placeholder, 
-                                             instruction=instruction, 
-                                             object_positions=object_positions, 
-                                             other_information=other_information,
-                                             x_workspace=x_workspace,
-                                             y_workspace=y_workspace,
-                                             z_workspace=z_workspace,
-                                             max_action=self.config.max_actions_per_step)
+            # Subsequent observations include action results
+            obs_str = action_template(
+                valid_actions=valid_actions,
+                observation=img_placeholder,
+                instruction=instruction,
+                x_workspace=x_workspace,
+                y_workspace=y_workspace,
+                z_workspace=z_workspace,
+                object_positions=object_positions,
+                other_information=other_information
+            ) + "\n" + format_prompt_text
+        
         multi_modal_data = None
         if self.config.render_mode == "vision":
-            img=self.env.render()
+            img = self.env.render()
             multi_modal_data = {
-                    img_placeholder: [convert_numpy_to_PIL(img)]
-                }
+                img_placeholder: [convert_numpy_to_PIL(img)]
+            }
+        
+        # Return observation dictionary with appropriate fields
         if multi_modal_data is not None:
             return {
                 "obs_str": obs_str,
@@ -149,10 +259,18 @@ class PrimitiveSkillEnv(BaseEnv):
             return {
                 "obs_str": obs_str,
             }
+    
+    
+    def _parse_action(self, action_str):
+        """
+        Parse a single action string into an action array.
+        
+        Args:
+            action_str (str): Action string to parse
             
-    import numpy as np
-
-    def _parse_action(self,action_str):
+        Returns:
+            np.array: Parsed action array or None if invalid
+        """
         # Initialize empty 9-dim array (3 for action type, 6 for coordinates)
         action_array = np.zeros(9)
         
@@ -209,7 +327,6 @@ class PrimitiveSkillEnv(BaseEnv):
         except (IndexError, ValueError):
             # If any parsing error occurs, return None
             return None
-        
         
 if __name__ == "__main__":
     """

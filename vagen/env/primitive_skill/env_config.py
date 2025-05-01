@@ -11,6 +11,10 @@ class PrimitiveSkillEnvConfig(BaseEnvConfig):
     record_video: bool = field(default=False)
     video_record_dir: str = field(default='./test')
     mask_success: bool = field(default=True)
+    prompt_format: str = "free_think" 
+    # "free_think", "no_think", "grounding", "worldmodeling", "grounding_worldmodeling"
+    use_accuracy_reward: bool = False
+    
     
     def config_id(self) -> str:
         id_fields=["env_id","render_mode","max_actions_per_step"]
