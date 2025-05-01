@@ -49,7 +49,7 @@ Your response should be in the format of:
 def grounding_format_prompt(max_actions_per_step, action_sep, add_example=True):
     base_prompt = f"""You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}.
 You should first give the current state, then your thought process, and finally your answer.
-The state should be in the format of {{"player":(row,column),"box":(row1,column1),"target":(row1,column1)}}
+The state should be in the format of {{"player":(row1,column1),"box":(row2,column2),"target":(row3,column3)}}
 Your response should be in the format of:
 <current_state>...</current_state><think>...</think><answer>...</answer>"""
     
@@ -61,7 +61,7 @@ Your response should be in the format of:
 def worldmodeling_format_prompt(max_actions_per_step, action_sep, add_example=True):
     base_prompt = f"""You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}.
 You should first give your thought process, then your answer, and finally predict the next state.
-The state should be in the format of {{"player":(row,column),"box":(row1,column1),"target":(row1,column1)}}
+The state should be in the format of {{"player":(row1,column1),"box":(row2,column2),"target":(row3,column3)}}
 Your response should be in the format of:
 <think>...</think><answer>...</answer><next_state>...</next_state>"""
     
@@ -73,7 +73,7 @@ Your response should be in the format of:
 def grounding_worldmodeling_format_prompt(max_actions_per_step, action_sep, add_example=True):
     base_prompt = f"""You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}.
 You should first give the current state, then your thought process, then your answer, and finally predict the next state.
-The state should be in the format of {{"player":(row,column),"box":(row1,column1),"target":(row1,column1)}}
+The state should be in the format of {{"player":(row1,column1),"box":(row2,column2),"target":(row3,column3)}}
 Your response should be in the format of:
 <current_state>...</current_state><think>...</think><answer>...</answer><next_state>...</next_state>"""
     
