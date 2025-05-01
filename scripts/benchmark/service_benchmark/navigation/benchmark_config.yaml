@@ -1,0 +1,34 @@
+# Server configuration
+server:
+  base_url: http://localhost:5000
+  timeout: 600
+  max_workers: 48
+
+# Benchmark parameters
+benchmark:
+  # Service functions to benchmark
+  functions: 
+    - create_environments_batch
+    - reset_batch
+    - step_batch
+    - compute_reward_batch
+    - get_system_prompts_batch
+    - close_batch
+  
+  # Number of iterations for statistical significance
+  iterations: 3
+  
+  # Number of steps to perform for step_batch
+  step_count: 5
+  
+  # Batch sizes to test
+  batch_sizes: [8]
+  
+  # Directory to save benchmark results
+  output_dir: benchmark_results
+
+datasets:
+  - name: navigation
+    train_path: data/navigation-vision-benchmark/train.parquet
+    test_path: data/navigation-vision-benchmark/test.parquet
+    use_split: both

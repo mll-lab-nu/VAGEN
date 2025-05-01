@@ -2,6 +2,6 @@ env1:
     env_name: alfworld  
     env_config:
         render_mode: text
-        alf_config_path: "${env:ALFWORLD_DATA}/alf-config.yaml"
+        alf_config_path: "SCRIPT_DIR/alf-config.yaml"
     train_size: 64
     test_size: 16

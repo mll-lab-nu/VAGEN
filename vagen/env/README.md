@@ -64,9 +64,29 @@ apt-get install -y xorg xserver-xorg-core xserver-xorg-video-dummy
 
 # Set the data path and download before running the server
 export ALFWORLD_DATA=<storage_path>
+# or you can add this path directly into bashrc
+# echo 'export ALFWORLD_DATA=<storage_path>' >> ~/.bashrc
+
+# download dataset
 alfworld-download
 
-# on a new window, start a startx port and then start server
+# on new windows, start a startx port and then start server
 python vagen/env/alfworld/startx.py 0
 python vagen/server/server.py
+```
+
+## Benchmark your Env and Service
+env/service running time varies on different devices, you can benchmark current env/service or debug your own env/service as follow:
+### Start a env benchmark
+```
+# run env script
+./scripts/benchmark/env_benchmark/frozenlake/run.sh
+```
+### Start a service benchmark
+```
+# start a server
+python vagen/server/server.py
+
+# run service script
+./scripts/benchmark/service_benchmark/frozenlake/run.sh
 ```

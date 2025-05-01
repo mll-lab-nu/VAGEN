@@ -1,0 +1,8 @@
+alfworld-vision:
+  env_name: alfworld
+  env_config:
+    render_mode: vision
+    alf_config_path: "${env:ALFWORLD_DATA}/alf-config.yaml"
+    max_actions_per_step: 1
+  train_size: 1000
+  test_size: 64

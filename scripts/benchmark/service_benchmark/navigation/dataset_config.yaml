@@ -1,0 +1,6 @@
+navigation:
+  env_name: navigation
+  env_config:
+    render_mode: vision
+  train_size: 8
+  test_size: 4
