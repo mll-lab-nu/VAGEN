@@ -38,7 +38,7 @@ def handle_info(info,mask_success=False,env=None):
             info.pop(k)
     
     for k, v in info.items():
-        if k.endswith('_pos'):
+        if k.endswith('_position'):
             # Convert position arrays to integer tuples in cm
             obj_positions[k] = tuple(np.round(v * 1000, 0).astype(int).tolist())
         elif k.endswith('_value'):
@@ -70,7 +70,7 @@ def handle_info(info,mask_success=False,env=None):
         final_info.update(other_info)
     
     return {
-        'obj_positions': obj_positions,
+        'obj_positions': list(obj_positions.values()),
         'other_info': str(final_info)
     }
     

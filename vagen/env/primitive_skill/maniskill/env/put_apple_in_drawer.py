@@ -22,6 +22,7 @@ class PutAppleInDrawerEnv(BaseEnv):
     SUPPORTED_ROBOTS = ["panda", "xmate3_robotiq", "fetch"]
     agent: Union[Panda, Xmate3Robotiq, Fetch]
     vlm_info_keys=["drawer_open_value"]
+    state_keys=["apple_position", "drawer_position"]
     # Asset configuration and constants
     DRAWER_ASSET_ID = "partnet_mobility_cabinet"
     handle_types = ["prismatic"]  # We are interested in prismatic joints (drawers)
@@ -51,13 +52,13 @@ class PutAppleInDrawerEnv(BaseEnv):
 
     @property
     def _default_sensor_configs(self):
-        pose = sapien_utils.look_at(eye=[-0.5, 0, 0.6], target=[-0.5, 0, 0.1])
-        return [CameraConfig("base_camera", pose, 128, 128, np.pi / 2, 0.01, 100)]
+        pose = sapien_utils.look_at(eye=[1, 0.0, 0.6], target=[-0.2, 0.0, 0.2])
+        return [CameraConfig("base_camera", pose, 300, 300, np.pi / 2, 0.01, 100)]
 
     @property
     def _default_human_render_camera_configs(self):
-        pose = sapien_utils.look_at([1.0, 0.3, 1.0], [-0.5, -0.2, 0.35])
-        return CameraConfig("render_camera", pose, 300, 300, 1, 0.01, 100)
+        pose = sapien_utils.look_at([1, 0.0, 0.6], [-0.2, 0.0, 0.2])
+        return CameraConfig("render_camera", pose, 300,300, 1, 0.01, 100)
 
     def instruction(self):
         return "Please put the apple in the drawer and close the drawer."
@@ -141,16 +142,16 @@ class PutAppleInDrawerEnv(BaseEnv):
         info= {}
         for name in self.object_list:
             info[f"is_{name}_grasped"] = self.agent.is_grasping(self.object_list[name])[0]
-            info[f"{name}_pos"] = self.object_list[name].pose.p[0]
+            info[f"{name}_position"] = self.object_list[name].pose.p[0]
         
         info["stage"] = self.cur_stage
-        info["gripper_pos"] = self.agent.tcp.pose.p[0]
+        info["gripper_position"] = self.agent.tcp.pose.p[0]
 
         drawer_link = self.drawer_joint.get_child_link()
-        info["drawer_handle_pos"] = drawer_link.pose.p.to(self.device)[0] + np.array([0, 0.37, -0.3])
-        info["drawer_pos"] = drawer_link.pose.p.to(self.device)[0] + np.array([0, 0.2, -0.3])
+        info["drawer_handle_position"] = drawer_link.pose.p.to(self.device)[0] + np.array([0, 0.37, -0.3])
+        info["drawer_position"] = drawer_link.pose.p.to(self.device)[0] + np.array([0, 0.2, -0.3])
 
-        info["drawer_open_value"] = (info["drawer_handle_pos"][1] - np.array([0.5, -0.63,  0.2]))[1]
+        info["drawer_open_value"] = (info["drawer_handle_position"][1] - np.array([0.5, -0.63,  0.2]))[1]
         
      
         return info
@@ -163,7 +164,7 @@ class PutAppleInDrawerEnv(BaseEnv):
         
         def stage1_success(info):
             # Check if apple is in drawer
-            abs_diff_xy = torch.abs(info["apple_pos"][:2] - info["drawer_pos"][:2])
+            abs_diff_xy = torch.abs(info["apple_pos"][:2] - info["drawer_position"][:2])
 
             # Check if x and y differences are within tolerance
             within_xy = (abs_diff_xy <= 0.1).all(dim=-1)
@@ -177,7 +178,7 @@ class PutAppleInDrawerEnv(BaseEnv):
 
         def stage2_success(info):
             # Check if apple is in drawer
-            abs_diff_xy = torch.abs(info["apple_pos"][:2] - info["drawer_pos"][:2])
+            abs_diff_xy = torch.abs(info["apple_pos"][:2] - info["drawer_position"][:2])
 
             # Check if x and y differences are within tolerance
             within_xy = (abs_diff_xy <= 0.1).all(dim=-1)
@@ -203,7 +204,7 @@ class PutAppleInDrawerEnv(BaseEnv):
             info = self.get_info()
         obs = []
         for name in self.object_list:
-            obs += info[f"{name}_pos"].flatten().tolist()
+            obs += info[f"{name}_position"].flatten().tolist()
 
         for name in self.object_list:
              obs += info[f"is_{name}_grasped"].flatten().tolist()

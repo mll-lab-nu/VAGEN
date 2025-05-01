@@ -23,6 +23,7 @@ class StackThreeCubeEnv(BaseEnv):
     agent: Union[Panda, Xmate3Robotiq, Fetch]
     skill_config=None
     vlm_info_keys=['cube_size']
+    state_keys=["red_cube_position", "green_cube_position", "purple_cube_position"]
 
     def __init__(self, stage=0,*args, robot_uids="panda", robot_init_qpos_noise=0.02, **kwargs):
         self.stage=stage
@@ -30,8 +31,9 @@ class StackThreeCubeEnv(BaseEnv):
         self.cube_size = 0.04
 
         self.workspace_x=[-0.10, 0.15]
-        self.workspace_y=[-0.15, 0.15]
-        self.workspace_z=[0.01, 0.15]
+        self.workspace_y=[-0.2, 0.2]
+        self.workspace_z=[0.01, 0.2]
+        
         self.robot_init_qpos_noise = robot_init_qpos_noise
         self.reward_components = ["success","afford"]
         super().__init__(*args, robot_uids=robot_uids, **kwargs)
@@ -46,15 +48,13 @@ class StackThreeCubeEnv(BaseEnv):
 
     @property
     def _default_sensor_configs(self):
-        pose = sapien_utils.look_at(eye=[0.3, 0, 0.6], target=[-0.1, 0, 0.1])
+        pose = sapien_utils.look_at(eye=[1, 0.0, 0.6], target=[-0.2, 0.0, 0.2])
         return [CameraConfig("base_camera", pose, 300, 300, np.pi / 2, 0.01, 100)]
 
     @property
     def _default_human_render_camera_configs(self):
-        pose = sapien_utils.look_at([0.8, 0.8, 0.6], [0.14, +0.08, 0.12])
-        return CameraConfig(
-            "render_camera", pose=pose, width=300, height=300, fov=0.63, near=0.01, far=100
-        )
+        pose = sapien_utils.look_at([1, 0.0, 0.6], [-0.2, 0.0, 0.2])
+        return CameraConfig("render_camera", pose, 300,300, 1, 0.01, 100)
 
     def instruction(self):
         return "Please stack the red cube on top of the green cube, and then stack purple cube on top of the red cube."
@@ -124,9 +124,9 @@ class StackThreeCubeEnv(BaseEnv):
         info = {}
         for name in self.object_list:
             info[f"is_{name}_grasped"] = self.agent.is_grasping(self.object_list[name])[0]
-            info[f"{name}_pos"] = self.object_list[name].pose.p[0]
-        info["cube_size"]=torch.ones_like(info["red_cube_pos"])*0.04
-        info["gripper_pos"] = self.agent.tcp.pose.p[0]
+            info[f"{name}_position"] = self.object_list[name].pose.p[0]
+        info["cube_size"]=torch.ones_like(info["red_cube_position"])*0.04
+        info["gripper_position"] = self.agent.tcp.pose.p[0]
         return info
 
     def evaluate(self):
@@ -137,7 +137,7 @@ class StackThreeCubeEnv(BaseEnv):
         
         def stage1_success(info):
             red_not_grasped = ~info["is_red_cube_grasped"]
-            red_on_green = (torch.linalg.norm(info["red_cube_pos"][:2] - info["green_cube_pos"][:2]) < self.cube_size/2) and (info["red_cube_pos"][2] > (info["green_cube_pos"][2] + self.cube_size/2))
+            red_on_green = (torch.linalg.norm(info["red_cube_position"][:2] - info["green_cube_position"][:2]) < self.cube_size/2) and (info["red_cube_position"][2] > (info["green_cube_position"][2] + self.cube_size/2))
             return (red_on_green and red_not_grasped)
         
         def stage2_success(info):
@@ -145,7 +145,7 @@ class StackThreeCubeEnv(BaseEnv):
         
         def stage3_success(info):
             purple_not_grasped = ~info["is_purple_cube_grasped"]
-            purple_on_red = (torch.linalg.norm(info["purple_cube_pos"][:2] - info["red_cube_pos"][:2]) < self.cube_size/2) and (info["purple_cube_pos"][2] > (info["red_cube_pos"][2] + self.cube_size/2))
+            purple_on_red = (torch.linalg.norm(info["purple_cube_position"][:2] - info["red_cube_position"][:2]) < self.cube_size/2) and (info["purple_cube_position"][2] > (info["red_cube_position"][2] + self.cube_size/2))
             
             return purple_on_red and purple_not_grasped and stage1_success(info)
         
@@ -161,7 +161,7 @@ class StackThreeCubeEnv(BaseEnv):
             info = self.get_info()
         obs = []
         for name in self.object_list:
-            obs += info[f"{name}_pos"].flatten().tolist()
+            obs += info[f"{name}_position"].flatten().tolist()
 
         for name in self.object_list:
              obs += info[f"is_{name}_grasped"].flatten().tolist()
