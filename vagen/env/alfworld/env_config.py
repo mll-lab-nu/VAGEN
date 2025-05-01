@@ -6,7 +6,8 @@ import os
 @dataclass
 class ALFWorldEnvConfig(BaseEnvConfig):
     """Configuration class for the ALFWorld environment."""
-    alf_config_path: str = "path/to/alf-config.yaml"
+    # Please put your alf config into the script directory your are running
+    alf_config_path: str = "SCRIPT_DIR/alf-config.yaml"
     max_actions_per_step: int = 1
     action_only_prompt: bool = False
     render_mode: str = "vision"
@@ -16,6 +17,12 @@ class ALFWorldEnvConfig(BaseEnvConfig):
         raw = self.alf_config_path
         # Convert Hydra-style ${env:VAR} to shell-style $VAR
         raw = raw.replace('${env:', '$').replace('}', '')
+        
+        # Or use SCRIPT_DIR for prefix
+        if raw.startswith("SCRIPT_DIR"):
+            script_folder = os.path.dirname(os.path.abspath(__file__))
+            raw = raw.replace("SCRIPT_DIR", script_folder, 1)
+
         # Expand environment variables
         self.alf_config_path = os.path.expandvars(raw)
 
