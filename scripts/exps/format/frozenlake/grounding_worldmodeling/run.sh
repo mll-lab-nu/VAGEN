@@ -26,7 +26,7 @@ python3 -m vagen.trainer.main_ppo \
     data.val_files=data/$EXPERIMENT_NAME/test.parquet \
     data.train_batch_size=64 \
     data.max_prompt_length=1024 \
-    data.max_response_length=256 \
+    data.max_response_length=150 \
     data.max_trajectory_length=2400 \
     data.image_key=images \
     data.truncation=error \
