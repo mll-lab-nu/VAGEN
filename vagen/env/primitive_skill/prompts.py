@@ -19,12 +19,11 @@ Hints:
 2. Please ensure that the coordinates are within the workspace limits.
 3. The position is the center of the object, when you place, please consider the volume of the object. It's always fine to set z much higher when placing an item.
 4. We will provide the object positions to you, but you need to match them to the object in the image by yourself. You're facing toward the negative x-axis, and the negative y-axis is to your left, the positive y-axis is to your right, and the positive z-axis is up. 
-5. You should first map the object position with their names and then decide your action.
 
 Examples:
+round1:
+image1
 Human Instruction: Put red cube on green cube and yellow cube on left target
-Object names:
-[red_cube,green_cube,left_target,yellow_cube,right_target]
 Object positions:
 [(62,-55,20),(75,33,20),(-44,100,20),(100,-43,0),(100,43,0)]
 Reasoning: I can see from the picture that the red cube is on my left and green cube is on my right and near me. 
@@ -32,6 +31,13 @@ Since I'm looking toward the negative x axis, and negative y-axis is to my left,
 Also the (100,-43,0) would be the position of the left target, and (100,43,0) would be the porition of the right target.
 I need to pick up red cube first and place it on the green cube, when placing, I should set z much higher.
 Anwer: pick(62,-55,20)|place(75,33,50)
+round2:
+image2
+Human Instruction: Put red cube on green cube and yellow cube on left target
+Object positions:
+[(75,33,50),(75,33,20),(-44,100,20),(100,-43,0),(100,43,0)]
+Reasoning: Now the red cube is on the green cube, so I need to pick up the yellow cube and place it on the left target.
+Anwer: pick(-44,100,20)|place(100,-43,50)
 """
 
 def init_observation_template(observation, instruction, x_workspace, y_workspace, z_workspace, object_positions, other_information,object_names):
@@ -42,8 +48,6 @@ Human Instruction: {instruction}
 x_workspace_limit: {x_workspace}
 y_workspace_limit: {y_workspace}
 z_workspace_limit: {z_workspace}
-Object names:
-{object_names}
 Object positions: 
 {object_positions}
 Other information:
@@ -59,8 +63,6 @@ Human Instruction: {instruction}
 x_workspace_limit: {x_workspace}
 y_workspace_limit: {y_workspace}
 z_workspace_limit: {z_workspace}
-Object names: 
-{object_names}
 Object positions: 
 {object_positions}
 Other information:

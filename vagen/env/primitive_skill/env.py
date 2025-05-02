@@ -205,10 +205,10 @@ class PrimitiveSkillEnv(BaseEnv):
         """
         new_info = handle_info(info.copy(), state_keys=self.state_keys,mask_success=self.config.mask_success, env=self.env)
         positions_list = list(new_info['obj_positions'].values())
-        random.seed(seed)
-        random.shuffle(positions_list)  # This shuffles the list in-place
+        # random.seed(seed)
+        # random.shuffle(positions_list)  # This shuffles the list in-place
         object_positions = str(positions_list)
-        object_names=str([key.removesuffix("_position") for key in new_info['obj_positions'].keys()])
+        # object_names=str([key.removesuffix("_position") for key in new_info['obj_positions'].keys()])
         other_information = str(new_info['other_info'])
         instruction = self.env.instruction()
         img_placeholder = self.config.image_placeholder
@@ -232,7 +232,7 @@ class PrimitiveSkillEnv(BaseEnv):
                 z_workspace=z_workspace,
                 object_positions=object_positions,
                 other_information=other_information,
-                object_names=object_names
+                #object_names=object_names
             ) + "\n" + format_prompt_text
         else:
             # Subsequent observations include action results
@@ -245,7 +245,7 @@ class PrimitiveSkillEnv(BaseEnv):
                 z_workspace=z_workspace,
                 object_positions=object_positions,
                 other_information=other_information,
-                object_names=object_names
+                #object_names=object_names
             ) + "\n" + format_prompt_text
         
         multi_modal_data = None
