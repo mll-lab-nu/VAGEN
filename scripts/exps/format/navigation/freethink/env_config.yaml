@@ -14,6 +14,6 @@ env2:
         render_mode: vision
         prompt_format: free_think
         use_accuracy_reward: false
-        eval_set: common
+        eval_set: common_sense
     train_size: 10000  
     test_size: 64
