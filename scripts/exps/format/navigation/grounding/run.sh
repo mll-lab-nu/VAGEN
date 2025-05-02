@@ -12,7 +12,7 @@ EXPERIMENT_NAME=$(echo $SCRIPT_DIR | rev | cut -d'/' -f1-3 | rev | tr '/' '-')
 
 echo "Experiment name: $EXPERIMENT_NAME"
 # run 
-# python -m vagen.server.server server.port=5000
+# python -m vagen.server.server server.port=5000 
 # in a tmux session first
 python -m vagen.env.create_dataset \
     --yaml_path "$SCRIPT_DIR/env_config.yaml" \
