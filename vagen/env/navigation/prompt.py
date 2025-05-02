@@ -1,37 +1,12 @@
 def system_prompt():
     return """You are a home robot and perform navigation tasks according to instructions.
 
-Navigation Guide
-Goal: Achieve the human instruction
-
 Actions you can take: moveahead, moveback, moveright, moveleft, rotateright, rotateleft, lookup, lookdown. 
 
-moveahead: Move forward by 0.25 meter
-moveback: Move backward by 0.25 meter
-moveright: Move rightward by 0.25 meter
-moveleft: Move leftward by 0.25 meter
-rotateright: Rotate to the right by 90 degrees
-rotateleft: Rotate to the left by 90 degrees
-lookup: Tilt the camera upward by 30 degrees
-lookdown: Tilt the camera downward by 30 degrees
-
-Rewards:
-Format correct: +0.5
-Achieve the human instruction: +10.0
-"""
-
-def system_prompt_vision():
-    return """You are a home robot and perform navigation tasks according to instructions.
-
-Navigation Guide
-You should follow the human instruction and navigate to the target location.
-
-Actions you can take: moveahead, moveback, moveright, moveleft, rotateright, rotateleft, lookup, lookdown. 
-
-moveahead: Move forward by 0.25 meter
-moveback: Move backward by 0.25 meter
-moveright: Move rightward by 0.25 meter
-moveleft: Move leftward by 0.25 meter
+moveahead: Move forward by 0.4 meter
+moveback: Move backward by 0.4 meter
+moveright: Move rightward by 0.4 meter
+moveleft: Move leftward by 0.4 meter
 rotateright: Rotate to the right by 90 degrees
 rotateleft: Rotate to the left by 90 degrees
 lookup: Tilt the camera upward by 30 degrees
@@ -42,24 +17,44 @@ Format correct: +0.5
 Achieve the human instruction: +10.0
 
 The instruction will be provided with each observation. Look at the image carefully and navigate to complete the instruction.
-"""
+Hints:
+1. You can take multiple actions at a time, in most cases, if you find the target object is far away from you, you can call moveahead, moveleft and move right multiple times.
+2. If you find yourself seems to be stuck, you can lookdown to see if there's any object above or below you, you can also rotate to see if there's any object behind you.
+
+Example:
+Round 1:
+<image>
+Reasoning: I can see the garbage can in the upper left corner of the image, next to the kitchen sink. To move there, we can go forward-left, but since there's a kitchen counter directly ahead, we should go left first. Following the strategy, I can go by first moving leftward.
+Actions: moveleft, moveleft
+Round 2:
+Env_feedback: Last action is executed successfully.
+<image>
+Reasoning: From the secene, I see that by moving leftward, we are getting closer to the garbage can. Now, the garbage can is in front of me, slightly to the left. And there's a large area ahead of us. Following the strategy, I can go by first moving forward then moving leftward.
+Actions: moveahead, moveahead,moveahead,moveleft
+Round 3:
+Env_feedback: Last action is executed successfully.
+<image>
+Reasoning: From the image we can see the garbage can is very close to us, still to our front-left. Moving leftward might be blocked but i can see that there is still space in front of me to get closer to the garbage can. Following the strategy, we can take about two steps forward then one step left to reach the garbage can.
+Actions: moveahead, moveahead,moveleft
+Round 4:
+Env_feedback: Success"""
+
 
 def init_observation_template(observation, instruction):
     return f"""[Initial Observation]:
 {observation}
 Human Instruction: {instruction}
-Decide your next action(s).
-"""
+Decide your next action(s)."""
 
-def action_template(valid_action, observation, reward, done, instruction):
+def action_template(valid_action, observation, reward, done, instruction,env_feedback):
     return f"""After your answer, the extracted valid action is {valid_action}.
-After that, the observation is:
-{observation}
+The environment feedback is: {env_feedback}
 reward: {reward}
 done: {done}
+After that, the observation is:
+{observation}
 Human Instruction: {instruction}
-Decide your next action(s).
-"""
+Decide your next action(s)."""
 
 def free_think_format_prompt(max_actions_per_step, action_sep, add_example=True):
     base_prompt = f"""You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}.
@@ -68,7 +63,7 @@ Your response should be in the format of:
 <think>...</think><answer>...</answer>"""
     
     if add_example:
-        example = f"""e.g. <think>I can see from the sight the target object is right in the top left of me, I will move forward, then move left to access it.</think><answer>moveahead{action_sep}moveahead{action_sep}moveahead{action_sep}moveahead{action_sep}moveahead{action_sep}moveleft{action_sep}moveleft</answer>"""
+        example = f"""e.g. <think>I can see from the sight the target object is right in the top left of me, I will move forward, then move left to access it.</think><answer>moveahead{action_sep}moveahead{action_sep}moveahead{action_sep}moveleft{action_sep}moveleft</answer>"""
         return base_prompt + '\n' + example
     return base_prompt
 
@@ -79,13 +74,13 @@ Your response should be in the format of:
 <answer>...</answer>"""
     
     if add_example:
-        example = f"""e.g. <answer>moveahead{action_sep}moveahead{action_sep}moveahead{action_sep}moveahead{action_sep}moveahead{action_sep}moveleft{action_sep}moveleft</answer>"""
+        example = f"""e.g. <answer>moveahead{action_sep}moveahead{action_sep}moveahead{action_sep}moveleft{action_sep}moveleft</answer>"""
         return base_prompt + '\n' + example
     return base_prompt
 
 def grounding_format_prompt(max_actions_per_step, action_sep, add_example=True):
     base_prompt = f"""You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}.
-You should first give the current state, then your thought process, and finally your answer.
+You should first give the description of current state, then your thought process, and finally your answer.
 The state should be described in detail about what you see in the environment.
 Your response should be in the format of:
 <current_state>...</current_state><think>...</think><answer>...</answer>"""
