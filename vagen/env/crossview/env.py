@@ -7,12 +7,12 @@ import random
 import re
 from PIL import Image
 from dataclasses import dataclass, field
-from .env_config import CrossViewQAEnvConfig
+from .env_config import CrossViewEnvConfig
 from vagen.env.utils.context_utils import parse_llm_raw_response
 
 
-class CrossViewQAEnv(BaseEnv):
-    def __init__(self, config: CrossViewQAEnvConfig):
+class CrossViewEnv(BaseEnv):
+    def __init__(self, config: CrossViewEnvConfig):
         self.config = config
         self.script_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),"CrossViewQA")
         self.data_path = os.path.join(self.script_dir, config.data_path)
@@ -135,10 +135,9 @@ class CrossViewQAEnv(BaseEnv):
         pass
     
     def system_prompt(self) -> str:
-        """Get the system prompt for the environment"""
-        return "You are an AI assistant that answers visual questions based on images. " \
-               "Given images and a question, first think through the problem in the <think> section, " \
-               "and then provide your final answer in the <answer> section."
+        return """You are an AI assistant that answers visual questions based on images.
+Given images and a question, first give your thought then answer.
+Your answer should be in the format of <think>...</think><answer>...</answer>."""
     
     def compute_reward(self) -> float:
         """Return the total reward accumulated so far"""
@@ -147,10 +146,10 @@ class CrossViewQAEnv(BaseEnv):
 
 if __name__ == "__main__":
     # Create config
-    config = CrossViewQAEnvConfig()
+    config = CrossViewEnvConfig()
     
     # Create environment
-    env = CrossViewQAEnv(config)
+    env = CrossViewEnv(config)
     
     print("System prompt:")
     print(env.system_prompt())
