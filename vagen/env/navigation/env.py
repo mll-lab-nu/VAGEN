@@ -4,17 +4,15 @@ import numpy as np
 import time
 import math
 from ai2thor.platform import CloudRendering
-from typing import Dict, List, Tuple, Optional, Any
-from vagen.env.utils.env_utils import NoLoggerWarnings, set_seed
-from vagen.env.utils.context_utils import parse_llm_raw_response, convert_numpy_to_PIL
+from vagen.env.utils.context_utils import convert_numpy_to_PIL
 from vagen.env.utils.parse_utils import parse_function_map
 from .env_config import NavigationEnvConfig
-from .prompt import system_prompt, system_prompt_vision, init_observation_template, action_template, format_prompt
+from .prompt import system_prompt,init_observation_template, action_template, format_prompt
 
 
 class NavigationEnv(BaseEnv):
     """Navigation environment from embodied bench. """   
-    SUCCESS_THRESHOLD = 1
+    SUCCESS_THRESHOLD = 2
 
     ValidEvalSets = [
         'base', 'common_sense', 'complex_instruction', 'visual_appearance', 'long_horizon'
@@ -34,10 +32,10 @@ class NavigationEnv(BaseEnv):
 
     # Action descriptions
     DISCRETE_SKILLSET = [
-        "Move forward by 0.25",
-        "Move backward by 0.25",
-        "Move rightward by 0.25",
-        "Move leftward by 0.25",
+        "Move forward by 0.5 meter",
+        "Move backward by 0.5 meter",
+        "Move rightward by 0.5 meter",
+        "Move leftward by 0.5 meter",
         "Rotate to the right by 90 degrees.",
         "Rotate to the left by 90 degrees.",
         "Tilt the camera upward by 30 degrees.",
@@ -82,7 +80,7 @@ class NavigationEnv(BaseEnv):
         self.number_of_episodes = len(self.dataset)
         self._current_episode_num = 0
         self._current_step = 0
-        self._max_episode_steps = 20
+        self._max_episode_steps = 30
         self._episode_start_time = 0
         self.is_holding = False
         self.episode_log = []
@@ -273,7 +271,8 @@ class NavigationEnv(BaseEnv):
         info['episode_elapsed_seconds'] = time.time() - self._episode_start_time
         info['task_success'] = success
         info['last_action_success'] = self.env.last_event.metadata['lastActionSuccess']
-        
+        info["env_feedback"] ="Last action is executed successfully." if info['last_action_success'] else "Last action is not executed successfully."
+        self.info = info
         # Update total reward
         self.total_reward += self.reward
         
@@ -286,13 +285,13 @@ class NavigationEnv(BaseEnv):
             action_index: Index of the action to execute
         """
         if action_index == 1:  # Move forward by 0.25 meter
-            self._last_event = self.env.step(action="MoveAhead", moveMagnitude=0.25)
+            self._last_event = self.env.step(action="MoveAhead", moveMagnitude=0.5)
         elif action_index == 2:  # Move backward by 0.25 meter
-            self._last_event = self.env.step(action="MoveBack", moveMagnitude=0.25)
+            self._last_event = self.env.step(action="MoveBack", moveMagnitude=0.5)
         elif action_index == 3:  # Move right by 0.25 meter
-            self._last_event = self.env.step(action="MoveRight", moveMagnitude=0.25)
+            self._last_event = self.env.step(action="MoveRight", moveMagnitude=0.5)
         elif action_index == 4:  # Move left by 0.25 meter
-            self._last_event = self.env.step(action="MoveLeft", moveMagnitude=0.25)
+            self._last_event = self.env.step(action="MoveLeft", moveMagnitude=0.5)
         elif action_index == 5:  # Rotate clockwise by 90 degrees
             self._last_event = self.env.step(action="RotateRight", degrees=90)
         elif action_index == 6:  # Rotate counterclockwise by 90 degrees
@@ -361,6 +360,7 @@ class NavigationEnv(BaseEnv):
                 reward=self.reward,
                 done=self.measure_success()[0],
                 instruction=self.episode_language_instruction,
+                env_feedback=self.info["env_feedback"]
             ) + "\n" + format_prompt_text
         
         return {
@@ -384,10 +384,8 @@ class NavigationEnv(BaseEnv):
             add_example=True  # Always true for system prompt
         )
         
-        if self.config.render_mode == "vision":
-            return system_prompt_vision() + '\n' + format_prompt_text
-        else:
-            return system_prompt() + '\n' + format_prompt_text
+    
+        return system_prompt() + '\n' + format_prompt_text
     
     def compute_reward(self):
         """Compute the total reward for the episode.
@@ -409,7 +407,7 @@ if __name__ == "__main__":
     env = NavigationEnv(config)
     print(env.system_prompt())
     
-    obs, info = env.reset(seed=0)
+    obs, info = env.reset(seed=3)
     print(obs["obs_str"])
     i = 0
     os.makedirs("./test_navigation", exist_ok=True)

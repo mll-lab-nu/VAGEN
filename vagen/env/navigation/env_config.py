@@ -11,7 +11,7 @@ class NavigationEnvConfig(BaseEnvConfig):
     fov: int = 100
     multiview: bool = False
     render_mode: str= 'vision'
-    max_actions_per_step: int = 10
+    max_actions_per_step: int = 5
     max_action_penalty: float = -0.1
     format_reward: float = 0.5
     gpu_device: int = 0
