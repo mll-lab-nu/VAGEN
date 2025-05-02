@@ -7,7 +7,7 @@ export PYTHONHASHSEED=0
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # run 
-# python -m vagen.server.server
+# python -m vagen.server.server server.port=5001
 # in a tmux session first
 
 # Extract experiment name from the path
