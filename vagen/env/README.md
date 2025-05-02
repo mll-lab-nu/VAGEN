@@ -40,8 +40,8 @@ python vagen/env/navigation/startx.py 1
 ### PrimitiveSkill
 ```
 pip install --upgrade mani_skill
-python -m mani_skill.utils.download_asset "PickSingleYCB-v1"
-python -m mani_skill.utils.download_asset partnet_mobility_cabinet
+python -m mani_skill.utils.download_asset "PickSingleYCB-v1" -y
+python -m mani_skill.utils.download_asset partnet_mobility_cabinet -y
 
 # Refer to https://github.com/haosulab/ManiSkill, probably you also need:
 sudo apt-get update && sudo apt-get install -y libx11-6
