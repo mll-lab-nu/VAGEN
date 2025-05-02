@@ -22,7 +22,7 @@ class PutAppleInDrawerEnv(BaseEnv):
     SUPPORTED_ROBOTS = ["panda", "xmate3_robotiq", "fetch"]
     agent: Union[Panda, Xmate3Robotiq, Fetch]
     vlm_info_keys=["drawer_open_value"]
-    state_keys=["apple_position", "drawer_position"]
+    state_keys=["apple_positionition", "drawer_position"]
     # Asset configuration and constants
     DRAWER_ASSET_ID = "partnet_mobility_cabinet"
     handle_types = ["prismatic"]  # We are interested in prismatic joints (drawers)
@@ -164,13 +164,13 @@ class PutAppleInDrawerEnv(BaseEnv):
         
         def stage1_success(info):
             # Check if apple is in drawer
-            abs_diff_xy = torch.abs(info["apple_pos"][:2] - info["drawer_position"][:2])
+            abs_diff_xy = torch.abs(info["apple_position"][:2] - info["drawer_position"][:2])
 
             # Check if x and y differences are within tolerance
             within_xy = (abs_diff_xy <= 0.1).all(dim=-1)
 
             # Check if z position is within valid range
-            within_z = (info["apple_pos"][2] >= 0.1) & (info["apple_pos"][2] <= 0.4)
+            within_z = (info["apple_position"][2] >= 0.1) & (info["apple_position"][2] <= 0.4)
 
             # Combine conditions
             is_apple_in_drawer = within_xy & within_z
@@ -178,13 +178,13 @@ class PutAppleInDrawerEnv(BaseEnv):
 
         def stage2_success(info):
             # Check if apple is in drawer
-            abs_diff_xy = torch.abs(info["apple_pos"][:2] - info["drawer_position"][:2])
+            abs_diff_xy = torch.abs(info["apple_position"][:2] - info["drawer_position"][:2])
 
             # Check if x and y differences are within tolerance
             within_xy = (abs_diff_xy <= 0.1).all(dim=-1)
 
             # Check if z position is within valid range
-            within_z = (info["apple_pos"][2] >= 0.1) & (info["apple_pos"][2] <= 0.4)
+            within_z = (info["apple_position"][2] >= 0.1) & (info["apple_position"][2] <= 0.4)
 
             # Combine conditions
             is_apple_in_drawer = within_xy & within_z

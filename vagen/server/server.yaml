@@ -13,7 +13,7 @@ svg:
   model_size: "small"
 navigation:
   max_workers: 48
-  devices: [0,1,2,3,4,5,6,7]
+  devices: [0,1,2,4,5,6,7]
 primitive_skill:
   max_workers: 48
 

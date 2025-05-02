@@ -23,17 +23,17 @@ Hints:
 
 Example:
 Round 1:
-<image>
+image_1
 Reasoning: I can see the garbage can in the upper left corner of the image, next to the kitchen sink. To move there, we can go forward-left, but since there's a kitchen counter directly ahead, we should go left first. Following the strategy, I can go by first moving leftward.
 Actions: moveleft, moveleft
 Round 2:
 Env_feedback: Last action is executed successfully.
-<image>
+image_2
 Reasoning: From the secene, I see that by moving leftward, we are getting closer to the garbage can. Now, the garbage can is in front of me, slightly to the left. And there's a large area ahead of us. Following the strategy, I can go by first moving forward then moving leftward.
 Actions: moveahead, moveahead,moveahead,moveleft
 Round 3:
 Env_feedback: Last action is executed successfully.
-<image>
+image_3
 Reasoning: From the image we can see the garbage can is very close to us, still to our front-left. Moving leftward might be blocked but i can see that there is still space in front of me to get closer to the garbage can. Following the strategy, we can take about two steps forward then one step left to reach the garbage can.
 Actions: moveahead, moveahead,moveleft
 Round 4:
