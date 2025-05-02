@@ -9,7 +9,8 @@ from vagen.env.svg.score import calculate_total_score, calculate_total_score_bat
 from vagen.env.svg.svg_utils import process_and_rasterize_svg, is_valid_svg
 from vagen.env.utils.context_utils import parse_llm_raw_response, convert_numpy_to_PIL
 from .service_config import SVGServiceConfig
-
+from vagen.env.svg.svg_utils import (process_and_rasterize_svg, is_valid_svg, load_svg_dataset)
+import os
 class SVGService(BaseService):
     """
     Service class for SVG environments.
@@ -30,6 +31,9 @@ class SVGService(BaseService):
         self.environments = {}
         self.env_configs = {}
         self.cache = {}
+        self.script_dir = os.path.dirname(os.path.abspath(__file__))
+        self.dataset = {}
+        
         
         # Load the DINO model directly in the service
         # This allows all environments to share the same model instance
@@ -43,6 +47,17 @@ class SVGService(BaseService):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         print(f"SVGService initialized with {self.max_workers} workers, model_size={self.model_size}, device={self.device}")
     
+    def _config_to_env_config(self, config):
+        env_config_dict = config.get('env_config', {})
+        env_config = SvgEnvConfig(**env_config_dict)
+        data_dir= os.path.join(self.script_dir, self.config.get("data_dir", ""))
+        dataset_name = env_config.dataset_name
+        split = env_config.get("split", "train")
+        return {
+            "dataset_id":"-".join([str(data_dir), str(dataset_name), str(split)]),
+            "config": env_config,
+        }
+    
     def create_environments_batch(self, ids2configs: Dict[Any, Any]) -> None:
         """
         Create multiple SVG environments in parallel.
@@ -51,19 +66,21 @@ class SVGService(BaseService):
             ids2configs: A dictionary where each key is an environment ID and the corresponding
                         value is the configuration for that environment.
         """
-        def create_single_env(env_id, config):
-            env_name = config.get('env_name', 'svg')
-            if env_name != 'svg':
-                return env_id, None, f"Expected environment type 'SVG', got '{env_name}'"
-            
-            # Get SVG specific configuration
-            env_config_dict = config.get('env_config', {})
-            
-            # Create environment config
-            env_config = SvgEnvConfig(**env_config_dict)
-                            
-            # Create environment
-            env = SVGEnv(env_config)
+        id_to_env_config = {}
+        for env_id, config in ids2configs.items():
+            rst=self._config_to_env_config(config)
+            dataset_id=rst["dataset_id"]
+            env_config=rst["config"]
+            if dataset_id not in self.dataset:
+                self.dataset[dataset_id]=load_svg_dataset(
+                    data_dir=os.path.join(self.script_dir,env_config.get("data_dir", "")), 
+                    dataset_name=env_config.dataset_name,
+                    split=env_config.get("split", "train")
+                )
+            id_to_env_config[env_id] = (env_config,dataset_id)
+                
+        def create_single_env(env_id, env_config,dataset):
+            env = SVGEnv(env_config,dataset)
             
             return env_id, (env, env_config), None
         
@@ -71,8 +88,8 @@ class SVGService(BaseService):
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             # Submit all environment creation tasks
             futures = {
-                executor.submit(create_single_env, env_id, config): env_id 
-                for env_id, config in ids2configs.items()
+                executor.submit(create_single_env, k, v[0],self.dataset[v[1]]): env_id 
+                for k, v in id_to_env_config.items()
             }
             
             # Process results as they complete
