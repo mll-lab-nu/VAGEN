@@ -79,7 +79,7 @@ python3 -m vagen.trainer.main_ppo \
     rollout_manager.use_loss_mask=True \
     rollout_manager.use_gae_mask=True \
     trainer.val_before_train=True \
-    trainer.val_generations_to_log_to_wandb=4 \
+    trainer.val_generations_to_log_to_wandb=8 \
     rollout_manager.n_trajectory=1 \
     rollout_manager.use_service=True \
     rollout_manager.timeout=240 \

@@ -12,7 +12,7 @@ from .prompt import system_prompt,init_observation_template, action_template, fo
 
 class NavigationEnv(BaseEnv):
     """Navigation environment from embodied bench. """   
-    SUCCESS_THRESHOLD = 2
+    SUCCESS_THRESHOLD = 1.5
 
     ValidEvalSets = [
         'base', 'common_sense', 'complex_instruction', 'visual_appearance', 'long_horizon'
