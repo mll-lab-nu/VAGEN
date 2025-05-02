@@ -40,7 +40,7 @@ Reasoning: Now the red cube is on the green cube, so I need to pick up the yello
 Anwer: pick(-44,100,20)|place(100,-43,50)
 """
 
-def init_observation_template(observation, instruction, x_workspace, y_workspace, z_workspace, object_positions, other_information,object_names):
+def init_observation_template(observation, instruction, x_workspace, y_workspace, z_workspace, object_positions, other_information,object_names=None):
     return f"""
 [Initial Observation]:
 {observation}
@@ -54,7 +54,7 @@ Other information:
 {other_information}
 Decide your next action(s)."""
 
-def action_template(valid_actions, observation, instruction, x_workspace, y_workspace, z_workspace, object_positions, other_information,object_names):
+def action_template(valid_actions, observation, instruction, x_workspace, y_workspace, z_workspace, object_positions, other_information,object_names=None):
     
     return f"""After your answer, the extracted valid action(s) is {valid_actions}.
 After that, the observation is:
