@@ -137,7 +137,8 @@ class CrossViewEnv(BaseEnv):
     def system_prompt(self) -> str:
         return """You are an AI assistant that answers visual questions based on images.
 Given images and a question, first give your thought then answer.
-Your answer should be in the format of <think>...</think><answer>...</answer>."""
+Your answer should be in the format of <think>...</think><answer>...</answer>.
+e.g. <think>I can see there're multiple images with different view. I can see from the second view the object is on the target's left.I think the correct answer is A</think><answer>A</answer>"""
     
     def compute_reward(self) -> float:
         """Return the total reward accumulated so far"""
