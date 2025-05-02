@@ -11,7 +11,9 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 EXPERIMENT_NAME=$(echo $SCRIPT_DIR | rev | cut -d'/' -f1-3 | rev | tr '/' '-')
 
 echo "Experiment name: $EXPERIMENT_NAME"
-# run python -m vagen.server.server in a tmux session first
+# run 
+# python -m vagen.server.server server.port=5000 
+# in a tmux session first
 python -m vagen.env.create_dataset \
     --yaml_path "$SCRIPT_DIR/env_config.yaml" \
     --train_path "data/$EXPERIMENT_NAME/train.parquet" \
@@ -25,9 +27,10 @@ python3 -m vagen.trainer.main_ppo \
     data.train_files=data/$EXPERIMENT_NAME/train.parquet \
     data.val_files=data/$EXPERIMENT_NAME/test.parquet \
     data.train_batch_size=128 \
+    data.val_batch_size=8 \
     data.max_prompt_length=1024 \
-    data.max_response_length=648 \
-    data.max_trajectory_length=2600 \
+    data.max_response_length=150 \
+    data.max_trajectory_length=4000 \
     data.image_key=images \
     data.truncation=error \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \
@@ -39,10 +42,10 @@ python3 -m vagen.trainer.main_ppo \
     actor_rollout_ref.actor.kl_loss_coef=0.001 \
     actor_rollout_ref.actor.kl_loss_type=mse \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
-    actor_rollout_ref.actor.fsdp_config.param_offload=False \
-    actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
+    actor_rollout_ref.actor.fsdp_config.param_offload=True \
+    actor_rollout_ref.actor.fsdp_config.optimizer_offload=True \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \
-    actor_rollout_ref.rollout.tensor_model_parallel_size=2 \
+    actor_rollout_ref.rollout.tensor_model_parallel_size=4 \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.1 \
     actor_rollout_ref.rollout.enable_chunked_prefill=False \
@@ -70,8 +73,8 @@ python3 -m vagen.trainer.main_ppo \
     trainer.save_freq=90 \
     trainer.test_freq=20 \
     trainer.total_training_steps=200 \
-    rollout_manager.max_turns=2 \
-    rollout_manager.window_size=3 \
+    rollout_manager.max_turns=5 \
+    rollout_manager.window_size=5 \
     rollout_manager.use_multi_turn_reward=False \
     rollout_manager.use_loss_mask=True \
     rollout_manager.use_gae_mask=True \
@@ -79,4 +82,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.val_generations_to_log_to_wandb=8 \
     rollout_manager.n_trajectory=1 \
     rollout_manager.use_service=True \
+    rollout_manager.timeout=240 \
+    +rollout_manager.mini_batch_size=64 \
+    rollout_manager.base_url="http://localhost:5000" \
     2>&1 | tee $EXPERIMENT_NAME.log
