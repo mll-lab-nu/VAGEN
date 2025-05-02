@@ -999,7 +999,7 @@ class RayPPOTrainer(object):
                                                     prefix=logging_prefix)
         metrics.update(global_balance_stats)
 
-    def _process_in_mini_batches(batch, rollout_manager, mini_batch_size):
+    def _process_in_mini_batches(self,batch, rollout_manager, mini_batch_size):
         """
         Process the batch in mini-batches.
         
