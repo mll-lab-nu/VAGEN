@@ -27,10 +27,10 @@ python3 -m vagen.trainer.main_ppo \
     data.train_files=data/$EXPERIMENT_NAME/train.parquet \
     data.val_files=data/$EXPERIMENT_NAME/test.parquet \
     data.train_batch_size=64 \
-    data.val_batch_size=16 \
+    data.val_batch_size=8 \
     data.max_prompt_length=1024 \
-    data.max_response_length=256 \
-    data.max_trajectory_length=3800 \
+    data.max_response_length=150 \
+    data.max_trajectory_length=4000 \
     data.image_key=images \
     data.truncation=error \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \
@@ -42,12 +42,12 @@ python3 -m vagen.trainer.main_ppo \
     actor_rollout_ref.actor.kl_loss_coef=0.001 \
     actor_rollout_ref.actor.kl_loss_type=mse \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
-    actor_rollout_ref.actor.fsdp_config.param_offload=False \
-    actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
+    actor_rollout_ref.actor.fsdp_config.param_offload=True \
+    actor_rollout_ref.actor.fsdp_config.optimizer_offload=True \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \
     actor_rollout_ref.rollout.tensor_model_parallel_size=4 \
     actor_rollout_ref.rollout.name=vllm \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.3 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.1 \
     actor_rollout_ref.rollout.enable_chunked_prefill=False \
     actor_rollout_ref.rollout.enforce_eager=False \
     actor_rollout_ref.rollout.free_cache_engine=False \
@@ -83,5 +83,5 @@ python3 -m vagen.trainer.main_ppo \
     rollout_manager.n_trajectory=1 \
     rollout_manager.use_service=True \
     rollout_manager.timeout=240 \
-    rollout_manager.base_url="http://localhost:5001" \
+    rollout_manager.base_url="http://localhost:5000" \
     2>&1 | tee $EXPERIMENT_NAME.log

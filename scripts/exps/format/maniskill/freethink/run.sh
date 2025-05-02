@@ -16,7 +16,7 @@ EXPERIMENT_NAME=$(echo $SCRIPT_DIR | rev | cut -d'/' -f1-3 | rev | tr '/' '-')
 
 echo "Experiment name: $EXPERIMENT_NAME"
 # run 
-# python -m vagen.server.server server.port=5001 
+# python -m vagen.server.server server.port=5001
 # in a tmux session first
 python -m vagen.env.create_dataset \
     --yaml_path "$SCRIPT_DIR/env_config.yaml" \
@@ -33,8 +33,8 @@ python3 -m vagen.trainer.main_ppo \
     data.train_batch_size=64 \
     data.val_batch_size=32 \
     data.max_prompt_length=1024 \
-    data.max_response_length=256 \
-    data.max_trajectory_length=3000 \
+    data.max_response_length=150 \
+    data.max_trajectory_length=4000 \
     data.image_key=images \
     data.truncation=error \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \
@@ -46,8 +46,8 @@ python3 -m vagen.trainer.main_ppo \
     actor_rollout_ref.actor.kl_loss_coef=0.001 \
     actor_rollout_ref.actor.kl_loss_type=mse \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
-    actor_rollout_ref.actor.fsdp_config.param_offload=False \
-    actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
+    actor_rollout_ref.actor.fsdp_config.param_offload=True \
+    actor_rollout_ref.actor.fsdp_config.optimizer_offload=True \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \
     actor_rollout_ref.rollout.tensor_model_parallel_size=4 \
     actor_rollout_ref.rollout.name=vllm \
@@ -77,8 +77,8 @@ python3 -m vagen.trainer.main_ppo \
     trainer.save_freq=90 \
     trainer.test_freq=20 \
     trainer.total_training_steps=200 \
-    rollout_manager.max_turns=3 \
-    rollout_manager.window_size=3 \
+    rollout_manager.max_turns=4 \
+    rollout_manager.window_size=4 \
     rollout_manager.use_multi_turn_reward=False \
     rollout_manager.use_loss_mask=True \
     rollout_manager.use_gae_mask=True \
@@ -87,5 +87,5 @@ python3 -m vagen.trainer.main_ppo \
     rollout_manager.n_trajectory=2 \
     rollout_manager.use_service=True \
     rollout_manager.timeout=240 \
-    rollout_manager.base_url="http://localhost:5000" \
+    rollout_manager.base_url="http://localhost:5001" \
     2>&1 | tee $EXPERIMENT_NAME.log

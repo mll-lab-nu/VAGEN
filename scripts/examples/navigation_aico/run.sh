@@ -78,5 +78,5 @@ python3 -m vagen.trainer.main_ppo \
     rollout_manager.n_trajectory=1 \
     rollout_manager.use_service=True \
     rollout_manager.timeout=240 \
-    rollout_manager.base_url="http://localhost:5001" \
+    rollout_manager.base_url="http://localhost:5000" \
     2>&1 | tee aico_navigation_vision.log
