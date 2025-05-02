@@ -36,10 +36,10 @@ class SVGEnv(BaseEnv):
         """
         BaseEnv.__init__(self)
         self.config = config
-        
+        self.script_dir = os.path.dirname(os.path.abspath(__file__))
         # Load the actual SVG dataset
         self.dataset = load_svg_dataset(
-            data_dir=self.config.get("data_dir", ""), 
+            data_dir=os.path.join(self.script_dir,self.config.get("data_dir", "")), 
             dataset_name=self.config.dataset_name,
             split=self.config.get("split", "train")
         )
