@@ -1,0 +1,17 @@
+from vagen.env.base.base_env_config import BaseEnvConfig
+from dataclasses import dataclass, fields,field
+from typing import Optional, List, Union
+
+@dataclass
+class CrossViewEnvConfig(BaseEnvConfig):
+    data_path: str = "crossviewQA_train_qwenformat_singleletter.json"
+    image_dir: str = "extracted_images"
+    image_size: tuple = (300, 300)
+    render_mode: str = "vision"
+    
+    def config_id(self) -> str:
+        return f"CrossViewQAEnv"
+    
+if __name__ == "__main__":
+    config = CrossViewEnvConfig()
+    print(config.config_id())

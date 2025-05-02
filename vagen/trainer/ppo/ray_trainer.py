@@ -999,6 +999,52 @@ class RayPPOTrainer(object):
                                                     prefix=logging_prefix)
         metrics.update(global_balance_stats)
 
+    def _process_in_mini_batches(batch, rollout_manager, mini_batch_size):
+        """
+        Process the batch in mini-batches.
+        
+        Args:
+            batch: DataProto containing the data
+            rollout_manager: Manager for rollout operations
+            mini_batch_size: Size of each mini-batch to process
+        
+        Returns:
+            Tuple of (final_combined_batch_output, combined_rst)
+        """
+        batch_size = len(batch)
+        num_mini_batches = (batch_size + mini_batch_size - 1) // mini_batch_size  # Ceiling division
+        
+        all_final_gen_batch_outputs = []
+        all_rst = []
+        
+        for i in range(num_mini_batches):
+            start_idx = i * mini_batch_size
+            end_idx = min((i + 1) * mini_batch_size, batch_size)
+            actual_mini_batch_size = end_idx - start_idx
+            print(f"Processing mini-batch {i+1}/{num_mini_batches}, size: {actual_mini_batch_size}")
+            
+            # Extract env_configs for this mini-batch
+            mini_batch_env_configs = [
+                batch.non_tensor_batch['extra_info'][j]
+                for j in range(start_idx, end_idx)
+            ]
+            
+            # Reset and process this mini-batch
+            rollout_manager.reset(mini_batch_env_configs)
+            rollout_manager.rollout_loop()
+            mini_batch_output = rollout_manager.generate_batch_for_update()
+            mini_batch_rst = rollout_manager.recording_to_log()
+            
+            # Store results
+            all_final_gen_batch_outputs.append(mini_batch_output)
+            all_rst.extend(mini_batch_rst)  # Extend the list since rst is a list
+        
+       
+            combined_output = DataProto.concat(all_final_gen_batch_outputs)
+       
+        
+        return combined_output, all_rst
+    
     def fit(self):
         """
         The training loop of PPO.
@@ -1065,70 +1111,23 @@ class RayPPOTrainer(object):
                         non_tensor_batch_keys=['raw_prompt_ids'],
                     )
 
-                #VAGEN: original codes
-                # # pop those keys for generation
-                # if 'multi_modal_inputs' in batch.non_tensor_batch.keys():
-                #     gen_batch = batch.pop(
-                #         batch_keys=['input_ids', 'attention_mask', 'position_ids'],
-                #         non_tensor_batch_keys=['raw_prompt_ids', 'multi_modal_data', 'multi_modal_inputs'],
-                #     )
-                # else:
-                #     gen_batch = batch.pop(
-                #         batch_keys=['input_ids', 'attention_mask', 'position_ids'],
-                #         non_tensor_batch_keys=['raw_prompt_ids'],
-                #     )
-
-                # with _timer('step', timing_raw):
-                #     # generate a batch
-                #     with _timer('gen', timing_raw):
-                #         gen_batch_output = self.actor_rollout_wg.generate_sequences(gen_batch)
-
-                # TODO check following codes
-                #     if self.config.algorithm.adv_estimator == AdvantageEstimator.REMAX:
-                #         with _timer('gen_max', timing_raw):
-                #             gen_baseline_batch = deepcopy(gen_batch)
-                #             gen_baseline_batch.meta_info['do_sample'] = False
-                #             gen_baseline_output = self.actor_rollout_wg.generate_sequences(gen_baseline_batch)
-
-                #             batch = batch.union(gen_baseline_output)
-                #             reward_baseline_tensor = self.reward_fn(batch)
-                #             reward_baseline_tensor = reward_baseline_tensor.sum(dim=-1)
-
-                #             batch.pop(batch_keys=list(gen_baseline_output.batch.keys()))
-
-                #             batch.batch['reward_baselines'] = reward_baseline_tensor
-
-                #             del gen_baseline_batch, gen_baseline_output
-
                 
                 # We control vanilla-grpo sampling param here (start from init state s0, sample n_trajectory)
                 batch.non_tensor_batch['uid'] = np.array([str(uuid.uuid4()) for _ in range(len(batch.batch))],dtype=object)
                 batch = batch.repeat(repeat_times=self.config.rollout_manager.n_trajectory, interleave=True)
                 
                     
-                env_configs = [
-                    batch.non_tensor_batch['extra_info'][i]
-                    for i in range(len(batch))
-                ]
-                rollout_manager.reset(env_configs)
+                
 
                 with _timer('step', timing_raw):
                     # generate a batch
                     with _timer('gen', timing_raw):
-                        # gen_batch_output = self.actor_rollout_wg.generate_sequences(gen_batch)
-                        rollout_manager.rollout_loop()
-                        final_gen_batch_output = rollout_manager.generate_batch_for_update()
-                        rst= rollout_manager.recording_to_log() # data source == inputs in our current setting, outputs=whole 
-                        
+                       
+                        mini_batch_size=self.config.rollout_manager.get('mini_batch_size',len(batch))
+                        final_gen_batch_output, rst=self._process_in_mini_batches(batch, rollout_manager, mini_batch_size) 
                         train_metrics=self.log_rst_to_metrics_dict(rst=rst,mode='train')
                         metrics.update(train_metrics)
                     print(f"[DEBUG] step {self.global_steps} rollout ends")
-                    
-                    # VAGEN: This is moved to before rollout because we don't use vllm n sample param for grpo due to multi-turn nature of our method
-                    # batch.non_tensor_batch['uid'] = np.array([str(uuid.uuid4()) for _ in range(len(batch.batch))],
-                    #                                          dtype=object)
-                    # # repeat to align with repeated responses in rollout
-                    # batch = batch.repeat(repeat_times=self.config.actor_rollout_ref.rollout.n, interleave=True)
                     batch = batch.union(final_gen_batch_output)
 
                     # balance the number of valid tokens on each dp rank.
