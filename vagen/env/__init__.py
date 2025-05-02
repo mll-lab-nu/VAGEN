@@ -4,6 +4,7 @@ from .frozenlake import FrozenLakeEnv,FrozenLakeEnvConfig, FrozenLakeService
 # from .svg import SVGEnv, SvgEnvConfig, SVGService, SVGServiceConfig
 # from .primitive_skill import PrimitiveSkillEnv, PrimitiveSkillEnvConfig, PrimitiveSkillService, PrimitiveSkillServiceConfig
 # from .alfworld import ALFWorldEnv, ALFWorldEnvConfig, ALFWorldService, ALFWorldServiceConfig
+# from .crossview import CrossViewEnv, CrossViewEnvConfig
 REGISTERED_ENV = {
     "sokoban": {
         "env_cls": SokobanEnv,
@@ -38,4 +39,7 @@ REGISTERED_ENV = {
     #     "service_cls": ALFWorldService,
     #     "service_config_cls": ALFWorldServiceConfig
     # },
+    # "crossview": {
+    #     "env_cls": CrossViewEnv,
+    #     "config_cls": CrossViewEnvConfig,
 }
