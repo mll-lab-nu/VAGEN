@@ -80,6 +80,7 @@ python vagen/server/server.py
 cd vagen/env/crossview
 git clone https://huggingface.co/datasets/yinbq/CrossViewQA
 cd CrossViewQA
+git lfs pull
 mkdir -p extracted_images
 unzip other_all_image.zip -d extracted_images
 
