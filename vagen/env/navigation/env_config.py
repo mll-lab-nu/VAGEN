@@ -15,6 +15,9 @@ class NavigationEnvConfig(BaseEnvConfig):
     max_action_penalty: float = -0.1
     format_reward: float = 0.5
     gpu_device: int = 0
+    prompt_format: str = "free_think" 
+    # "free_think", "no_think", "grounding", "worldmodeling", "grounding_worldmodeling"
+    use_accuracy_reward: bool = False
 
     def config_id(self) -> str:
         """Generate a unique identifier for this configuration."""

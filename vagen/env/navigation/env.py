@@ -3,18 +3,17 @@ import ai2thor.controller
 import numpy as np
 import time
 import math
-import re
 from ai2thor.platform import CloudRendering
 from typing import Dict, List, Tuple, Optional, Any
 from vagen.env.utils.env_utils import NoLoggerWarnings, set_seed
 from vagen.env.utils.context_utils import parse_llm_raw_response, convert_numpy_to_PIL
+from vagen.env.utils.parse_utils import parse_function_map
 from .env_config import NavigationEnvConfig
-from .prompt import system_prompt_text, system_prompt_vision, init_observation_template, action_template
+from .prompt import system_prompt, system_prompt_vision, init_observation_template, action_template, format_prompt
 
 
 class NavigationEnv(BaseEnv):
-    """Navigation environment based on AI2-THOR."""
-    
+    """Navigation environment from embodied bench. """   
     SUCCESS_THRESHOLD = 1
 
     ValidEvalSets = [
@@ -49,7 +48,8 @@ class NavigationEnv(BaseEnv):
         """Initialize the Navigation environment.
         
         Args:
-            config: Configuration for the environment
+            config: Configuration for the environment including resolution, FOV,
+                   eval set, render mode, etc.
         """
         super().__init__()
         self.config = config
@@ -70,12 +70,7 @@ class NavigationEnv(BaseEnv):
         }
         
         # Initialize AI2-THOR controller
-        # try:
         self.env = ai2thor.controller.Controller(**self.thor_config)
-        # except Exception as e:
-        #     print(f"Error initializing AI2-THOR: {e}")
-        #     import traceback
-        #     traceback.print_exc()
         
         # Load dataset
         assert config.eval_set in self.ValidEvalSets
@@ -98,6 +93,14 @@ class NavigationEnv(BaseEnv):
         self.multiview = config.multiview
         self.img_paths = []
         self.total_reward = 0
+        self.valid_actions = []
+        self.reward = 0
+        
+        # Store the format prompt function for later use
+        self.format_prompt_func = format_prompt[self.config.prompt_format]
+        
+        # Get the parse function based on the prompt format
+        self.parse_func = parse_function_map[self.config.prompt_format]
         
     def _get_dataset_path(self, eval_set):
         """Get the path to the dataset file."""
@@ -118,13 +121,18 @@ class NavigationEnv(BaseEnv):
     def reset(self, seed=None):
         """Reset the environment to a new episode.
         
+        This method resets the AI2-THOR environment and initializes a new episode
+        based on the dataset. If a seed is provided, it ensures deterministic
+        episode selection.
+        
         Args:
             seed: Random seed for reproducibility
             
         Returns:
             Observation dict, info dict
         """
-        # Reset the environment
+        # Reset the environment with the proper seed
+        
         idx = seed % self.number_of_episodes if seed is not None else 0
         
         # Get the trajectory data
@@ -173,12 +181,19 @@ class NavigationEnv(BaseEnv):
         self._episode_start_time = time.time()
         self.img_paths = []
         self.total_reward = 0
-        
+        self.valid_actions = []
+        self.reward = 0
         
         return self._render(init_obs=True), {}
     
     def step(self, action_str: str):
         """Execute an action in the environment.
+        
+        This method:
+        1. Parses the raw LLM response to extract actions
+        2. Executes each valid action in sequence
+        3. Calculates rewards and metrics
+        4. Generates the next observation
         
         Args:
             action_str: Raw text response from LLM
@@ -187,7 +202,7 @@ class NavigationEnv(BaseEnv):
             Observation, reward, done, info
         """
         # Process the LLM response to extract actions
-        rst = parse_llm_raw_response(
+        rst = self.parse_func(
             response=action_str,
             special_token_list=self.config.get('special_token_list', None),
             action_sep=self.config.get('action_sep', ','),
@@ -215,7 +230,9 @@ class NavigationEnv(BaseEnv):
         
         # Execute valid actions
         if metrics["turn_metrics"]["action_is_valid"]:
-            self.reward += self.config.format_reward
+            # Add format reward if actions were valid and format is correct
+            if rst.get("format_correct", True):
+                self.reward += self.config.format_reward
             
             for action in action_list:
                 action_lower = action.lower()
@@ -226,7 +243,6 @@ class NavigationEnv(BaseEnv):
                     
                     # Update reward based on success
                     if success:
-                        # Success reward is handled in the measure_success method
                         self.reward += 10.0  # Success reward
                         done = True
                         metrics['traj_metrics']['success'] = True
@@ -305,6 +321,10 @@ class NavigationEnv(BaseEnv):
     def _render(self, init_obs=False):
         """Render the environment observation.
         
+        This method creates either a text representation or an image of the environment
+        state, depending on the configured render mode. It formats the observation string
+        based on whether this is the initial observation or a subsequent one.
+        
         Args:
             init_obs: Whether this is the initial observation
             
@@ -312,6 +332,13 @@ class NavigationEnv(BaseEnv):
             Observation dict
         """
         img_placeholder = self.config.get("image_placeholder", "<image>")
+        
+        # Get format prompt without examples for action/init templates
+        format_prompt_text = self.format_prompt_func(
+            max_actions_per_step=self.config.max_actions_per_step,
+            action_sep=self.config.action_sep,
+            add_example=False  # No examples for action and init obs
+        )
         
         # Get the RGB frame from the environment
         frame = self.env.last_event.frame
@@ -323,18 +350,18 @@ class NavigationEnv(BaseEnv):
         
         # Format the template
         if init_obs:
-            obs_str = init_observation_template.format(
+            obs_str = init_observation_template(
                 observation=img_placeholder,
                 instruction=self.episode_language_instruction,
-            )
+            ) + "\n" + format_prompt_text
         else:
-            obs_str = action_template.format(
+            obs_str = action_template(
                 valid_action=self.valid_actions,
                 observation=img_placeholder,
                 reward=self.reward,
                 done=self.measure_success()[0],
                 instruction=self.episode_language_instruction,
-            )
+            ) + "\n" + format_prompt_text
         
         return {
             "obs_str": obs_str,
@@ -344,19 +371,23 @@ class NavigationEnv(BaseEnv):
     def system_prompt(self):
         """Get the system prompt for the environment.
         
+        Returns a prompt explaining the environment to the LLM agent,
+        with different prompts for text and vision modes.
+        
         Returns:
             System prompt string
         """
+        # Get format prompt with examples for system prompt
+        format_prompt_text = self.format_prompt_func(
+            max_actions_per_step=self.config.max_actions_per_step,
+            action_sep=self.config.action_sep,
+            add_example=True  # Always true for system prompt
+        )
+        
         if self.config.render_mode == "vision":
-            return system_prompt_vision.format(
-                max_actions_per_step=self.config.max_actions_per_step,
-                action_sep=self.config.action_sep
-            )
+            return system_prompt_vision() + '\n' + format_prompt_text
         else:
-            return system_prompt_text.format(
-                max_actions_per_step=self.config.max_actions_per_step,
-                action_sep=self.config.action_sep
-            )
+            return system_prompt() + '\n' + format_prompt_text
     
     def compute_reward(self):
         """Compute the total reward for the episode.
@@ -385,7 +416,6 @@ if __name__ == "__main__":
     img = obs["multi_modal_data"][config.image_placeholder][0]
     img.save(f"./test_navigation/navigation_{i}.png")
     done = False
-    
     
     # Interactive testing loop
     while not done:
