@@ -34,7 +34,7 @@ python3 -m vagen.trainer.main_ppo \
     data.val_batch_size=32 \
     data.max_prompt_length=1024 \
     data.max_response_length=150 \
-    data.max_trajectory_length=4000 \
+    data.max_trajectory_length=3600 \
     data.image_key=images \
     data.truncation=error \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \
@@ -77,8 +77,8 @@ python3 -m vagen.trainer.main_ppo \
     trainer.save_freq=90 \
     trainer.test_freq=20 \
     trainer.total_training_steps=200 \
-    rollout_manager.max_turns=4 \
-    rollout_manager.window_size=4 \
+    rollout_manager.max_turns=3 \
+    rollout_manager.window_size=3 \
     rollout_manager.use_multi_turn_reward=False \
     rollout_manager.use_loss_mask=True \
     rollout_manager.use_gae_mask=True \
