@@ -41,5 +41,6 @@ REGISTERED_ENV = {
     # },
     # "crossview": {
     #     "env_cls": CrossViewEnv,
-    #     "config_cls": CrossViewEnvConfig,
+    #     "config_cls": CrossViewEnvConfig
+    # }
 }
