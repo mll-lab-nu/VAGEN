@@ -74,6 +74,15 @@ python vagen/env/alfworld/startx.py 0
 python vagen/server/server.py
 ```
 
+
+
+### crossview
+cd vagen/env/crossview
+git clone https://huggingface.co/datasets/yinbq/CrossViewQA
+cd CrossViewQA
+mkdir -p extracted_images
+unzip other_all_image.zip -d extracted_images
+
 ## Benchmark your Env and Service
 env/service running time varies on different devices, you can benchmark current env/service or debug your own env/service as follow:
 ### Start a env benchmark

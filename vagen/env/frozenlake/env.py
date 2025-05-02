@@ -180,12 +180,10 @@ class FrozenLakeEnv(BaseEnv):
         if metrics["turn_metrics"]['action_is_valid'] and rst["format_correct"]:
             self.reward += self.config.format_reward
         
-        # Add metrics to info dictionary
-        info["metrics"] = metrics
         
         # Check if position changed to determine if action was effective
         metrics["turn_metrics"]['action_is_effective'] = not np.array_equal(prev_player_position, self._get_player_position())
-        
+        info["metrics"] = metrics
         # Update total reward for the episode
         self.total_reward += self.reward
         

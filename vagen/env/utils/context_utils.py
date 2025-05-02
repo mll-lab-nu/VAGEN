@@ -18,6 +18,8 @@ def parse_llm_raw_response(response: str,special_token_list=None,action_sep=',',
 
     pattern = r'<think>(.*?)</think>\s*<answer>(.*?)</answer>'
     match = re.search(pattern, response, re.DOTALL)
+    format_correct = match is not None
+    
     if not match:
         think_content, action_content, actions = "", "", []
     else:
@@ -38,6 +40,7 @@ def parse_llm_raw_response(response: str,special_token_list=None,action_sep=',',
         "think_content": think_content,
         "action_content": action_content,
         "actions": actions,
+        "format_correct": format_correct,
     }
 
 
