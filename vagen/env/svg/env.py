@@ -28,7 +28,7 @@ class SVGEnv(BaseEnv):
     reproduces the image as accurately as possible.
     """
     
-    def __init__(self, config: SvgEnvConfig):
+    def __init__(self, config: SvgEnvConfig,dataset):
         """Initialize the SVG environment.
         
         Args:
@@ -36,13 +36,8 @@ class SVGEnv(BaseEnv):
         """
         BaseEnv.__init__(self)
         self.config = config
-        self.script_dir = os.path.dirname(os.path.abspath(__file__))
+
         # Load the actual SVG dataset
-        self.dataset = load_svg_dataset(
-            data_dir=os.path.join(self.script_dir,self.config.get("data_dir", "")), 
-            dataset_name=self.config.dataset_name,
-            split=self.config.get("split", "train")
-        )
         
         # Initialize state variables
         self.total_reward = 0
@@ -55,7 +50,7 @@ class SVGEnv(BaseEnv):
         self.gen_svg_code = None
         self.gen_image = None
         self.dino_model = None
-        
+        self.dataset = dataset
         # Store the format prompt function for later use
         self.format_prompt_func = format_prompt[self.config.get('prompt_format', 'free_think')]
         

@@ -18,7 +18,7 @@ python3 -m vagen.trainer.main_ppo \
     algorithm.high_level_gamma=0.95 \
     data.train_files=data/crossview/train.parquet \
     data.val_files=data/crossview/test.parquet \
-    data.train_batch_size=16 \
+    data.train_batch_size=64 \
     data.max_prompt_length=1024 \
     data.max_response_length=648 \
     data.max_trajectory_length=3600 \
