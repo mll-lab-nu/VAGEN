@@ -1,0 +1,9 @@
+svg-vision:
+  env_name: svg
+  env_config:
+    split: train
+    dino_weight: 1.0
+    structural_weight: 1.0
+    dreamsim_weight: 1.0
+  train_size: 1000
+  test_size: 64

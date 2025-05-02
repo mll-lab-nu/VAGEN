@@ -19,6 +19,10 @@ class SvgEnvConfig(BaseEnvConfig):
     # Reward configuration
     format_reward: float = 0.5
     format_penalty: float = 0.0
+    # Prompt configuration
+    prompt_format: str = "free_think" 
+    # "free_think", "no_think", "grounding", "worldmodeling", "grounding_worldmodeling"
+    use_accuracy_reward: bool = False
     
     def config_id(self) -> str:
         """Generate a unique identifier for this configuration"""

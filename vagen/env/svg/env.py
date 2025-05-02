@@ -2,8 +2,14 @@ from vagen.env.base.base_env import BaseEnv
 from vagen.env.svg.svg_utils import (process_and_rasterize_svg, is_valid_svg, load_svg_dataset)
 from vagen.env.svg.score import calculate_total_score
 from vagen.env.utils.context_utils import parse_llm_raw_response, convert_numpy_to_PIL
+from vagen.env.utils.parse_utils import parse_function_map
 from .env_config import SvgEnvConfig
-from .prompt import system_prompt, init_observation_template, action_template
+from .prompt import (
+    system_prompt,
+    init_observation_template,
+    action_template,
+    format_prompt
+)
 
 import os
 import re
@@ -16,14 +22,27 @@ from pathlib import Path
 from datasets import Dataset
 
 class SVGEnv(BaseEnv):
+    """SVG environment for training and evaluating language models to generate SVG code.
+    
+    This environment provides an image and asks the LLM to generate SVG code that
+    reproduces the image as accurately as possible.
+    """
+    
     def __init__(self, config: SvgEnvConfig):
+        """Initialize the SVG environment.
+        
+        Args:
+            config: Configuration for the environment
+        """
         BaseEnv.__init__(self)
         self.config = config
         
         # Load the actual SVG dataset
-        self.dataset = load_svg_dataset(data_dir = self.config.get("data_dir", ""), 
-                                        dataset_name = self.config.dataset_name,
-                                        split = self.config.get("split", "train"))
+        self.dataset = load_svg_dataset(
+            data_dir=self.config.get("data_dir", ""), 
+            dataset_name=self.config.dataset_name,
+            split=self.config.get("split", "train")
+        )
         
         # Initialize state variables
         self.total_reward = 0
@@ -37,14 +56,26 @@ class SVGEnv(BaseEnv):
         self.gen_image = None
         self.dino_model = None
         
+        # Store the format prompt function for later use
+        self.format_prompt_func = format_prompt[self.config.get('prompt_format', 'free_think')]
+        
+        # Get the parse function based on the prompt format
+        self.parse_func = parse_function_map[self.config.get('prompt_format', 'free_think')]
+        
         # Initialize random number generator
         self.rng = random.Random()
         if hasattr(self.config, "seed") and self.config.seed is not None:
             self.rng.seed(self.config.seed)
     
-
     def reset(self, seed=None) -> Tuple[Dict, Dict]:
-        """Reset the environment with an optional seed"""
+        """Reset the environment with an optional seed.
+        
+        Args:
+            seed: Random seed for reproducibility
+            
+        Returns:
+            Observation dict, info dict
+        """
         # Update seed if provided
         if seed is not None:
             self.rng.seed(seed)
@@ -70,17 +101,26 @@ class SVGEnv(BaseEnv):
         self.reward = 0
         self.gen_svg_code = ""
         self.gen_image = None
+        self.valid_actions = []
         
         return self._render(init_obs=True), {}
 
     def step(self, action_str: str, dino_model=None) -> Tuple[Dict, float, bool, Dict]:
-        """Execute a step in the environment"""
-        # Parse LLM response
-        rst = parse_llm_raw_response(
+        """Execute a step in the environment.
+        
+        Args:
+            action_str: Raw text response from LLM
+            dino_model: Optional DINO model for scoring
+            
+        Returns:
+            Observation, reward, done, info
+        """
+        # Process the LLM response to extract actions
+        rst = self.parse_func(
             response=action_str,
             special_token_list=self.config.get('special_token_list', None),
-            action_sep=self.config.get("action_sep", ","),
-            max_actions=self.config.get("max_actions_per_step", 1)
+            action_sep=self.config.get('action_sep', ','),
+            max_actions=self.config.get('max_actions_per_step', 1)
         )
         
         # Extract SVG code if not found in parsed response
@@ -98,7 +138,7 @@ class SVGEnv(BaseEnv):
         
         metrics = {
             "turn_metrics": {
-                "action_is_valid": rst['actions'] != [],
+                "action_is_valid": len(rst['actions']) > 0,
                 "action_is_effective": False,
             },
             "traj_metrics": {
@@ -123,7 +163,9 @@ class SVGEnv(BaseEnv):
             return self._render(init_obs=False), self.reward, done, info
         else:
             # Valid SVG code - apply format reward and process it
-            self.reward += self.config.format_reward
+            if rst.get("format_correct", True):
+                self.reward += self.config.format_reward
+                
             self.gen_svg_code = rst['actions'][0]
             self.valid_actions = rst['actions']
             
@@ -131,6 +173,7 @@ class SVGEnv(BaseEnv):
                 # Process the generated SVG code
                 _, gen_image = process_and_rasterize_svg(self.gen_svg_code)
                 self.gen_image = gen_image
+                
                 # Calculate score
                 score_config = self.config.get_score_config()
                 scores = calculate_total_score(
@@ -145,6 +188,7 @@ class SVGEnv(BaseEnv):
                 # Set metrics and update reward
                 self.reward += scores["total_score"]
                 info["scores"] = scores
+                
                 # SVG generation is considered effective if score is above threshold
                 metrics["turn_metrics"]["action_is_effective"] = scores["total_score"] > 0
                     
@@ -163,7 +207,14 @@ class SVGEnv(BaseEnv):
         return self._render(init_obs=False), self.reward, done, info
     
     def _extract_svg_code(self, text: str) -> str:
-        """Extract SVG code from text"""
+        """Extract SVG code from text.
+        
+        Args:
+            text: Text containing SVG code
+            
+        Returns:
+            Extracted SVG code or empty string
+        """
         svg_match = re.search(r'<svg.*?</svg>', text, re.DOTALL)
         if svg_match:
             return svg_match.group(0)
@@ -177,21 +228,47 @@ class SVGEnv(BaseEnv):
         return ""
         
     def system_prompt(self) -> str:
-        """Return the system prompt"""
-        return system_prompt
+        """Return the system prompt for the environment.
+        
+        Returns a prompt explaining the environment to the LLM agent,
+        along with the format prompt.
+        
+        Returns:
+            System prompt string
+        """
+        # Get format prompt with examples for system prompt
+        format_prompt_text = self.format_prompt_func(
+            max_actions_per_step=self.config.get('max_actions_per_step', 1),
+            action_sep=self.config.get('action_sep', ','),
+            add_example=True  # Always true for system prompt
+        )
+        
+        return system_prompt() + '\n' + format_prompt_text
         
     def compute_reward(self) -> float:
-        """Return the total reward collected so far"""
+        """Return the total reward collected so far.
+        
+        Returns:
+            Total reward
+        """
         return self.total_reward
         
     def close(self):
-        """Close the environment and clean up resources"""
+        """Close the environment and clean up resources."""
         pass
     
     def _render(self, init_obs=False):
-        """Render the current state of the environment"""
-        multi_modal_data = None
+        """Render the current state of the environment.
         
+        This method creates an observation with the current image and appropriate
+        text prompt.
+        
+        Args:
+            init_obs: Whether this is the initial observation
+            
+        Returns:
+            Observation dict
+        """
         # Determine which image to show
         if init_obs:
             img = self.gt_image
@@ -201,49 +278,34 @@ class SVGEnv(BaseEnv):
             img = Image.new('RGB', (256, 256), color='white')
             
         # Set up multi-modal data with the image
-        img_placeholder = self.config.get("image_placeholder", "image")
+        img_placeholder = self.config.get("image_placeholder", "<image>")
         multi_modal_data = {
             img_placeholder: [img]
         }
-        img_str = img_placeholder
+        
+        # Get format prompt without examples for action/init templates
+        format_prompt_text = self.format_prompt_func(
+            max_actions_per_step=self.config.get('max_actions_per_step', 1),
+            action_sep=self.config.get('action_sep', ','),
+            add_example=False  # No examples for action and init obs
+        )
         
         # Prepare observation string based on whether this is initial observation
         if init_obs:
-            obs_str = init_observation_template.format(observation=img_str)
+            obs_str = init_observation_template(
+                observation=img_placeholder
+            ) + "\n" + format_prompt_text
         else:
-            obs_str = action_template.format(
-                valid_action=self.valid_actions,
-                observation=img_str,
+            valid_action_str = self.valid_actions[0] if self.valid_actions else ""
+            obs_str = action_template(
+                valid_action=valid_action_str,
+                observation=img_placeholder,
                 reward=self.reward,
                 done=False,  # SVG task doesn't have a "done" state
-            )
+            ) + "\n" + format_prompt_text
         
         # Return observation with multi-modal data
         return {
             "obs_str": obs_str,
             "multi_modal_data": multi_modal_data,
         }
-    
-
-if __name__ == "__main__":
-    config = SvgEnvConfig()
-    
-    env = SVGEnv(config)
-    print(env.system_prompt())
-    
-    obs, info = env.reset()
-    print(obs["obs_str"])
-    
-    action = """<answer>
-    <svg width="100" height="100" viewBox="0 0 100 100">
-      <path d="M30 60 Q50 75 70 60" stroke="black" stroke-width="3" fill="none"/>
-    </svg>
-    </answer>"""
-    
-    obs, reward, done, info = env.step(action)
-    print(f"Reward: {reward}")
-    print(f"Done: {done}")
-    print(obs["obs_str"])
-    
-    print(f"Total reward: {env.compute_reward()}")
-    env.close()

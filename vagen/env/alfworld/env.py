@@ -1,148 +1,85 @@
 from vagen.env.base.base_env import BaseEnv
+from vagen.env.alfworld.alfworld_utils import load_alfworld_dataset
 from vagen.env.utils.context_utils import parse_llm_raw_response, convert_numpy_to_PIL
-from alfworld.agents.utils.misc import get_templated_task_desc
-from .env_config import ALFWorldEnvConfig
-from .prompt import system_prompt_text, system_prompt_vision, init_observation_template, action_template
+from vagen.env.utils.parse_utils import parse_function_map
+from .env_config import AlfEnvConfig
+from .prompt import (
+    system_prompt,
+    init_observation_template,
+    action_template,
+    format_prompt
+)
 
-import alfworld.agents.environment
-import numpy as np
-import torch
+import os
+import json
+import logging
 import random
+import alfworld.agents.environment as environment
+import numpy as np
+from PIL import Image
+from typing import Dict, Any, Optional, Tuple, List
+from pathlib import Path
 
-class ALFWorldEnv(BaseEnv):
-    """ALFWorld environment adapter that maps the BaseEnv interface to ALFWorld interface"""
+class AlfEnv(BaseEnv):
+    """ALFRED environment for training and evaluating language models as agents.
     
-    def __init__(self, config: ALFWorldEnvConfig):
-        """Initialize the ALFWorld environment"""
+    This environment implements a text-based world where an agent must complete
+    household tasks. It is designed specifically for Large Language Models (LLMs)
+    as agents, providing structured observations and handling text-based actions.
+    """
+    
+    def __init__(self, config: AlfEnvConfig):
+        """Initialize the ALFRED environment.
+        
+        Args:
+            config: Configuration for the environment
+        """
         super().__init__()
         self.config = config
         
-        # Load ALFWorld config
-        import yaml
-        with open(self.config.alf_config_path) as reader:
-            alf_config = yaml.safe_load(reader)
-        
-        if self.config.render_mode == "vision":
-            alf_config['env']['type'] = 'AlfredThorEnv'
-            env = alfworld.agents.environment.AlfredThorEnv(alf_config)
-        else:
-            alf_config['env']['type'] = 'AlfredTWEnv'
-            env = alfworld.agents.environment.AlfredTWEnv(alf_config)
-        
-        self.env = env.init_env(batch_size=1)
-        
-        # Track state
-        self.total_reward = 0
-        self.prev_admissible_commands = None
-        self.valid_actions = []
-    
-    def step(self, llm_raw_response):
-        """Process LLM response and take a step in the environment."""
-        
-        # Parse LLM response
-        parsed = parse_llm_raw_response(
-            response=llm_raw_response,
-            special_token_list=self.config.special_token_list,
-            action_sep=self.config.action_sep,
-            max_actions=self.config.max_actions_per_step
+        # Setup environment
+        self.env = environment.AlfredTWEnv(
+            self.config.get("data_path", None),
+            self.config.get("force_compute_cache", False),
+            self.config.get("objs", False),
+            self.config.get("rewards_heuristic", False),
+            self.config.get("eval_mode", False)
         )
         
-        # Extract actions and process them
-        action_list = parsed['actions']
-        legal_action = False
-        for i in range(len(action_list)):
-            action_list[i] = action_list[i].lower()
-            if len(action_list[i]) == 0:
-                print("Action is empty!!!!")
-                # If action is empty, choose a random action from the action list
-                action_list[i] = self.prev_admissible_commands[random.randint(0, len(self.prev_admissible_commands)-1)]
-            else:
-                action_index = action_list[i].find('"action":')
-                if action_index == -1:
-                    string = action_list[i][-30:]
-                else:
-                    string = action_list[i][action_index:]
-                for act in self.prev_admissible_commands:
-                    if act in string:
-                        action_list[i] = act
-                        legal_action = True
-                        break
-                # If not a valid action, randomly pick an action
-                if not legal_action:
-                    action_list[i] = self.prev_admissible_commands[random.randint(0, len(self.prev_admissible_commands)-1)]
+        # Initialize state variables
+        self.total_reward = 0
+        self.reward = 0
+        self.valid_actions = []
+        self.current_task = None
+        self.current_observation = None
+        self.available_actions = []
+        self.is_done = False
+        self.task_completed = False
+        self.step_count = 0
         
-        # Use the first valid action from the action list
-        action_text = action_list[0] if action_list else ""
+        # Store the format prompt function for later use
+        self.format_prompt_func = format_prompt[self.config.get('prompt_format', 'free_think')]
         
-        # Store valid action for observation formatting
-        self.valid_actions = [action_text] if action_text else []
+        # Get the parse function based on the prompt format
+        self.parse_func = parse_function_map[self.config.get('prompt_format', 'free_think')]
         
-        # Check if action is valid
-        action_is_valid = action_text in self.prev_admissible_commands
+        # Initialize the dataset
+        self.dataset = self._load_dataset()
+        self.num_games = len(self.dataset) if self.dataset else 0
         
-        # Take the step in ALFWorld env
-        obs, reward, done, infos = self.env.step([action_text])
-        
-        # Render the environment and track the action effectiveness
-        observation = self._render(obs, infos)  # Add render here to capture observation
-        
-        # Simple tracking of state change (text environments don't have position)
-        action_is_effective = len(obs[0]) > 10  # Basic check if we got a meaningful observation
-        
-        # Check if metrics are available in infos
-        success = False
-        goal_condition_rate = 0.0
-        
-        if 'won' in infos:
-            success = float(infos['won'][0]) if isinstance(infos['won'], (list, tuple)) else float(infos['won'])
-        
-        if 'goal_condition_success_rate' in infos:
-            goal_condition_rate = float(infos['goal_condition_success_rate'][0]) if isinstance(infos['goal_condition_success_rate'], (list, tuple)) else float(infos['goal_condition_success_rate'])
-        
-        metrics = {
-            "turn_metrics": {
-                "action_is_valid": action_is_valid,
-                "action_is_effective": action_is_effective,
-            },
-            "traj_metrics": {
-                "success": success,
-                "goal_condition_success_rate": goal_condition_rate
-            },
-        }
-        
-        info = {
-            "metrics": metrics,
-            "llm_raw_response": llm_raw_response,
-            "llm_response": parsed
-        }
-        
-        # Compute reward with a penalty for illegal actions
-        if isinstance(reward, tuple):
-            reward_value = reward[0]
-        elif isinstance(reward, (list, np.ndarray)):
-            reward_value = reward[0]
-        else:
-            reward_value = reward
-        
-        if reward_value is None:
-            reward_value = 0  # Handle None rewards
-        
-        # Add penalty if the action is illegal
-        if not legal_action:
-            reward_value -= 1  # Apply penalty for illegal action
-        
-        self.total_reward += reward_value
-        
-        # Update admissible commands for next step
-        self.prev_admissible_commands = infos['admissible_commands'][0]
-        
-        # Convert done to boolean if it's a list or array
-        done_value = done[0] if isinstance(done, (list, np.ndarray)) else done
-        
-        return observation, reward_value, done_value, info
+        # Initialize random number generator
+        self.rng = random.Random()
+        if hasattr(self.config, "seed") and self.config.seed is not None:
+            self.rng.seed(self.config.seed)
+    
+    def _load_dataset(self):
+        """Load the ALFRED dataset."""
+        if hasattr(self.config, "split_id"):
+            return self.env.json_file_list[self.config.split_id]
+        return self.env.json_file_list
     
     def reset(self, seed=None):
-        """Reset the environment
+        """Reset the environment with an optional seed.
         
         Args:
             seed: Random seed for reproducibility
@@ -150,98 +87,213 @@ class ALFWorldEnv(BaseEnv):
         Returns:
             Observation dict, info dict
         """
-        # Handle seed manually if provided @TODO figure out better random way
+        # Update seed if provided
         if seed is not None:
-            random.seed(seed)
+            self.rng.seed(seed)
             
-            np.random.seed(seed)
+        # Determine game index
+        if hasattr(self.config, "gamefiles") and self.config.gamefiles:
+            self.env.game_files = self.config.gamefiles
+            self.env.random_start = False
+        else:
+            game_index = self.rng.randint(0, self.num_games - 1) if seed is None else seed % self.num_games
+            self.env.game_files = [self.dataset[game_index]]
+            self.env.random_start = False
             
-            if torch:
-                torch.manual_seed(seed)
-                if torch.cuda.is_available():
-                    torch.cuda.manual_seed(seed)
-                
-        obs, infos = self.env.reset()
+        # Reset the environment
+        self.current_observation, game_info = self.env.reset()
+        self.current_task = game_info["task_desc"] if "task_desc" in game_info else None
+        self.available_actions = self.env.admissible_commands
+        
+        # Reset state variables
         self.total_reward = 0
-        self.prev_admissible_commands = infos['admissible_commands'][0]
+        self.reward = 0
         self.valid_actions = []
-        return self._render(obs, infos, init_obs=True), infos
+        self.is_done = False
+        self.task_completed = False
+        self.step_count = 0
+        
+        return self._render(init_obs=True), {}
+    
+    def step(self, action_str: str):
+        """Execute an action in the environment.
+        
+        This method:
+        1. Parses the raw LLM response to extract actions
+        2. Executes each valid action in sequence
+        3. Calculates rewards and metrics
+        4. Generates the next observation
+        
+        Args:
+            action_str: Raw text response from LLM
+            
+        Returns:
+            Observation, reward, done, info
+        """
+        # Process the LLM response to extract actions
+        rst = self.parse_func(
+            response=action_str,
+            special_token_list=self.config.get('special_token_list', None),
+            action_sep=self.config.get('action_sep', ','),
+            max_actions=self.config.get('max_actions_per_step', 1)
+        )
+        
+        action_list = rst['actions']
+        
+        metrics = {
+            "turn_metrics": {
+                "action_is_valid": len(action_list) > 0,
+                "action_is_effective": False,
+            },
+            "traj_metrics": {
+                "success": False,
+            }
+        }
+        
+        self.reward = 0
+        self.valid_actions = []
+        done = self.is_done
+        info = {}
+        info.update(rst)
+        
+        # Execute valid actions
+        if metrics["turn_metrics"]["action_is_valid"]:
+            # Add format reward if actions were valid and format is correct
+            if rst.get("format_correct", True):
+                self.reward += self.config.format_reward
+            
+            for action in action_list:
+                # Check if action is admissible
+                if action in self.available_actions:
+                    # Execute the action
+                    observation, reward, done, _ = self.env.step(action)
+                    self.current_observation = observation
+                    self.available_actions = self.env.admissible_commands
+                    self.is_done = done
+                    
+                    # Update state and metrics
+                    self.reward += reward
+                    self.valid_actions.append(action)
+                    metrics["turn_metrics"]["action_is_effective"] = True
+                    
+                    if reward > 1.0:  # Task completion reward
+                        metrics["traj_metrics"]["success"] = True
+                        self.task_completed = True
+                else:
+                    # Invalid action penalty
+                    self.reward += self.config.invalid_action_penalty
+                    metrics["turn_metrics"]["action_is_valid"] = False
+                    break
+                
+                self.step_count += 1
+                if self.step_count >= self.config.max_steps or done:
+                    break
+        
+        # Update info dict and total reward
+        info["metrics"] = metrics
+        info["task"] = self.current_task
+        info["step_count"] = self.step_count
+        info["task_completed"] = self.task_completed
+        
+        self.total_reward += self.reward
+        
+        return self._render(init_obs=False), self.reward, done, info
     
     def system_prompt(self):
-        """Generate system prompt
+        """Get the system prompt for the environment.
+        
+        Returns a prompt explaining the environment to the LLM agent,
+        along with the format prompt.
         
         Returns:
             System prompt string
         """
-        if self.config.render_mode == "vision":
-            return system_prompt_vision.format(
+        # Get format prompt with examples for system prompt
+        format_prompt_text = self.format_prompt_func(
+            max_actions_per_step=self.config.get('max_actions_per_step', 1),
+            action_sep=self.config.get('action_sep', ','),
+            add_example=True  # Always true for system prompt
+        )
+        
+        if self.config.get("use_vision", False):
+            return self.config.vision_system_prompt.format(
                 max_actions_per_step=self.config.max_actions_per_step,
                 action_sep=self.config.action_sep
-            )
+            ) + '\n' + format_prompt_text
         else:
-            return system_prompt_text.format(
-                max_actions_per_step=self.config.max_actions_per_step,
-                action_sep=self.config.action_sep
-            )
+            return system_prompt() + '\n' + format_prompt_text
     
     def compute_reward(self):
-        """Return total reward
+        """Return the total reward for the episode.
         
         Returns:
-            Total reward for the episode
+            Total reward
         """
         return self.total_reward
     
     def close(self):
-        """Close the environment and release resources"""
-        self.env.close()
+        """Close the environment."""
+        if hasattr(self, "env"):
+            self.env.close()
     
-    def _render(self, obs, infos, init_obs=False):
-        """Render the environment as observation
+    def _render(self, init_obs=False):
+        """Render the environment observation.
         
-        This method creates a text representation of the environment state.
-        In the future, it could be extended to support visual rendering.
+        This method creates a text representation of the environment state,
+        formatting the observation string based on whether this is the
+        initial observation or a subsequent one.
         
         Args:
-            obs: Raw observations from ALFWorld
-            infos: Additional information from environment
             init_obs: Whether this is the initial observation
             
         Returns:
-            Dict: Observation dictionary
+            Observation dict
         """
-        # Get the observation text
-        observation_text = obs[0]
+        # Get format prompt without examples for action/init templates
+        format_prompt_text = self.format_prompt_func(
+            max_actions_per_step=self.config.get('max_actions_per_step', 1),
+            action_sep=self.config.get('action_sep', ','),
+            add_example=False  # No examples for action and init obs
+        )
         
-        # Format the list of admissible commands
-        commands_text = "\n".join([f"'{s}'" for s in self.prev_admissible_commands]) if self.prev_admissible_commands else ""
+        # Format the commands as a string
+        commands_str = ", ".join(self.available_actions)
         
-        if self.config.render_mode == "vision":
-            img = self.env.get_frames()[0]
-            img_placeholder = self.config.image_placeholder
-            observation_text = f"{img_placeholder}\n{observation_text}"
-
-        # Select appropriate template based on whether this is initial observation
+        # Get vision observation if enabled
+        multi_modal_data = None
+        if self.config.get("use_vision", False) and hasattr(self.env, "get_frame"):
+            frame = self.env.get_frame()
+            if frame is not None:
+                img_placeholder = self.config.get("image_placeholder", "<image>")
+                multi_modal_data = {
+                    img_placeholder: [convert_numpy_to_PIL(frame)]
+                }
+                # Use the image placeholder in the observation if frame is available
+                observation = img_placeholder
+            else:
+                observation = self.current_observation
+        else:
+            observation = self.current_observation
+        
+        # Format the template
         if init_obs:
-            obs_str = init_observation_template.format(
-                observation=observation_text,
-                commands=commands_text
-            )
+            obs_str = init_observation_template(
+                observation=observation,
+                commands=commands_str,
+                instruction=self.current_task
+            ) + "\n" + format_prompt_text
         else:
-            # For non-initial observations, include action results
-            obs_str = action_template.format(
-                valid_action=self.valid_actions[0] if self.valid_actions else "None",
-                observation=observation_text,
-                commands=commands_text,
-                reward=self.total_reward
-            )
+            valid_action_str = self.valid_actions[-1] if self.valid_actions else "No action"
+            obs_str = action_template(
+                valid_action=valid_action_str,
+                observation=observation,
+                commands=commands_str,
+                reward=self.total_reward,
+                done=self.is_done,
+                instruction=self.current_task
+            ) + "\n" + format_prompt_text
         
-        # For text mode, just return the observation string
-        if self.config.render_mode == "vision":
-            return {
-                "obs_str": obs_str,
-                "multi_modal_data": {img_placeholder: [convert_numpy_to_PIL(img)]}
-            }
-        else:
-            return {"obs_str": obs_str}
-            
+        return {
+            "obs_str": obs_str,
+            "multi_modal_data": multi_modal_data
+        }

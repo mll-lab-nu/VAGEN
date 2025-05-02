@@ -28,7 +28,7 @@ benchmark:
 
 # Datasets to use for benchmarking
 datasets:
-  - name: frozenlake-vision
-    train_path: data/frozenlake-vision-benchmark/train.parquet
-    test_path: data/frozenlake-vision-benchmark/test.parquet
+  - name: svg-vision
+    train_path: data/svg-vision-benchmark/train.parquet
+    test_path: data/svg-vision-benchmark/test.parquet
     use_split: both
