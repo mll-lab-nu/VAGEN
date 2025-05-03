@@ -8,7 +8,10 @@ export OPENAI_API_KEY=<sk-your_openai_api_key>
 pip install anthropic
 export ANTHROPIC_API_KEY=<your_claude_api_key>
 ```
-
+# Use Gemini API
+```
+export GOOGLE_API_KEY=<your_gemini_api_key>
+```
 ## Test your inference pipeline
 ```
 python vagen/server/server.py

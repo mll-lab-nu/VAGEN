@@ -38,11 +38,24 @@ class ModelFactory:
             available_providers = list(REGISTERED_MODEL.keys())
             raise ValueError(f"Unknown provider '{provider}'. Available providers: {available_providers}")
         
+        # Get model and config classes from registry
+        model_cls = REGISTERED_MODEL[provider]["model_cls"]
+        config_cls = REGISTERED_MODEL[provider]["config_cls"]
+        
+        # Get provider info to validate model_name
+        supported_models = []
+        if hasattr(config_cls, 'get_provider_info'):
+            provider_info = config_cls.get_provider_info()
+            supported_models = provider_info.get("supported_models", [])
+        
+        # Validate model name before initialization
+        if model_name and supported_models and model_name not in supported_models:
+            raise ValueError(
+                f"Invalid model '{model_name}' for provider '{provider}'. "
+                f"Supported models: {supported_models}"
+            )
+        
         try:
-            # Get model and config classes from registry
-            model_cls = REGISTERED_MODEL[provider]["model_cls"]
-            config_cls = REGISTERED_MODEL[provider]["config_cls"]
-            
             # Create config instance
             model_config = config_cls(**config)
             
@@ -51,7 +64,7 @@ class ModelFactory:
             
         except Exception as e:
             logger.error(f"Failed to initialize model interface: {str(e)}")
-            raise
+            raise ValueError(f"Failed to initialize model interface: {str(e)}")
     
     @staticmethod
     def create_from_config_instance(config: BaseModelConfig) -> BaseModelInterface:
