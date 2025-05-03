@@ -5,6 +5,7 @@ export OPENAI_API_KEY=<sk-your_openai_api_key>
 
 # Use Claude API
 ```
+pip install anthropic
 export ANTHROPIC_API_KEY=<your_claude_api_key>
 ```
 
