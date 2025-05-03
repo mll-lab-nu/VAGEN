@@ -1,22 +1,18 @@
 # vagen/inference/run_inference.py
 
-import os
-import sys
 import argparse
 import logging
 import yaml
-import json
 import wandb
 import pandas as pd
 import numpy as np
 from datetime import datetime
 from typing import Dict, List, Any
-from pathlib import Path
+from collections import defaultdict
 
 from vagen.mllm_agent.model_interface.factory_model import ModelFactory
 from vagen.mllm_agent.inference_rollout.inference_rollout_service import InferenceRolloutService
-from vagen.inference.utils.metrics import calculate_aggregate_metrics
-from vagen.inference.utils.logging import maybe_log_val_generations_to_wandb, log_metrics_by_config_id
+from vagen.inference.utils.logging import maybe_log_val_generations_to_wandb
 
 logger = logging.getLogger(__name__)
 
@@ -70,56 +66,58 @@ def setup_wandb(model_name: str, model_config: Dict, inference_config: Dict) -> 
         }
     )
 
-def run_inference_batch(
-    service: InferenceRolloutService,
-    env_configs: List[Dict],
-    batch_size: int,
-    max_steps: int
-) -> List[Dict]:
-    """Run inference on a batch of environments."""
-    all_results = []
+def log_results_to_wandb(results: List[Dict], inference_config: Dict) -> None:
+    """Log results to wandb with improved organization."""
+    # Log generations table
+    val_generations_to_log = inference_config.get('val_generations_to_log_to_wandb', 10)
+    maybe_log_val_generations_to_wandb(results, val_generations_to_log, 0)
     
-    # Process environments in batches
-    for i in range(0, len(env_configs), batch_size):
-        batch_configs = env_configs[i:i + batch_size]
-        logger.info(f"Processing batch {i//batch_size + 1}/{(len(env_configs) + batch_size - 1)//batch_size}")
+    # Extract metrics and log by example index
+    for metric_name in {k for r in results for k in r['metrics'].keys()}:
+        values = []
+        for i, r in enumerate(results):
+            if metric_name in r['metrics'] and isinstance(r['metrics'][metric_name], (int, float)):
+                values.append([i, float(r['metrics'][metric_name])])
         
-        # Reset environments for this batch
-        service.reset(batch_configs)
+        if not values:
+            continue
         
-        # Run inference
-        service.run(max_steps=max_steps)
-        
-        # Get results
-        batch_results = service.recording_to_log()
-        all_results.extend(batch_results)
-        
-        # Log batch progress
-        if wandb.run:
-            wandb.log({
-                "batch_progress": (i + batch_size) / len(env_configs) * 100,
-                "num_environments_processed": i + len(batch_configs)
-            })
+        table = wandb.Table(data=values, columns=["example_idx", "value"])
+        wandb.log({
+            f"eval/{metric_name}_by_example": wandb.plot.line(
+                table, 
+                "example_idx", 
+                "value",
+                title=f"{metric_name} by Example Index"
+            )
+        })
     
-    return all_results
-
-def log_results_to_wandb(results: List[Dict], global_step: int = 0) -> None:
-    """Log results to wandb without any aggregation."""
-    # Log raw metrics for each environment
-    metrics = log_metrics_by_config_id(results, mode='val')
-    wandb.log(metrics)
+    # Log summary metrics
+    summary_metrics = {}
     
-    # Log generation table (unchanged)
-    generations_to_log = 10  # You can make this configurable
-    maybe_log_val_generations_to_wandb(results, generations_to_log, global_step)
+    # Basic counts and rates
+    summary_metrics['summary/total_examples'] = len(results)
+    summary_metrics['summary/num_successful'] = sum(1 for r in results if r['metrics'].get('success', 0) > 0)
+    summary_metrics['summary/num_done'] = sum(1 for r in results if r['metrics'].get('done', 0) > 0)
     
-    # If you still want some overall summary, just count things
-    wandb.log({
-        "val/total_environments": len(results),
-        "val/num_successful": sum(1 for r in results if r['metrics'].get('success', 0) > 0),
-        "val/num_done": sum(1 for r in results if r['metrics'].get('done', 0) > 0),
-    })
-
+    if len(results) > 0:
+        summary_metrics['summary/success_rate'] = summary_metrics['summary/num_successful'] / len(results)
+        summary_metrics['summary/completion_rate'] = summary_metrics['summary/num_done'] / len(results)
+    
+    # Calculate means and standard deviations
+    metric_values = defaultdict(list)
+    for result in results:
+        for metric_name, value in result['metrics'].items():
+            if isinstance(value, (int, float)):
+                metric_values[metric_name].append(float(value))
+    
+    for metric_name, values in metric_values.items():
+        if len(values) > 0:
+            summary_metrics[f'summary/{metric_name}_mean'] = np.mean(values)
+            if len(values) > 1:
+                summary_metrics[f'summary/{metric_name}_std'] = np.std(values)
+    
+    wandb.log(summary_metrics)
 
 def main():
     """Main entry point for inference."""
@@ -154,7 +152,7 @@ def main():
             # Create model interface
             model_interface = ModelFactory.create(model_cfg)
             
-            # Create inference service
+            # Create inference service with all config parameters
             service = InferenceRolloutService(
                 config=inference_config,
                 model_interface=model_interface,
@@ -165,19 +163,16 @@ def main():
                 debug=inference_config.get('debug', False)
             )
             
-            # Run inference
-            results = run_inference_batch(
-                service=service,
-                env_configs=env_configs,
-                batch_size=inference_config.get('batch_size', 32),
-                max_steps=inference_config.get('max_steps', 10)
-            )
+            # Reset environments and run inference
+            service.reset(env_configs)
+            service.run(max_steps=inference_config.get('max_steps', 10))
+            results = service.recording_to_log()
             
             # Log results to wandb
             if inference_config.get('use_wandb', True):
-                log_results_to_wandb(results, global_step=0)
+                log_results_to_wandb(results, inference_config)
             
-            # Print summary (no saving to disk)
+            # Print summary
             print(f"\n===== Results for {model_name} =====")
             print(f"Total environments: {len(results)}")
             

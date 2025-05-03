@@ -1,121 +1,118 @@
-# vagen/inference/utils/metrics.py
-
 import numpy as np
 from collections import defaultdict
 from typing import Dict, List, Any, Union
 
-def calculate_aggregate_metrics(results: List[Dict]) -> Dict[str, float]:
+
+def create_metric_series(
+    results: List[Dict], 
+    metric_name: str
+) -> List[Dict[str, Any]]:
     """
-    Calculate aggregate metrics from results.
+    Create a series of (example_idx, value) pairs for a given metric.
     
     Args:
-        results: List of result dictionaries from recording_to_log
+        results: List of result dictionaries
+        metric_name: Name of the metric to extract
         
     Returns:
-        Dictionary of aggregate metrics
+        List of dictionaries with example_idx and value
     """
-    all_metrics = defaultdict(list)
-    config_metrics = defaultdict(lambda: defaultdict(list))
+    series = []
     
-    # Helper function to convert NumPy types to Python native types
-    def convert_to_native(value):
-        import numpy as np
-        if isinstance(value, np.integer):
-            return int(value)
-        elif isinstance(value, np.floating):
-            return float(value)
-        elif isinstance(value, np.bool_):
-            return bool(value)
-        elif isinstance(value, np.ndarray):
-            return value.tolist()
-        else:
-            return value
+    for idx, result in enumerate(results):
+        if metric_name in result['metrics']:
+            value = result['metrics'][metric_name]
+            # Convert numpy types to Python native types
+            if hasattr(value, 'item'):
+                value = value.item()
+            
+            # Only include numeric values
+            if isinstance(value, (int, float)):
+                series.append({
+                    'example_idx': idx,
+                    'value': float(value)
+                })
+    
+    return series
+
+def create_summary_metrics(results: List[Dict]) -> Dict[str, Any]:
+    """
+    Create summary metrics from results.
+    
+    Args:
+        results: List of result dictionaries
+        
+    Returns:
+        Dictionary of summary metrics
+    """
+    summary = {}
+    
+    # Basic counts
+    summary['total_examples'] = len(results)
+    summary['num_successful'] = sum(1 for r in results if r['metrics'].get('success', 0) > 0)
+    summary['num_done'] = sum(1 for r in results if r['metrics'].get('done', 0) > 0)
+    
+    # Success and completion rates
+    if len(results) > 0:
+        summary['success_rate'] = summary['num_successful'] / len(results)
+        summary['completion_rate'] = summary['num_done'] / len(results)
+    
+    # Collect all numeric metrics
+    metric_values = defaultdict(list)
     
     for result in results:
-        config_id = result.get("config_id", "unknown")
-        for k, v in result["metrics"].items():
-            native_v = convert_to_native(v)
-            all_metrics[k].append(native_v)
-            config_metrics[config_id][k].append(native_v)
-    
-    metrics = {}
-    
-    # Overall metrics
-    for key, values in all_metrics.items():
-        if not values or not isinstance(values[0], (int, float)):
-            continue
-            
-        metrics[f"mean_{key}"] = float(np.mean(values))
-        if len(values) > 1:
-            metrics[f"std_{key}"] = float(np.std(values))
-        metrics[f"min_{key}"] = float(np.min(values))
-        metrics[f"max_{key}"] = float(np.max(values))
-        
-        # For boolean-like metrics
-        if key in ["done", "success", "action_is_valid", "action_is_effective"] or \
-           (all(isinstance(v, (int, float)) for v in values) and 
-            all(0 <= v <= 1 for v in values)):
-            metrics[f"percent_{key}"] = float(np.mean(values) * 100)
-    
-    # Metrics by config_id
-    for config_id, config_data in config_metrics.items():
-        for key, values in config_data.items():
-            if not values or not isinstance(values[0], (int, float)):
-                continue
+        for metric_name, value in result['metrics'].items():
+            # Convert numpy types to Python native types
+            if hasattr(value, 'item'):
+                value = value.item()
                 
-            metrics[f"{config_id}/{key}"] = float(np.mean(values))
+            if isinstance(value, (int, float)):
+                metric_values[metric_name].append(float(value))
     
-    return metrics
+    # Calculate statistics for each metric
+    for metric_name, values in metric_values.items():
+        if len(values) > 0:
+            summary[f'{metric_name}_mean'] = float(np.mean(values))
+            if len(values) > 1:
+                summary[f'{metric_name}_std'] = float(np.std(values))
+            summary[f'{metric_name}_min'] = float(np.min(values))
+            summary[f'{metric_name}_max'] = float(np.max(values))
+    
+    return summary
 
-def log_rst_to_metrics_dict(rst: List[Dict], mode: str = 'eval') -> Dict[str, float]:
+def organize_metrics_for_wandb(results: List[Dict]) -> Dict[str, Any]:
     """
-    Convert results to metrics dictionary format compatible with PPO trainer.
+    Organize metrics into sections for wandb logging.
     
     Args:
-        rst: Results list from recording_to_log
-        mode: Metrics prefix (eval/train/val)
+        results: List of result dictionaries
         
     Returns:
-        Metrics dictionary with proper prefixes
+        Dictionary with eval and summary sections
     """
-    metrics_dict = {}
-    metrics_by_config_id = defaultdict(lambda: defaultdict(list))
+    wandb_metrics = {}
     
-    # Helper function to convert NumPy types to Python native types
-    def convert_to_native(value):
-        import numpy as np
-        if isinstance(value, np.integer):
-            return int(value)
-        elif isinstance(value, np.floating):
-            return float(value)
-        elif isinstance(value, np.bool_):
-            return bool(value)
-        elif isinstance(value, np.ndarray):
-            return value.tolist()
-        else:
-            return value
+    # Get all unique metric names
+    all_metric_names = set()
+    for result in results:
+        all_metric_names.update(result['metrics'].keys())
     
-    # Group metrics by config_id
-    for item in rst:
-        config_id = item["config_id"]
-        for k, v in item["metrics"].items():
-            native_v = convert_to_native(v)
-            metrics_by_config_id[config_id][k].append(native_v)
+    # Process each metric
+    eval_section = {}
+    for metric_name in all_metric_names:
+        # Extract series data
+        series = create_metric_series(results, metric_name)
+        if series:
+            for point in series:
+                eval_key = f"eval/{metric_name}/example_{point['example_idx']}"
+                eval_section[eval_key] = point['value']
     
-    # Compute averages for each metric by config_id
-    for config_id, metrics in metrics_by_config_id.items():
-        for k, values in metrics.items():
-            if values:
-                metrics_dict[f'{mode}/{k}/{config_id}'] = float(np.mean(values))
+    # Create summary section
+    summary = create_summary_metrics(results)
+    summary_section = {f"summary/{k}": v for k, v in summary.items()}
     
-    # Aggregate metrics across all configs
-    all_metrics = defaultdict(list)
-    for config_id, metrics in metrics_by_config_id.items():
-        for k, values in metrics.items():
-            all_metrics[k].extend(values)
+    # Combine sections
+    wandb_metrics.update(eval_section)
+    wandb_metrics.update(summary_section)
     
-    for k, values in all_metrics.items():
-        if values:
-            metrics_dict[f'{mode}/{k}/all'] = float(np.mean(values))
-    
-    return metrics_dict
+    return wandb_metrics

@@ -1,15 +1,13 @@
-# vagen/inference/utils/logging.py
-
 import wandb
 import logging
 from typing import List, Dict, Any, Optional
 import numpy as np
-import PIL
+from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
 class ValidationTableManager:
-    """Manages the cumulative validation table for wandb logging."""
+    """Manages the validation table for wandb logging."""
     
     def __init__(self):
         self.validation_table = None
@@ -18,9 +16,9 @@ class ValidationTableManager:
         self, 
         log_rst: List[Dict[str, Any]], 
         generations_to_log: int, 
-        global_steps: int
+        global_steps: int = 0  # Default to 0 for inference
     ) -> None:
-        """Log a table of validation samples with each example in its own row."""
+        """Log a table of validation samples."""
         if generations_to_log == 0:
             return
             
@@ -38,10 +36,10 @@ class ValidationTableManager:
             inputs.append(item['config_id'])
             outputs.append(item['output_str'])
             scores.append(item['metrics']['score'])
-            images.append(item['image_data'])
+            images.append(item.get('image_data', None))
         
         # Check if we have images
-        has_images = any(img_list for img_list in images)
+        has_images = any(img_list for img_list in images if img_list)
         
         # Find maximum number of images in any sample
         if has_images:
@@ -60,7 +58,7 @@ class ValidationTableManager:
         
         # Sort and shuffle for consistency
         samples.sort(key=lambda x: x[0])  # Sort by input text
-        rng = np.random.RandomState()
+        rng = np.random.RandomState(42)  # Use a fixed seed for reproducibility
         rng.shuffle(samples)
         
         # Take first N samples
@@ -68,9 +66,9 @@ class ValidationTableManager:
         
         # Create columns for the table
         if has_images:
-            columns = ["step", "input", "output", "score"] + [f"image_{i+1}" for i in range(max_images_per_sample)]
+            columns = ["input", "output", "score"] + [f"image_{i+1}" for i in range(max_images_per_sample)]
         else:
-            columns = ["step", "input", "output", "score"]
+            columns = ["input", "output", "score"]
         
         # Create table
         table = wandb.Table(columns=columns)
@@ -94,10 +92,10 @@ class ValidationTableManager:
                     wandb_images.append(None)
                 
                 # Add row
-                table.add_data(global_steps, input_text, output_text, score, *wandb_images)
+                table.add_data(input_text, output_text, score, *wandb_images)
             else:
                 input_text, output_text, score = sample
-                table.add_data(global_steps, input_text, output_text, score)
+                table.add_data(input_text, output_text, score)
         
         # Log the table
         wandb.log({"val/generations": table})
@@ -110,7 +108,7 @@ validation_table_manager = ValidationTableManager()
 def maybe_log_val_generations_to_wandb(
     results: List[Dict[str, Any]], 
     generations_to_log: int, 
-    global_step: int
+    global_step: int = 0  # Default to 0 for inference
 ) -> None:
     """
     Log validation generation examples to wandb as a table.
@@ -123,24 +121,85 @@ def maybe_log_val_generations_to_wandb(
     )
 
 
-def log_metrics_by_config_id(
-    results: List[Dict[str, Any]], 
-    mode: str = 'inference'
+def aggregate_metrics_for_summary(
+    results: List[Dict[str, Any]]
 ) -> Dict[str, Any]:
     """
-    Convert results to metrics dictionary without any aggregation.
-    Just logs raw metrics as they are.
-    """
-    metric_dict = {}
+    Create a summary dictionary with mean, std, min, max for all numeric metrics.
     
-    # Simply iterate through results and create metric entries
-    for i, item in enumerate(results):
-        config_id = item["config_id"]
-        env_id = item.get("env_id", f"env_{i}")
+    Args:
+        results: List of result dictionaries
         
-        # Log each metric as is, with a unique key including env_id
-        for k, v in item["metrics"].items():
-            metric_key = f'{mode}/{config_id}/{env_id}/{k}'
-            metric_dict[metric_key] = v
+    Returns:
+        Dictionary of summary metrics
+    """
+    summary = {}
     
-    return metric_dict
+    # Basic counts
+    summary['summary/total_examples'] = len(results)
+    summary['summary/num_successful'] = sum(1 for r in results if r['metrics'].get('success', 0) > 0)
+    summary['summary/num_done'] = sum(1 for r in results if r['metrics'].get('done', 0) > 0)
+    
+    # Calculate rates
+    if len(results) > 0:
+        summary['summary/success_rate'] = summary['summary/num_successful'] / len(results)
+        summary['summary/completion_rate'] = summary['summary/num_done'] / len(results)
+    
+    # Collect all metrics across examples
+    metrics_values = defaultdict(list)
+    for result in results:
+        for metric_name, value in result['metrics'].items():
+            if isinstance(value, (int, float)):
+                metrics_values[metric_name].append(float(value))
+    
+    # Calculate statistics for each metric
+    for metric_name, values in metrics_values.items():
+        if values:
+            summary[f'summary/{metric_name}_mean'] = float(np.mean(values))
+            if len(values) > 1:
+                summary[f'summary/{metric_name}_std'] = float(np.std(values))
+            summary[f'summary/{metric_name}_min'] = float(np.min(values))
+            summary[f'summary/{metric_name}_max'] = float(np.max(values))
+    
+    return summary
+
+
+def log_metrics_by_example(
+    results: List[Dict[str, Any]]
+) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Organize metrics by example for line plots.
+    
+    Args:
+        results: List of result dictionaries
+        
+    Returns:
+        Dictionary mapping metric names to lists of (example_idx, value) pairs
+    """
+    # Get all unique metric names
+    all_metric_names = set()
+    for result in results:
+        all_metric_names.update(result['metrics'].keys())
+    
+    # Collect values for each metric across all examples
+    metrics_data = {}
+    for metric_name in all_metric_names:
+        # Skip non-numeric metrics
+        sample_value = next((r['metrics'].get(metric_name) for r in results 
+                           if metric_name in r['metrics']), None)
+        if not isinstance(sample_value, (int, float)):
+            continue
+        
+        # Collect (example_idx, value) pairs
+        data_points = []
+        for idx, result in enumerate(results):
+            if metric_name in result['metrics']:
+                data_points.append({
+                    'example_idx': idx,
+                    'value': float(result['metrics'][metric_name])
+                })
+        
+        if data_points:
+            metrics_data[f'eval/{metric_name}'] = data_points
+    
+    return metrics_data

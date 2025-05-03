@@ -15,15 +15,15 @@ models:
   #   tensor_parallel_size: 2
   #   gpu_memory_utilization: 0.9
 
-  # gpt4o:
-  #   provider: openai
-  #   model_name: gpt-4o
-  #   max_tokens: 1024
-  #   temperature: 0.7
-  #   presence_penalty: 0.0
-  #   frequency_penalty: 0.0
-  #   max_retries: 3
-  #   timeout: 60
+  gpt4o:
+    provider: openai
+    model_name: gpt-4o
+    max_tokens: 1024
+    temperature: 0.7
+    presence_penalty: 0.0
+    frequency_penalty: 0.0
+    max_retries: 3
+    timeout: 60
 
   # gpt4_vision:
   #   provider: openai
@@ -35,9 +35,9 @@ models:
   #   max_retries: 3
   #   timeout: 60
 
-  claude_3_haiku:
+  claude_3_sonnet:
     provider: claude
-    model_name: claude-3-haiku-20240307
+    model_name: claude-3-7-sonnet-20250219
     max_tokens: 1024
     temperature: 0.7
   
