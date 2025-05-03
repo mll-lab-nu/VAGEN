@@ -1,9 +1,14 @@
 # vagen/inference/run_inference.py
 
+import os
+import sys
 import argparse
 import logging
 import yaml
 import wandb
+import pandas as pd
+import numpy as np
+from datetime import datetime
 import pandas as pd
 import numpy as np
 from datetime import datetime
@@ -18,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 def parse_args():
     """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description="Run inference with models")
     parser = argparse.ArgumentParser(description="Run inference with models")
     
     parser.add_argument("--inference_config_path", type=str, required=True,
@@ -121,6 +127,7 @@ def log_results_to_wandb(results: List[Dict], inference_config: Dict) -> None:
 
 def main():
     """Main entry point for inference."""
+    """Main entry point for inference."""
     args = parse_args()
     
     # Load configurations
@@ -134,11 +141,15 @@ def main():
     )
     
     logger.info("Starting inference pipeline")
+    logger.info("Starting inference pipeline")
     
+    # Load environment configurations
+    env_configs = load_environment_configs_from_parquet(args.val_files_path)
     # Load environment configurations
     env_configs = load_environment_configs_from_parquet(args.val_files_path)
     logger.info(f"Loaded {len(env_configs)} environment configurations")
     
+    # Process each model
     # Process each model
     models = model_config.get('models', {})
     for model_name, model_cfg in models.items():
@@ -168,6 +179,7 @@ def main():
             service.run(max_steps=inference_config.get('max_steps', 10))
             results = service.recording_to_log()
             
+            # Log results to wandb
             # Log results to wandb
             if inference_config.get('use_wandb', True):
                 log_results_to_wandb(results, inference_config)
