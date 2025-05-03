@@ -1,101 +1,169 @@
 # vagen/inference/utils/logging.py
 
-import logging
 import wandb
-from typing import Dict, List, Any
-from datetime import datetime
-from omegaconf import DictConfig
+import logging
+from typing import List, Dict, Any, Optional
+import numpy as np
+import PIL
 
 logger = logging.getLogger(__name__)
 
-def setup_wandb_for_model(
-    model_name: str,
-    model_config: Dict,
-    inference_config: DictConfig
+class ValidationTableManager:
+    """Manages the cumulative validation table for wandb logging."""
+    
+    def __init__(self):
+        self.validation_table = None
+    
+    def log_generations_to_wandb(
+        self, 
+        log_rst: List[Dict[str, Any]], 
+        generations_to_log: int, 
+        global_steps: int
+    ) -> None:
+        """
+        Log a table of validation samples with multiple images per sample to wandb.
+        Matches the training code's _maybe_log_val_generations_to_wandb function.
+        """
+        if generations_to_log == 0:
+            return
+            
+        if wandb.run is None:
+            logger.warning('`val_generations_to_log_to_wandb` is set, but wandb is not initialized')
+            return
+        
+        # Extract data from results exactly like training code
+        inputs = []
+        outputs = []
+        scores = []
+        images = []
+        
+        for item in log_rst:
+            inputs.append(item['config_id'])
+            outputs.append(item['output_str'])
+            scores.append(item['metrics']['score'])
+            images.append(item['image_data'])
+        
+        # Handle the case where images might not be provided
+        if images is None or all(img is None for img in images):
+            samples = list(zip(inputs, outputs, scores))
+            has_images = False
+            max_images_per_sample = 0
+        else:
+            samples = list(zip(inputs, outputs, scores, images))
+            has_images = True
+            # Find maximum number of images in any sample
+            max_images_per_sample = max(
+                len(img_list) if isinstance(img_list, (list, tuple)) else 1 
+                for img_list in images
+            )
+        
+        # Sort and shuffle exactly like training
+        samples.sort(key=lambda x: x[0])  # Sort by input text
+        
+        # Use fixed random seed for deterministic shuffling
+        rng = np.random.RandomState()  # No seed specified in training code
+        rng.shuffle(samples)
+        
+        # Take first N samples after shuffling
+        samples = samples[:generations_to_log]
+        
+        # Create column names for all samples
+        if has_images:
+            columns = ["step"]
+            for i in range(len(samples)):
+                columns.extend([f"input_{i+1}", f"output_{i+1}", f"score_{i+1}"])
+                columns.extend([f"image_{i+1}_{j+1}" for j in range(max_images_per_sample)])
+        else:
+            columns = ["step"] + sum([[f"input_{i+1}", f"output_{i+1}", f"score_{i+1}"] 
+                                     for i in range(len(samples))], [])
+        
+        if self.validation_table is None:
+            # Initialize the table on first call
+            self.validation_table = wandb.Table(columns=columns)
+        
+        # Create a new table with same columns and existing data
+        new_table = wandb.Table(columns=columns, data=self.validation_table.data)
+        
+        # Add new row with all data
+        row_data = []
+        row_data.append(global_steps)
+        
+        for sample in samples:
+            if has_images:
+                input_text, output_text, score, sample_images = sample
+                row_data.extend([input_text, output_text, score])
+                
+                # Handle if sample_images is a single image or list of images
+                if not isinstance(sample_images, (list, tuple)):
+                    sample_images = [sample_images]
+                    
+                # Convert each image to wandb.Image
+                wandb_images = []
+                for img in sample_images:
+                    if not isinstance(img, wandb.Image):
+                        img = wandb.Image(img)
+                    wandb_images.append(img)
+                    
+                # Pad with None if there are fewer images than max_images_per_sample
+                wandb_images.extend([None] * (max_images_per_sample - len(wandb_images)))
+                row_data.extend(wandb_images)
+            else:
+                input_text, output_text, score = sample
+                row_data.extend([input_text, output_text, score])
+        
+        new_table.add_data(*row_data)
+        
+        # Update reference and log
+        wandb.log({"val/generations": new_table})
+        self.validation_table = new_table
+
+
+# Global instance for maintaining table state across calls
+validation_table_manager = ValidationTableManager()
+
+
+def maybe_log_val_generations_to_wandb(
+    results: List[Dict[str, Any]], 
+    generations_to_log: int, 
+    global_step: int
 ) -> None:
     """
-    Sets up wandb run for a specific model.
-    Each model gets its own wandb run for independent tracking.
-    
-    Args:
-        model_name: Name identifier for the model
-        model_config: Model configuration
-        inference_config: Inference configuration
+    Log validation generation examples to wandb as a table.
+    Uses the global ValidationTableManager to maintain state.
     """
-    if not inference_config.use_wandb:
-        return
-    
-    # Create run name with timestamp
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_name = f"{model_name}_{timestamp}"
-    
-    # Initialize wandb
-    wandb.init(
-        project=inference_config.wandb_project,
-        name=run_name,
-        config={
-            "model_name": model_name,
-            "model_config": model_config,
-            "inference_config": dict(inference_config)
-        },
-        reinit=True  # Allow multiple runs in same process
+    validation_table_manager.log_generations_to_wandb(
+        log_rst=results,
+        generations_to_log=generations_to_log,
+        global_steps=global_step
     )
-    
-    logger.info(f"Initialized wandb run: {run_name}")
 
-def log_metrics_to_wandb(
-    results: List[Dict],
-    model_name: str
-) -> None:
-    """
-    Logs raw environment metrics to wandb.
-    No aggregation or modification - just raw metrics from environments.
-    
-    Args:
-        results: List of result dictionaries from environments
-        model_name: Model identifier for logging
-    """
-    if not wandb.run:
-        return
-    
-    # Log each environment's metrics
-    for result in results:
-        env_id = result.get("env_id", "unknown")
-        config_id = result.get("config_id", "unknown")
-        metrics = result.get("metrics", {})
-        
-        # Create wandb log dict with raw metrics
-        log_dict = {}
-        for metric_name, value in metrics.items():
-            # Use hierarchical naming for wandb
-            key = f"{model_name}/{config_id}/{metric_name}"
-            log_dict[key] = value
-        
-        # Log to wandb
-        wandb.log(log_dict)
-    
-    logger.debug(f"Logged {len(results)} environment results to wandb")
 
-def log_batch_progress(
-    model_name: str,
-    batch_idx: int,
-    total_batches: int
-) -> None:
+def log_metrics_by_config_id(
+    results: List[Dict[str, Any]], 
+    mode: str = 'inference'
+) -> Dict[str, float]:
     """
-    Logs batch progress to wandb and console.
-    
-    Args:
-        model_name: Model identifier
-        batch_idx: Current batch index (0-based)
-        total_batches: Total number of batches
+    Convert results to metrics dictionary with proper prefixes.
+    Matches training code's log_rst_to_metrics_dict function.
     """
-    progress = (batch_idx + 1) / total_batches * 100
-    message = f"Model {model_name}: Batch {batch_idx + 1}/{total_batches} ({progress:.1f}%)"
+    from collections import defaultdict
     
-    logger.info(message)
+    metric_dict = {}
     
-    if wandb.run:
-        wandb.log({
-            f"{model_name}/batch_progress": batch_idx + 1,
-            f"{model_name}/progress_percent": progress
-        })
+    # Group metrics by config_id
+    metrics_by_config_id = defaultdict(dict)  # dict of dict of list
+    
+    for item in results:
+        config_id = item["config_id"]
+        for k, v in item["metrics"].items():
+            if k not in metrics_by_config_id[config_id]:
+                metrics_by_config_id[config_id][k] = []
+            metrics_by_config_id[config_id][k].append(v)
+    
+    # Aggregate metrics
+    for config_id, metrics in metrics_by_config_id.items():
+        for k, v in metrics.items():
+            metric_key = f'{mode}/{k}/{config_id}'
+            metric_dict[metric_key] = np.mean(v)
+    
+    return metric_dict

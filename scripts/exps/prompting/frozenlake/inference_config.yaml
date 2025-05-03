@@ -1,18 +1,21 @@
-batch_size: 32
-max_steps: 10
-num_workers: 4
-
-dataset_dir: data
-use_split: test
-
-server_url: http://localhost:5000
+# Server configuration
+server_url: "http://localhost:5000"
 server_timeout: 600
 server_max_workers: 48
 
-output_dir: inference_results
-show_progress: true
-
-use_wandb: true
-wandb_project: vagen-prompting-frozenlake
-
+# Inference parameters
+batch_size: 32
+max_steps: 10
+split: "test"
 debug: false
+
+# Output configuration
+output_dir: "inference_outputs"
+
+# WandB configuration
+use_wandb: true
+wandb_project: "vagen-inference"
+
+# Display settings
+show_progress: true
+val_generations_to_log_to_wandb: 10

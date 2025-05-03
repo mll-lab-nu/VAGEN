@@ -1,5 +1,7 @@
+# vagen/mllm_agent/model_interface/vllm/model_config.py
+
 from dataclasses import dataclass, field, fields
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 from vagen.mllm_agent.model_interface.base_model_config import BaseModelConfig
 
@@ -16,12 +18,15 @@ class VLLMModelConfig(BaseModelConfig):
     top_p: float = 0.9
     top_k: int = 50
     
-    
     # VLM specific settings
     image_input_type: str = "pixel_values"  # For Qwen-VL
     image_token_id: Optional[int] = None
     image_input_shape: Optional[str] = None  # e.g., "1,3,224,224"
     image_feature_size: Optional[int] = None
+    
+    # Special tokens that might be needed
+    additional_special_tokens: Optional[List[str]] = field(default_factory=lambda: ["<think>", "</think>", "<answer>", "</answer>"])
+    tokenizer_mode: str = "auto"  # Can be "auto", "slow", or "mistral"
     
     # interface specific parameter
     model_name: str = field(default="Qwen/Qwen2.5-0.5B-Instruct")

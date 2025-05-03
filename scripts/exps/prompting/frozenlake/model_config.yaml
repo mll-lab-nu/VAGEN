@@ -1,23 +1,16 @@
-qwen_0.5b:
-  provider: vllm
-  model_name: Qwen/Qwen2.5-0.5B-Instruct
-  max_tokens: 1024
-  temperature: 0.7
-  top_p: 0.9
-  top_k: 50
-  tensor_parallel_size: 1
-  gpu_memory_utilization: 0.9
-  dtype: bfloat16
-  trust_remote_code: true
+models:
+  qwen_0.5b:
+    provider: vllm
+    model_name: Qwen/Qwen2.5-0.5B-Instruct
+    max_tokens: 1024
+    temperature: 0.7
+    tensor_parallel_size: 1
+    gpu_memory_utilization: 0.9
 
-# qwen_vl_3b:
-#   provider: vllm
-#   model_name: Qwen/Qwen2.5-VL-3B-Instruct
-#   max_tokens: 1024
-#   temperature: 0.7
-#   top_p: 0.9
-#   top_k: 50
-#   tensor_parallel_size: 1
-#   gpu_memory_utilization: 0.9
-#   dtype: bfloat16
-#   trust_remote_code: true
+  # qwen_vl_3b:
+  #   provider: vllm
+  #   model_name: Qwen/Qwen2.5-VL-3B-Instruct
+  #   max_tokens: 1024
+  #   temperature: 0.7
+  #   tensor_parallel_size: 2
+  #   gpu_memory_utilization: 0.9
