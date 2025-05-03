@@ -1,16 +1,26 @@
+"""
+Abstract base class for model interfaces.
+Defines the minimal standard interface that all model implementations must follow.
+"""
+
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any
 
 class BaseModelInterface(ABC):
     """
-    Simplified base class for model interfaces that focuses only on
-    the essential methods needed for inference.
+    Base class for all model interfaces that provides a standardized
+    interface for interacting with different underlying models.
     """
 
     def __init__(self, config: Dict[str, Any]):
-        """Initialize with configuration."""
+        """
+        Initialize the model interface with a configuration dictionary.
+        
+        Args:
+            config: Configuration dictionary containing model parameters
+        """
         self.config = config
-
+        
     @abstractmethod
     def generate(self, prompts: List[Any], **kwargs) -> List[Dict[str, Any]]:
         """
@@ -21,10 +31,10 @@ class BaseModelInterface(ABC):
             **kwargs: Additional generation parameters
             
         Returns:
-            List of response dictionaries with text, finish_reason, etc.
+            List of response dictionaries with at least 'text' field
         """
         pass
-
+    
     @abstractmethod
     def format_prompt(self, messages: List[Dict[str, Any]]) -> str:
         """
@@ -37,26 +47,7 @@ class BaseModelInterface(ABC):
             Formatted prompt string
         """
         pass
-
-    @property
-    @abstractmethod
-    def is_multimodal(self) -> bool:
-        """Whether the model supports images."""
-        pass
-
-    @abstractmethod
-    def process_images(self, images: List[Any]) -> List[Any]:
-        """
-        Process images for multi-modal models.
-        
-        Args:
-            images: List of image data
-            
-        Returns:
-            Processed image data
-        """
-        pass
-
+    
     def get_model_info(self) -> Dict[str, Any]:
         """
         Get basic information about the model.
@@ -66,5 +57,5 @@ class BaseModelInterface(ABC):
         """
         return {
             "name": self.config.get("name", "unknown"),
-            "is_multimodal": self.is_multimodal
+            "type": self.config.get("type", "unknown"),
         }

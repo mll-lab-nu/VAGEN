@@ -45,7 +45,7 @@ VAGEN addresses these challenges by focusing optimization on the most critical d
 - New service architecture for efficient distributed training
 - Check out our new guides:
   - [Creating Environments](./docs/envs/create-env.md): New environment protocal.
-  - [Creating Services](./docs/envs/create-service.md): We now support hosting environments in a seperate process
+  - [Creating Services](./docs/envs/create-service.md): We now support hosting environments in a separate process
 
 ## Installation
 
@@ -97,7 +97,7 @@ See our [Creating Environments](./docs/envs/create-env.md) guide. You may also w
 ## How to Add New Model
 
 1. Refer to [VERL](https://verl.readthedocs.io/en/latest/index.html) for adding new MLLM.
-2. Refer to [QwenVLRolloutManager](./vagen/mllm_agent/rollout.py) to understand how rollout works. In most cases, you can use QwenVLRolloutManager directly with only minor modifications to the model's special tokens
+2. Refer to [QwenVLRolloutManager](vagen/mllm_agent/training_rollout/rollout.py) to understand how rollout works. In most cases, you can use QwenVLRolloutManager directly with only minor modifications to the model's special tokens
 
 ## Experimental Results
 > To reproduce our experiment, please refer to document: [Reproduce Experiments](docs/reproduce-exp.md)

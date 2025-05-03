@@ -127,3 +127,4 @@ svg_analysis_results/
 temp/
 benchmark_results/
 env_benchmark_results/
+results/

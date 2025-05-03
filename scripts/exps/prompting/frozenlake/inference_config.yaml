@@ -1,48 +1,18 @@
-# Server configuration
-server:
-  base_url: "http://localhost:5000"  # Environment server URL
-  timeout: 600  # Request timeout (seconds)
-  max_workers: 10  # Maximum number of concurrent worker threads
+batch_size: 32
+max_steps: 10
+num_workers: 4
 
-# Inference settings
-inference:
-  max_steps: 10  # Maximum steps per environment
-  show_progress: true  # Display progress bar
-  debug: false  # Debug mode
-  save_images: true  # Save image results
-  save_intermediate: false  # Save intermediate results
+dataset_dir: data
+use_split: test
 
-# Generation parameters (overrides defaults in model config)
-generation:
-  temperature: 0.7  # Temperature parameter
-  top_p: 0.95  # Nucleus sampling parameter
-  max_tokens: 512  # Maximum number of tokens to generate
-  stop: ["\n\nUser:", "\n\nHuman:"]  # Stop generation at these markers
+server_url: http://localhost:5000
+server_timeout: 600
+server_max_workers: 48
 
-# Batch processing settings
-batch:
-  batch_size: 4  # Batch size
-  batch_size_multiple: 4  # Batch size multiple (for hardware optimization)
+output_dir: inference_results
+show_progress: true
 
-# Evaluation configuration
-evaluation:
-  metrics:
-    - score  # Overall score
-    - done  # Completion rate
-    - steps  # Step count statistics
+use_wandb: true
+wandb_project: vagen-prompting-frozenlake
 
-# Weights & Biases logging configuration
-wandb:
-  project: "qwen-vl-eval"  # Project name
-  experiment_name: "qwen2.5-vl-3b-eval"  # Experiment name
-  entity: null  # Team/entity name (optional)
-  val_generations_to_log_to_wandb: 5  # Number of generated samples to log
-  log_model: false  # Whether to save the model to wandb
-
-# Output configuration
-output:
-  format: "json"  # Output format
-  include_metrics: true  # Include evaluation metrics
-  include_trajectories: true  # Include full trajectories
-  pretty_print: true  # Pretty-print the output
-
+debug: false

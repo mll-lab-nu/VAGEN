@@ -1,28 +1,23 @@
-type: "vllm"
-name: "Qwen2.5-0.5B-Instruct"
+qwen_0.5b:
+  provider: vllm
+  model_name: Qwen/Qwen2.5-0.5B-Instruct
+  max_tokens: 1024
+  temperature: 0.7
+  top_p: 0.9
+  top_k: 50
+  tensor_parallel_size: 1
+  gpu_memory_utilization: 0.9
+  dtype: bfloat16
+  trust_remote_code: true
 
-# Model path
-path: "Qwen/Qwen2.5-0.5B-Instruct"
-tokenizer_path: null  # Use the same path as the model
-processor_path: null  # Use the same path as the model
-
-# vLLM specific configuration
-tensor_parallel_size: 1  # Adjust according to the number of available GPUs
-dtype: "bfloat16"  # Options: auto, float16, bfloat16, float32
-gpu_memory_utilization: 0.9
-trust_remote_code: true
-max_model_len: 4096  # Maximum sequence length
-
-# Generation parameters
-temperature: 0.7
-top_p: 0.95
-top_k: 50
-max_tokens: 512
-repetition_penalty: 1.0
-presence_penalty: 0.0
-frequency_penalty: 0.0
-
-# Multimodal specific configuration
-is_multimodal: true
-limit_mm_per_prompt:
-  image: 4  # Maximum number of images per prompt
+# qwen_vl_3b:
+#   provider: vllm
+#   model_name: Qwen/Qwen2.5-VL-3B-Instruct
+#   max_tokens: 1024
+#   temperature: 0.7
+#   top_p: 0.9
+#   top_k: 50
+#   tensor_parallel_size: 1
+#   gpu_memory_utilization: 0.9
+#   dtype: bfloat16
+#   trust_remote_code: true

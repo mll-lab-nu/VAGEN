@@ -1,44 +1,26 @@
-"""
-Utility functions for config loading and management.
-"""
-
 import yaml
-import json
-import os
+import logging
 from typing import Dict, Any
 
-def load_config(config_path: str) -> Dict:
+logger = logging.getLogger(__name__)
+
+def load_yaml_config(config_path: str) -> Dict[str, Any]:
     """
-    Load configuration from YAML file.
-
+    Load configuration from a YAML file.
+    
     Args:
-        config_path: Path to configuration file
-
+        config_path: Path to YAML configuration file
+        
     Returns:
-        Configuration dictionary
+        Dictionary containing the configuration
     """
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
-    return config
-
-def save_configs(output_dir: str, model_config: Dict, inference_config: Dict, args: Any) -> None:
-    """
-    Save configurations to output directory.
-
-    Args:
-        output_dir: Output directory
-        model_config: Model configuration
-        inference_config: Inference configuration
-        args: Command line arguments
-    """
-    # Save model config
-    with open(os.path.join(output_dir, "model_config.yaml"), "w") as f:
-        yaml.dump(model_config, f, default_flow_style=False)
-
-    # Save inference config
-    with open(os.path.join(output_dir, "inference_config.yaml"), "w") as f:
-        yaml.dump(inference_config, f, default_flow_style=False)
-
-    # Save command line args
-    with open(os.path.join(output_dir, "args.json"), "w") as f:
-        json.dump(vars(args), f, indent=2)
+    try:
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+        
+        logger.info(f"Successfully loaded config from {config_path}")
+        return config
+        
+    except Exception as e:
+        logger.error(f"Failed to load config from {config_path}: {e}")
+        raise
