@@ -1,5 +1,6 @@
 from .vllm import VLLMModelInterface, VLLMModelConfig
 from .openai import OpenAIModelInterface, OpenAIModelConfig
+from .claude import ClaudeModelInterface, ClaudeModelConfig
 
 REGISTERED_MODEL = {
     "vllm": {
@@ -9,5 +10,9 @@ REGISTERED_MODEL = {
     "openai": {
         "model_cls": OpenAIModelInterface,
         "config_cls": OpenAIModelConfig
+    },
+    "claude": {
+        "model_cls": ClaudeModelInterface,
+        "config_cls": ClaudeModelConfig
     }
 }

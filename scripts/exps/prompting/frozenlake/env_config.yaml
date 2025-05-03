@@ -1,7 +1,7 @@
 env1:
   env_name: frozenlake
   env_config:
-    render_mode: text
+    render_mode: vision
     prompt_format: free_think
     use_accuracy_reward: false
   train_size: 10000
