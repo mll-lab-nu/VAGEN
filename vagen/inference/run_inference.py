@@ -104,58 +104,22 @@ def run_inference_batch(
     return all_results
 
 def log_results_to_wandb(results: List[Dict], global_step: int = 0) -> None:
-    """Log results to wandb using the same format as training."""
-    # Log metrics by config_id (same as training)
-    metrics = log_metrics_by_config_id(results, mode='val')  # Use 'val' to match training prefix
+    """Log results to wandb without any aggregation."""
+    # Log raw metrics for each environment
+    metrics = log_metrics_by_config_id(results, mode='val')
     wandb.log(metrics)
     
-    # Log generation table (same as training)
+    # Log generation table (unchanged)
     generations_to_log = 10  # You can make this configurable
     maybe_log_val_generations_to_wandb(results, generations_to_log, global_step)
     
-    # Log overall statistics
-    success_count = sum(1 for r in results if r['metrics'].get('success', 0) > 0)
-    done_count = sum(1 for r in results if r['metrics'].get('done', 0) > 0)
-    total_score = sum(r['metrics'].get('score', 0) for r in results)
-    avg_steps = sum(r['metrics'].get('step', 0) for r in results) / len(results) if results else 0
-    
+    # If you still want some overall summary, just count things
     wandb.log({
-        "val/success_rate": success_count / len(results) if results else 0,
-        "val/completion_rate": done_count / len(results) if results else 0,
-        "val/average_score": total_score / len(results) if results else 0,
-        "val/average_steps": avg_steps
+        "val/total_environments": len(results),
+        "val/num_successful": sum(1 for r in results if r['metrics'].get('success', 0) > 0),
+        "val/num_done": sum(1 for r in results if r['metrics'].get('done', 0) > 0),
     })
 
-def save_results(results: List[Dict], output_dir: str) -> None:
-    """Save results to disk."""
-    os.makedirs(output_dir, exist_ok=True)
-    
-    # Custom JSON encoder to handle NumPy types
-    class NumpyEncoder(json.JSONEncoder):
-        def default(self, obj):
-            import numpy as np
-            if isinstance(obj, np.integer):
-                return int(obj)
-            elif isinstance(obj, np.floating):
-                return float(obj)
-            elif isinstance(obj, np.bool_):
-                return bool(obj)
-            elif isinstance(obj, np.ndarray):
-                return obj.tolist()
-            return super(NumpyEncoder, self).default(obj)
-    
-    # Save raw results
-    results_file = os.path.join(output_dir, "results.json")
-    with open(results_file, "w") as f:
-        json.dump(results, f, indent=2, cls=NumpyEncoder)
-    
-    # Save summary
-    summary = calculate_aggregate_metrics(results)
-    summary_file = os.path.join(output_dir, "summary.json")
-    with open(summary_file, "w") as f:
-        json.dump(summary, f, indent=2, cls=NumpyEncoder)
-    
-    logger.info(f"Results saved to {output_dir}")
 
 def main():
     """Main entry point for inference."""
@@ -209,35 +173,24 @@ def main():
                 max_steps=inference_config.get('max_steps', 10)
             )
             
-            # Log results to wandb (aligned with training format)
+            # Log results to wandb
             if inference_config.get('use_wandb', True):
                 log_results_to_wandb(results, global_step=0)
             
-            # Save results
-            output_dir = os.path.join(
-                inference_config.get('output_dir', 'inference_outputs'),
-                model_name,
-                datetime.now().strftime("%Y%m%d_%H%M%S")
-            )
-            save_results(results, output_dir)
-            
-            # Print summary
+            # Print summary (no saving to disk)
             print(f"\n===== Results for {model_name} =====")
             print(f"Total environments: {len(results)}")
             
             success_count = sum(1 for r in results if r['metrics'].get('success', 0) > 0)
             done_count = sum(1 for r in results if r['metrics'].get('done', 0) > 0)
-            total_score = sum(r['metrics'].get('score', 0) for r in results)
             
-            print(f"Success rate: {success_count / len(results) * 100:.1f}%")
-            print(f"Completion rate: {done_count / len(results) * 100:.1f}%")
-            print(f"Average score: {total_score / len(results):.4f}")
+            print(f"Successful: {success_count}")
+            print(f"Completed: {done_count}")
             
-            # Print by config_id results (like training)
-            metrics_by_config = log_metrics_by_config_id(results, mode='val')
-            print("\nMetrics by config:")
-            for metric_name, value in metrics_by_config.items():
-                print(f"  {metric_name}: {value:.4f}")
+            # Print individual results
+            print("\nIndividual results:")
+            for i, result in enumerate(results):
+                print(f"Environment {i}: score={result['metrics'].get('score', 0)}, done={result['metrics'].get('done', 0)}, steps={result['metrics'].get('step', 0)}")
             
         except Exception as e:
             logger.error(f"Error during inference for model {model_name}: {str(e)}")

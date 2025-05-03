@@ -20,10 +20,7 @@ class ValidationTableManager:
         generations_to_log: int, 
         global_steps: int
     ) -> None:
-        """
-        Log a table of validation samples with multiple images per sample to wandb.
-        Matches the training code's _maybe_log_val_generations_to_wandb function.
-        """
+        """Log a table of validation samples with each example in its own row."""
         if generations_to_log == 0:
             return
             
@@ -31,7 +28,7 @@ class ValidationTableManager:
             logger.warning('`val_generations_to_log_to_wandb` is set, but wandb is not initialized')
             return
         
-        # Extract data from results exactly like training code
+        # Extract data from results
         inputs = []
         outputs = []
         scores = []
@@ -43,79 +40,67 @@ class ValidationTableManager:
             scores.append(item['metrics']['score'])
             images.append(item['image_data'])
         
-        # Handle the case where images might not be provided
-        if images is None or all(img is None for img in images):
-            samples = list(zip(inputs, outputs, scores))
-            has_images = False
-            max_images_per_sample = 0
-        else:
-            samples = list(zip(inputs, outputs, scores, images))
-            has_images = True
-            # Find maximum number of images in any sample
+        # Check if we have images
+        has_images = any(img_list for img_list in images)
+        
+        # Find maximum number of images in any sample
+        if has_images:
             max_images_per_sample = max(
-                len(img_list) if isinstance(img_list, (list, tuple)) else 1 
+                len(img_list) if img_list else 0
                 for img_list in images
             )
+        else:
+            max_images_per_sample = 0
         
-        # Sort and shuffle exactly like training
+        # Create samples
+        if has_images:
+            samples = list(zip(inputs, outputs, scores, images))
+        else:
+            samples = list(zip(inputs, outputs, scores))
+        
+        # Sort and shuffle for consistency
         samples.sort(key=lambda x: x[0])  # Sort by input text
-        
-        # Use fixed random seed for deterministic shuffling
-        rng = np.random.RandomState()  # No seed specified in training code
+        rng = np.random.RandomState()
         rng.shuffle(samples)
         
-        # Take first N samples after shuffling
+        # Take first N samples
         samples = samples[:generations_to_log]
         
-        # Create column names for all samples
+        # Create columns for the table
         if has_images:
-            columns = ["step"]
-            for i in range(len(samples)):
-                columns.extend([f"input_{i+1}", f"output_{i+1}", f"score_{i+1}"])
-                columns.extend([f"image_{i+1}_{j+1}" for j in range(max_images_per_sample)])
+            columns = ["step", "input", "output", "score"] + [f"image_{i+1}" for i in range(max_images_per_sample)]
         else:
-            columns = ["step"] + sum([[f"input_{i+1}", f"output_{i+1}", f"score_{i+1}"] 
-                                     for i in range(len(samples))], [])
+            columns = ["step", "input", "output", "score"]
         
-        if self.validation_table is None:
-            # Initialize the table on first call
-            self.validation_table = wandb.Table(columns=columns)
+        # Create table
+        table = wandb.Table(columns=columns)
         
-        # Create a new table with same columns and existing data
-        new_table = wandb.Table(columns=columns, data=self.validation_table.data)
-        
-        # Add new row with all data
-        row_data = []
-        row_data.append(global_steps)
-        
+        # Add each sample as a separate row
         for sample in samples:
             if has_images:
                 input_text, output_text, score, sample_images = sample
-                row_data.extend([input_text, output_text, score])
                 
-                # Handle if sample_images is a single image or list of images
-                if not isinstance(sample_images, (list, tuple)):
-                    sample_images = [sample_images]
-                    
-                # Convert each image to wandb.Image
+                # Convert images to wandb.Image
                 wandb_images = []
-                for img in sample_images:
-                    if not isinstance(img, wandb.Image):
-                        img = wandb.Image(img)
-                    wandb_images.append(img)
-                    
-                # Pad with None if there are fewer images than max_images_per_sample
-                wandb_images.extend([None] * (max_images_per_sample - len(wandb_images)))
-                row_data.extend(wandb_images)
+                if sample_images:
+                    for img in sample_images:
+                        if img is not None:
+                            if not isinstance(img, wandb.Image):
+                                img = wandb.Image(img)
+                            wandb_images.append(img)
+                
+                # Pad with None if fewer images than max
+                while len(wandb_images) < max_images_per_sample:
+                    wandb_images.append(None)
+                
+                # Add row
+                table.add_data(global_steps, input_text, output_text, score, *wandb_images)
             else:
                 input_text, output_text, score = sample
-                row_data.extend([input_text, output_text, score])
+                table.add_data(global_steps, input_text, output_text, score)
         
-        new_table.add_data(*row_data)
-        
-        # Update reference and log
-        wandb.log({"val/generations": new_table})
-        self.validation_table = new_table
+        # Log the table
+        wandb.log({"val/generations": table})
 
 
 # Global instance for maintaining table state across calls
@@ -141,29 +126,21 @@ def maybe_log_val_generations_to_wandb(
 def log_metrics_by_config_id(
     results: List[Dict[str, Any]], 
     mode: str = 'inference'
-) -> Dict[str, float]:
+) -> Dict[str, Any]:
     """
-    Convert results to metrics dictionary with proper prefixes.
-    Matches training code's log_rst_to_metrics_dict function.
+    Convert results to metrics dictionary without any aggregation.
+    Just logs raw metrics as they are.
     """
-    from collections import defaultdict
-    
     metric_dict = {}
     
-    # Group metrics by config_id
-    metrics_by_config_id = defaultdict(dict)  # dict of dict of list
-    
-    for item in results:
+    # Simply iterate through results and create metric entries
+    for i, item in enumerate(results):
         config_id = item["config_id"]
+        env_id = item.get("env_id", f"env_{i}")
+        
+        # Log each metric as is, with a unique key including env_id
         for k, v in item["metrics"].items():
-            if k not in metrics_by_config_id[config_id]:
-                metrics_by_config_id[config_id][k] = []
-            metrics_by_config_id[config_id][k].append(v)
-    
-    # Aggregate metrics
-    for config_id, metrics in metrics_by_config_id.items():
-        for k, v in metrics.items():
-            metric_key = f'{mode}/{k}/{config_id}'
-            metric_dict[metric_key] = np.mean(v)
+            metric_key = f'{mode}/{config_id}/{env_id}/{k}'
+            metric_dict[metric_key] = v
     
     return metric_dict
