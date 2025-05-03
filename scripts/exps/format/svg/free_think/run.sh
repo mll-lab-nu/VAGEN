@@ -6,26 +6,28 @@ export PYTHONHASHSEED=0
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-# run python -m vagen.server.server in a tmux session first
+# Extract experiment name from the path
+# This will take the last 3 parts of the path: format/sokoban/free_think
+EXPERIMENT_NAME=$(echo $SCRIPT_DIR | rev | cut -d'/' -f1-3 | rev | tr '/' '-')
 
+echo "Experiment name: $EXPERIMENT_NAME"
+# run python -m vagen.server.server in a tmux session first
 python -m vagen.env.create_dataset \
     --yaml_path "$SCRIPT_DIR/env_config.yaml" \
-    --train_path "data/navigation-vision-debug/train.parquet" \
-    --test_path "data/navigation-vision-debug/test.parquet" \
-    --force_gen
+    --train_path "data/$EXPERIMENT_NAME/train.parquet" \
+    --test_path "data/$EXPERIMENT_NAME/test.parquet" \
 
 # max_trajectory_length = max_prompt_length + max_response_length
 
 python3 -m vagen.trainer.main_ppo \
     algorithm.adv_estimator=masked_gae \
     algorithm.high_level_gamma=0.95 \
-    data.train_files=data/navigation-vision-debug/train.parquet \
-    data.val_files=data/navigation-vision-debug/test.parquet \
-    data.train_batch_size=64 \
-    data.val_batch_size=16 \
+    data.train_files=data/$EXPERIMENT_NAME/train.parquet \
+    data.val_files=data/$EXPERIMENT_NAME/test.parquet \
+    data.train_batch_size=128 \
     data.max_prompt_length=1024 \
-    data.max_response_length=128 \
-    data.max_trajectory_length=2400 \
+    data.max_response_length=648 \
+    data.max_trajectory_length=2600 \
     data.image_key=images \
     data.truncation=error \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \
@@ -62,21 +64,19 @@ python3 -m vagen.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
     trainer.project_name='vagen_new' \
-    trainer.experiment_name='aico_navigation_vision_service' \
+    trainer.experiment_name=$EXPERIMENT_NAME \
     trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \
-    trainer.save_freq=70 \
+    trainer.save_freq=90 \
     trainer.test_freq=20 \
     trainer.total_training_steps=200 \
-    rollout_manager.max_turns=3 \
+    rollout_manager.max_turns=2 \
     rollout_manager.window_size=3 \
     rollout_manager.use_multi_turn_reward=False \
     rollout_manager.use_loss_mask=True \
     rollout_manager.use_gae_mask=True \
     trainer.val_before_train=True \
-    trainer.val_generations_to_log_to_wandb=4 \
+    trainer.val_generations_to_log_to_wandb=8 \
     rollout_manager.n_trajectory=1 \
     rollout_manager.use_service=True \
-    rollout_manager.timeout=240 \
-    rollout_manager.base_url="http://localhost:5000" \
-    2>&1 | tee aico_navigation_vision.log
+    2>&1 | tee $EXPERIMENT_NAME.log

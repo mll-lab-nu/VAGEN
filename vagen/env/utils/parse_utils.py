@@ -14,17 +14,17 @@ def parse_freethink(response: str, special_token_list=None, action_sep=',', max_
     - actions: a list of actions extracted from action_content
     - format_correct: whether the response strictly follows the expected format
     """
-    # Pattern to check for content strictly in the format <think>...</think><answer>...</answer>
-    # strict_pattern = r'^\s*<think>(.*?)</think>\s*<answer>(.*?)</answer>\s*$'
-    # strict_match = re.match(strict_pattern, response.strip(), re.DOTALL)
+    #Pattern to check for content strictly in the format <think>...</think><answer>...</answer>
+    strict_pattern = r'^\s*<think>(.*?)</think>\s*<answer>(.*?)</answer>\s*$'
+    strict_match = re.match(strict_pattern, response.strip(), re.DOTALL)
     
     
     # Pattern to extract content from think and answer tags
     extraction_pattern = r'<think>(.*?)</think>\s*<answer>(.*?)</answer>'
     match = re.search(extraction_pattern, response, re.DOTALL)
-    format_correct = match is not None
+    format_correct = strict_match is not None
     
-    if not match:
+    if not strict_match:
         think_content, action_content, actions = "", "", []
     else:
         think_content, action_content = match.group(1), match.group(2)
@@ -60,16 +60,16 @@ def parse_no_think(response: str, special_token_list=None, action_sep=',', max_a
     - format_correct: whether the response strictly follows the expected format
     """
     # Pattern to check for content strictly in the format <answer>...</answer>
-    # strict_pattern = r'^\s*<answer>(.*?)</answer>\s*$'
-    # strict_match = re.match(strict_pattern, response.strip(), re.DOTALL)
-    # format_correct = strict_match is not None
+    strict_pattern = r'^\s*<answer>(.*?)</answer>\s*$'
+    strict_match = re.match(strict_pattern, response.strip(), re.DOTALL)
+    format_correct = strict_match is not None
     
     # Pattern to extract content from answer tag
     extraction_pattern = r'<answer>(.*?)</answer>'
     match = re.search(extraction_pattern, response, re.DOTALL)
-    format_correct = match is not None
+    #format_correct = match is not None
     
-    if not match:
+    if not strict_match:
         think_content, action_content, actions = "", "", []
     else:
         action_content = match.group(1)
@@ -106,16 +106,16 @@ def parse_grounding(response: str, special_token_list=None, action_sep=',', max_
     - format_correct: whether the response strictly follows the expected format
     """
     # Pattern to check for content strictly in the expected format
-    # strict_pattern = r'^\s*<current_state>(.*?)</current_state>\s*<think>(.*?)</think>\s*<answer>(.*?)</answer>\s*$'
-    # strict_match = re.match(strict_pattern, response.strip(), re.DOTALL)
-    # format_correct = strict_match is not None
+    strict_pattern = r'^\s*<current_state>(.*?)</current_state>\s*<think>(.*?)</think>\s*<answer>(.*?)</answer>\s*$'
+    strict_match = re.match(strict_pattern, response.strip(), re.DOTALL)
+    format_correct = strict_match is not None
     
     # Pattern to extract content from tags
     extraction_pattern = r'<current_state>(.*?)</current_state>\s*<think>(.*?)</think>\s*<answer>(.*?)</answer>'
     match = re.search(extraction_pattern, response, re.DOTALL)
-    format_correct = match is not None
+    #format_correct = match is not None
     
-    if not match:
+    if not strict_match:
         current_state_content, think_content, action_content, actions = "", "", "", []
     else:
         current_state_content, think_content, action_content = match.group(1), match.group(2), match.group(3)
@@ -156,16 +156,16 @@ def parse_worldmodeling(response: str, special_token_list=None, action_sep=',', 
     - format_correct: whether the response strictly follows the expected format
     """
     # Pattern to check for content strictly in the expected format
-    # strict_pattern = r'^\s*<think>(.*?)</think>\s*<answer>(.*?)</answer>\s*<next_state>(.*?)</next_state>\s*$'
-    # strict_match = re.match(strict_pattern, response.strip(), re.DOTALL)
-    # format_correct = strict_match is not None
+    strict_pattern = r'^\s*<think>(.*?)</think>\s*<answer>(.*?)</answer>\s*<next_state>(.*?)</next_state>\s*$'
+    strict_match = re.match(strict_pattern, response.strip(), re.DOTALL)
+    format_correct = strict_match is not None
     
     # Pattern to extract content from tags
     extraction_pattern = r'<think>(.*?)</think>\s*<answer>(.*?)</answer>\s*<next_state>(.*?)</next_state>'
     match = re.search(extraction_pattern, response, re.DOTALL)
-    format_correct = match is not None
+    #format_correct = match is not None
     
-    if not match:
+    if not strict_match:
         think_content, action_content, next_state_content, actions = "", "", "", []
     else:
         think_content, action_content, next_state_content = match.group(1), match.group(2), match.group(3)
@@ -207,16 +207,16 @@ def parse_grounding_worldmodeling(response: str, special_token_list=None, action
     - format_correct: whether the response strictly follows the expected format
     """
     # Pattern to check for content strictly in the expected format
-    # strict_pattern = r'^\s*<current_state>(.*?)</current_state>\s*<think>(.*?)</think>\s*<answer>(.*?)</answer>\s*<next_state>(.*?)</next_state>\s*$'
-    # strict_match = re.match(strict_pattern, response.strip(), re.DOTALL)
-    # format_correct = strict_match is not None
+    strict_pattern = r'^\s*<current_state>(.*?)</current_state>\s*<think>(.*?)</think>\s*<answer>(.*?)</answer>\s*<next_state>(.*?)</next_state>\s*$'
+    strict_match = re.match(strict_pattern, response.strip(), re.DOTALL)
+    format_correct = strict_match is not None
     
     # Pattern to extract content from tags
     extraction_pattern = r'<current_state>(.*?)</current_state>\s*<think>(.*?)</think>\s*<answer>(.*?)</answer>\s*<next_state>(.*?)</next_state>'
     match = re.search(extraction_pattern, response, re.DOTALL)
-    format_correct = match is not None
+    #format_correct = match is not None
     
-    if not match:
+    if not strict_match:
         current_state_content, think_content, action_content, next_state_content, actions = "", "", "", "", []
     else:
         current_state_content, think_content, action_content, next_state_content = match.group(1), match.group(2), match.group(3), match.group(4)

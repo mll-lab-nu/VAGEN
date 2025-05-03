@@ -6,7 +6,7 @@ from typing import Optional, List, Union, Dict
 class SvgEnvConfig(BaseEnvConfig):
     """Configuration for the SVG environment"""
     dataset_name: str = "starvector/svg-icons-simple"
-    data_dir: str = "vagen/env/svg/data"
+    data_dir: str = "data"
     seed: int = 42
     split: str = "train"
     action_sep: str = "~~"

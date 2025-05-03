@@ -26,7 +26,7 @@ def build_env(env_id, control_mode="pd_ee_delta_pose", stage=0, record_dir='./te
     return env
 
 
-def handle_info(info,mask_success=False,env=None):
+def handle_info(info,state_keys,mask_success=False,env=None,):
     obj_positions = {}
     other_info = {}
     
@@ -40,7 +40,8 @@ def handle_info(info,mask_success=False,env=None):
     for k, v in info.items():
         if k.endswith('_position'):
             # Convert position arrays to integer tuples in cm
-            obj_positions[k] = tuple(np.round(v * 1000, 0).astype(int).tolist())
+            if k in state_keys:
+                obj_positions[k] = tuple(np.round(v * 1000, 0).astype(int).tolist())
         elif k.endswith('_value'):
             # Convert value arrays to integers in cm
             other_info[k] = np.round(v * 1000, 0).astype(int).item()
@@ -70,8 +71,8 @@ def handle_info(info,mask_success=False,env=None):
         final_info.update(other_info)
     
     return {
-        'obj_positions': list(obj_positions.values()),
-        'other_info': str(final_info)
+        'obj_positions': obj_positions,
+        'other_info': final_info
     }
     
 def get_workspace_limits(env):

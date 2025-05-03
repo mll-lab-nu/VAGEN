@@ -23,7 +23,7 @@ class PlaceTwoCubeEnv(BaseEnv):
     agent: Union[Panda, Xmate3Robotiq, Fetch]
     skill_config=None
     vlm_info_keys=[]
-    state_keys=["red_cube_position", "green_cube_position"]
+    state_keys=["red_cube_position", "green_cube_position","left_target_position","right_target_position"]
 
     def __init__(self, stage=0,*args, robot_uids="panda", robot_init_qpos_noise=0.02, **kwargs):
         self.stage=stage

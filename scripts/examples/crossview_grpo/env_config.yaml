@@ -1,0 +1,8 @@
+env1:
+    env_name: crossview
+    env_config:
+        render_mode: vision
+    train_size: 10000
+    test_size: 512
+    
+

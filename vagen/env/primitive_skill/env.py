@@ -9,7 +9,7 @@ from .env_config import PrimitiveSkillEnvConfig
 from .maniskill.utils import build_env, handle_info, get_workspace_limits
 from .prompts import system_prompt, init_observation_template, action_template, format_prompt
 import vagen.env.primitive_skill.maniskill.env
-
+import random
 class PrimitiveSkillEnv(BaseEnv):
     def __init__(self, config: PrimitiveSkillEnvConfig):
         """
@@ -191,7 +191,7 @@ class PrimitiveSkillEnv(BaseEnv):
         # This is a simple implementation - customize based on your environment
         return {k: v for k, v in self.last_info.items() if k.endswith('_position')}
     
-    def _render(self, info, init_obs=False, valid_actions=None):
+    def _render(self, info, init_obs=False, valid_actions=None,seed=42):
         """
         Render the environment as an observation.
         
@@ -203,9 +203,13 @@ class PrimitiveSkillEnv(BaseEnv):
         Returns:
             Dict: Observation dictionary containing observation string and optional image data
         """
-        new_info = handle_info(info.copy(), mask_success=self.config.mask_success, env=self.env)
-        object_positions = new_info['obj_positions']
-        other_information = new_info['other_info']
+        new_info = handle_info(info.copy(), state_keys=self.state_keys,mask_success=self.config.mask_success, env=self.env)
+        positions_list = list(new_info['obj_positions'].values())
+        # random.seed(seed)
+        # random.shuffle(positions_list)  # This shuffles the list in-place
+        object_positions = str(positions_list)
+        # object_names=str([key.removesuffix("_position") for key in new_info['obj_positions'].keys()])
+        other_information = str(new_info['other_info'])
         instruction = self.env.instruction()
         img_placeholder = self.config.image_placeholder
         x_workspace, y_workspace, z_workspace = get_workspace_limits(self.env)
@@ -227,7 +231,8 @@ class PrimitiveSkillEnv(BaseEnv):
                 y_workspace=y_workspace,
                 z_workspace=z_workspace,
                 object_positions=object_positions,
-                other_information=other_information
+                other_information=other_information,
+                #object_names=object_names
             ) + "\n" + format_prompt_text
         else:
             # Subsequent observations include action results
@@ -239,7 +244,8 @@ class PrimitiveSkillEnv(BaseEnv):
                 y_workspace=y_workspace,
                 z_workspace=z_workspace,
                 object_positions=object_positions,
-                other_information=other_information
+                other_information=other_information,
+                #object_names=object_names
             ) + "\n" + format_prompt_text
         
         multi_modal_data = None

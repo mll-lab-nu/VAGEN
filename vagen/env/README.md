@@ -40,8 +40,8 @@ python vagen/env/navigation/startx.py 1
 ### PrimitiveSkill
 ```
 pip install --upgrade mani_skill
-python -m mani_skill.utils.download_asset "PickSingleYCB-v1"
-python -m mani_skill.utils.download_asset partnet_mobility_cabinet
+python -m mani_skill.utils.download_asset "PickSingleYCB-v1" -y
+python -m mani_skill.utils.download_asset partnet_mobility_cabinet -y
 
 # Refer to https://github.com/haosulab/ManiSkill, probably you also need:
 sudo apt-get update && sudo apt-get install -y libx11-6
@@ -73,6 +73,16 @@ alfworld-download
 python vagen/env/alfworld/startx.py 0
 python vagen/server/server.py
 ```
+
+
+
+### crossview
+cd vagen/env/crossview
+git clone https://huggingface.co/datasets/yinbq/CrossViewQA
+cd CrossViewQA
+git lfs pull
+mkdir -p extracted_images
+unzip other_all_image.zip -d extracted_images
 
 ## Benchmark your Env and Service
 env/service running time varies on different devices, you can benchmark current env/service or debug your own env/service as follow:

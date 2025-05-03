@@ -32,4 +32,4 @@ echo "Installing Frozenlake dependencies"
 pip install 'gymnasium'
 pip install "gymnasium[toy-text]"
 
-echo "Installation complete, to install dependencies for other environments, refer to env/readme!"
+echo "Installation complete, to install dependencies for other environments, refer to env/readme"
