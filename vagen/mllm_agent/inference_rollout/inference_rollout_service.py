@@ -1,3 +1,5 @@
+# vagen/mllm_agent/inference_rollout/inference_rollout_service.py
+
 import os
 import time
 from typing import List, Dict, Tuple, Optional, Any
@@ -166,7 +168,7 @@ class InferenceRolloutService(BaseRollout):
                     print(f"All environments completed after {step} steps")
                 break
             
-            # Collect prompts and images for active environments
+            # Collect prompts for active environments
             env_messages = {}
             
             for env_id in active_envs:
@@ -233,6 +235,10 @@ class InferenceRolloutService(BaseRollout):
         """
         Generate responses for multiple environments.
         
+        This method now properly aligns with the model interface that expects
+        message lists directly, and handles multimodal data according to the
+        training rollout format.
+        
         Args:
             env_messages: Dictionary mapping environment IDs to conversation histories
             
@@ -243,21 +249,13 @@ class InferenceRolloutService(BaseRollout):
         env_ids = list(env_messages.keys())
         prompts = []
         
+        # Collect all messages for batch generation
         for env_id in env_ids:
             messages = env_messages[env_id]
-            # Check if any message has multimodal data
-            has_images = any("multi_modal_data" in msg for msg in messages)
-            
-            if has_images:
-                # Process multimodal input
-                prompt = self._process_multimodal_messages(messages)
-            else:
-                # Process text-only input
-                prompt = self.model_interface.format_prompt(messages)
-            
-            prompts.append(prompt)
+            prompts.append(messages)  # Model interface expects message lists directly
         
         # Generate responses for all prompts
+        # The model interface will handle multimodal data extraction internally
         batch_results = self.model_interface.generate(prompts)
         
         # Extract responses
@@ -265,39 +263,6 @@ class InferenceRolloutService(BaseRollout):
             responses[env_id] = batch_results[i]["text"]
         
         return responses
-    
-    def _process_multimodal_messages(self, messages: List[Dict]) -> Dict:
-        """
-        Process messages with multimodal data for the model interface.
-        
-        Args:
-            messages: List of message dictionaries
-            
-        Returns:
-            Processed input for the model interface
-        """
-        # Extract images from messages
-        all_images = []
-        for message in messages:
-            if "multi_modal_data" in message:
-                for key, values in message["multi_modal_data"].items():
-                    for value in values:
-                        # Handle different image formats
-                        if isinstance(value, PIL.Image.Image):
-                            all_images.append(value)
-                        # Handle serialized images from the service
-                        elif isinstance(value, dict) and "__pil_image__" in value:
-                            from vagen.server.serial import deserialize_pil_image
-                            all_images.append(deserialize_pil_image(value))
-        
-        # Process images
-        processed_images = self.model_interface.process_images(all_images)
-        
-        # Return formatted input
-        return {
-            "messages": messages,
-            "images": processed_images
-        }
     
     def recording_to_log(self) -> List[Dict]:
         """
@@ -348,14 +313,15 @@ class InferenceRolloutService(BaseRollout):
             for message in self.recordings[env_id]:
                 if "multi_modal_data" in message:
                     for key, values in message["multi_modal_data"].items():
-                        for value in values:
-                            # Handle different image formats
-                            if isinstance(value, PIL.Image.Image):
-                                image_data.append(value)
-                            # Handle serialized images from the service
-                            elif isinstance(value, dict) and "__pil_image__" in value:
-                                from vagen.server.serial import deserialize_pil_image
-                                image_data.append(deserialize_pil_image(value))
+                        if key == "<image>" or "image" in key.lower():
+                            for value in values:
+                                # Handle different image formats
+                                if isinstance(value, PIL.Image.Image):
+                                    image_data.append(value)
+                                # Handle serialized images from the service
+                                elif isinstance(value, dict) and "__pil_image__" in value:
+                                    from vagen.server.serial import deserialize_pil_image
+                                    image_data.append(deserialize_pil_image(value))
             
             # Format the conversation
             output_str = ""
@@ -420,82 +386,4 @@ class InferenceRolloutService(BaseRollout):
         self.system_prompts = {}
         
         if self.debug:
-            print("Closed all environments and cleaned up resources")
-            
-
-def run_test():
-    """Run a simple test of the InferenceRolloutService."""
-    print("=== Testing InferenceRolloutService ===")
-    
-    # Create a model interface
-    model = MockModelInterface()
-    
-    # Create a configuration
-    config = {
-        "max_steps": 5,
-        "show_progress": True,
-        "debug": True
-    }
-    
-    # Create the service
-    service = InferenceRolloutService(
-        config=config,
-        model_interface=model,
-        debug=True
-    )
-    
-    # Create environment configurations
-    env_configs = [
-        {
-            "env_name": "frozenlake",
-            "env_config": {
-                "size": 4,
-                "is_slippery": False,
-                "render_mode": "vision"
-            },
-            "seed": 42
-        },
-        {
-            "env_name": "frozenlake",
-            "env_config": {
-                "size": 4,
-                "is_slippery": True,
-                "render_mode": "text"
-            },
-            "seed": 43
-        }
-    ]
-    
-    try:
-        # Reset environments
-        print("\nResetting environments...")
-        service.reset(env_configs)
-        
-        # Run inference
-        print("\nRunning inference...")
-        service.run()
-        
-        # Get results
-        print("\nGetting results...")
-        results = service.recording_to_log()
-        
-        # Print results
-        print("\n=== Results ===")
-        for result in results:
-            print(f"Environment: {result['env_id']}")
-            print(f"Config ID: {result['config_id']}")
-            print(f"Steps: {result['metrics']['step']}")
-            print(f"Done: {result['metrics']['done']}")
-            print(f"Score: {result['metrics']['score']}")
-            print("Metrics:", {k: v for k, v in result['metrics'].items() if k not in ['step', 'done', 'score']})
-            print("---")
-    
-    finally:
-        # Clean up
-        print("\nCleaning up...")
-        service.close()
-    
-    print("=== Test completed ===")
-
-if __name__ == "__main__":
-    run_test()
+            print("Closed all environments and cleaned up resources")   
