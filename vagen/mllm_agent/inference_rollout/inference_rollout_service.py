@@ -133,7 +133,7 @@ class InferenceRolloutService(BaseRollout):
                 "rewards": [],
                 "metrics": {
                     "turn_metrics": defaultdict(list),
-                    "traj_metrics": {}
+                    "traj_metrics": defaultdict(list)  # Changed to defaultdict to accumulate all metrics
                 }
             }
         
@@ -200,10 +200,21 @@ class InferenceRolloutService(BaseRollout):
                 # Store llm_raw_response in info
                 info["llm_raw_response"] = responses[env_id]
                 
-                # Update metrics
-                self.env_states[env_id]["metrics"]["traj_metrics"] = info["metrics"].get("traj_metrics", {})
-                for k, v in info["metrics"].get("turn_metrics", {}).items():
-                    self.env_states[env_id]["metrics"]["turn_metrics"][k].append(v)
+                # Update metrics - properly handle all metrics from the environment
+                if "metrics" in info:
+                    # Update trajectory metrics
+                    for k, v in info["metrics"].get("traj_metrics", {}).items():
+                        if isinstance(v, list):
+                            self.env_states[env_id]["metrics"]["traj_metrics"][k].extend(v)
+                        else:
+                            self.env_states[env_id]["metrics"]["traj_metrics"][k] = v
+                    
+                    # Update turn metrics (accumulate lists)
+                    for k, v in info["metrics"].get("turn_metrics", {}).items():
+                        if isinstance(v, list):
+                            self.env_states[env_id]["metrics"]["turn_metrics"][k].extend(v)
+                        else:
+                            self.env_states[env_id]["metrics"]["turn_metrics"][k].append(v)
                 
                 # Add assistant response to recording
                 self.recordings[env_id].append({
@@ -349,16 +360,28 @@ class InferenceRolloutService(BaseRollout):
                 "step": convert_numpy_types(step_count),
             }
             
-            # Add turn metrics (averaged)
+            # Add turn metrics (handle both averaged and list data)
             turn_metrics = self.env_states[env_id]["metrics"]["turn_metrics"]
             for k, v in turn_metrics.items():
-                if v:
+                if isinstance(v, list) and v:
+                    # Average list values
                     metrics[f"avg_{k}"] = convert_numpy_types(sum(v) / len(v))
+                    # Also keep the raw list
+                    metrics[f"all_{k}"] = convert_numpy_types(v)
+                else:
+                    # Direct value
+                    metrics[k] = convert_numpy_types(v)
             
-            # Add trajectory metrics
+            # Add trajectory metrics (keep all metrics)
             traj_metrics = self.env_states[env_id]["metrics"]["traj_metrics"]
             for k, v in traj_metrics.items():
-                metrics[k] = convert_numpy_types(v)
+                if isinstance(v, list) and v:
+                    # For list values, take the last one (most recent state)
+                    metrics[k] = convert_numpy_types(v[-1] if v else 0)
+                    # Also keep the full history
+                    metrics[f"history_{k}"] = convert_numpy_types(v)
+                else:
+                    metrics[k] = convert_numpy_types(v)
             
             # Add to results
             results.append({
@@ -386,4 +409,4 @@ class InferenceRolloutService(BaseRollout):
         self.system_prompts = {}
         
         if self.debug:
-            print("Closed all environments and cleaned up resources")   
+            print("Closed all environments and cleaned up resources")
