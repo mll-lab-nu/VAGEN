@@ -18,4 +18,5 @@ python -m vagen.env.create_dataset \
 python -m vagen.inference.run_inference \
     --inference_config_path="$(dirname $SCRIPT_DIR)/inference_config.yaml" \
     --model_config_path="$(dirname $SCRIPT_DIR)/model_config.yaml" \
-    --val_files_path="data/$EXPERIMENT_NAME/test.parquet"
+    --val_files_path="data/$EXPERIMENT_NAME/test.parquet" \
+    --wandb_path_name="$EXPERIMENT_NAME"

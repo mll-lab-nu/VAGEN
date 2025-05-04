@@ -1,5 +1,3 @@
-# vagen/inference/run_inference.py
-
 import os
 import sys
 import argparse
@@ -32,6 +30,8 @@ def parse_args():
                        help="Path to model configuration YAML")
     parser.add_argument("--val_files_path", type=str, required=True,
                        help="Path to validation dataset parquet file")
+    parser.add_argument("--wandb_path_name", type=str, required=True,
+                        help="For clearify wandb run's name")
     
     return parser.parse_args()
 
@@ -57,10 +57,10 @@ def load_environment_configs_from_parquet(val_files_path: str) -> List[Dict]:
     
     return env_configs
 
-def setup_wandb(model_name: str, model_config: Dict, inference_config: Dict) -> None:
+def setup_wandb(model_name: str,wandb_path_name: str,  model_config: Dict, inference_config: Dict) -> None:
     """Initialize wandb run."""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_name = f"{model_name}_inference_{timestamp}"
+    run_name = f"{model_name}_{wandb_path_name}_inference"
     
     wandb.init(
         project=inference_config.get('wandb_project', 'vagen-inference'),
@@ -127,7 +127,6 @@ def log_results_to_wandb(results: List[Dict], inference_config: Dict) -> None:
 
 def main():
     """Main entry point for inference."""
-    """Main entry point for inference."""
     args = parse_args()
     
     # Load configurations
@@ -141,10 +140,7 @@ def main():
     )
     
     logger.info("Starting inference pipeline")
-    logger.info("Starting inference pipeline")
     
-    # Load environment configurations
-    env_configs = load_environment_configs_from_parquet(args.val_files_path)
     # Load environment configurations
     env_configs = load_environment_configs_from_parquet(args.val_files_path)
     logger.info(f"Loaded {len(env_configs)} environment configurations")
@@ -156,7 +152,7 @@ def main():
         
         # Setup wandb for this model
         if inference_config.get('use_wandb', True):
-            setup_wandb(model_name, model_cfg, inference_config)
+            setup_wandb(model_name, args.wandb_path_name, model_cfg, inference_config)
         
         try:
             # Create model interface
