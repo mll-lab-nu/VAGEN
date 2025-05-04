@@ -5,4 +5,4 @@ env1:
         use_accuracy_reward: false
         prompt_format: free_think
     train_size: 10000 
-    test_size: 2
+    test_size: 512
