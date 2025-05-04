@@ -25,6 +25,6 @@ mkdir -p benchmark_results
 
 # Run benchmark
 echo "Running service benchmark"
-python -m vagen.utils_benchmark.service_benchmark --config "$SCRIPT_DIR/benchmark_config.yaml"
+python -m vagen.env.verify_service --config "$SCRIPT_DIR/benchmark_config.yaml"
 
 echo "Benchmark complete. Results saved to benchmark_results directory."
