@@ -1,0 +1,21 @@
+env1:
+    env_name: svg
+    env_config:
+        prompt_format: free_think
+        split: train
+        dino_weight: 0.0
+        structural_weight: 0.0
+        dreamsim_weight: 5.0
+    train_size: 500
+    test_size: 0
+
+env2:
+    env_name: svg
+    env_config:
+        prompt_format: free_think
+        split: test
+        dino_weight: 0.0
+        structural_weight: 0.0
+        dreamsim_weight: 5.0
+    train_size: 0
+    test_size: 2

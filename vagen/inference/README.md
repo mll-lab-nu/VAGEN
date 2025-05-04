@@ -15,5 +15,5 @@ export GOOGLE_API_KEY=<your_gemini_api_key>
 ## Test your inference pipeline
 ```
 python vagen/server/server.py
-./scripts/exps/prompting/frozenlake/run.sh
+./scripts/debug/debug_api_frozenlake/run.sh
 ```

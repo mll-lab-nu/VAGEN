@@ -5,7 +5,7 @@ server_max_workers: 12
 
 # Inference parameters
 batch_size: 32
-max_steps: 3
+max_steps: 5
 split: "test"
 debug: false
 
@@ -15,7 +15,7 @@ output_dir: "inference_outputs"
 # WandB configuration
 use_wandb: true
 wandb_project: "vagen-inference"
-val_generations_to_log_to_wandb: 10 
+val_generations_to_log_to_wandb: 50
 
 # Display settings
 show_progress: true

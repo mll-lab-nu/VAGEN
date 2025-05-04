@@ -150,7 +150,6 @@ def main():
     logger.info(f"Loaded {len(env_configs)} environment configurations")
     
     # Process each model
-    # Process each model
     models = model_config.get('models', {})
     for model_name, model_cfg in models.items():
         logger.info(f"Running inference for model: {model_name}")

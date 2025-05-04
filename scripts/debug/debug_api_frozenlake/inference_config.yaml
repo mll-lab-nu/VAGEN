@@ -1,7 +1,7 @@
 # Server configuration
 server_url: "http://localhost:5000"
 server_timeout: 600
-server_max_workers: 12
+server_max_workers: 48
 
 # Inference parameters
 batch_size: 32
@@ -14,7 +14,7 @@ output_dir: "inference_outputs"
 
 # WandB configuration
 use_wandb: true
-wandb_project: "vagen-inference"
+wandb_project: "vagen-debug"
 val_generations_to_log_to_wandb: 10 
 
 # Display settings
