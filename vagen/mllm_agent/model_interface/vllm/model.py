@@ -335,7 +335,7 @@ class VLLMModelInterface(BaseModelInterface):
             else:
                 # If it's already processed, just append
                 processed_images.append(img)
-            
+        
         return processed_images
     
     def get_model_info(self) -> Dict[str, Any]:
