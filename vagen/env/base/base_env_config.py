@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
 from typing import Optional, List, Union
+import random
 @dataclass
 class BaseEnvConfig(ABC):
     format_reward: float = 0.5
@@ -19,3 +20,8 @@ class BaseEnvConfig(ABC):
             default: Default value if key is not found
         """
         return getattr(self, key, default)
+    
+    def generate_seeds(self,size,seed=0,n_candidate: int = 20000,) -> list:
+        random.seed(seed)
+        seeds=random.sample(range(0, n_candidate+size), size)
+        return seeds
