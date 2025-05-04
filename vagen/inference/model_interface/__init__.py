@@ -2,6 +2,7 @@ from .vllm import VLLMModelInterface, VLLMModelConfig
 from .openai import OpenAIModelInterface, OpenAIModelConfig
 from .claude import ClaudeModelInterface, ClaudeModelConfig
 from .gemini import GeminiModelInterface, GeminiModelConfig
+from .routerapi import RouterAPIModelInterface, RouterAPIModelConfig
 
 REGISTERED_MODEL = {
     "vllm": {
@@ -19,5 +20,9 @@ REGISTERED_MODEL = {
     "gemini": {
         "model_cls": GeminiModelInterface,
         "config_cls": GeminiModelConfig
+    },
+    "routerapi": {
+        "model_cls": RouterAPIModelInterface,
+        "config_cls": RouterAPIModelConfig
     }
 }

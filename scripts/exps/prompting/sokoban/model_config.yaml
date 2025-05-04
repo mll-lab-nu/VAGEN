@@ -13,21 +13,21 @@ models:
     max_tokens: 150
     temperature: 0.7
 
-  # gpt4o:
-  #   provider: openai
-  #   model_name: gpt-4o
-  #   max_tokens: 150
-  #   temperature: 0.7
-  #   presence_penalty: 0.0
-  #   frequency_penalty: 0.0
-  #   max_retries: 3
-  #   timeout: 60
+  gpt4o:
+    provider: openai
+    model_name: gpt-4o
+    max_tokens: 150
+    temperature: 0.7
+    presence_penalty: 0.0
+    frequency_penalty: 0.0
+    max_retries: 3
+    timeout: 60
 
-  # claude_3_sonnet:
-  #   provider: claude
-  #   model_name: claude-3-7-sonnet-20250219
-  #   max_tokens: 150
-  #   temperature: 0.7
+  claude_3_sonnet:
+    provider: claude
+    model_name: claude-3-7-sonnet-20250219
+    max_tokens: 150
+    temperature: 0.7
   
   # Gemini_2.5_flask:
   #     provider: gemini
