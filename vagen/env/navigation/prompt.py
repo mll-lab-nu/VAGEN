@@ -1,4 +1,4 @@
-def system_prompt():
+def system_prompt(**kwargs):
     return """You are a home robot and perform navigation tasks according to instructions.
 
 Actions you can take: moveahead, moveback, moveright, moveleft, rotateright, rotateleft, lookup, lookdown. 

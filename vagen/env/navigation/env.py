@@ -385,7 +385,7 @@ class NavigationEnv(BaseEnv):
         )
         
     
-        return system_prompt() + '\n' + format_prompt_text
+        return system_prompt(format=self.config.prompt_format) + '\n' + format_prompt_text
     
     def compute_reward(self):
         """Compute the total reward for the episode.
