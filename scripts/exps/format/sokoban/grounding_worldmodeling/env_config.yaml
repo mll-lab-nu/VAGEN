@@ -5,4 +5,4 @@ env1:
         prompt_format: grounding_worldmodeling
         use_accuracy_reward: false
     train_size: 10000  
-    test_size: 512
+    test_size: 128
