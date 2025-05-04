@@ -38,23 +38,3 @@ models:
   #   use_batch_api: true  # Use batch API for cost optimization
   #   batch_poll_interval: 10  # Poll every 10 seconds
   #   batch_max_wait_time: 7200  # Wait up to 2 hours
-
-  # VLM-R1-MATH:
-  #   provider: vllm
-  #   model_name: omlab/VLM-R1-Qwen2.5VL-3B-Math-0305
-  #   max_tokens: 150
-  #   temperature: 0.7
-  
-  # VLM-R1-OVD:
-  #   provider: vllm
-  #   model_name: omlab/VLM-R1-Qwen2.5VL-3B-OVD-0321
-  #   max_tokens: 150
-  #   temperature: 0.7
-  
-  VLM-R1-REC:
-    provider: vllm
-    model_name: omlab/Qwen2.5VL-3B-VLM-R1-REC-500steps
-    max_tokens: 150
-    temperature: 0.7
-
-    

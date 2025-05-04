@@ -1,0 +1,34 @@
+# Benchmark parameters
+benchmark:
+  # Functions to benchmark
+  functions: 
+    - system_prompt
+    - reset
+    - step
+    - compute_reward
+    - close
+  
+  # Number of iterations for statistical significance
+  iterations: 3
+  
+  # Number of steps to perform for each environment
+  step_count: 5
+  
+  # Batch sizes to test
+  batch_sizes: [8, 128]
+  
+  # Maximum number of parallel workers
+  max_workers: 8
+  
+  # Directory to save benchmark results
+  output_dir: "env_benchmark_results"
+  
+  # Valid commands for testing (optional, environment-specific)
+  valid_commands: ["Left", "Right", "Up", "Down"]
+
+# Datasets to use for benchmarking
+datasets:
+  - name: sokoban-vision
+    train_path: data/sokoban-vision-benchmark/train.parquet
+    test_path: data/sokoban-vision-benchmark/test.parquet
+    use_split: both

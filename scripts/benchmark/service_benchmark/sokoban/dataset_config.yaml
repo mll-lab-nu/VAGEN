@@ -1,0 +1,7 @@
+sokoban-vision:
+  env_name: sokoban
+  env_config:
+    render_mode: vision
+    max_actions_per_step: 1
+  train_size: 1000
+  test_size: 64
