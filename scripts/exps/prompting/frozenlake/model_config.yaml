@@ -7,6 +7,12 @@ models:
   #   tensor_parallel_size: 2
   #   gpu_memory_utilization: 0.9
 
+  qwen_vl_3b_api:
+    provider: routerapi
+    model_name: qwen/qwen2.5-vl-3b-instruct:free
+    max_tokens: 150
+    temperature: 0.7
+
   # gpt4o:
   #   provider: openai
   #   model_name: gpt-4o
@@ -51,10 +57,10 @@ models:
   #   max_tokens: 150
   #   temperature: 0.7
   
-  VLM-R1-REC:
-    provider: vllm
-    model_name: omlab/Qwen2.5VL-3B-VLM-R1-REC-500steps
-    max_tokens: 150
-    temperature: 0.7
+  # VLM-R1-REC:
+  #   provider: vllm
+  #   model_name: omlab/Qwen2.5VL-3B-VLM-R1-REC-500steps
+  #   max_tokens: 150
+  #   temperature: 0.7
 
     
