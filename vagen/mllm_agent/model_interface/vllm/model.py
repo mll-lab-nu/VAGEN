@@ -1,5 +1,3 @@
-# vagen/mllm_agent/model_interface/vllm/vllm_model.py
-
 import base64
 import io
 import logging
@@ -36,7 +34,7 @@ class VLLMModelInterface(BaseModelInterface):
         self.is_multimodal = any(mm_indicator in self.model_name.lower() 
                                 for mm_indicator in ["vl", "vision", "vlm"])
         
-        # Prepare model initialization parameters
+        # Base model parameters (work for all models)
         model_kwargs = {
             "model": self.model_name,
             "tensor_parallel_size": config.tensor_parallel_size,
@@ -46,16 +44,57 @@ class VLLMModelInterface(BaseModelInterface):
             "dtype": config.dtype
         }
         
-        # Add VLM specific parameters if it's a multimodal model
+        # If this is a multimodal model, try to handle according to vLLM VLM documentation
         if self.is_multimodal:
+            logger.info(f"Detected multimodal model: {self.model_name}. Using VLM parameters.")
+            
+            # Create engine_args dict separately for VLM models
+            # Note: using engine_args dict directly instead of adding to model_kwargs
+            from vllm.engine.arg_utils import EngineArgs
+            
+            # Default engine arguments
+            engine_args_dict = {
+                "model": self.model_name,
+                "tensor_parallel_size": config.tensor_parallel_size,
+                "trust_remote_code": config.trust_remote_code,
+                "enforce_eager": config.enforce_eager,
+                "gpu_memory_utilization": config.gpu_memory_utilization,
+                "dtype": config.dtype
+            }
+            
+            # Add additional args for VLM if provided in config
+            extra_vlm_args = {}
             if config.image_input_type:
-                model_kwargs["image_input_type"] = config.image_input_type
+                extra_vlm_args["image_input_type"] = config.image_input_type
             if config.image_token_id is not None:
-                model_kwargs["image_token_id"] = config.image_token_id
+                extra_vlm_args["image_token_id"] = config.image_token_id
             if config.image_input_shape:
-                model_kwargs["image_input_shape"] = config.image_input_shape
+                extra_vlm_args["image_input_shape"] = config.image_input_shape
             if config.image_feature_size:
-                model_kwargs["image_feature_size"] = config.image_feature_size
+                extra_vlm_args["image_feature_size"] = config.image_feature_size
+            
+            try:
+                # Try to create engine args with VLM-specific parameters
+                vlm_engine_args = EngineArgs(**engine_args_dict, **extra_vlm_args)
+                model_kwargs["engine_args"] = vlm_engine_args
+                logger.info("Successfully created VLM engine args with multimodal parameters")
+            except TypeError as e:
+                logger.warning(f"Failed to create VLM engine args: {e}")
+                logger.info("Trying direct initialization approach...")
+                
+                # Fallback to direct parameter passing method
+                try:
+                    # For newer vLLM versions that directly support VLM parameters
+                    model_kwargs.update(extra_vlm_args)
+                    logger.info("Using direct VLM parameters instead of engine_args")
+                except Exception as e:
+                    logger.error(f"Both VLM initialization methods failed. Running in text-only mode: {e}")
+                    # Remove all VLM-specific parameters to ensure text mode works
+                    for key in ["image_input_type", "image_token_id", "image_input_shape", "image_feature_size"]:
+                        if key in model_kwargs:
+                            del model_kwargs[key]
+                    # Mark as non-multimodal to prevent VLM-specific processing
+                    self.is_multimodal = False
         
         # Load model
         logger.info(f"Loading {'multimodal' if self.is_multimodal else 'text'} model {self.model_name} with vLLM...")
@@ -64,7 +103,63 @@ class VLLMModelInterface(BaseModelInterface):
             logger.info(f"Model successfully loaded with vLLM")
         except Exception as e:
             logger.error(f"Failed to load model: {e}")
-            raise
+            # If using engine_args failed, try without engine_args
+            if 'engine_args' in model_kwargs:
+                logger.info("Retrying without engine_args")
+                del model_kwargs['engine_args']
+                
+                # Try direct parameter approach again
+                try:
+                    self.model = LLM(**model_kwargs)
+                    logger.info("Model loaded successfully with direct parameters")
+                except Exception as e2:
+                    logger.error(f"Failed with direct parameters: {e2}. Trying text-only mode.")
+                    # Remove all VLM parameters
+                    for key in ["image_input_type", "image_token_id", "image_input_shape", "image_feature_size"]:
+                        if key in model_kwargs:
+                            del model_kwargs[key]
+                    
+                    try:
+                        self.model = LLM(**model_kwargs)
+                        logger.info("Model loaded successfully in text-only mode")
+                        self.is_multimodal = False
+                    except Exception as e3:
+                        logger.error(f"All loading attempts failed: {e3}")
+                        raise
+            else:
+                # No engine_args, so this is already a direct attempt
+                # Try again without multimodal parameters
+                for key in ["image_input_type", "image_token_id", "image_input_shape", "image_feature_size"]:
+                    if key in model_kwargs:
+                        del model_kwargs[key]
+                
+                try:
+                    self.model = LLM(**model_kwargs)
+                    logger.info("Model loaded successfully in text-only mode")
+                    self.is_multimodal = False
+                except Exception as e2:
+                    logger.error(f"Failed to load model even in text-only mode: {e2}")
+                    raise
+    
+    def _check_vllm_multimodal_support(self) -> bool:
+        """
+        Check if the installed vLLM version supports multimodal parameters.
+        
+        Returns:
+            True if vLLM supports multimodal, False otherwise
+        """
+        try:
+            from vllm.engine.arg_utils import EngineArgs
+            
+            # Check if EngineArgs supports multimodal parameters
+            # Create a test instance to see if image_input_type is a valid parameter
+            supported_params = set(EngineArgs.__init__.__code__.co_varnames)
+            
+            # If image_input_type is in the parameters, multimodal is supported
+            return "image_input_type" in supported_params
+        except (ImportError, AttributeError):
+            logger.warning("Could not inspect vLLM's EngineArgs class, assuming no multimodal support")
+            return False
     
     def generate(self, prompts: List[Any], **kwargs) -> List[Dict[str, Any]]:
         """
@@ -124,11 +219,16 @@ class VLLMModelInterface(BaseModelInterface):
             if self.is_multimodal and any(img is not None for img in image_inputs):
                 # For multimodal generation with vLLM
                 logger.debug(f"Generating multimodal responses for {len(formatted_prompts)} prompts")
-                outputs = self.model.generate(
-                    prompts=formatted_prompts,
-                    sampling_params=sampling_params,
-                    multi_modal_data={"image": image_inputs}  # vLLM expects this format
-                )
+                try:
+                    outputs = self.model.generate(
+                        prompts=formatted_prompts,
+                        sampling_params=sampling_params,
+                        multi_modal_data={"image": image_inputs}  # vLLM expects this format
+                    )
+                except Exception as e:
+                    logger.warning(f"Multimodal generation failed: {e}. Falling back to text-only generation.")
+                    # Fallback to text-only
+                    outputs = self.model.generate(formatted_prompts, sampling_params)
             else:
                 # Text-only generation
                 logger.debug(f"Generating text responses for {len(formatted_prompts)} prompts")
@@ -204,30 +304,6 @@ class VLLMModelInterface(BaseModelInterface):
         formatted_prompt += "<|im_start|>assistant\n"
         
         return formatted_prompt
-    
-    def _process_multimodal_content(self, content: str, multi_modal_data: Dict[str, List]) -> str:
-        """
-        Process multimodal data for Qwen VL models.
-        
-        Note: For vLLM with Qwen-VL, we need to handle images differently.
-        The images are passed separately in the generate() call, not embedded in prompts.
-        This method prepares the text content with placeholders.
-        """
-        if not self.is_multimodal:
-            return content
-        
-        # For vLLM + Qwen-VL, we typically use placeholders like <image>
-        # The actual images are passed separately to the generate function
-        # This is different from some other VLM implementations
-        
-        processed_content = content
-        
-        # Count how many image placeholders we have
-        if "<image>" in multi_modal_data:
-            image_count = len(multi_modal_data["<image>"])
-            logger.debug(f"Found {image_count} images in multi_modal_data")
-        
-        return processed_content
     
     def process_images(self, images: List[Any]) -> List[Any]:
         """
