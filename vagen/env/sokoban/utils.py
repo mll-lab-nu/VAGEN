@@ -38,6 +38,7 @@ def generate_seeds(size,config,min_actions_to_succeed=5,seed=0,n_candidate: int 
     pool.join()
 
     valid_seeds_with_actions = [(seed, gt_action_sequence) for seed, gt_action_sequence in results if gt_action_sequence and len(gt_action_sequence) <= min_actions_to_succeed]
+    seed_to_length = {seed: len(gt_action_sequence) for seed, gt_action_sequence in valid_seeds_with_actions}
     valid_seeds = [seed for seed, _ in valid_seeds_with_actions]
     action_lengths = [len(gt_action_sequence) for _, gt_action_sequence in valid_seeds_with_actions]
     for _, gt_action_sequence in valid_seeds_with_actions:
@@ -76,6 +77,15 @@ def generate_seeds(size,config,min_actions_to_succeed=5,seed=0,n_candidate: int 
     for action, count in sorted(action_count.items(), key=lambda x: x[1], reverse=True):
         percentage = (count / len(valid_seeds_with_actions)) * 100
         print(f"  {action}: {count} instances ({percentage:.2f}%)")
+    
+    distribution_of_generated_seeds = defaultdict(int)
+    for seed in valid_seeds[:size]:
+        length = seed_to_length[seed]
+        distribution_of_generated_seeds[length] += 1
+    print("\nDistribution of generated seeds:")
+    for length, count in sorted(distribution_of_generated_seeds.items(), key=lambda x: x[0]):
+        percentage = (count / len(valid_seeds)) * 100
+        print(f"  Length {length}: {count} instances ({percentage:.2f}%)")
     return valid_seeds[:size]
         
 def get_shortest_action_path(room_fixed, room_state, MAX_DEPTH=100):
