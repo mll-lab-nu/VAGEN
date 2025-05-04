@@ -1,8 +1,8 @@
 env1:
-    env_name: frozenlake  
+    env_name: sokoban
     env_config:
         render_mode: vision
-        use_accuracy_reward: false
         prompt_format: free_think
-    train_size: 10000 
+        use_accuracy_reward: false
+    train_size: 10000
     test_size: 2
