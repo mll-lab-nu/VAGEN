@@ -29,7 +29,7 @@ python3 -m vagen.trainer.main_ppo \
     data.train_batch_size=128 \
     data.val_batch_size=8 \
     data.max_prompt_length=1024 \
-    data.max_response_length=200 \
+    data.max_response_length=190 \
     data.max_trajectory_length=4080 \
     data.image_key=images \
     data.truncation=error \
