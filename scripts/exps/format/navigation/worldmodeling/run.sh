@@ -12,7 +12,7 @@ EXPERIMENT_NAME=$(echo $SCRIPT_DIR | rev | cut -d'/' -f1-3 | rev | tr '/' '-')
 
 echo "Experiment name: $EXPERIMENT_NAME"
 # run 
-# python -m vagen.server.server server.port=5000 
+# python -m vagen.server.server server.port=5000
 # in a tmux session first
 python -m vagen.env.create_dataset \
     --yaml_path "$SCRIPT_DIR/env_config.yaml" \
@@ -29,8 +29,8 @@ python3 -m vagen.trainer.main_ppo \
     data.train_batch_size=128 \
     data.val_batch_size=8 \
     data.max_prompt_length=1024 \
-    data.max_response_length=150 \
-    data.max_trajectory_length=4000 \
+    data.max_response_length=200 \
+    data.max_trajectory_length=4080 \
     data.image_key=images \
     data.truncation=error \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \
