@@ -7,15 +7,15 @@ models:
   #   tensor_parallel_size: 2
   #   gpu_memory_utilization: 0.9
 
-  # gpt4o:
-  #   provider: openai
-  #   model_name: gpt-4o
-  #   max_tokens: 150
-  #   temperature: 0.7
-  #   presence_penalty: 0.0
-  #   frequency_penalty: 0.0
-  #   max_retries: 3
-  #   timeout: 60
+  gpt4o:
+    provider: openai
+    model_name: gpt-4o
+    max_tokens: 150
+    temperature: 0.7
+    presence_penalty: 0.0
+    frequency_penalty: 0.0
+    max_retries: 3
+    timeout: 60
 
   # claude_3_sonnet:
   #   provider: claude

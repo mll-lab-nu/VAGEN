@@ -21,6 +21,6 @@ export PYTHONPATH=$(pwd):$PYTHONPATH
 
 # Run benchmark
 echo "Running environment benchmark"
-python -m vagen.utils_benchmark.env_benchmark --config "$SCRIPT_DIR/benchmark_config.yaml"
+python -m vagen.env.verify_env --config "$SCRIPT_DIR/benchmark_config.yaml"
 
 echo "Benchmark complete. Results saved to env_benchmark_results directory."

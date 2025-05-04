@@ -40,8 +40,8 @@ from verl.utils.dataset.rl_dataset import RLHFDataset, collate_fn
 from torch.utils.data import RandomSampler, SequentialSampler
 from torchdata.stateful_dataloader import StatefulDataLoader
 
-from vagen.mllm_agent.rollout import QwenVLRolloutManager
-from vagen.mllm_agent.rollout_service import QwenVLRolloutManagerService
+from vagen.rollout.qwen_rollout.rollout_manager import QwenVLRolloutManager
+from vagen.rollout.qwen_rollout.rollout_manager_service import QwenVLRolloutManagerService
 WorkerType = Type[Worker]
 
 
