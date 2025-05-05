@@ -13,8 +13,8 @@ from datetime import datetime
 from typing import Dict, List, Any
 from collections import defaultdict
 
-from vagen.mllm_agent.model_interface.factory_model import ModelFactory
-from vagen.mllm_agent.inference_rollout.inference_rollout_service import InferenceRolloutService
+from vagen.inference.model_interface.factory_model import ModelFactory
+from vagen.rollout.inference_rollout.inference_rollout_service import InferenceRolloutService
 from vagen.inference.utils.logging import maybe_log_val_generations_to_wandb
 
 logger = logging.getLogger(__name__)

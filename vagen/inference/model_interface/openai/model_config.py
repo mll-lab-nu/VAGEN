@@ -1,7 +1,7 @@
 # vagen/mllm_agent/model_interface/openai/model_config.py
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any
-from vagen.mllm_agent.model_interface.base_model_config import BaseModelConfig
+from vagen.inference.model_interface.base_model_config import BaseModelConfig
 
 @dataclass
 class OpenAIModelConfig(BaseModelConfig):

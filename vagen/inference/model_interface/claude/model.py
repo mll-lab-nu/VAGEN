@@ -10,7 +10,7 @@ from PIL import Image
 import io
 import requests as http_requests
 
-from vagen.mllm_agent.model_interface.base_model import BaseModelInterface
+from vagen.inference.model_interface.base_model import BaseModelInterface
 from .model_config import ClaudeModelConfig
 
 logger = logging.getLogger(__name__)

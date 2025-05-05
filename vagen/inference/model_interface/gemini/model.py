@@ -8,7 +8,7 @@ import io
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
-from vagen.mllm_agent.model_interface.base_model import BaseModelInterface
+from vagen.inference.model_interface.base_model import BaseModelInterface
 from .model_config import GeminiModelConfig
 
 logger = logging.getLogger(__name__)

@@ -8,7 +8,7 @@ from openai import OpenAI
 from PIL import Image
 import io
 
-from vagen.mllm_agent.model_interface.base_model import BaseModelInterface
+from vagen.inference.model_interface.base_model import BaseModelInterface
 from .model_config import OpenAIModelConfig
 
 logger = logging.getLogger(__name__)
