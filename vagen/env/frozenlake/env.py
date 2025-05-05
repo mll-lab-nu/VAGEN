@@ -6,8 +6,8 @@ from gymnasium.utils import seeding
 from gymnasium.envs.toy_text.frozen_lake import FrozenLakeEnv as GymFrozenLakeEnv
 from vagen.env.utils.env_utils import NoLoggerWarnings, set_seed
 from vagen.env.utils.context_utils import convert_numpy_to_PIL
-from vagen.env.utils.parse_utils import parse_function_map
-from .prompt import system_prompt, init_observation_template, action_template, format_prompt
+from vagen.env.utils.parse_utils_3 import parse_function_map
+from .prompt_3 import system_prompt, init_observation_template, action_template, format_prompt
 from .env_config import FrozenLakeEnvConfig
 from .utils import generate_random_map, is_valid
 
