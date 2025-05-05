@@ -2,9 +2,9 @@ from vagen.env.base.base_env import BaseEnv
 from vagen.env.svg.svg_utils import (process_and_rasterize_svg, is_valid_svg, load_svg_dataset)
 from vagen.env.svg.score import calculate_total_score
 from vagen.env.utils.context_utils import parse_llm_raw_response, convert_numpy_to_PIL
-from vagen.env.utils.parse_utils import parse_function_map
+from vagen.env.utils.parse_utils_4 import parse_function_map
 from .env_config import SvgEnvConfig
-from .prompt import (
+from .prompt_4 import (
     system_prompt,
     init_observation_template,
     action_template,
@@ -52,10 +52,11 @@ class SVGEnv(BaseEnv):
         self.dino_model = None
         self.dataset = dataset
         # Store the format prompt function for later use
-        self.format_prompt_func = format_prompt[self.config.get('prompt_format', 'free_think')]
+        self.prompt_format=self.config.get('prompt_format', 'free_think')
+        self.format_prompt_func = format_prompt[self.prompt_format]
         
         # Get the parse function based on the prompt format
-        self.parse_func = parse_function_map[self.config.get('prompt_format', 'free_think')]
+        self.parse_func = parse_function_map[self.prompt_format]
         
         # Initialize random number generator
         self.rng = random.Random()
@@ -238,7 +239,7 @@ class SVGEnv(BaseEnv):
             add_example=True  # Always true for system prompt
         )
         
-        return system_prompt() + '\n' + format_prompt_text
+        return system_prompt(format=self.prompt_format) + '\n' + format_prompt_text
         
     def compute_reward(self) -> float:
         """Return the total reward collected so far.

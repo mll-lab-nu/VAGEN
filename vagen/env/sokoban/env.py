@@ -6,7 +6,7 @@ from typing import Dict
 from vagen.env.utils.env_utils import NoLoggerWarnings, set_seed
 from vagen.env.utils.context_utils import convert_numpy_to_PIL
 import numpy as np
-from vagen.env.utils.parse_utils_3 import parse_function_map
+from vagen.env.utils.parse_utils_4 import parse_function_map
 from .prompt_3 import (
     system_prompt, 
     init_observation_template, 

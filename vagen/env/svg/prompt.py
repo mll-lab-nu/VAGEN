@@ -1,4 +1,4 @@
-def system_prompt():
+def system_prompt(**kwargs):
     return """You are a precise SVG code generator.
 
 SVG Quick Guide
