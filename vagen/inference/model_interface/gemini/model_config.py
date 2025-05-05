@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List
-from vagen.mllm_agent.model_interface.base_model_config import BaseModelConfig
+from vagen.inference.model_interface.base_model_config import BaseModelConfig
 
 @dataclass
 class GeminiModelConfig(BaseModelConfig):
@@ -41,7 +41,8 @@ class GeminiModelConfig(BaseModelConfig):
                 "gemini-1.5-pro-001",
                 "gemini-2.0-flash-001",
                 "gemini-2.0-pro-001",
-                "gemini-2.5-flash-preview-04-17"
+                "gemini-2.5-flash-preview-04-17",
+                "gemini-2.0-flash"
             ],
             "default_model": "gemini-2.0-flash-001"
         }

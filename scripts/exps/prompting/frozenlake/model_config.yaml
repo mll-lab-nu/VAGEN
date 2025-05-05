@@ -19,6 +19,12 @@ models:
   #   max_tokens: 150
   #   temperature: 0.7
 
+  qwen_vl_3b_api:
+    provider: routerapi
+    model_name: qwen/qwen2.5-vl-3b-instruct:free
+    max_tokens: 150
+    temperature: 0.7
+
   # gpt4o:
   #   provider: openai
   #   model_name: gpt-4o
@@ -29,11 +35,11 @@ models:
   #   max_retries: 3
   #   timeout: 60
 
-  # claude_3_sonnet:
-  #   provider: claude
-  #   model_name: claude-3-7-sonnet-20250219
-  #   max_tokens: 150
-  #   temperature: 0.7
+  claude_3_sonnet:
+    provider: claude
+    model_name: claude-3-7-sonnet-20250219
+    max_tokens: 150
+    temperature: 0.7
   
   # Gemini_2.5_flask:
   #     provider: gemini
@@ -57,6 +63,11 @@ models:
   #   max_tokens: 150
   #   temperature: 0.7
   
+  # VLM-R1-REC:
+  #   provider: vllm
+  #   model_name: omlab/Qwen2.5VL-3B-VLM-R1-REC-500steps
+  #   max_tokens: 150
+  #   temperature: 0.7
   # VLM-R1-REC:
   #   provider: vllm
   #   model_name: omlab/Qwen2.5VL-3B-VLM-R1-REC-500steps

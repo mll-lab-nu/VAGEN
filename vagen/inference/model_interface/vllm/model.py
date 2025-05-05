@@ -6,7 +6,7 @@ from PIL import Image
 
 from vllm import LLM, SamplingParams
 
-from vagen.mllm_agent.model_interface.base_model import BaseModelInterface
+from vagen.inference.model_interface.base_model import BaseModelInterface
 from .model_config import VLLMModelConfig
 
 logger = logging.getLogger(__name__)

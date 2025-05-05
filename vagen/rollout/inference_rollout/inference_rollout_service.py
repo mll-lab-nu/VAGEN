@@ -7,7 +7,7 @@ from collections import defaultdict
 from tqdm import tqdm
 import PIL
 
-from vagen.mllm_agent.base_rollout import BaseRollout
+from vagen.rollout.base_rollout import BaseRollout
 from vagen.server.client import BatchEnvClient
 from vagen.env import REGISTERED_ENV
 

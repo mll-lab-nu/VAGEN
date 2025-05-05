@@ -31,7 +31,8 @@ def calculate_total_score(gt_im, gen_im, gt_code, gen_code, score_config, dino_m
             - dino_only: Whether to use only DINO for scoring
             - dino_weight: Weight for DINO score
             - structural_weight: Weight for structural score
-            - dreamsim_weight: Weight for DreamSim score (new)
+            - dreamsim_weight: Weight for DreamSim score
+            - device: Dictionary with keys "dino" and "dreamsim" specifying device
         dino_model: Pre-loaded DINO model (optional)
         dreamsim_model: Pre-loaded DreamSim model (optional)
         
@@ -41,6 +42,11 @@ def calculate_total_score(gt_im, gen_im, gt_code, gen_code, score_config, dino_m
     # Get configuration parameters with defaults
     model_size = score_config.get("model_size", "small")
     dino_only = score_config.get("dino_only", False)
+    
+    # Get device configuration with defaults
+    devices = score_config.get("device", {"dino": "cuda:0", "dreamsim": "cuda:0"})
+    dino_device = devices.get("dino", "cuda:0")
+    dreamsim_device = devices.get("dreamsim", "cuda:0")
     
     # Define default weights based on model size
     default_weights = {
@@ -68,14 +74,14 @@ def calculate_total_score(gt_im, gen_im, gt_code, gen_code, score_config, dino_m
     if weights["dino"] > 0:
         if dino_model is None:
             from vagen.env.svg.dino import get_dino_model
-            dino_model = get_dino_model(model_size)
+            dino_model = get_dino_model(model_size, device=dino_device)
         scores["dino_score"] = float(dino_model.calculate_DINOv2_similarity_score(gt_im=gt_im, gen_im=gen_im))
     
     # Calculate DreamSim score if needed
     if weights["dreamsim"] > 0:
         if dreamsim_model is None:
             from vagen.env.svg.dreamsim import get_dreamsim_model
-            dreamsim_model = get_dreamsim_model()
+            dreamsim_model = get_dreamsim_model(device=dreamsim_device)
         scores["dreamsim_score"] = float(dreamsim_model.calculate_similarity_score(gt_im=gt_im, gen_im=gen_im))
     
     # If DINO only mode, return only DINO score
@@ -131,11 +137,25 @@ def calculate_total_score_batch(gt_images, gen_images, gt_codes, gen_codes, scor
         "total_score": 0.0
     } for _ in range(batch_size)]
 
-    # Check if we need to calculate DINO scores
-    need_dino = any(score_config.get("dino_weight", 5.0) > 0 for score_config in score_configs)
+    # Check if we need to calculate DINO scores and get device
+    need_dino = False
+    dino_device = "cuda:0"
+    for score_config in score_configs:
+        if score_config.get("dino_weight", 0.0) > 0:
+            need_dino = True
+            devices = score_config.get("device", {"dino": "cuda:0", "dreamsim": "cuda:0"})
+            dino_device = devices.get("dino", "cuda:0")
+            break
 
-    # Check if we need to calculate DreamSim scores
-    need_dreamsim = any(score_config.get("dreamsim_weight", 5.0) > 0 for score_config in score_configs)
+    # Check if we need to calculate DreamSim scores and get device
+    need_dreamsim = False
+    dreamsim_device = "cuda:0"
+    for score_config in score_configs:
+        if score_config.get("dreamsim_weight", 0.0) > 0:
+            need_dreamsim = True
+            devices = score_config.get("device", {"dino": "cuda:0", "dreamsim": "cuda:0"})
+            dreamsim_device = devices.get("dreamsim", "cuda:0")
+            break
 
     # Calculate DINO scores in batch if needed
     if need_dino:
@@ -143,7 +163,7 @@ def calculate_total_score_batch(gt_images, gen_images, gt_codes, gen_codes, scor
             from vagen.env.svg.dino import get_dino_model
             # Default to small model size if not specified
             model_size = score_configs[0].get("model_size", "small") if score_configs else "small"
-            dino_model = get_dino_model(model_size)
+            dino_model = get_dino_model(model_size, device=dino_device)
 
         # Calculate all DINO scores at once using batch processing
         dino_scores = dino_model.calculate_batch_scores(gt_images, gen_images)
@@ -156,7 +176,7 @@ def calculate_total_score_batch(gt_images, gen_images, gt_codes, gen_codes, scor
     if need_dreamsim:
         if dreamsim_model is None:
             from vagen.env.svg.dreamsim import get_dreamsim_model
-            dreamsim_model = get_dreamsim_model()
+            dreamsim_model = get_dreamsim_model(device=dreamsim_device)
 
         # Calculate all DreamSim scores at once using batch processing
         dreamsim_scores = dreamsim_model.calculate_batch_scores(gt_images, gen_images)

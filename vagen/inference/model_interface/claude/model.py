@@ -10,7 +10,7 @@ from PIL import Image
 import io
 import requests as http_requests
 
-from vagen.mllm_agent.model_interface.base_model import BaseModelInterface
+from vagen.inference.model_interface.base_model import BaseModelInterface
 from .model_config import ClaudeModelConfig
 
 logger = logging.getLogger(__name__)
@@ -90,15 +90,37 @@ class ClaudeModelInterface(BaseModelInterface):
         """Generate responses using Claude Batch API."""
         # Convert prompts to batch request format
         batch_requests = []
+        max_tokens = kwargs.get("max_tokens", self.config.max_tokens)
         
         for i, prompt in enumerate(prompts):
             messages, system_prompt = self._convert_qwen_to_claude_format(prompt)
             
+            # Add token limit instruction to the last user message
+            messages_with_limit = []
+            for j, msg in enumerate(messages):
+                msg_copy = msg.copy()
+                if j == len(messages) - 1 and msg_copy.get("role") == "user":
+                    if isinstance(msg_copy["content"], str):
+                        msg_copy["content"] += f"\n\nYour response should be within {max_tokens} tokens."
+                    elif isinstance(msg_copy["content"], list):
+                        # For multimodal content, append to the last text item
+                        for k in range(len(msg_copy["content"]) - 1, -1, -1):
+                            if msg_copy["content"][k].get("type") == "text":
+                                msg_copy["content"][k]["text"] += f"\n\nYour response should be within {max_tokens} tokens."
+                                break
+                        else:
+                            # If no text content found, add a new text item
+                            msg_copy["content"].append({
+                                "type": "text",
+                                "text": f"Your response should be within {max_tokens} tokens."
+                            })
+                messages_with_limit.append(msg_copy)
+            
             # Create request params
             params = {
                 "model": self.config.model_name,
-                "messages": messages,
-                "max_tokens": kwargs.get("max_tokens", self.config.max_tokens),
+                "messages": messages_with_limit,
+                "max_tokens": max_tokens,
                 "temperature": kwargs.get("temperature", self.config.temperature),
                 "top_p": kwargs.get("top_p", self.config.top_p),
                 "top_k": kwargs.get("top_k", self.config.top_k),
@@ -313,11 +335,36 @@ class ClaudeModelInterface(BaseModelInterface):
     def _single_api_call(self, messages: List[Dict], system_prompt: str, **kwargs) -> Dict[str, Any]:
         """Make a single API call to Claude."""
         try:
+            # Get max_tokens value
+            max_tokens = kwargs.get("max_tokens", self.config.max_tokens)
+            
+            # Create a copy of messages to avoid modifying the original
+            messages_with_limit = []
+            for i, msg in enumerate(messages):
+                msg_copy = msg.copy()
+                # If this is the last user message, append token limit instruction
+                if i == len(messages) - 1 and msg_copy.get("role") == "user":
+                    if isinstance(msg_copy["content"], str):
+                        msg_copy["content"] += f"\n\nYour response should be within {max_tokens} tokens."
+                    elif isinstance(msg_copy["content"], list):
+                        # For multimodal content, append to the last text item
+                        for j in range(len(msg_copy["content"]) - 1, -1, -1):
+                            if msg_copy["content"][j].get("type") == "text":
+                                msg_copy["content"][j]["text"] += f"\n\nYour response should be within {max_tokens} tokens."
+                                break
+                        else:
+                            # If no text content found, add a new text item
+                            msg_copy["content"].append({
+                                "type": "text",
+                                "text": f"Your response should be within {max_tokens} tokens."
+                            })
+                messages_with_limit.append(msg_copy)
+            
             # Prepare parameters
             params = {
                 "model": self.config.model_name,
-                "messages": messages,
-                "max_tokens": kwargs.get("max_tokens", self.config.max_tokens),
+                "messages": messages_with_limit,
+                "max_tokens": max_tokens,
                 "temperature": kwargs.get("temperature", self.config.temperature),
                 "top_p": kwargs.get("top_p", self.config.top_p),
                 "top_k": kwargs.get("top_k", self.config.top_k),

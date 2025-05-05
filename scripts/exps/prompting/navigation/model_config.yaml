@@ -17,15 +17,15 @@ models:
   #   max_retries: 3
   #   timeout: 60
 
-  # claude_3_sonnet:
+  # claude_3.7_sonnet:
   #   provider: claude
   #   model_name: claude-3-7-sonnet-20250219
-  #   max_tokens: 150
+  #   max_tokens: 200
   #   temperature: 0.7
   
   # Gemini_2.5_flask:
   #     provider: gemini
-  #     model_name: gemini-2.5-flash-preview-04-17
+  #     model_name: gemini-2.0-flash
   #     max_tokens: 150
   #     temperature: 0.7
   

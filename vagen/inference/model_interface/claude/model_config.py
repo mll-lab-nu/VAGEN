@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List
-from vagen.mllm_agent.model_interface.base_model_config import BaseModelConfig
+from vagen.inference.model_interface.base_model_config import BaseModelConfig
 
 @dataclass
 class ClaudeModelConfig(BaseModelConfig):
