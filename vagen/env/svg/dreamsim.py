@@ -11,7 +11,7 @@ _model_cache_lock = threading.Lock()
 _model_counter = 0
 
 
-def get_dreamsim_model(device=None):
+def get_dreamsim_model(device="cuda:0"):
     """
     Get a singleton instance of DreamSim model, using cache to avoid duplicate loading
 
@@ -22,14 +22,6 @@ def get_dreamsim_model(device=None):
         DreamSimScoreCalculator: Instance of DreamSim calculator
     """
     global _model_counter
-
-    # Choose device based on availability if not specified
-    if device is None:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-    else:
-        # If CUDA was requested but not available, fall back to CPU
-        if device == "cuda" and not torch.cuda.is_available():
-            device = "cpu"
 
     # Use device as cache key
     cache_key = f"dreamsim_{device}"
@@ -60,7 +52,7 @@ class DreamSimScoreCalculator:
         cache_dir = os.path.expanduser(cache_dir)
 
         # Verify device availability
-        if device is None or (device == "cuda" and not torch.cuda.is_available()):
+        if device is None:
             self.device = "cpu"
         else:
             self.device = device

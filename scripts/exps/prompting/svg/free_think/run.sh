@@ -15,7 +15,7 @@ python -m vagen.env.create_dataset \
     --test_path "data/$EXPERIMENT_NAME/test.parquet" \
     --force_gen
 
-python -m vagen.inference.run_inference \
+python -m vagen.inference.svg_inference \
     --inference_config_path="$(dirname $SCRIPT_DIR)/inference_config.yaml" \
     --model_config_path="$(dirname $SCRIPT_DIR)/model_config.yaml" \
     --val_files_path="data/$EXPERIMENT_NAME/test.parquet" \

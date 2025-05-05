@@ -1,17 +1,17 @@
 models:
-  qwen_vl_3b:
-    provider: vllm
-    model_name: Qwen/Qwen2.5-VL-3B-Instruct
-    max_tokens: 150
-    temperature: 0.7
-    tensor_parallel_size: 2
-    gpu_memory_utilization: 0.9
+  # qwen_vl_3b:
+  #   provider: vllm
+  #   model_name: Qwen/Qwen2.5-VL-3B-Instruct
+  #   max_tokens: 150
+  #   temperature: 0.7
+  #   tensor_parallel_size: 2
+  #   gpu_memory_utilization: 0.9
 
-  VLM-R1-MATH:
-    provider: vllm
-    model_name: omlab/VLM-R1-Qwen2.5VL-3B-Math-0305
-    max_tokens: 150
-    temperature: 0.7
+  # VLM-R1-MATH:
+  #   provider: vllm
+  #   model_name: omlab/VLM-R1-Qwen2.5VL-3B-Math-0305
+  #   max_tokens: 150
+  #   temperature: 0.7
 
   gpt4o:
     provider: openai

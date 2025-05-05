@@ -1,6 +1,6 @@
 from vagen.env.base.base_env_config import BaseEnvConfig
 from dataclasses import dataclass, fields, field
-from typing import Optional, List, Union, Dict
+from typing import Optional, List, Union, Dict, Any
 
 @dataclass
 class SvgEnvConfig(BaseEnvConfig):
@@ -16,6 +16,8 @@ class SvgEnvConfig(BaseEnvConfig):
     dino_weight: Optional[float] = None
     structural_weight: Optional[float] = None
     dreamsim_weight: Optional[float] = None
+    # Device configuration
+    device: Dict[str, Any] = field(default_factory=lambda: {"dino": 0, "dreamsim": 0})
     # Reward configuration
     format_reward: float = 0.5
     format_penalty: float = 0.0
@@ -23,6 +25,18 @@ class SvgEnvConfig(BaseEnvConfig):
     prompt_format: str = "free_think" 
     # "free_think", "no_think", "grounding", "worldmodeling", "grounding_worldmodeling"
     use_accuracy_reward: bool = False
+    
+    def __post_init__(self):
+        """Process device configuration after initialization"""
+        # Convert device numbers to CUDA device format
+        processed_device = {}
+        for key, value in self.device.items():
+            if isinstance(value, (int, float)):
+                processed_device[key] = f"cuda:{int(value)}"
+            else:
+                # If it's already a string (like "cuda:1"), keep it as is
+                processed_device[key] = value
+        self.device = processed_device
     
     def config_id(self) -> str:
         """Generate a unique identifier for this configuration"""
@@ -52,6 +66,7 @@ class SvgEnvConfig(BaseEnvConfig):
         score_config = {
             "model_size": self.model_size,
             "dino_only": self.dino_only,
+            "device": self.device  # Include processed device configuration in score config
         }
         
         # Add optional weights if set
@@ -67,7 +82,10 @@ class SvgEnvConfig(BaseEnvConfig):
 
 if __name__ == "__main__":
     # Example usage
-    config = SvgEnvConfig()
+    config = SvgEnvConfig(
+        device={"dino": 1, "dreamsim": 2}  # Will be converted to "cuda:1" and "cuda:2"
+    )
     
     print(config.config_id())
     print(config.get_score_config())
+    print(f"Processed device config: {config.device}")  # Should show {"dino": "cuda:1", "dreamsim": "cuda:2"}

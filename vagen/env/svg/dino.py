@@ -15,7 +15,7 @@ _model_cache = {}
 _model_cache_lock = threading.Lock()
 _model_counter = 0  
 
-def get_dino_model(model_size="small", device="cuda"):
+def get_dino_model(model_size="small", device="cuda:0"):
     global _model_counter
     cache_key = f"{model_size}_{device}"
     
@@ -94,16 +94,14 @@ class BaseMetric:
         return self.meter.avg
 
 class DINOScoreCalculator(BaseMetric): 
-    #@TODO how to make sure DINO always on GPU? check how ray is deliver gpu resources
-    def __init__(self, config=None, model_size='large', device='cuda'):
+    def __init__(self, config=None, model_size='large', device='cuda:0'):
         super().__init__()
         self.class_name = self.__class__.__name__
         self.config = config
         self.model_size = model_size
         self.model, self.processor = self.get_DINOv2_model(model_size)
-        device = device if torch.cuda.is_available() else "cpu"
-        self.model = self.model.to(device)
         self.device = device
+        self.model = self.model.to(self.device)
 
         self.metric = self.calculate_DINOv2_similarity_score
 
