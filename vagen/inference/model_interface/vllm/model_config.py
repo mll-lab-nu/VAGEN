@@ -50,6 +50,7 @@ class VLLMModelConfig(BaseModelConfig):
             "supported_models": [
                 "Qwen/Qwen2.5-0.5B-Instruct",
                 "Qwen/Qwen2.5-VL-3B-Instruct",
+                "Qwen/Qwen2.5-VL-7B-Instruct",
                 "omlab/VLM-R1-Qwen2.5VL-3B-OVD-0321",
                 "omlab/VLM-R1-Qwen2.5VL-3B-Math-0305",
                 "omlab/Qwen2.5VL-3B-VLM-R1-REC-500steps"
