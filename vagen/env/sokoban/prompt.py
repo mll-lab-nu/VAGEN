@@ -1,147 +1,163 @@
-def system_prompt():
+def system_prompt(**kwargs):
     return """You are a Sokoban solver.
-
 Sokoban Quick Guide
 Goal: Push all boxes onto targets.
-
 Symbols (If image is provided there are no symbols):
 # Wall | _ Floor | O Target | X Box | P You | √ Box on Target | S You on Target
-
 Rules:
 1. Push boxes (can't pull).
 2. Avoid walls.
-
 Actions you can take: Left, Down, Right, Up."""
 
-def init_observation_template(observation):
+def init_observation_template(**kwargs):
+    observation = kwargs.get("img_str", "The player is near a box")
     return f"""[Initial Observation]:
 {observation}
 Decide your next action(s)."""
 
-def action_template(valid_action, observation):
+def action_template(**kwargs):
+    valid_action = kwargs.get("valid_action", "Down")
+    observation = kwargs.get("img_str", "The player pushed the box closer to the target")
     return f"""After your answer, the extracted valid action is {valid_action}.
 After that, the observation is:
 {observation}
 Decide your next action(s)."""
 
-def free_think_format_prompt(max_actions_per_step, action_sep, add_example=True):
-    base_prompt = f"""You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}.
-You should first give your thought process, and then your answer.
-Your response should be in the format of:
-<think>...</think><answer>...</answer>"""
+# Format configurations defining the structure of each format
+FORMAT_CONFIGS = {
+    "free_think": {
+        "format": "<think>...</think><answer>...</answer>",
+        "description": "You should first give your reasoning, and then your answer.",
+        "example": "<think><reasoning>The box is one step below me, and the target is two steps below me, I need to go down then push the box down to the target.</reasoning></think><answer>Down{action_sep}Down</answer>"
+    },
     
-    if add_example:
-        example = f"""e.g. <think>The box is one step below me, and the target is two steps below me, I need to go down then push the box down to the target.</think><answer>Down{action_sep}Down</answer>"""
-        return base_prompt + '\n' + example
-    return base_prompt
-
-def no_think_format_prompt(max_actions_per_step, action_sep, add_example=True):
-    base_prompt = f"""You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}.
-You should provide only your answer.
-Your response should be in the format of:
-<answer>...</answer>"""
+    "no_think": {
+        "format": "<answer>...</answer>",
+        "description": "You should provide only your answer.",
+        "example": "<answer>Down{action_sep}Down</answer>"
+    },
     
-    if add_example:
-        example = f"""e.g. <answer>Down{action_sep}Down</answer>"""
-        return base_prompt + '\n' + example
-    return base_prompt
-
-def grounding_format_prompt(max_actions_per_step, action_sep, add_example=True):
-    base_prompt = f"""You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}.
-You should first give the current state, then your thought process, and finally your answer.
-The state should be in the format of {{"player":(row1,column1),"box":(row2,column2),"target":(row3,column3)}}
-Your response should be in the format of:
-<current_state>...</current_state><think>...</think><answer>...</answer>"""
+    "grounding": {
+        "format": "<think><observation>...</observation><reasoning>...</reasoning></think><answer>...</answer>",
+        "description": "You should first give the description of your observation, then your reasoning, and finally your answer.",
+        "example": "<think><observation>The box is below the player and the target is below the box</observation><reasoning>I need to go down then push the box down to the target</reasoning></think><answer>Down{action_sep}Down</answer>"
+    },
     
-    if add_example:
-        example = f"""e.g. <current_state>{{"player":(2,3),"box":(4,3),"target":(5,3)}}</current_state><think>I need to go down then push the box down to the target</think><answer>Down{action_sep}Down</answer>"""
-        return base_prompt + '\n' + example
-    return base_prompt
-
-def worldmodeling_format_prompt(max_actions_per_step, action_sep, add_example=True):
-    base_prompt = f"""You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}.
-You should first give your thought process, then your answer, and finally predict the next state.
-The state should be in the format of {{"player":(row1,column1),"box":(row2,column2),"target":(row3,column3)}}
-Your response should be in the format of:
-<think>...</think><answer>...</answer><next_state>...</next_state>"""
+    "worldmodeling": {
+        "format": "<think><reasoning>...</reasoning><prediction>...</prediction></think><answer>...</answer>",
+        "description": "You should first give your reasoning, then predict the next state, and finally your answer.",
+        "example": "<think><reasoning>I need to go right then push the box down to the target.</reasoning><prediction>The player will be above the box, the target and box will be at the same place.</prediction></think><answer>Right{action_sep}Down</answer>"
+    },
     
-    if add_example:
-        example = f"""e.g. <think>I need to go down then push the box down to the target.</think><answer>Down{action_sep}Down</answer><next_state>{{"player":(4,3),"box":(5,3),"target":(5,3)}}</next_state>"""
-        return base_prompt + '\n' + example
-    return base_prompt
-
-def grounding_worldmodeling_format_prompt(max_actions_per_step, action_sep, add_example=True):
-    base_prompt = f"""You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}.
-You should first give the current state, then your thought process, then your answer, and finally predict the next state.
-The state should be in the format of {{"player":(row1,column1),"box":(row2,column2),"target":(row3,column3)}}
-Your response should be in the format of:
-<current_state>...</current_state><think>...</think><answer>...</answer><next_state>...</next_state>"""
+    "grounding_worldmodeling": {
+        "format": "<think><observation>...</observation><reasoning>...</reasoning><prediction>...</prediction></think><answer>...</answer>",
+        "description": "You should first give the description of your observation, then your reasoning, then predict the next state, and finally your answer.",
+        "additional_info": "The state should be in the format of {\"player\":(row1,column1),\"box\":(row2,column2),\"target\":(row3,column3)}",
+        "example": "<think><observation>The box is below the player and the target is below the box</observation><reasoning>I need to go down then push the box down to the target</reasoning><prediction>The player will be above the box, the target and box will be at the same place.</prediction></think><answer>Down{action_sep}Down</answer>"
+    },
     
-    if add_example:
-        example = f"""e.g. <current_state>{{"player":(2,3),"box":(4,3),"target":(5,3)}}</current_state><think>I need to go down then push the box down to the target</think><answer>Down{action_sep}Down</answer><next_state>{{"player":(4,3),"box":(5,3),"target":(5,3)}}</next_state>"""
-        return base_prompt + '\n' + example
-    return base_prompt
-
-def grounding_symbol_format_prompt(max_actions_per_step, action_sep, add_example=True):
-    base_prompt = f"""You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}.
-You should first give the current state as a grid, then your thought process, and finally your answer.
-The state should be represented as a grid using the symbols: # Wall | _ Floor | O Target | X Box | P You | √ Box on Target | S You on Target.
-Your response should be in the format of:
-<current_state>...</current_state><think>...</think><answer>...</answer>"""
+    "grounding_symbol": {
+        "format": "<think><observation>...</observation><reasoning>...</reasoning></think><answer>...</answer>",
+        "description": "You should first give the description of your observation as a grid, then your reasoning, and finally your answer.",
+        "additional_info": "The state should be represented as a grid using the symbols: # Wall | _ Floor | O Target | X Box | P You | √ Box on Target | S You on Target.",
+        "example": "<think><observation>####\n#_P#\n#__#\n#_X#\n#_O#</observation><reasoning>I need to go down then push the box down to reach the target</reasoning></think><answer>Down{action_sep}Down</answer>"
+    },
     
-    if add_example:
-        example = f"""e.g. <current_state>####
-#_P#
-#__#
-#_X#
-#_O#</current_state><think>I need to go down then push the box down to reach the target</think><answer>Down{action_sep}Down</answer>"""
-        return base_prompt + '\n' + example
-    return base_prompt
-
-def worldmodeling_symbol_format_prompt(max_actions_per_step, action_sep, add_example=True):
-    base_prompt = f"""You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}.
-You should first give your thought process, then your answer, and finally predict the next state as a grid.
-The state should be represented as a grid using the symbols: # Wall | _ Floor | O Target | X Box | P You | √ Box on Target | S You on Target.
-Your response should be in the format of:
-<think>...</think><answer>...</answer><next_state>...</next_state>"""
+    "worldmodeling_symbol": {
+        "format": "<think><reasoning>...</reasoning><prediction>...</prediction></think><answer>...</answer>",
+        "description": "You should first give your reasoning, then predict the next state as a grid, and finally your answer.",
+        "additional_info": "The state should be represented as a grid using the symbols: # Wall | _ Floor | O Target | X Box | P You | √ Box on Target | S You on Target.",
+        "example": "<think><reasoning>I need to go down then push the box down to reach the target</reasoning><prediction>####\n#__#\n#__#\n#_P#\n#_√#</prediction></think><answer>Down{action_sep}Down</answer>"
+    },
     
-    if add_example:
-        example = f"""e.g. <think>I need to go down then push the box down to reach the target</think><answer>Down{action_sep}Down</answer><next_state>####
-#__#
-#__#
-#_P#
-#_√#</next_state>"""
-        return base_prompt + '\n' + example
-    return base_prompt
-
-def grounding_worldmodeling_symbol_format_prompt(max_actions_per_step, action_sep, add_example=True):
-    base_prompt = f"""You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}.
-You should first give the current state as a grid, then your thought process, then your answer, and finally predict the next state as a grid.
-The state should be represented as grids using the symbols: # Wall | _ Floor | O Target | X Box | P You | √ Box on Target | S You on Target.
-Your response should be in the format of:
-<current_state>...</current_state><think>...</think><answer>...</answer><next_state>...</next_state>"""
+    "grounding_worldmodeling_symbol": {
+        "format": "<think><observation>...</observation><reasoning>...</reasoning><prediction>...</prediction></think><answer>...</answer>",
+        "description": "You should first give the description of your observation as a grid, then your reasoning, then predict the next state as a grid, and finally your answer.",
+        "additional_info": "The observation and state should be represented as grids using the symbols: # Wall | _ Floor | O Target | X Box | P You | √ Box on Target | S You on Target.",
+        "example": "<think><observation>####\n#_P#\n#__#\n#_X#\n#_O#</observation><reasoning>I need to go down then push the box down to reach the target</reasoning><prediction>####\n#__#\n#__#\n#_P#\n#_√#</prediction></think><answer>Down{action_sep}Down</answer>"
+    },
     
-    if add_example:
-        example = f"""e.g. <current_state>####
-#_P#
-#__#
-#_X#
-#_O#</current_state><think>I need to go down then push the box down to reach the target</think><answer>Down{action_sep}Down</answer><next_state>####
-#__#
-#__#
-#_P#
-#_√#</next_state>"""
-        return base_prompt + '\n' + example
-    return base_prompt
-
-# Dictionary mapping format names to their corresponding functions
-format_prompt = {
-    "free_think": free_think_format_prompt,
-    "no_think": no_think_format_prompt,
-    "grounding": grounding_format_prompt,
-    "worldmodeling": worldmodeling_format_prompt,
-    "grounding_worldmodeling": grounding_worldmodeling_format_prompt,
-    "grounding_symbol": grounding_symbol_format_prompt,
-    "worldmodeling_symbol": worldmodeling_symbol_format_prompt,
-    "grounding_worldmodeling_symbol": grounding_worldmodeling_symbol_format_prompt
+    "grounding_structured": {
+        "format": "<think><observation>...</observation><reasoning>...</reasoning></think><answer>...</answer>",
+        "description": "You should first give the description of your observation, then your reasoning, and finally your answer.",
+        "additional_info": "The observation should be in the format of {\"player\":(row,column),\"box\":(row,column),\"target\":(row,column)}",
+        "example": "<think><observation>{{\"player\":(1,2),\"box\":(3,2),\"target\":(4,2)}}</observation><reasoning>I need to go down then push the box down to the target</reasoning></think><answer>Down{action_sep}Down</answer>"
+    },
+    
+    "worldmodeling_structured": {
+        "format": "<think><reasoning>...</reasoning><prediction>...</prediction></think><answer>...</answer>",
+        "description": "You should first give your reasoning, then predict the next state, and finally your answer.",
+        "additional_info": "The prediction should be in the format of {\"player\":(row,column),\"box\":(row,column),\"target\":(row,column)}",
+        "example": "<think><reasoning>I need to go down then push the box down to the target</reasoning><prediction>{{\"player\":(3,2),\"box\":(4,2),\"target\":(4,2)}}</prediction></think><answer>Down{action_sep}Down</answer>"
+    },
+    
+    "grounding_worldmodeling_structured": {
+        "format": "<think><observation>...</observation><reasoning>...</reasoning><prediction>...</prediction></think><answer>...</answer>",
+        "description": "You should first give the description of your observation, then your reasoning, then predict the next state, and finally your answer.",
+        "additional_info": "The observation and prediction should be in the format of {\"player\":(row,column),\"box\":(row,column),\"target\":(row,column)}",
+        "example": "<think><observation>{{\"player\":(1,2),\"box\":(3,2),\"target\":(4,2)}}</observation><reasoning>I need to go down then push the box down to the target</reasoning><prediction>{{\"player\":(3,2),\"box\":(4,2),\"target\":(4,2)}}</prediction></think><answer>Down{action_sep}Down</answer>"
+    },
 }
+
+def format_prompt_generator(format_type):
+    """
+    Generates a prompt function for the specified format type.
+    
+    Args:
+        format_type (str): The format type to generate a prompt function for
+        
+    Returns:
+        function: A function that generates a prompt for the specified format
+    """
+    def prompt_function(**kwargs):
+        """
+        Generate a prompt for the specified format.
+        
+        Args:
+            max_actions_per_step (int): Maximum number of actions allowed per step
+            action_sep (str): Separator between actions
+            add_example (bool): Whether to add an example
+            
+        Returns:
+            str: The formatted prompt
+        """
+        max_actions_per_step = kwargs.get("max_actions_per_step", 1)
+        action_sep = kwargs.get("action_sep", "|")
+        add_example = kwargs.get("add_example", True)
+        config = FORMAT_CONFIGS[format_type]
+        
+        # Build the base prompt text
+        base_prompt = f"""You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}.
+{config["description"]}"""
+        
+        # Add additional information if available
+        if "additional_info" in config:
+            base_prompt += f"\n{config['additional_info']}"
+        
+        # Add response format instruction
+        base_prompt += f"""
+Your response should be in the format of:
+{config["format"]}"""
+        
+        # Add example if requested
+        if add_example:
+            example = config["example"].format(action_sep=action_sep)
+            return base_prompt + '\n' + f"e.g. {example}"
+        
+        return base_prompt
+    
+    return prompt_function
+
+# Generate the format prompt dictionary using the generator
+format_prompt = {format_type: format_prompt_generator(format_type) 
+                for format_type in FORMAT_CONFIGS}
+
+if __name__ == "__main__":
+    # Example usage
+    max_actions_per_step = 2
+    action_sep = "|"
+    
+    for key, func in format_prompt.items():
+        print(f"{key} format prompt:")
+        print(func(max_actions_per_step=max_actions_per_step, action_sep=action_sep, add_example=True))
+        print("\n" + "="*50 + "\n")

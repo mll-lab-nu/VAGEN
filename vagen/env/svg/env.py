@@ -4,7 +4,7 @@ from vagen.env.svg.score import calculate_total_score
 from vagen.env.utils.context_utils import parse_llm_raw_response, convert_numpy_to_PIL
 from vagen.env.utils.parse_utils_4 import parse_function_map
 from .env_config import SvgEnvConfig
-from .prompt_4 import (
+from .prompt import (
     system_prompt,
     init_observation_template,
     action_template,

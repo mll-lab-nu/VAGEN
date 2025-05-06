@@ -40,7 +40,15 @@ Reasoning: Now the red cube is on the green cube, so I need to pick up the yello
 Anwer: pick(-44,100,20)|place(100,-43,50)
 """
 
-def init_observation_template(observation, instruction, x_workspace, y_workspace, z_workspace, object_positions, other_information,object_names=None):
+def init_observation_template(**kwargs):
+    object_names = kwargs.get("object_names", None)
+    observation = kwargs.get("observation")
+    instruction = kwargs.get("instruction")
+    x_workspace = kwargs.get("x_workspace")
+    y_workspace = kwargs.get("y_workspace")
+    z_workspace = kwargs.get("z_workspace")
+    object_positions = kwargs.get("object_positions")
+    other_information = kwargs.get("other_information")
     return f"""
 [Initial Observation]:
 {observation}
@@ -54,7 +62,16 @@ Other information:
 {other_information}
 Decide your next action(s)."""
 
-def action_template(valid_actions, observation, instruction, x_workspace, y_workspace, z_workspace, object_positions, other_information,object_names=None):
+def action_template(**kwargs):
+    object_names = kwargs.get("object_names", None)
+    observation = kwargs.get("observation")
+    instruction = kwargs.get("instruction")
+    x_workspace = kwargs.get("x_workspace")
+    y_workspace = kwargs.get("y_workspace")
+    z_workspace = kwargs.get("z_workspace")
+    object_positions = kwargs.get("object_positions")
+    valid_actions = kwargs.get("valid_actions")
+    other_information = kwargs.get("other_information")
     
     return f"""After your answer, the extracted valid action(s) is {valid_actions}.
 After that, the observation is:
@@ -69,129 +86,99 @@ Other information:
 {other_information}
 Decide your next action(s)."""
 
-def free_think_format_prompt(max_actions_per_step, action_sep, state_keys, add_example=True):
-    """
-    Format prompt for free thinking: thinking + answer.
-    
-    Args:
-        max_actions_per_step (int): Maximum number of actions allowed per step
-        action_sep (str): Separator between actions
-        state_keys (list): List of object states to track/predict (not used in this format)
-        add_example (bool): Whether to add an example
-        
-    Returns:
-        str: The formatted prompt
-    """
-    base_prompt = f"""You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}.
-You should first give your thought process, and then your answer. 
-Your response should be in the format of:
-<think>...</think><answer>...</answer>"""
-    
-    if add_example:
-        example = f"""e.g. <think>I need to pick the red cube at (100,100,40) first and place it on top of the green cube at (200,200,50)</think><answer>pick(100,100,40){action_sep}place(200,200,100)</answer>"""
-        return base_prompt + '\n' + example
-    return base_prompt
-
-def no_think_format_prompt(max_actions_per_step, action_sep, state_keys, add_example=True):
-    base_prompt = f"""You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}.
-You should provide only your answer.
-Your response should be in the format of:
-<answer>...</answer>"""
-    
-    if add_example:
-        example = f"""e.g. <answer>pick(100,100,40){action_sep}place(200,200,100)</answer>"""
-        return base_prompt + '\n' + example
-    return base_prompt
-
-def grounding_format_prompt(max_actions_per_step, action_sep, state_keys, add_example=True):
-    state_format = {key: "(x,y,z)" for key in state_keys}
-    
-    # Create example state with first object at pick position and others at different positions
-    state_example = {}
-    for i, key in enumerate(state_keys):
-        if i == 0:
-            state_example[key] = "(100,100,40)"  # This will be the object to pick
-        else:
-            state_example[key] = f"({i*100+200},{i*100+200},{50})"
-    
-    base_prompt = f"""You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}.
-You should first give the current state, then your thought process, and finally your answer.
-The state should be in the format of {state_format}
-Your response should be in the format of:
-<current_state>...</current_state><think>...</think><answer>...</answer>"""
-    
-    if add_example:
-        # Use the first key as the object being manipulated in the example
-        target_object = state_keys[0] if state_keys else "red_cube_position"
-        example = f"""e.g. <current_state>{state_example}</current_state><think>I need to pick the {target_object.replace('_position','')} at (100,100,40) and place it at a new location</think><answer>pick(100,100,40){action_sep}place(80,100,50)</answer>"""
-        return base_prompt + '\n' + example
-    return base_prompt
-
-def worldmodeling_format_prompt(max_actions_per_step, action_sep, state_keys, add_example=True):
-    state_format = {key: "(x,y,z)" for key in state_keys}
-    
-    # Set up the next state example showing the object movement
-    next_state_example = {}
-    
-    base_prompt = f"""You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}.
-You should first give your thought process, then your answer, and finally predict the next state.
-The state should be in the format of {state_format}
-Your response should be in the format of:
-<think>...</think><answer>...</answer><next_state>...</next_state>"""
-    
-    if add_example:
-        # Use the first key as the object being manipulated in the example
-        target_object = state_keys[0] if state_keys else "red_cube_position"
-        
-        # Create next state example showing the object moved to the place location
-        for i, key in enumerate(state_keys):
-            if i == 0:
-                next_state_example[key] = "(80,100,50)"  # This is where it's placed
-            else:
-                next_state_example[key] = f"({i*100+200},{i*100+200},{50})"  # Other objects remain in place
-        
-        example = f"""e.g. <think>I need to pick the {target_object.replace('_position','')} at (100,100,40) and place it at (80,100,50)</think><answer>pick(100,100,40){action_sep}place(80,100,50)</answer><next_state>{next_state_example}</next_state>"""
-        return base_prompt + '\n' + example
-    return base_prompt
-
-def grounding_worldmodeling_format_prompt(max_actions_per_step, action_sep, state_keys, add_example=True):
-    state_format = {key: "(x,y,z)" for key in state_keys}
-    
-    # Create initial state example
-    init_state_example = {}
-    for i, key in enumerate(state_keys):
-        if i == 0:
-            init_state_example[key] = "(100,100,40)"  # This will be the object to pick
-        else:
-            init_state_example[key] = f"({i*100+200},{i*100+200},{50})"
-    
-    # Create next state example showing the object movement
-    next_state_example = {}
-    for i, key in enumerate(state_keys):
-        if i == 0:
-            next_state_example[key] = "(80,100,50)"  # This is where it's placed
-        else:
-            next_state_example[key] = init_state_example[key]  # Other objects remain in place
-    
-    base_prompt = f"""You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}.
-You should first give the current state, then your thought process, then your answer, and finally predict the next state.
-The state should be in the format of {state_format}
-Your response should be in the format of:
-<current_state>...</current_state><think>...</think><answer>...</answer><next_state>...</next_state>"""
-    
-    if add_example:
-        # Use the first key as the object being manipulated in the example
-        target_object = state_keys[0] if state_keys else "red_cube_position"
-        
-        example = f"""e.g. <current_state>{init_state_example}</current_state><think>I need to pick the {target_object.replace('_position','')} at (100,100,40) and place it at (80,100,50)</think><answer>pick(100,100,40){action_sep}place(80,100,50)</answer><next_state>{next_state_example}</next_state>"""
-        return base_prompt + '\n' + example
-    return base_prompt
-
-# Dictionary mapping format names to their corresponding functions
-format_prompt = {
-    "free_think": free_think_format_prompt,
-    "no_think": no_think_format_prompt,
-    "grounding": grounding_format_prompt,
-    "worldmodeling": worldmodeling_format_prompt,
-    "grounding_worldmodeling": grounding_worldmodeling_format_prompt
+# --- FORMAT_CONFIGS Definition with Fixed Examples ---
+FORMAT_CONFIGS = {
+    "free_think": {
+        "description": "You should first give your thought process, and then your answer.",
+        "format": "<think>...</think><answer>...</answer>",
+        "example": "e.g. <think>I need to pick the red_cube_pos at (10,20,30) and place it on the green_block_pos at (50,60,40).</think><answer>pick(10,20,30){action_sep}place(50,60,70)</answer>"
+    },
+    "no_think": {
+        "description": "You should provide only your answer.",
+        "format": "<answer>...</answer>",
+        "example": "e.g. <answer>pick(10,20,30){action_sep}place(50,60,70)</answer>"
+    },
+    "grounding": {
+        "description": "You should first give your thought process with observation and reasoning, and then your answer.",
+        "format": "<think><observation>...</observation><reasoning>...</reasoning></think><answer>...</answer>",
+        "example": "<think><observation>I see a red cube at (100,100,40) and a green cube at (200,200,60).</observation><reasoning>I need to pick the red cube and place it on top of the green cube</reasoning></think><answer>pick(100,100,40){action_sep}place(200,200,100)</answer>"
+    },
+    "worldmodeling": {
+        "description": "You should first give your thought process with reasoning and prediction of next state, and then your answer.",
+        "format": "<think><reasoning>...</reasoning><prediction>...</prediction></think><answer>...</answer>",
+        "example": "<think><reasoning>I need to pick the red cube at (100,100,40) and place it at (80,100,60)</reasoning><prediction>After executing this action, the red cube will be at (80,100,60)</prediction></think><answer>pick(100,100,40){action_sep}place(80,100,60)</answer>"
+    },
+    "grounding_worldmodeling": {
+        "description": "You should first give your thought process with observation, reasoning, and prediction, and then your answer.",
+        "format": "<think><observation>...</observation><reasoning>...</reasoning><prediction>...</prediction></think>",
+        "example": "<think><observation>I see a red cube at (100,100,40) and a green cube at (200,200,60).</observation><reasoning>I need to pick the red cube and place it on top of the green cube</reasoning><prediction>After executing this action, the red cube will be at position (200,200,100), stacked on top of the green cube at (200,200,60)</prediction></think><answer>pick(100,100,40){action_sep}place(200,200,100)</answer>"
+    },
+    "grounding_structured": {
+        "description": "You should first give your thought process with observation and reasoning, and then your answer.",
+        "format": "<think><observation>...</observation><reasoning>...</reasoning></think><answer>...</answer>",
+        "additional_info": "The observation should be in the format of {state_format}",
+        "example": "<think><observation>{{'red_cube':(100,100,40),'green_cube':(200,200,60)}}</observation><reasoning>I need to pick the red cube and place it on top of the green cube</reasoning></think><answer>pick(100,100,40){action_sep}place(200,200,100)</answer>"
+    },
+    "worldmodeling_structured": {
+        "description": "You should first give your thought process with reasoning and prediction of next state, and then your answer.",
+        "format": "<think><reasoning>...</reasoning><prediction>...</prediction></think><answer>...</answer>",
+        "additional_info": "The prediction should be in the format of {state_format}",
+        "example": "<think><reasoning>I need to pick the red cube and place it on top of the green cube</reasoning><prediction>{{'red_cube':(200,200,100),'green_cube':(200,200,60)}}</prediction></think><answer>pick(100,100,40){action_sep}place(200,200,100)</answer>"
+    },
+    "grounding_worldmodeling_structured": {
+        "description": "You should first give your thought process with observation, reasoning, and prediction, and then your answer.",
+        "additional_info": "The observation and prediction should be in the format of {state_format}",
+        "format": "<think><observation>...</observation><reasoning>...</reasoning><prediction>...</prediction></think>",
+        "example": "<think><observation>{{'red_cube':(100,100,40),'green_cube':(200,200,60)}}</observation><reasoning>I need to pick the red cube and place it on top of the green cube</reasoning><prediction>{{'red_cube':(200,200,100),'green_cube':(200,200,60)}}</prediction></think><answer>pick(100,100,40){action_sep}place(200,200,100)</answer>"
+    }
 }
+
+# --- Generic Format Prompt Generator ---
+def format_prompt_generator(format_type):
+    def prompt_function(**kwargs):
+        max_actions_per_step = kwargs.get("max_actions_per_step", 1)
+        action_sep = kwargs.get("action_sep", "|")
+        add_example = kwargs.get("add_example", True)
+        config = FORMAT_CONFIGS[format_type]
+        state_keys = kwargs.get("state_keys", None)
+        state_format = str({key: "(x,y,z)" for key in state_keys})
+        
+        # Build the base prompt text
+        base_prompt = f"""You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}.
+{config["description"]}"""
+        
+        
+        # Add response format instruction
+        base_prompt += f"""
+Your response should be in the format of:
+{config["format"]}"""
+        
+        # Add additional information if available
+        if "additional_info" in config:
+            base_prompt += f"\n{config['additional_info'].format(state_format=state_format)}"
+            
+        # Add example if requested
+        if add_example:
+            example = config["example"].format(action_sep=action_sep)
+            return base_prompt + '\n' + f"e.g. {example}"
+        
+        return base_prompt
+    
+    return prompt_function
+
+# --- Populate format_prompt dictionary ---
+format_prompt = {
+    ft: format_prompt_generator(ft) 
+    for ft in FORMAT_CONFIGS
+}
+
+
+if __name__ == "__main__":
+    # Example usage
+    max_actions_per_step = 2
+    action_sep = "|"
+    state_keys = ["red_cube", "green_cube", "yellow_cube"]
+    for key, func in format_prompt.items():
+        print(f"{key} format prompt:")
+        print(func(max_actions_per_step=max_actions_per_step, action_sep=action_sep,state_keys=state_keys, add_example=True))
+        print("\n" + "="*50 + "\n")

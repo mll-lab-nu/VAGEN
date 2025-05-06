@@ -7,7 +7,7 @@ from vagen.env.utils.context_utils import convert_numpy_to_PIL
 from vagen.env.utils.parse_utils_4 import parse_function_map
 from .env_config import PrimitiveSkillEnvConfig
 from .maniskill.utils import build_env, handle_info, get_workspace_limits
-from .prompt_4 import system_prompt, init_observation_template, action_template, format_prompt
+from .prompt import system_prompt, init_observation_template, action_template, format_prompt
 import vagen.env.primitive_skill.maniskill.env
 import random
 class PrimitiveSkillEnv(BaseEnv):
