@@ -56,21 +56,21 @@ FORMAT_CONFIGS = {
         "example": "<think><observation>The box is below the player and the target is below the box</observation><reasoning>I need to go down then push the box down to the target</reasoning><prediction>The player will be above the box, the target and box will be at the same place.</prediction></think><answer>Down{action_sep}Down</answer>"
     },
     
-    "grounding_symbol": {
+    "grounding_symbolic": {
         "format": "<think><observation>...</observation><reasoning>...</reasoning></think><answer>...</answer>",
         "description": "You should first give the description of your observation as a grid, then your reasoning, and finally your answer.",
         "additional_info": "The state should be represented as a grid using the symbols: # Wall | _ Floor | O Target | X Box | P You | √ Box on Target | S You on Target.",
         "example": "<think><observation>####\n#_P#\n#__#\n#_X#\n#_O#</observation><reasoning>I need to go down then push the box down to reach the target</reasoning></think><answer>Down{action_sep}Down</answer>"
     },
     
-    "worldmodeling_symbol": {
+    "worldmodeling_symbolic": {
         "format": "<think><reasoning>...</reasoning><prediction>...</prediction></think><answer>...</answer>",
         "description": "You should first give your reasoning, then predict the next state as a grid, and finally your answer.",
         "additional_info": "The state should be represented as a grid using the symbols: # Wall | _ Floor | O Target | X Box | P You | √ Box on Target | S You on Target.",
         "example": "<think><reasoning>I need to go down then push the box down to reach the target</reasoning><prediction>####\n#__#\n#__#\n#_P#\n#_√#</prediction></think><answer>Down{action_sep}Down</answer>"
     },
     
-    "grounding_worldmodeling_symbol": {
+    "grounding_worldmodeling_symbolic": {
         "format": "<think><observation>...</observation><reasoning>...</reasoning><prediction>...</prediction></think><answer>...</answer>",
         "description": "You should first give the description of your observation as a grid, then your reasoning, then predict the next state as a grid, and finally your answer.",
         "additional_info": "The observation and state should be represented as grids using the symbols: # Wall | _ Floor | O Target | X Box | P You | √ Box on Target | S You on Target.",
