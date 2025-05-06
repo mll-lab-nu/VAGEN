@@ -6,8 +6,8 @@ from gymnasium.utils import seeding
 from gymnasium.envs.toy_text.frozen_lake import FrozenLakeEnv as GymFrozenLakeEnv
 from vagen.env.utils.env_utils import NoLoggerWarnings, set_seed
 from vagen.env.utils.context_utils import convert_numpy_to_PIL
-from vagen.env.utils.parse_utils_3 import parse_function_map
-from .prompt_3 import system_prompt, init_observation_template, action_template, format_prompt
+from vagen.env.utils.parse_utils_4 import parse_function_map
+from .prompt import system_prompt, init_observation_template, action_template, format_prompt
 from .env_config import FrozenLakeEnvConfig
 from .utils import generate_random_map, is_valid
 
@@ -267,12 +267,12 @@ class FrozenLakeEnv(BaseEnv):
         # Format the observation string using the appropriate template
         if init_obs:
             # Initial observation doesn't include action results
-            obs_str = init_observation_template(img_str) + "\n" + format_prompt_text
+            obs_str = init_observation_template(img_str=img_str) + "\n" + format_prompt_text
         else:
             # Subsequent observations include action results
             obs_str = action_template(
                 valid_action=self.valid_actions,
-                observation=img_str,
+                img_str=img_str,
             ) + "\n" + format_prompt_text
         
         # Return observation dictionary with appropriate fields

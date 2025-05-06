@@ -5,9 +5,9 @@ import time
 import math
 from ai2thor.platform import CloudRendering
 from vagen.env.utils.context_utils import convert_numpy_to_PIL
-from vagen.env.utils.parse_utils_3 import parse_function_map
+from vagen.env.utils.parse_utils_4 import parse_function_map
 from .env_config import NavigationEnvConfig
-from .prompt_3 import system_prompt,init_observation_template, action_template, format_prompt
+from .prompt import system_prompt,init_observation_template, action_template, format_prompt
 
 
 class NavigationEnv(BaseEnv):

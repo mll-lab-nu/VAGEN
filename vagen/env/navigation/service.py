@@ -131,7 +131,22 @@ class NavigationService(BaseService):
         # Define worker function
         def step_single_env(env_id, action):
             env = self.environments[env_id]
-            observation, reward, done, info = env.step(action)
+            try:
+                observation, reward, done, info = env.step(action)
+            except Exception as e:
+                print(f"Error stepping navigation environment {env_id}: {e}")
+                try:
+                    observation,info=env.reset()
+                    reward=0.0
+                    done=True 
+                except Exception as e:
+                    print(f"Error resetting navigation environment {env_id} after step failure: {e}")
+                    env.close()
+                    self.environments.pop(env_id, None)
+                    observation={"obs_str":"error"}
+                    reward=0.0
+                    done=True
+                    info={}
             serialized_observation = serialize_observation(observation)
             return env_id, (serialized_observation, reward, done, info), None
             
@@ -244,7 +259,7 @@ class NavigationService(BaseService):
             env_ids = list(self.environments.keys())
         
         # Define worker function
-        def close_single_env(env_id):                
+        def close_single_env(env_id):      
             env = self.environments[env_id]
             env.close()
             return None

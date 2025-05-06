@@ -12,7 +12,9 @@ class PrimitiveSkillEnvConfig(BaseEnvConfig):
     video_record_dir: str = field(default='./test')
     mask_success: bool = field(default=True)
     prompt_format: str = "free_think" 
-    # "free_think", "no_think", "grounding", "worldmodeling", "grounding_worldmodeling"
+    # "free_think", "no_think", "grounding", "worldmodeling", "grounding_worldmodeling",
+    # "grounding_structured","worldmodeling_structured","grounding_worldmodeling_structured"
+    
     use_accuracy_reward: bool = False
     
     

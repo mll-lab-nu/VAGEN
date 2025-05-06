@@ -6,8 +6,8 @@ from typing import Dict
 from vagen.env.utils.env_utils import NoLoggerWarnings, set_seed
 from vagen.env.utils.context_utils import convert_numpy_to_PIL
 import numpy as np
-from vagen.env.utils.parse_utils_3 import parse_function_map
-from .prompt_3 import (
+from vagen.env.utils.parse_utils_4 import parse_function_map
+from .prompt import (
     system_prompt, 
     init_observation_template, 
     action_template,
@@ -157,11 +157,11 @@ class SokobanEnv(BaseEnv):
             img_str = "\n".join("".join(lookup(cell) for cell in row) for row in room_state)
         
         if init_obs:
-            obs_str = init_observation_template(img_str) + "\n" + format_prompt
+            obs_str = init_observation_template(img_str=img_str) + "\n" + format_prompt
         else:
             obs_str = action_template(
                 valid_action=self.valid_actions,
-                observation=img_str,
+                img_str=img_str,
             ) + "\n" + format_prompt
         
         if multi_modal_data is not None:
