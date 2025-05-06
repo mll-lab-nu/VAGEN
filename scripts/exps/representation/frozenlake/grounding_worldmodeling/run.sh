@@ -63,7 +63,7 @@ python3 -m vagen.trainer.main_ppo \
     algorithm.kl_ctrl.kl_coef=0.001 \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
-    trainer.project_name='vagen_format' \
+    trainer.project_name='vagen_new' \
     trainer.experiment_name=$EXPERIMENT_NAME \
     trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \
