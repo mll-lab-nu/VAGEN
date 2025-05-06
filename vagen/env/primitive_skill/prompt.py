@@ -1,4 +1,4 @@
-def system_prompt():
+def system_prompt(**kwargs):
     """
     Returns the system prompt for the robot arm control.
     
