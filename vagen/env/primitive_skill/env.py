@@ -370,8 +370,7 @@ if __name__ == "__main__":
     while True:
         i += 1
         action = input("Enter action:")
-        action = f"<think>Let me try this direction.</think><answer>{action}</answer>"
-        
+        #action = f"<think>Let me try this direction.</think><answer>{action}</answer>"
         obs, reward, done, info = env.step(action)
         print(obs["obs_str"])
         

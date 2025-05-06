@@ -13,7 +13,7 @@ class FrozenLakeEnvConfig(BaseEnvConfig):
     min_actions_to_succeed: int = 5
     prompt_format: str = "free_think" 
     # "free_think", "no_think", "grounding", "worldmodeling", "grounding_worldmodeling"
-    # "grounding_symbol", "worldmodeling_symbol", "grounding_worldmodeling_symbol"
+    # "grounding_symbolic", "worldmodeling_symbolic", "grounding_worldmodeling_symbolic"
     # "grounding_structured", "worldmodeling_structured", "grounding_worldmodeling_structured"
     use_accuracy_reward: bool = False
     

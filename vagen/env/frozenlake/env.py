@@ -78,7 +78,7 @@ class FrozenLakeEnv(BaseEnv):
         # Store the format prompt function for later use
         self.format_prompt_func = format_prompt[self.config.prompt_format]
         
-        self.parse_func = parse_function_map[self.config.prompt_format.rstrip("_symbol")]
+        self.parse_func = parse_function_map[self.config.prompt_format]
 
     def reset(self, seed=None):
         """

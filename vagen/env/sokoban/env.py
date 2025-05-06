@@ -49,7 +49,7 @@ class SokobanEnv(BaseEnv):
         # Call the function with add_example=True for system prompt
     
         
-        self.parse_func = parse_function_map[self.config.prompt_format.rstrip("_symbol")]
+        self.parse_func = parse_function_map[self.config.prompt_format]
         
     def reset(self, seed=None):
         with NoLoggerWarnings():

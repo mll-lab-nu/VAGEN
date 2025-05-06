@@ -57,21 +57,21 @@ FORMAT_CONFIGS = {
         "example": "<think><observation>The player is on the above the target</observation><reasoning>I should go down then left to reach the target</reasoning><prediction>The player will reach the target</prediction></think><answer>Down{action_sep}Left</answer>"
     },
     
-    "grounding_symbol": {
+    "grounding_symbolic": {
         "format": "<think><observation>...</observation><reasoning>...</reasoning></think><answer>...</answer>",
         "description": "You should first describe the observation as a grid, then your reasoning, and finally your answer.",
         "additional_info": "The observation should be represented as a grid using the symbols: _ Frozen | O Hole | G Goal | P Player | X Player fell into hole | √ Player on goal.",
         "example": "<think><observation>_P__\nG___\n*OO*\n____</observation><reasoning>I should go down then left to reach the target</reasoning></think><answer>Down{action_sep}Left</answer>"
     },
     
-    "worldmodeling_symbol": {
+    "worldmodeling_symbolic": {
         "format": "<think><reasoning>...</reasoning><prediction>...</prediction></think>",
         "description": "You should first give your reasoning, then predict the next state, and finally your answer.",
         "additional_info": "The prediction should be represented as a grid using the symbols: _ Frozen | O Hole | G Goal | P Player | X Player fell into hole | √ Player on goal.",
         "example": "<think><reasoning>I can see the target is on my down left, I should go down then left</reasoning><prediction>____\n√___\n*OO*\n____</prediction></think><answer>Down{action_sep}Left</answer>"
     },
     
-    "grounding_worldmodeling_symbol": {
+    "grounding_worldmodeling_symbolic": {
         "format": "<think><observation>...</observation><reasoning>...</reasoning><prediction>...</prediction></think>",
         "description": "You should first describe the observation as a grid, then your reasoning, then predict the next state, and finally your answer.",
         "additional_info": "The observation and state should be represented as grids using the symbols: _ Frozen | O Hole | G Goal | P Player | X Player fell into hole | √ Player on goal.",
