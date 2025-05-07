@@ -101,16 +101,8 @@ class SVGEnv(BaseEnv):
         
         return self._render(init_obs=True), {}
 
-    def step(self, action_str: str, dino_model=None) -> Tuple[Dict, float, bool, Dict]:
-        """Execute a step in the environment.
-        
-        Args:
-            action_str: Raw text response from LLM
-            dino_model: Optional DINO model for scoring
-            
-        Returns:
-            Observation, reward, done, info
-        """
+    def step(self, action_str: str, dino_model=None, dreamsim_model=None) -> Tuple[Dict, float, bool, Dict]:
+        """Execute a step in the environment."""
         # Process the LLM response to extract actions
         rst = self.parse_func(
             response=action_str,
@@ -170,7 +162,7 @@ class SVGEnv(BaseEnv):
                 _, gen_image = process_and_rasterize_svg(self.gen_svg_code)
                 self.gen_image = gen_image
                 
-                # Calculate score
+                # Calculate score using service models if provided
                 score_config = self.config.get_score_config()
                 scores = calculate_total_score(
                     gt_im=self.gt_image,
@@ -178,7 +170,8 @@ class SVGEnv(BaseEnv):
                     gt_code=self.gt_svg_code,
                     gen_code=self.gen_svg_code,
                     score_config=score_config,
-                    dino_model=dino_model
+                    dino_model=dino_model,
+                    dreamsim_model=dreamsim_model
                 ) 
                 
                 # Set metrics and update reward
@@ -189,9 +182,6 @@ class SVGEnv(BaseEnv):
                 metrics["turn_metrics"]["action_is_effective"] = scores["total_score"] > 0
                     
             except Exception as e:
-                import traceback
-                print(f"Error processing SVG: {e}")
-                traceback.print_exc()
                 # Reset actions and update metrics
                 self.valid_actions = []
                 metrics["turn_metrics"]["action_is_valid"] = False

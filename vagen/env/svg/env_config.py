@@ -12,7 +12,7 @@ class SvgEnvConfig(BaseEnvConfig):
     action_sep: str = "~~"
     # Score configuration
     model_size: str = "small"  # 'small', 'base', or 'large'
-    dino_only: bool = False
+    # Weights for different scoring components
     dino_weight: Optional[float] = None
     structural_weight: Optional[float] = None
     dreamsim_weight: Optional[float] = None
@@ -43,7 +43,6 @@ class SvgEnvConfig(BaseEnvConfig):
         id_fields = [
             "dataset_name", 
             "model_size", 
-            "dino_only", 
             "format_reward", 
             "format_penalty"
         ]
@@ -65,7 +64,6 @@ class SvgEnvConfig(BaseEnvConfig):
         """Get the score configuration dictionary"""
         score_config = {
             "model_size": self.model_size,
-            "dino_only": self.dino_only,
             "device": self.device  # Include processed device configuration in score config
         }
         
@@ -78,14 +76,3 @@ class SvgEnvConfig(BaseEnvConfig):
             score_config["dreamsim_weight"] = self.dreamsim_weight
             
         return score_config
-
-
-if __name__ == "__main__":
-    # Example usage
-    config = SvgEnvConfig(
-        device={"dino": 1, "dreamsim": 2}  # Will be converted to "cuda:1" and "cuda:2"
-    )
-    
-    print(config.config_id())
-    print(config.get_score_config())
-    print(f"Processed device config: {config.device}")  # Should show {"dino": "cuda:1", "dreamsim": "cuda:2"}

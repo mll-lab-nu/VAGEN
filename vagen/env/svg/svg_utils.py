@@ -50,11 +50,6 @@ def clean_svg(svg_text, output_width=None, output_height=None):
         
     svg_clean = "\n".join([line for line in svg_cairo.split("\n") if not line.strip().startswith("<?xml")]) # Remove xml header
     return svg_clean
-
-
-def use_placeholder():
-    VOID_SVF = "Exception Placeholder"
-    return VOID_SVF
  
 def process_and_rasterize_svg(svg_string, resolution=256, dpi=128, scale=2):
     try:
