@@ -11,9 +11,9 @@ Actions you can take: Left, Down, Right, Up.
 """
 
 def init_observation_template(**kwargs):
-    img_str = kwargs.get("img_str", "The player is on the above the target")
+    observation = kwargs.get("observation", "The player is on the above the target")
     return f"""[Initial Observation]:
-{img_str}
+{observation}
 Decide your next action(s).
 """
 

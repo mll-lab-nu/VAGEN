@@ -257,22 +257,22 @@ class FrozenLakeEnv(BaseEnv):
             multi_modal_data = {
                 img_placeholder: [convert_numpy_to_PIL(self.gym_env._render_gui(mode='rgb_array'))]
             }
-            img_str = img_placeholder  # In the text, just use the placeholder
+            observation = img_placeholder  # In the text, just use the placeholder
         else:
             # For text mode, generate a text grid representation
             room_state = self._get_text_representation()
             lookup = lambda cell: self.GRID_LOOKUP.get(cell, "?")
-            img_str = "\n".join("".join(lookup(cell) for cell in row) for row in room_state)
+            observation = "\n".join("".join(lookup(cell) for cell in row) for row in room_state)
         
         # Format the observation string using the appropriate template
         if init_obs:
             # Initial observation doesn't include action results
-            obs_str = init_observation_template(img_str=img_str) + "\n" + format_prompt_text
+            obs_str = init_observation_template(observation=observation) + "\n" + format_prompt_text
         else:
             # Subsequent observations include action results
             obs_str = action_template(
                 valid_action=self.valid_actions,
-                img_str=img_str,
+                observation=observation,
             ) + "\n" + format_prompt_text
         
         # Return observation dictionary with appropriate fields
