@@ -72,7 +72,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python -m vagen.env.create_dataset \\
 # Then start the training
 tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     algorithm.adv_estimator=bi_level_gae \\
-    algorithm.high_level_gamma=0.95 \\
+    algorithm.high_level_gamma=1.0 \\
     data.train_files=data/$EXPERIMENT_NAME/train.parquet \\
     data.val_files=data/$EXPERIMENT_NAME/test.parquet \\
     data.train_batch_size=64 \\
