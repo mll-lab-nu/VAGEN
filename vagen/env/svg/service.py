@@ -165,10 +165,16 @@ class SVGService(BaseService):
         return results
     
     def step_batch(self, ids2actions: Dict[Any, Any]) -> Dict[Any, Tuple[Dict, float, bool, Dict]]:
+        """
+        Optimized step_batch method that maximizes RAM and GPU utilization
+        """
         results = {}
+        
+        # Process SVG actions in batch
         env_processing_results, error_results = self._process_svg_actions_batch(ids2actions)
         results.update(error_results)
         
+        # Collect valid SVGs for batch processing
         valid_env_ids = []
         gt_images = []
         gen_images = []
@@ -177,7 +183,6 @@ class SVGService(BaseService):
         score_configs = []
         
         for env_id, result in env_processing_results.items():
-            # Only process valid SVGs - skip invalid ones entirely for scoring
             if result["valid"] and result["gen_image"] is not None and result["metrics"]["turn_metrics"]["svg_is_valid"]:
                 valid_env_ids.append(env_id)
                 gt_images.append(result["env"].gt_image)
@@ -187,16 +192,17 @@ class SVGService(BaseService):
                 score_configs.append(result["env"].config.get_score_config())
         
         if valid_env_ids:
-            # Get the models from the service
+            # Get models from service
             dino_model = self.get_dino_model()
             dreamsim_model = self.get_dreamsim_model()
 
-            # Calculate all scores at once with the service models
+            # Calculate all scores at once
             batch_results = calculate_total_score_batch(
                 gt_images, gen_images, gt_codes, gen_codes, score_configs,
                 dino_model=dino_model, dreamsim_model=dreamsim_model
             )
             
+            # Process results and update environments
             for i, env_id in enumerate(valid_env_ids):
                 result = env_processing_results[env_id]
                 env = result["env"]
@@ -206,9 +212,7 @@ class SVGService(BaseService):
                 env.reward += scores["total_score"]
                 env.total_reward += env.reward
                 
-                # Determine if action is effective - either:
-                # 1. First generation (no previous score) with a positive score
-                # 2. Improved score compared to previous generation
+                # Determine effectiveness based on improvement
                 previous_score = 0.0
                 is_first_generation = True
                 
@@ -216,29 +220,30 @@ class SVGService(BaseService):
                     previous_score = self.cache[env_id]['scores'].get('total_score', 0.0)
                     is_first_generation = False
                 
-                # Check effectiveness based on whether it's the first generation or an improvement
+                # Check if first generation or improved
                 if is_first_generation:
                     result["metrics"]["turn_metrics"]["action_is_effective"] = scores["total_score"] > 0
                 else:
                     result["metrics"]["turn_metrics"]["action_is_effective"] = scores["total_score"] > previous_score
                 
-                # Update other metrics
+                # Update metrics
                 result["metrics"]["turn_metrics"]["dino_score"] = scores["dino_score"]
                 result["metrics"]["turn_metrics"]["dreamsim_score"] = scores["dreamsim_score"]
                 info = result["rst"].copy()
                 info["scores"] = scores
                 info["metrics"] = result["metrics"]
                 
-                # Update cache if needed
+                # Update cache
                 if env_id in self.cache:
                     self.cache[env_id]['gen_image'] = env.gen_image
                     self.cache[env_id]['gen_svg_code'] = env.gen_svg_code
                     self.cache[env_id]['scores'] = scores
                 
+                # Create observation
                 observation = env._render(init_obs=False)
                 results[env_id] = serialize_step_result((observation, env.reward, False, info))
         
-        # Handle invalid cases or cases not processed above
+        # Handle invalid cases
         for env_id, result in env_processing_results.items():
             if env_id not in results:
                 env = result["env"]
@@ -252,11 +257,11 @@ class SVGService(BaseService):
                 elif "traj_metrics" not in info["metrics"]:
                     info["metrics"]["traj_metrics"] = {}
                     
-                # For invalid SVGs, explicitly set scores to zero
+                # Set invalid metrics
                 info["metrics"]["turn_metrics"]["action_is_valid"] = False
                 info["metrics"]["turn_metrics"]["action_is_effective"] = False
                 
-                # Set all scores to zero for invalid SVGs
+                # Zero scores for invalid SVGs
                 info["scores"] = {
                     "dino_score": 0.0,
                     "structural_score": 0.0,
@@ -264,6 +269,7 @@ class SVGService(BaseService):
                     "total_score": 0.0
                 }
                 
+                # Apply penalty
                 reward = 0.0
                 if hasattr(env.config, "format_penalty"):
                     reward = env.config.format_penalty
@@ -273,8 +279,10 @@ class SVGService(BaseService):
                 env.gen_svg_code = None
                 env.gen_image = None
                 
+                # Create observation
                 observation = env._render(init_obs=False)
                 
+                # Update cache
                 if env_id in self.cache:
                     self.cache[env_id]['gen_image'] = None
                     self.cache[env_id]['gen_svg_code'] = None

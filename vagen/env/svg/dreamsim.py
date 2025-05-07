@@ -3,7 +3,8 @@ from PIL import Image
 import os
 from dreamsim import dreamsim
 import logging
-
+from concurrent.futures import ThreadPoolExecutor
+from typing import List, Any
 
 class DreamSimScoreCalculator:
     """
@@ -46,38 +47,24 @@ class DreamSimScoreCalculator:
 
         return similarity
 
-    def calculate_batch_scores(self, gt_images, gen_images):
+    def calculate_batch_scores(self, gt_images: List[Any], gen_images: List[Any]) -> List[float]:
         """
-        Calculate similarity scores for a batch of image pairs.
+        Calculate similarity scores for multiple image pairs.
+        Since DreamSim doesn't natively support batch comparison, we process each pair individually.
         """
-        # Preprocess all images
-        gt_processed = [self.preprocess(img) for img in gt_images]
-        gen_processed = [self.preprocess(img) for img in gen_images]
-
+        if not gt_images or not gen_images:
+            return []
+            
+        batch_size = len(gt_images)
+        
+        gt_processed = [self.preprocess(img).to(self.device) for img in gt_images]
+        gen_processed = [self.preprocess(img).to(self.device) for img in gen_images]
+        
         scores = []
-        # Process each pair
-        for gt, gen in zip(gt_processed, gen_processed):
-            # Move to device
-            gt = gt.to(self.device)
-            gen = gen.to(self.device)
-
-            # Calculate distance
+        for i in range(batch_size):
             with torch.no_grad():
-                distance = self.model(gt, gen).item()
-
-            # Convert to similarity score
+                distance = self.model(gt_processed[i], gen_processed[i]).item()
             similarity = 1.0 - min(1.0, max(0.0, distance))
             scores.append(similarity)
-
+        
         return scores
-
-
-# Compatibility function for existing code
-def get_dreamsim_model(device="cuda:0"):
-    """
-    Create a new DreamSim model instance.
-    This function exists for backward compatibility.
-    The service should use DreamSimScoreCalculator directly.
-    """
-    logging.info(f"Creating new DreamSim model on {device}")
-    return DreamSimScoreCalculator(device=device)
