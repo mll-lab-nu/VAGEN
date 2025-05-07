@@ -1,7 +1,5 @@
 import numpy as np
 import cv2
-from vagen.env.svg.dino import DINOScoreCalculator
-
 
 def calculate_structural_accuracy(gt_im, gen_im):
     "range from 0 - 1"
@@ -20,24 +18,6 @@ def calculate_structural_accuracy(gt_im, gen_im):
 def calculate_total_score(gt_im, gen_im, gt_code, gen_code, score_config, dino_model=None, dreamsim_model=None):
     """
     Calculate all metrics and return a comprehensive score
-    
-    Args:
-        gt_im: Ground truth image
-        gen_im: Generated image
-        gt_code: Ground truth SVG code
-        gen_code: Generated SVG code
-        score_config: Dictionary containing scoring parameters
-            - model_size: small, base, large
-            - dino_only: Whether to use only DINO for scoring
-            - dino_weight: Weight for DINO score
-            - structural_weight: Weight for structural score
-            - dreamsim_weight: Weight for DreamSim score
-            - device: Dictionary with keys "dino" and "dreamsim" specifying device
-        dino_model: Pre-loaded DINO model (optional)
-        dreamsim_model: Pre-loaded DreamSim model (optional)
-        
-    Returns:
-        dict: Dictionary of all scores including the total weighted score
     """
     # Get configuration parameters with defaults
     model_size = score_config.get("model_size", "small")
@@ -108,18 +88,6 @@ def calculate_total_score_batch(gt_images, gen_images, gt_codes, gen_codes, scor
                                 dreamsim_model=None):
     """
     Calculate scores for multiple image pairs in batch mode
-
-    Args:
-        gt_images: List of ground truth images
-        gen_images: List of generated images
-        gt_codes: List of ground truth SVG codes
-        gen_codes: List of generated SVG codes
-        score_configs: List of scoring parameters dictionaries
-        dino_model: Pre-loaded DINO model (optional)
-        dreamsim_model: Pre-loaded DreamSim model (optional)
-
-    Returns:
-        List of dictionaries containing all scores
     """
     batch_size = len(gt_images)
     if batch_size == 0:

@@ -1,32 +1,11 @@
 import torch
 from torch.utils.data import DataLoader
-from tqdm import tqdm
-from transformers import AutoModel, AutoImageProcessor
-from PIL import Image
 import torch.nn as nn
-import threading
 import logging
 from typing import Dict, List, Tuple, Optional, Any, Union
+from transformers import AutoModel, AutoImageProcessor
+from PIL import Image
 
-
-# @TODO clean codes of this section
-
-_model_cache = {}
-_model_cache_lock = threading.Lock()
-_model_counter = 0  
-
-def get_dino_model(model_size="small", device="cuda:0"):
-    global _model_counter
-    cache_key = f"{model_size}_{device}"
-    
-    with _model_cache_lock:
-        if cache_key not in _model_cache:
-            _model_counter += 1
-            import os
-            pid = os.getpid()
-            logging.info(f"Process {pid}: Created DINO model #{_model_counter}: {model_size} on {device}")
-            _model_cache[cache_key] = DINOScoreCalculator(model_size=model_size, device=device)
-        return _model_cache[cache_key]
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -46,6 +25,7 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
+
 class BaseMetric:
     def __init__(self):
         self.meter = AverageMeter()
@@ -59,7 +39,7 @@ class BaseMetric:
         """
         values = []
         batch_size = len(next(iter(batch.values())))
-        for index in tqdm(range(batch_size)):
+        for index in range(batch_size):
             kwargs = {}
             for key in ["gt_im", "gen_im", "gt_svg", "gen_svg", "caption"]:
                 if key in batch:
@@ -69,7 +49,7 @@ class BaseMetric:
             except Exception as e:
                 print("Error calculating metric: {}".format(e))
                 continue
-            if math.isnan(measure):
+            if not (measure >= 0) and not (measure <= 0):  # Check for NaN
                 continue
             values.append(measure)
 
@@ -85,13 +65,12 @@ class BaseMetric:
             return score, values
 
     def metric(self, **kwargs):
-        """
-        This method should be overridden by subclasses to provide the specific metric computation.
-        """
+        """This method should be overridden by subclasses"""
         raise NotImplementedError("The metric method must be implemented by subclasses.")
     
     def get_average_score(self):
         return self.meter.avg
+
 
 class DINOScoreCalculator(BaseMetric): 
     def __init__(self, config=None, model_size='large', device='cuda:0'):
@@ -158,19 +137,11 @@ class DINOScoreCalculator(BaseMetric):
     def calculate_batch_scores(self, gt_images: List[Any], gen_images: List[Any]) -> List[float]:
         """
         Calculate similarity scores for multiple image pairs in a single batch
-        
-        Args:
-            gt_images: List of ground truth images (PIL Images, file paths, or tensors)
-            gen_images: List of generated images (PIL Images, file paths, or tensors)
-            
-        Returns:
-            List of similarity scores (float values between 0-1)
         """      
         if not gt_images: 
             return []
         
         gt_features = self.process_input(gt_images, self.processor)
-        
         gen_features = self.process_input(gen_images, self.processor)
         
         cos = nn.CosineSimilarity(dim=1)
@@ -179,5 +150,14 @@ class DINOScoreCalculator(BaseMetric):
         scores = [(sim.item() + 1) / 2 for sim in similarities]
         
         return scores
-    
-    
+
+
+# Compatibility function for existing code
+def get_dino_model(model_size="small", device="cuda:0"):
+    """
+    Create a new DINO model instance.
+    This function exists for backward compatibility.
+    The service should use DINOScoreCalculator directly.
+    """
+    logging.info(f"Creating new DINO model: {model_size} on {device}")
+    return DINOScoreCalculator(model_size=model_size, device=device)

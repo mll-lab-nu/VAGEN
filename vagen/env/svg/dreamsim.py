@@ -2,37 +2,7 @@ import torch
 from PIL import Image
 import os
 from dreamsim import dreamsim
-import threading
 import logging
-
-# Create global cache and lock, similar to DINO implementation
-_model_cache = {}
-_model_cache_lock = threading.Lock()
-_model_counter = 0
-
-
-def get_dreamsim_model(device="cuda:0"):
-    """
-    Get a singleton instance of DreamSim model, using cache to avoid duplicate loading
-
-    Args:
-        device: Device to run model on
-
-    Returns:
-        DreamSimScoreCalculator: Instance of DreamSim calculator
-    """
-    global _model_counter
-
-    # Use device as cache key
-    cache_key = f"dreamsim_{device}"
-
-    with _model_cache_lock:
-        if cache_key not in _model_cache:
-            _model_counter += 1
-            pid = os.getpid()
-            logging.info(f"Process {pid}: Created DreamSim model #{_model_counter} on {device}")
-            _model_cache[cache_key] = DreamSimScoreCalculator(device=device)
-        return _model_cache[cache_key]
 
 
 class DreamSimScoreCalculator:
@@ -43,11 +13,6 @@ class DreamSimScoreCalculator:
     def __init__(self, pretrained=True, cache_dir="~/.cache", device=None):
         """
         Initialize DreamSim model.
-
-        Args:
-            pretrained: Whether to use pretrained model
-            cache_dir: Cache directory for model weights
-            device: Device to run the model on (defaults to CUDA if available, else CPU)
         """
         cache_dir = os.path.expanduser(cache_dir)
 
@@ -63,13 +28,6 @@ class DreamSimScoreCalculator:
     def calculate_similarity_score(self, gt_im, gen_im):
         """
         Calculate similarity score between ground truth and generated images.
-
-        Args:
-            gt_im: Ground truth PIL Image
-            gen_im: Generated PIL Image
-
-        Returns:
-            float: Similarity score (1 - distance, normalized to [0, 1])
         """
         # Preprocess images
         img1 = self.preprocess(gt_im)
@@ -84,8 +42,6 @@ class DreamSimScoreCalculator:
             distance = self.model(img1, img2).item()
 
         # Convert distance to similarity score (1 - normalized distance)
-        # DreamSim usually outputs values in range [0, 1] where lower means more similar
-        # We invert it so that higher means more similar (1 = identical)
         similarity = 1.0 - min(1.0, max(0.0, distance))
 
         return similarity
@@ -93,13 +49,6 @@ class DreamSimScoreCalculator:
     def calculate_batch_scores(self, gt_images, gen_images):
         """
         Calculate similarity scores for a batch of image pairs.
-
-        Args:
-            gt_images: List of ground truth PIL Images
-            gen_images: List of generated PIL Images
-
-        Returns:
-            List[float]: List of similarity scores
         """
         # Preprocess all images
         gt_processed = [self.preprocess(img) for img in gt_images]
@@ -121,3 +70,14 @@ class DreamSimScoreCalculator:
             scores.append(similarity)
 
         return scores
+
+
+# Compatibility function for existing code
+def get_dreamsim_model(device="cuda:0"):
+    """
+    Create a new DreamSim model instance.
+    This function exists for backward compatibility.
+    The service should use DreamSimScoreCalculator directly.
+    """
+    logging.info(f"Creating new DreamSim model on {device}")
+    return DreamSimScoreCalculator(device=device)

@@ -11,22 +11,12 @@ from vagen.env.utils.context_utils import parse_llm_raw_response, convert_numpy_
 from .service_config import SVGServiceConfig
 from vagen.env.svg.svg_utils import (process_and_rasterize_svg, is_valid_svg, load_svg_dataset)
 import os
+
 class SVGService(BaseService):
-    """
-    Service class for SVG environments.
-    Implements batch operations with parallel processing for efficiency.
-    Integrates DINO scoring model directly within the service.
-    """
+    """Service class for SVG environments with centralized model management."""
     
     def __init__(self, config: SVGServiceConfig):
-        """
-        Initialize the SVGService.
-        
-        Args:
-            max_workers: Maximum number of worker threads for parallel processing
-            model_size: Size of the DINO model to use ("small", "base", or "large")
-        """
-        self.config= config
+        self.config = config
         self.max_workers = self.config.max_workers
         self.environments = {}
         self.env_configs = {}
@@ -34,23 +24,68 @@ class SVGService(BaseService):
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
         self.dataset = {}
         
+        # Store device configuration
+        self.devices = {
+            "dino": "cuda:0",
+            "dreamsim": "cuda:0"
+        }
+        if hasattr(config, "device") and isinstance(config.device, dict):
+            for key, value in config.device.items():
+                if isinstance(value, (int, float)):
+                    self.devices[key] = f"cuda:{int(value)}"
+                else:
+                    self.devices[key] = value
         
-        # Load the DINO model directly in the service
-        # This allows all environments to share the same model instance
+        # Initialize model parameters
         self.model_size = self.config.model_size
-        self.dino_model = None  # Will be loaded on first use
-
-        # Add DreamSim model support
-        self.dreamsim_model = None  # Will be loaded on first use if enabled
+        self._models = {}
         
-        # Store device for model inference
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        print(f"SVGService initialized with {self.max_workers} workers, model_size={self.model_size}, device={self.device}")
+        # Pre-initialize models if configured
+        if getattr(self.config, "preload_models", False):
+            self._initialize_models()
+            
+        print(f"SVGService initialized with {self.max_workers} workers, model_size={self.model_size}")
+    
+    def _initialize_models(self):
+        """Initialize models if they haven't been created yet"""
+        if "dino" not in self._models:
+            from vagen.env.svg.dino import DINOScoreCalculator
+            self._models["dino"] = DINOScoreCalculator(
+                model_size=self.model_size, 
+                device=self.devices["dino"]
+            )
+            print(f"Initialized DINO model (size={self.model_size}) on {self.devices['dino']}")
+        
+        if "dreamsim" not in self._models:
+            from vagen.env.svg.dreamsim import DreamSimScoreCalculator
+            self._models["dreamsim"] = DreamSimScoreCalculator(
+                device=self.devices["dreamsim"]
+            )
+            print(f"Initialized DreamSim model on {self.devices['dreamsim']}")
+    
+    def get_dino_model(self):
+        """Get the DINO model instance, initializing if necessary"""
+        if "dino" not in self._models:
+            from vagen.env.svg.dino import DINOScoreCalculator
+            self._models["dino"] = DINOScoreCalculator(
+                model_size=self.model_size, 
+                device=self.devices["dino"]
+            )
+        return self._models["dino"]
+    
+    def get_dreamsim_model(self):
+        """Get the DreamSim model instance, initializing if necessary"""
+        if "dreamsim" not in self._models:
+            from vagen.env.svg.dreamsim import DreamSimScoreCalculator
+            self._models["dreamsim"] = DreamSimScoreCalculator(
+                device=self.devices["dreamsim"]
+            )
+        return self._models["dreamsim"]
     
     def _config_to_env_config(self, config):
         env_config_dict = config.get('env_config', {})
         env_config = SvgEnvConfig(**env_config_dict)
-        data_dir= os.path.join(self.script_dir, self.config.get("data_dir", ""))
+        data_dir = os.path.join(self.script_dir, self.config.get("data_dir", ""))
         dataset_name = env_config.dataset_name
         split = env_config.get("split", "train")
         return {
@@ -59,40 +94,29 @@ class SVGService(BaseService):
         }
     
     def create_environments_batch(self, ids2configs: Dict[Any, Any]) -> None:
-        """
-        Create multiple SVG environments in parallel.
-        
-        Args:
-            ids2configs: A dictionary where each key is an environment ID and the corresponding
-                        value is the configuration for that environment.
-        """
         id_to_env_config = {}
         for env_id, config in ids2configs.items():
-            rst=self._config_to_env_config(config)
-            dataset_id=rst["dataset_id"]
-            env_config=rst["config"]
+            rst = self._config_to_env_config(config)
+            dataset_id = rst["dataset_id"]
+            env_config = rst["config"]
             if dataset_id not in self.dataset:
-                self.dataset[dataset_id]=load_svg_dataset(
-                    data_dir=os.path.join(self.script_dir,env_config.get("data_dir", "")), 
+                self.dataset[dataset_id] = load_svg_dataset(
+                    data_dir=os.path.join(self.script_dir, env_config.get("data_dir", "")), 
                     dataset_name=env_config.dataset_name,
                     split=env_config.get("split", "train")
                 )
-            id_to_env_config[env_id] = (env_config,dataset_id)
+            id_to_env_config[env_id] = (env_config, dataset_id)
                 
-        def create_single_env(env_id, env_config,dataset):
-            env = SVGEnv(env_config,dataset)
-            
+        def create_single_env(env_id, env_config, dataset):
+            env = SVGEnv(env_config, dataset)
             return env_id, (env, env_config), None
         
-        # Use ThreadPoolExecutor for parallel creation
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            # Submit all environment creation tasks
             futures = {
-                executor.submit(create_single_env, k, v[0],self.dataset[v[1]]): env_id 
+                executor.submit(create_single_env, k, v[0], self.dataset[v[1]]): env_id 
                 for k, v in id_to_env_config.items()
             }
             
-            # Process results as they complete
             for future in as_completed(futures):
                 env_id = futures[future]
                 env_id, result, error = future.result()
@@ -100,19 +124,9 @@ class SVGService(BaseService):
                     env, env_config = result
                     self.environments[env_id] = env
                     self.env_configs[env_id] = env_config
-                    # Initialize cache for this environment
                     self.cache[env_id] = {}
     
     def reset_batch(self, ids2seeds: Dict[Any, Any]) -> Dict[Any, Tuple[Any, Any]]:
-        """
-        Reset multiple SVG environments in parallel.
-        
-        Args:
-            ids2seeds: A dictionary mapping environment IDs to seed values.
-            
-        Returns:
-            A dictionary mapping environment IDs to tuples of the form (observation, info)
-        """
         results = {}
         
         def reset_single_env(env_id, seed):
@@ -122,7 +136,6 @@ class SVGService(BaseService):
             env = self.environments[env_id]
             observation, info = env.reset(seed=seed)
             
-            # Cache current state for this environment
             if env_id in self.cache:
                 self.cache[env_id] = {
                     'gt_image': env.gt_image, 
@@ -132,19 +145,15 @@ class SVGService(BaseService):
                     'scores': None
                 }
             
-            # Serialize the observation for return
             serialized_observation = serialize_observation(observation)
             return env_id, (serialized_observation, info), None
         
-        # Use ThreadPoolExecutor for parallel reset
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            # Submit all reset tasks
             futures = {
                 executor.submit(reset_single_env, env_id, seed): env_id 
                 for env_id, seed in ids2seeds.items()
             }
             
-            # Process results as they complete
             for future in as_completed(futures):
                 env_id = futures[future]
                 env_id, result, error = future.result()
@@ -156,21 +165,10 @@ class SVGService(BaseService):
         return results
     
     def step_batch(self, ids2actions: Dict[Any, Any]) -> Dict[Any, Tuple[Dict, float, bool, Dict]]:
-        """
-        Take a step in multiple SVG environments with optimized batch processing.
-        
-        Args:
-            ids2actions: A dictionary mapping environment IDs to actions
-            
-        Returns:
-            A dictionary mapping environment IDs to (observation, reward, done, info) tuples
-        """
         results = {}
-        # Step 1: Process SVG actions for all environments
         env_processing_results, error_results = self._process_svg_actions_batch(ids2actions)
         results.update(error_results)
         
-        # Step 2: Collect valid images for batch processing
         valid_env_ids = []
         gt_images = []
         gen_images = []
@@ -187,25 +185,25 @@ class SVGService(BaseService):
                 gen_codes.append(result["gen_svg_code"])
                 score_configs.append(result["env"].config.get_score_config())
         
-        # Step 3: Batch process scores if there are valid images
         if valid_env_ids:
+            # Get the models from the service
+            dino_model = self.get_dino_model()
+            dreamsim_model = self.get_dreamsim_model()
 
-            # Calculate all scores at once
+            # Calculate all scores at once with the service models
             batch_results = calculate_total_score_batch(
-                gt_images, gen_images, gt_codes, gen_codes, score_configs
+                gt_images, gen_images, gt_codes, gen_codes, score_configs,
+                dino_model=dino_model, dreamsim_model=dreamsim_model
             )
             
-            # Process results directly using the index mapping
             for i, env_id in enumerate(valid_env_ids):
                 result = env_processing_results[env_id]
                 env = result["env"]
                 scores = batch_results[i]
                 
-                # Update reward
                 env.reward += scores["total_score"]
                 env.total_reward += env.reward
                 
-                # Update metrics and prepare info
                 result["metrics"]["turn_metrics"]["action_is_effective"] = scores["total_score"] > 0
                 result["metrics"]["turn_metrics"]["dino_score"] = scores["dino_score"]
                 result["metrics"]["turn_metrics"]["dreamsim_score"] = scores["dreamsim_score"]
@@ -213,17 +211,14 @@ class SVGService(BaseService):
                 info["scores"] = scores
                 info["metrics"] = result["metrics"]
                 
-                # Update cache if needed
                 if env_id in self.cache:
                     self.cache[env_id]['gen_image'] = env.gen_image
                     self.cache[env_id]['gen_svg_code'] = env.gen_svg_code
                     self.cache[env_id]['scores'] = scores
                 
-                # Create final result
                 observation = env._render(init_obs=False)
                 results[env_id] = serialize_step_result((observation, env.reward, False, info))
         
-        # Step 4: Process invalid or failed generations
         for env_id, result in env_processing_results.items():
             if env_id not in results:
                 env = result["env"]
@@ -248,7 +243,6 @@ class SVGService(BaseService):
                     }
                 
                 reward = 0.0
-                
                 if hasattr(env.config, "format_penalty"):
                     reward = env.config.format_penalty
                     
@@ -269,15 +263,6 @@ class SVGService(BaseService):
         return results
     
     def compute_reward_batch(self, env_ids: List[str]) -> Dict[Any, float]:
-        """
-        Compute the total reward for multiple SVG environments in parallel.
-        
-        Args:
-            env_ids: A list of environment IDs
-            
-        Returns:
-            A dictionary mapping each environment ID to its computed total reward
-        """
         results = {}
         
         def compute_reward_single_env(env_id):
@@ -287,15 +272,12 @@ class SVGService(BaseService):
             env = self.environments[env_id]
             return env_id, env.compute_reward(), None
         
-        # Use ThreadPoolExecutor for parallel computation
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            # Submit all computation tasks
             futures = {
                 executor.submit(compute_reward_single_env, env_id): env_id 
                 for env_id in env_ids
             }
             
-            # Process results as they complete
             for future in as_completed(futures):
                 env_id = futures[future]
                 env_id, result, error = future.result()
@@ -307,15 +289,6 @@ class SVGService(BaseService):
         return results
     
     def get_system_prompts_batch(self, env_ids: List[str]) -> Dict[Any, str]:
-        """
-        Get system prompts for multiple SVG environments in parallel.
-        
-        Args:
-            env_ids: A list of environment IDs
-            
-        Returns:
-            A dictionary mapping each environment ID to its corresponding system prompt string
-        """
         results = {}
         
         def get_system_prompt_single_env(env_id):
@@ -325,15 +298,12 @@ class SVGService(BaseService):
             env = self.environments[env_id]
             return env_id, env.system_prompt(), None
         
-        # Use ThreadPoolExecutor for parallel retrieval
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            # Submit all retrieval tasks
             futures = {
                 executor.submit(get_system_prompt_single_env, env_id): env_id 
                 for env_id in env_ids
             }
             
-            # Process results as they complete
             for future in as_completed(futures):
                 env_id = futures[future]
                 env_id, result, error = future.result()
@@ -345,13 +315,6 @@ class SVGService(BaseService):
         return results
     
     def close_batch(self, env_ids: Optional[List[str]] = None) -> None:
-        """
-        Close multiple SVG environments and clean up resources in parallel.
-        
-        Args:
-            env_ids: Optional list of environment IDs to close. If None, close all environments.
-        """
-        # If no env_ids provided, close all environments
         if env_ids is None:
             env_ids = list(self.environments.keys())
         
@@ -363,32 +326,18 @@ class SVGService(BaseService):
             env.close()
             return None
         
-        # Use ThreadPoolExecutor for parallel closing
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            # Submit all closing tasks
             futures = [executor.submit(close_single_env, env_id) for env_id in env_ids]
             
-            # Wait for all tasks to complete
             for future in as_completed(futures):
                 future.result()
         
-        # Remove closed environments from dictionaries
         for env_id in env_ids:
             self.environments.pop(env_id, None)
             self.env_configs.pop(env_id, None)
             self.cache.pop(env_id, None)
     
     def _process_svg_actions_batch(self, ids2actions):
-        """
-        Process SVG actions for all environments in parallel using ThreadPoolExecutor.
-        
-        Args:
-            ids2actions (Dict): A dictionary mapping environment IDs to actions
-        
-        Returns:
-            Dict: A dictionary of processing results keyed by environment ID
-            Dict: A dictionary of error results directly ready for return keyed by environment ID
-        """
         env_processing_results = {}
         error_results = {}
         
@@ -398,7 +347,6 @@ class SVGService(BaseService):
                     return env_id, None, f"Environment {env_id} not found"
                 
                 env = self.environments[env_id]
-                # Parse and extract SVG code from action
                 rst = parse_llm_raw_response(
                     response=action,
                     special_token_list=env.config.get('special_token_list', None),
@@ -406,31 +354,26 @@ class SVGService(BaseService):
                     max_actions=env.config.get("max_actions_per_step", 1)
                 )
                 
-                # Handle SVG code extraction
                 svg_code = None
                 svg_is_valid = False
                 
-                # First, try to extract SVG code from the response
                 if not rst['actions']:
                     svg_code = env._extract_svg_code(action)
                     if svg_code:
                         svg_is_valid = is_valid_svg(svg_code)
-                        # Even if SVG is invalid, still keep it for training purposes
                         rst['actions'] = [svg_code]
                 else:
                     svg_code = env._extract_svg_code(rst['actions'][0])
                     if svg_code:
                         svg_is_valid = is_valid_svg(svg_code)
-                        # Always keep extracted SVG code regardless of validity
                         rst['actions'] = [svg_code]
                     else:
                         rst['actions'] = []
                 
-                # Initialize metrics - track validity separately from action presence
                 metrics = {
                     "turn_metrics": {
-                        "action_is_valid": rst['actions'] != [],  # Action exists
-                        "svg_is_valid": svg_is_valid,  # SVG syntax is valid
+                        "action_is_valid": rst['actions'] != [],
+                        "svg_is_valid": svg_is_valid,
                         "action_is_effective": False,
                         "dino_score": 0.0,
                         "dreamsim_score": 0.0,
@@ -440,7 +383,6 @@ class SVGService(BaseService):
                     }
                 }
                 
-                # Handle case where no SVG code could be extracted
                 if not rst['actions']:
                     env.reward = env.config.format_penalty
                     env.total_reward += env.reward
@@ -459,31 +401,42 @@ class SVGService(BaseService):
                         "done": False
                     }, None
                 
-                # Process SVG (valid or invalid)
                 env.reward = env.config.format_reward if svg_is_valid else env.config.format_penalty
                 env.total_reward += env.reward
                 env.gen_svg_code = rst['actions'][0]
                 env.valid_actions = rst['actions']
-
-                _, env.gen_image = process_and_rasterize_svg(env.gen_svg_code)
                 
-                return env_id, {
-                    "env": env,
-                    "gen_image": env.gen_image,
-                    "gen_svg_code": env.gen_svg_code,
-                    "rst": rst,
-                    "metrics": metrics,
-                    "valid": True,
-                    "done": False
-                }, None
+                try:
+                    _, env.gen_image = process_and_rasterize_svg(env.gen_svg_code)
+                    
+                    return env_id, {
+                        "env": env,
+                        "gen_image": env.gen_image,
+                        "gen_svg_code": env.gen_svg_code,
+                        "rst": rst,
+                        "metrics": metrics,
+                        "valid": True,
+                        "done": False
+                    }, None
+                except Exception as e:
+                    env.gen_image = None
+                    env.valid_actions = []
+                    
+                    return env_id, {
+                        "env": env,
+                        "gen_image": None,
+                        "gen_svg_code": env.gen_svg_code,
+                        "rst": rst,
+                        "metrics": metrics,
+                        "valid": False,
+                        "done": False
+                    }, None
             
-            # Submit all action processing tasks
             futures = {
                 executor.submit(process_action, env_id, action): env_id 
                 for env_id, action in ids2actions.items()
             }
             
-            # Process results as they complete
             for future in as_completed(futures):
                 env_id = futures[future]
                 env_id, result, error = future.result()
