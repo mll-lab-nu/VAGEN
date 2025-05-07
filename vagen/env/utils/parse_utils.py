@@ -14,6 +14,7 @@ def parse_freethink(response: str, special_token_list=None, action_sep=',', max_
     - actions: a list of actions extracted from action_content
     - format_correct: whether the response strictly follows the expected format
     """
+    response = response.replace("<image>","")
     #Pattern to check for content strictly in the format <think>...</think><answer>...</answer>
     strict_pattern = r'^\s*<think>(.*?)</think>\s*<answer>(.*?)</answer>\s*$'
     strict_match = re.match(strict_pattern, response.strip(), re.DOTALL)
@@ -59,6 +60,7 @@ def parse_no_think(response: str, special_token_list=None, action_sep=',', max_a
     - actions: a list of actions extracted from action_content
     - format_correct: whether the response strictly follows the expected format
     """
+    response = response.replace("<image>","")
     # Pattern to check for content strictly in the format <answer>...</answer>
     strict_pattern = r'^\s*<answer>(.*?)</answer>\s*$'
     strict_match = re.match(strict_pattern, response.strip(), re.DOTALL)
