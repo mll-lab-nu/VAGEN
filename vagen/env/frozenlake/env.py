@@ -314,6 +314,32 @@ class FrozenLakeEnv(BaseEnv):
         player_pos = self._get_player_position()
         return self.gym_env.desc[player_pos] in [b'G', b'H']
 
+    def get_state(self):
+        """
+        Get the current state of the environment as a dictionary.
+        
+        Returns:
+            Dict: Contains player position, target position, and hole positions
+                as coordinate tuples (row, col)
+        """
+        # Get dimensions of the grid
+        nrow, ncol = self.gym_env.desc.shape
+        
+        # Get player position
+        player_position = self._get_player_position()  # Already returns (row, col)
+        
+        # Find target/goal position (marked as 'G')
+        target_position = tuple(map(int, np.argwhere(self.gym_env.desc == b'G')[0]))
+        
+        # Find all hole positions (marked as 'H')
+        hole_positions = [tuple(map(int, pos)) for pos in np.argwhere(self.gym_env.desc == b'H')]
+        
+        return {
+            "player_position": player_position,
+            "target_position": target_position,
+            "hole_positions": hole_positions,
+            "grid_size": (nrow, ncol),
+        }
 
 if __name__ == "__main__":
     """
