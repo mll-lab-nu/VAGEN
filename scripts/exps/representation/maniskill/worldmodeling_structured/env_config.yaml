@@ -2,7 +2,7 @@ env1:
     env_name: primitive_skill 
     env_config:
         render_mode: vision
-        prompt_format: worldmodeling
+        prompt_format: worldmodeling_structured
         use_accuracy_reward: false
         env_id: "AlignTwoCube" # AlignTwoCube,PlaceTwoCube,PutAppleInDrawer,StackThreeCube
     train_size: 10000  
@@ -11,7 +11,7 @@ env2:
     env_name: primitive_skill 
     env_config:
         render_mode: vision
-        prompt_format: worldmodeling
+        prompt_format: worldmodeling_structured
         use_accuracy_reward: false
         env_id: "PlaceTwoCube" # AlignTwoCube,PlaceTwoCube,PutAppleInDrawer,StackThreeCube
     train_size: 10000  
@@ -20,7 +20,7 @@ env3:
     env_name: primitive_skill 
     env_config:
         render_mode: vision
-        prompt_format: worldmodeling
+        prompt_format: worldmodeling_structured
         use_accuracy_reward: false
         env_id: "PutAppleInDrawer" # AlignTwoCube,PlaceTwoCube,PutAppleInDrawer,StackThreeCube
     train_size: 10000  
@@ -29,7 +29,7 @@ env4:
     env_name: primitive_skill 
     env_config:
         render_mode: vision
-        prompt_format: worldmodeling
+        prompt_format: worldmodeling_structured
         use_accuracy_reward: false
         env_id: "StackThreeCube" # AlignTwoCube,PlaceTwoCube,PutAppleInDrawer,StackThreeCube
     train_size: 10000  
