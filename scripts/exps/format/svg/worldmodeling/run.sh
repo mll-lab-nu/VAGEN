@@ -26,8 +26,8 @@ python3 -m vagen.trainer.main_ppo \
     data.val_files=data/$EXPERIMENT_NAME/test.parquet \
     data.train_batch_size=128 \
     data.max_prompt_length=1024 \
-    data.max_response_length=648 \
-    data.max_trajectory_length=3000 \
+    data.max_response_length=750 \
+    data.max_trajectory_length=3500 \
     data.image_key=images \
     data.truncation=error \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \
@@ -67,9 +67,9 @@ python3 -m vagen.trainer.main_ppo \
     trainer.experiment_name=$EXPERIMENT_NAME \
     trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \
-    trainer.save_freq=90 \
+    trainer.save_freq=150 \
     trainer.test_freq=20 \
-    trainer.total_training_steps=200 \
+    trainer.total_training_steps=300 \
     rollout_manager.max_turns=2 \
     rollout_manager.window_size=3 \
     rollout_manager.use_multi_turn_reward=False \

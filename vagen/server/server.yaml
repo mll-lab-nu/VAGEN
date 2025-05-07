@@ -11,9 +11,12 @@ frozenlake:
 svg:
   max_workers: 48
   model_size: "small"
+  device:
+    dino: 1
+    service: 2
 navigation:
   max_workers: 48
-  devices: [0]
+  devices: [0,1,2,3]
 primitive_skill:
   max_workers: 48
 

@@ -113,6 +113,7 @@ def parse_grounding(response: str, special_token_list=None, action_sep=',', max_
     - actions: a list of actions extracted from action_content
     - format_correct: whether the response strictly follows the expected format
     """
+    response = response.replace("<image>","")
     # Pattern to check for content strictly in the expected format
     strict_pattern = r'^\s*<think>\s*<observation>(.*?)</observation>\s*<reasoning>(.*?)</reasoning>\s*</think>\s*<answer>(.*?)</answer>\s*$'
     strict_match = re.match(strict_pattern, response.strip(), re.DOTALL)
@@ -171,6 +172,7 @@ def parse_worldmodeling(response: str, special_token_list=None, action_sep=',', 
     - actions: a list of actions extracted from action_content
     - format_correct: whether the response strictly follows the expected format
     """
+    response = response.replace("<image>","")
     # Pattern to check for content strictly in the expected format
     strict_pattern = r'^\s*<think>\s*<reasoning>(.*?)</reasoning>\s*<prediction>(.*?)</prediction>\s*</think>\s*<answer>(.*?)</answer>\s*$'
     strict_match = re.match(strict_pattern, response.strip(), re.DOTALL)
@@ -230,6 +232,7 @@ def parse_grounding_worldmodeling(response: str, special_token_list=None, action
     - actions: a list of actions extracted from action_content
     - format_correct: whether the response strictly follows the expected format
     """
+    response = response.replace("<image>","")
     # Pattern to check for content strictly in the expected format
     strict_pattern = r'^\s*<think>\s*<observation>(.*?)</observation>\s*<reasoning>(.*?)</reasoning>\s*<prediction>(.*?)</prediction>\s*</think>\s*<answer>(.*?)</answer>\s*$'
     strict_match = re.match(strict_pattern, response.strip(), re.DOTALL)
