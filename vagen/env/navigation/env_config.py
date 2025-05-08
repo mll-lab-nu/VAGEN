@@ -16,7 +16,7 @@ class NavigationEnvConfig(BaseEnvConfig):
     gpu_device: int = 0
     prompt_format: str = "free_think" 
     # "free_think", "no_think", "grounding", "worldmodeling", "grounding_worldmodeling"
-    use_accuracy_reward: bool = False
+    use_state_reward: bool = False
     max_objects_in_state: int = 10
 
     def config_id(self) -> str:
