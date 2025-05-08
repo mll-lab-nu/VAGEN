@@ -97,7 +97,7 @@ See our [Creating Environments](./docs/envs/create-env.md) guide. You may also w
 ## How to Add New Model
 
 1. Refer to [VERL](https://verl.readthedocs.io/en/latest/index.html) for adding new MLLM.
-2. Refer to [QwenVLRolloutManager](vagen/mllm_agent/training_rollout/rollout.py) to understand how rollout works. In most cases, you can use QwenVLRolloutManager directly with only minor modifications to the model's special tokens
+2. Refer to [QwenVLRolloutManager](vagen/rollout/qwen_rollout/rollout_manager.py) to understand how rollout works. In most cases, you can use QwenVLRolloutManager directly with only minor modifications to the model's special tokens
 
 ## Experimental Results
 > To reproduce our experiment, please refer to document: [Reproduce Experiments](docs/reproduce-exp.md)
