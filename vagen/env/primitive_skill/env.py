@@ -4,12 +4,13 @@ import copy
 from typing import Dict, List, Optional, Tuple, Any
 from gymnasium.utils import seeding
 from vagen.env.utils.context_utils import convert_numpy_to_PIL
-from vagen.env.utils.parse_utils_4 import parse_function_map
+from vagen.env.utils.parse_utils import PARSE_FUNC_MAP
 from .env_config import PrimitiveSkillEnvConfig
 from .maniskill.utils import build_env, handle_info, get_workspace_limits
 from .prompt import system_prompt, init_observation_template, action_template, format_prompt
 import vagen.env.primitive_skill.maniskill.env
 import random
+from vagen.env.utils.state_reward_utils import state_reward_wrapper
 class PrimitiveSkillEnv(BaseEnv):
     def __init__(self, config: PrimitiveSkillEnvConfig):
         """
@@ -28,7 +29,7 @@ class PrimitiveSkillEnv(BaseEnv):
         
         # Store the format prompt function for later use based on the configuration
         self.format_prompt_func = format_prompt[self.config.prompt_format]
-        self.parse_func = parse_function_map[self.config.prompt_format]
+        self.parse_func = PARSE_FUNC_MAP[self.config.prompt_format]
         # Define the state keys for the environment
         self.state_keys = self.env.state_keys
         self.last_info = None
@@ -54,6 +55,7 @@ class PrimitiveSkillEnv(BaseEnv):
         self.steps = 0
         return obs, {}
     
+    @state_reward_wrapper
     def step(self, action_str):
         """
         Take a step in the environment based on the agent's action.

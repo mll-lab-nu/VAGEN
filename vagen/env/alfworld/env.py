@@ -1,7 +1,7 @@
 from vagen.env.base.base_env import BaseEnv
 from vagen.env.alfworld.alfworld_utils import load_alfworld_dataset
 from vagen.env.utils.context_utils import parse_llm_raw_response, convert_numpy_to_PIL
-from vagen.env.utils.parse_utils import parse_function_map
+from vagen.env.utils.parse_utils import PARSE_FUNC_MAP
 from .env_config import AlfEnvConfig
 from .prompt import (
     system_prompt,
@@ -61,7 +61,7 @@ class AlfEnv(BaseEnv):
         self.format_prompt_func = format_prompt[self.config.get('prompt_format', 'free_think')]
         
         # Get the parse function based on the prompt format
-        self.parse_func = parse_function_map[self.config.get('prompt_format', 'free_think')]
+        self.parse_func = PARSE_FUNC_MAP[self.config.get('prompt_format', 'free_think')]
         
         # Initialize the dataset
         self.dataset = self._load_dataset()

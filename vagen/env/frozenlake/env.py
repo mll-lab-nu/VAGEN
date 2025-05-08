@@ -6,11 +6,11 @@ from gymnasium.utils import seeding
 from gymnasium.envs.toy_text.frozen_lake import FrozenLakeEnv as GymFrozenLakeEnv
 from vagen.env.utils.env_utils import NoLoggerWarnings, set_seed
 from vagen.env.utils.context_utils import convert_numpy_to_PIL
-from vagen.env.utils.parse_utils_4 import parse_function_map
+from vagen.env.utils.parse_utils import PARSE_FUNC_MAP
 from .prompt import system_prompt, init_observation_template, action_template, format_prompt
 from .env_config import FrozenLakeEnvConfig
 from .utils import generate_random_map, is_valid
-
+from vagen.env.utils.state_reward_utils import state_reward_wrapper
 class FrozenLakeEnv(BaseEnv):
     """
     FrozenLake Environment for training and evaluating language models as agents.
@@ -78,7 +78,7 @@ class FrozenLakeEnv(BaseEnv):
         # Store the format prompt function for later use
         self.format_prompt_func = format_prompt[self.config.prompt_format]
         
-        self.parse_func = parse_function_map[self.config.prompt_format]
+        self.parse_func = PARSE_FUNC_MAP[self.config.prompt_format]
 
     def reset(self, seed=None):
         """
@@ -103,6 +103,7 @@ class FrozenLakeEnv(BaseEnv):
         self.total_reward = 0
         return self._render(init_obs=True), {}
 
+    @state_reward_wrapper
     def step(self, action_str: str):
         """
         Take a step in the environment based on the agent's action.
@@ -325,13 +326,11 @@ class FrozenLakeEnv(BaseEnv):
         # Get dimensions of the grid
         nrow, ncol = self.gym_env.desc.shape
         
-        # Get player position
-        player_position = self._get_player_position()  # Already returns (row, col)
+
+        player_position = player_position = tuple(map(int, self._get_player_position()))
         
-        # Find target/goal position (marked as 'G')
         target_position = tuple(map(int, np.argwhere(self.gym_env.desc == b'G')[0]))
         
-        # Find all hole positions (marked as 'H')
         hole_positions = [tuple(map(int, pos)) for pos in np.argwhere(self.gym_env.desc == b'H')]
         
         return {
