@@ -2,7 +2,7 @@ alfworld-vision:
   env_name: alfworld
   env_config:
     prompt_format: free_think
-    use_accuracy_reward: false
+    use_state_reward: false
     render_mode: vision
     alf_config_path: "scripts/exps/prompting/alfworld/alf-config.yaml"
     max_actions_per_step: 1

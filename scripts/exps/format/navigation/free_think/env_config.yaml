@@ -3,7 +3,7 @@ env1:
     env_config:
         render_mode: vision
         prompt_format: free_think
-        use_accuracy_reward: false
+        use_state_reward: false
         eval_set: base
     train_size: 10000  
     test_size: 64
@@ -13,7 +13,7 @@ env2:
     env_config:
         render_mode: vision
         prompt_format: free_think
-        use_accuracy_reward: false
+        use_state_reward: false
         eval_set: common_sense
     train_size: 10000  
     test_size: 64
