@@ -14,7 +14,7 @@ from .prompt import (
     format_prompt
 )
 from .env_config import SokobanEnvConfig
-from vagen.env.utils.state_reward_utils import state_reward_wrapper
+from vagen.env.utils.state_reward_utils import env_state_reward_wrapper
 
 class SokobanEnv(BaseEnv):
     GRID_LOOKUP = {
@@ -73,7 +73,7 @@ class SokobanEnv(BaseEnv):
         self.total_reward = 0
         return self._render(init_obs=True), {}
     
-    @state_reward_wrapper
+    @env_state_reward_wrapper
     def step(self, action_str: str):
         rst=self.parse_func(
             response=action_str,

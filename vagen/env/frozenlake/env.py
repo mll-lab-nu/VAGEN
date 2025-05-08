@@ -10,7 +10,7 @@ from vagen.env.utils.parse_utils import PARSE_FUNC_MAP
 from .prompt import system_prompt, init_observation_template, action_template, format_prompt
 from .env_config import FrozenLakeEnvConfig
 from .utils import generate_random_map, is_valid
-from vagen.env.utils.state_reward_utils import state_reward_wrapper
+from vagen.env.utils.state_reward_utils import env_state_reward_wrapper
 class FrozenLakeEnv(BaseEnv):
     """
     FrozenLake Environment for training and evaluating language models as agents.
@@ -103,7 +103,7 @@ class FrozenLakeEnv(BaseEnv):
         self.total_reward = 0
         return self._render(init_obs=True), {}
 
-    @state_reward_wrapper
+    @env_state_reward_wrapper
     def step(self, action_str: str):
         """
         Take a step in the environment based on the agent's action.

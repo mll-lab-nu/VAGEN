@@ -8,7 +8,7 @@ from vagen.env.utils.context_utils import convert_numpy_to_PIL
 from vagen.env.utils.parse_utils import PARSE_FUNC_MAP
 from .env_config import NavigationEnvConfig
 from .prompt import system_prompt,init_observation_template, action_template, format_prompt
-from vagen.env.utils.state_reward_utils import state_reward_wrapper
+from vagen.env.utils.state_reward_utils import env_state_reward_wrapper
 
 class NavigationEnv(BaseEnv):
     """Navigation environment from embodied bench. """   
@@ -184,7 +184,7 @@ class NavigationEnv(BaseEnv):
         
         return self._render(init_obs=True), {}
     
-    @state_reward_wrapper
+    @env_state_reward_wrapper
     def step(self, action_str: str):
         """Execute an action in the environment.
         

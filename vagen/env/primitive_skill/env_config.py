@@ -15,7 +15,10 @@ class PrimitiveSkillEnvConfig(BaseEnvConfig):
     # "free_think", "no_think", "grounding", "worldmodeling", "grounding_worldmodeling",
     # "grounding_structured","worldmodeling_structured","grounding_worldmodeling_structured"
     
+    # configs for process reward for grounding and world modeling
     use_state_reward: bool = False
+    grounding_reward_weight: float = 0.5
+    worldmodeling_reward_weight: float = 0.5
     
     
     def config_id(self) -> str:

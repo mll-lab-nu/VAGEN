@@ -10,7 +10,7 @@ from .maniskill.utils import build_env, handle_info, get_workspace_limits
 from .prompt import system_prompt, init_observation_template, action_template, format_prompt
 import vagen.env.primitive_skill.maniskill.env
 import random
-from vagen.env.utils.state_reward_utils import state_reward_wrapper
+from vagen.env.utils.state_reward_utils import env_state_reward_wrapper
 class PrimitiveSkillEnv(BaseEnv):
     def __init__(self, config: PrimitiveSkillEnvConfig):
         """
@@ -55,7 +55,7 @@ class PrimitiveSkillEnv(BaseEnv):
         self.steps = 0
         return obs, {}
     
-    @state_reward_wrapper
+    @env_state_reward_wrapper
     def step(self, action_str):
         """
         Take a step in the environment based on the agent's action.
