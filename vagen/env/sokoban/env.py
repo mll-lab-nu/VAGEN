@@ -133,7 +133,7 @@ class SokobanEnv(BaseEnv):
     def close(self):
         self.env.close()
     
-    def _render(self, init_obs=False):
+    def _render(self, init_obs=True):
         assert self.config.render_mode in ['text', 'vision']
         multi_modal_data = None
         
@@ -176,6 +176,38 @@ class SokobanEnv(BaseEnv):
     
     def _success(self):
         return self.env.boxes_on_target == self.env.num_boxes
+    
+    def get_env_state(self):
+        """
+        Get the basic positional state of the Sokoban environment.
+        
+        Returns:
+            Dict: Contains player position, box positions, target positions, and wall positions
+                as simple coordinate tuples
+        """
+        # Extract positions from room_state and room_fixed
+        room_state = self.env.room_state
+        
+        # Find player position (codes 5: player on floor, 6: player on target)
+        player_pos = tuple(np.argwhere(np.logical_or(room_state == 5, room_state == 6))[0])
+        
+        # Find box positions (codes 3: box on target, 4: box not on target)
+        box_positions = [tuple(pos) for pos in np.argwhere(np.logical_or(room_state == 3, room_state == 4))]
+        
+        # Find target positions (codes 2: empty target, 3: box on target, 6: player on target)
+        # For targets, we need to check both room_state and room_fixed
+        target_positions = [tuple(pos) for pos in np.argwhere(self.env.room_fixed == 2)]
+        
+        # Find wall positions (code 0: wall)
+        wall_positions = [tuple(pos) for pos in np.argwhere(room_state == 0)]
+        
+        return {
+            "player_position": player_pos,
+            "box_positions": box_positions,
+            "target_positions": target_positions,
+            "wall_positions": wall_positions,
+            "grid_size":room_state.shape
+        }
     
     
 if __name__ == "__main__":

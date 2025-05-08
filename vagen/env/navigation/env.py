@@ -317,7 +317,7 @@ class NavigationEnv(BaseEnv):
         success = (dist <= self.SUCCESS_THRESHOLD)
         return float(success), dist
     
-    def _render(self, init_obs=False):
+    def _render(self, init_obs=True):
         """Render the environment observation.
         
         This method creates either a text representation or an image of the environment
@@ -398,6 +398,96 @@ class NavigationEnv(BaseEnv):
     def close(self):
         """Close the environment."""
         self.env.stop()
+        
+    def get_env_state(self):
+        """
+        Get the current state of the navigation environment focusing on visible objects.
+        
+        Returns:
+            Dict: Contains target position, target direction, visible objects,
+                and instruction information with rounded distances
+        """
+        # Get agent information
+        agent_metadata = self.env.last_event.metadata["agent"]
+        agent_position = agent_metadata["position"]
+        agent_rotation = agent_metadata["rotation"]["y"]  # Only y-axis rotation is relevant
+        
+        # Get target information
+        target_position = self.episode_data["target_position"]
+        target_type = self.episode_data["targetObjectType"]
+        success, distance = self.measure_success()
+        
+        # Calculate target's relative direction
+        dx_target = target_position["x"] - agent_position["x"]
+        dz_target = target_position["z"] - agent_position["z"]
+        angle_to_target = math.degrees(math.atan2(dx_target, dz_target))
+        relative_angle_target = (angle_to_target - agent_rotation) % 360
+        if relative_angle_target > 180:
+            relative_angle_target -= 360
+            
+        # Determine target's relative position
+        if -45 <= relative_angle_target <= 45:
+            target_relative_direction = "ahead"
+        elif 45 < relative_angle_target <= 135:
+            target_relative_direction = "right"
+        elif -135 <= relative_angle_target < -45:
+            target_relative_direction = "left"
+        else:
+            target_relative_direction = "back"
+        
+        # Get visible objects with position and relationship data
+        objects = self.env.last_event.metadata["objects"]
+        visible_objects = []
+        
+        for obj in objects:
+            if obj.get("visible", False):
+                obj_position = obj["position"]
+                
+                # Calculate distance from agent to object
+                obj_distance = math.sqrt(
+                    (agent_position["x"] - obj_position["x"])**2 +
+                    (agent_position["z"] - obj_position["z"])**2
+                )
+                
+                # Round distance to 2 decimal places
+                obj_distance = round(obj_distance, 2)
+                
+                # Calculate relative angle to object (in degrees)
+                dx = obj_position["x"] - agent_position["x"]
+                dz = obj_position["z"] - agent_position["z"]
+                angle_to_obj = math.degrees(math.atan2(dx, dz))
+                # Adjust for agent's rotation (0 means directly in front)
+                relative_angle = (angle_to_obj - agent_rotation) % 360
+                if relative_angle > 180:
+                    relative_angle -= 360
+                    
+                # Determine relative position (front, back, left, right)
+                if -45 <= relative_angle <= 45:
+                    relative_direction = "ahead"
+                elif 45 < relative_angle <= 135:
+                    relative_direction = "right"
+                elif -135 <= relative_angle < -45:
+                    relative_direction = "left"
+                else:
+                    relative_direction = "back"
+                
+                # Store object information
+                visible_objects.append({
+                    "type": obj["objectType"],
+                    "distance": obj_distance,
+                    "relative_direction": relative_direction,
+                })
+    
+        # Sort objects by distance (closest first)
+        visible_objects.sort(key=lambda x: x["distance"])
+        
+        return {
+            "target_obj_type": target_type, 
+            "target_obj_distance": distance,
+            "distance_to_target": round(distance, 2), 
+            "target_relative_direction": target_relative_direction,
+            "visible_objects": visible_objects[:self.config.max_objects_in_state],   
+        }
 
 
 if __name__ == "__main__":

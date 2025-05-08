@@ -31,6 +31,7 @@ class PrimitiveSkillEnv(BaseEnv):
         self.parse_func = parse_function_map[self.config.prompt_format]
         # Define the state keys for the environment
         self.state_keys = self.env.state_keys
+        self.last_info = None
     
     def reset(self, seed: Optional[int] = None) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """
@@ -46,8 +47,8 @@ class PrimitiveSkillEnv(BaseEnv):
                 - info: Empty dictionary for initial state
         """
         _, info = self.env.reset(seed=seed)
-        obs = self._render(info, init_obs=True)
         self.last_info = info
+        obs = self._render(init_obs=True)
         self.initial_reward = self._compute_reward()
         self.total_reward = 0
         self.steps = 0
@@ -113,9 +114,8 @@ class PrimitiveSkillEnv(BaseEnv):
             metrics["traj_metrics"]['success'] = True
         
         done = terminated or truncated
-        info["action_is_valid"] = metrics["turn_metrics"]['action_is_valid']
         
-        obs = self._render(info, init_obs=False, valid_actions=valid_actions)
+        obs = self._render(init_obs=False, valid_actions=valid_actions)
         output_info["metrics"] = metrics
         
         self.total_reward += reward
@@ -180,33 +180,23 @@ class PrimitiveSkillEnv(BaseEnv):
             float: Total reward accumulated during the current episode
         """
         return self._compute_reward() + self.total_reward - self.initial_reward - self.steps * 0.1
+
     
-    def _get_current_state(self):
-        """
-        Get a representation of the current state for comparison.
-        
-        Returns:
-            dict: Dictionary representation of important state components
-        """
-        # This is a simple implementation - customize based on your environment
-        return {k: v for k, v in self.last_info.items() if k.endswith('_position')}
-    
-    def _render(self, info, init_obs=False, valid_actions=None,seed=42):
+    def _render(self, init_obs=True, valid_actions=None,seed=42):
         """
         Render the environment as an observation.
         
         Args:
-            info (dict): Environment info dictionary
             init_obs (bool): If True, create initial observation
             valid_actions (list): List of valid actions executed (for step observations)
         
         Returns:
             Dict: Observation dictionary containing observation string and optional image data
         """
-        new_info = handle_info(info.copy(), state_keys=self.state_keys,mask_success=self.config.mask_success, env=self.env)
+        info = self.last_info.copy()
+        new_info = handle_info(info, state_keys=self.state_keys,mask_success=self.config.mask_success, env=self.env)
         positions_list = list(new_info['obj_positions'].values())
-        # random.seed(seed)
-        # random.shuffle(positions_list)  # This shuffles the list in-place
+
         object_positions = str(positions_list)
         # object_names=str([key.removesuffix("_position") for key in new_info['obj_positions'].keys()])
         other_information = str(new_info['other_info'])
@@ -265,6 +255,17 @@ class PrimitiveSkillEnv(BaseEnv):
             return {
                 "obs_str": obs_str,
             }
+    
+    
+    def get_env_state(self):
+        """
+        Get the current state of the environment.
+        
+        Returns:
+            dict: Dictionary representation of the environment state
+        """
+        rst=handle_info(self.last_info, state_keys=self.state_keys,mask_success=self.config.mask_success, env=self.env)
+        return rst["obj_positions"]
     
     
     def _parse_action(self, action_str):
