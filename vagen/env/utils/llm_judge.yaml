@@ -1,0 +1,8 @@
+# Model
+name: "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8"
+temperature: 0.1
+max_tokens: 200
+
+# API
+max_parallel_requests: 10
+max_retries: 3

@@ -506,6 +506,7 @@ class QwenVLRolloutManager():
             for idx,reward in enumerate(rewards):
                 multi_turn_token_level_rewards[reward_positions[idx]] = reward
             row_dict["multi_turn_token_level_rewards"] = multi_turn_token_level_rewards # (seq_len,) 
+            row_dict["reward_positions"] = reward_positions
         if self.config.use_loss_mask:
             row_dict['loss_mask'] = loss_mask
         if self.config.use_gae_mask:
@@ -519,6 +520,7 @@ class QwenVLRolloutManager():
         row_dict['position_ids'] = position_ids
         index = row_dict.get("extra_info", {}).get("index", 0)
         row_dict["index"] = index
+        row_dict["rewards"] = rewards
         return row_dict
 
     @torch.no_grad()
@@ -623,7 +625,12 @@ class QwenVLRolloutManager():
                 step=self.env_states[env_id]['step'],
                 window_size=None,
             )
-            row_dict['reward_model'] = {"style": "given", "ground_truth": {"reward": self.envs[env_id].compute_reward()}}
+            step_reward_sum= sum(row_dict['rewards'])
+            last_reward=self.envs[env_id].compute_reward()
+            row_dict['reward_model'] = {"style": "given", "ground_truth": {"reward": last_reward+step_reward_sum}}
+            if self.config.use_multi_turn_reward:
+                last_reward_index = row_dict['reward_positions'][-1]
+                row_dict['multi_turn_token_level_rewards'][last_reward_index] += last_reward
             batch_list.append(row_dict)
         batch_dict = collate_fn(batch_list)
         batch = DataProto.from_single_dict(batch_dict)

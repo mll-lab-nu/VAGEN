@@ -2,11 +2,11 @@ from typing import Dict, List, Tuple, Optional, Any, Union
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from vagen.env.base.base_service import BaseService
 from vagen.env.base.base_service_config import BaseServiceConfig
+from vagen.env.utils.state_reward_text_utils import service_state_reward_wrapper
 from vagen.server.serial import serialize_observation
 
 from .env import SokobanEnv
 from .env_config import SokobanEnvConfig
-
 class SokobanService(BaseService):
     """
     Service class for Sokoban environments.
@@ -122,6 +122,7 @@ class SokobanService(BaseService):
         
         return results
     
+    @service_state_reward_wrapper
     def step_batch(self, ids2actions: Dict[Any, Any]) -> Dict[Any, Tuple[Dict, float, bool, Dict]]:
         """
         Take a step in multiple Sokoban environments in parallel.

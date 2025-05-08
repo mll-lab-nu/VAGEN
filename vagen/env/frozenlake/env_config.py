@@ -4,6 +4,7 @@ from typing import Optional, List, Union
 
 @dataclass
 class FrozenLakeEnvConfig(BaseEnvConfig):
+    env_name: str = "frozenlake"
     desc: Optional[List[str]] = None  # environment map
     is_slippery: bool = False
     size: int = 4

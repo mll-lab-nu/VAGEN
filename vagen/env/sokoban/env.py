@@ -14,7 +14,7 @@ from .prompt import (
     format_prompt
 )
 from .env_config import SokobanEnvConfig
-from vagen.env.utils.state_reward_utils import env_state_reward_wrapper
+from vagen.env.utils.state_reward_text_utils import env_state_reward_wrapper
 
 class SokobanEnv(BaseEnv):
     GRID_LOOKUP = {
@@ -130,7 +130,7 @@ class SokobanEnv(BaseEnv):
         return system_prompt() + "\n" + format_prompt
     
     def compute_reward(self):
-        return self.total_reward
+        return 0.0
     
     def close(self):
         self.env.close()

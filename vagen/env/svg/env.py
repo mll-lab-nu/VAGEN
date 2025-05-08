@@ -237,7 +237,7 @@ class SVGEnv(BaseEnv):
         Returns:
             Total reward
         """
-        return self.total_reward
+        return 0.0
         
     def close(self):
         """Close the environment and clean up resources."""

@@ -8,7 +8,7 @@ from vagen.env.utils.context_utils import convert_numpy_to_PIL
 from vagen.env.utils.parse_utils import PARSE_FUNC_MAP
 from .env_config import NavigationEnvConfig
 from .prompt import system_prompt,init_observation_template, action_template, format_prompt
-from vagen.env.utils.state_reward_utils import env_state_reward_wrapper
+from vagen.env.utils.state_reward_text_utils import env_state_reward_wrapper
 
 class NavigationEnv(BaseEnv):
     """Navigation environment from embodied bench. """   
@@ -394,7 +394,7 @@ class NavigationEnv(BaseEnv):
         Returns:
             Total reward
         """
-        return self.total_reward
+        return 0.0
     
     def close(self):
         """Close the environment."""

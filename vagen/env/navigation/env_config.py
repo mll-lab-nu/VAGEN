@@ -4,6 +4,7 @@ from dataclasses import dataclass, field, fields
 @dataclass
 class NavigationEnvConfig(BaseEnvConfig):
     """Configuration class for the Navigation environment."""
+    env_name: str = "navigation"
     resolution: int = 255
     eval_set: str = 'base'
     down_sample_ratio: float = 1.0

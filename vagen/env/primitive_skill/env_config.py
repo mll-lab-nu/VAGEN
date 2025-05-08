@@ -4,6 +4,7 @@ from typing import Optional, List, Union
 
 @dataclass
 class PrimitiveSkillEnvConfig(BaseEnvConfig):
+    env_name: str = "primitive_skill"
     env_id: str = "AlignTwoCube" # AlignTwoCube,PlaceTwoCube,PutAppleInDrawer,StackThreeCube
     render_mode: str = "vision" # vision, text
     max_actions_per_step: int = 2

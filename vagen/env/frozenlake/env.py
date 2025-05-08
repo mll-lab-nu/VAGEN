@@ -10,7 +10,7 @@ from vagen.env.utils.parse_utils import PARSE_FUNC_MAP
 from .prompt import system_prompt, init_observation_template, action_template, format_prompt
 from .env_config import FrozenLakeEnvConfig
 from .utils import generate_random_map, is_valid
-from vagen.env.utils.state_reward_utils import env_state_reward_wrapper
+from vagen.env.utils.state_reward_text_utils import env_state_reward_wrapper
 class FrozenLakeEnv(BaseEnv):
     """
     FrozenLake Environment for training and evaluating language models as agents.
@@ -217,7 +217,9 @@ class FrozenLakeEnv(BaseEnv):
         Returns:
             float: Total reward accumulated during the current episode
         """
-        return self.total_reward
+        # Now we accumulate reward in each step in rollout_manager
+        # Set it to non-zero only if you want to give a special trajectory reward
+        return 0.0 
 
     def close(self):
         self.gym_env.close()

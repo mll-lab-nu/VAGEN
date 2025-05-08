@@ -3,6 +3,7 @@ from dataclasses import dataclass, field, fields
 from .utils import generate_seeds
 @dataclass
 class SokobanEnvConfig(BaseEnvConfig):
+    env_name: str = "sokoban"
     dim_room: tuple = (6, 6)
     max_steps: int = 100
     num_boxes: int = 1

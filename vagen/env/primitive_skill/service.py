@@ -16,7 +16,7 @@ from .env import PrimitiveSkillEnv
 from .env_config import PrimitiveSkillEnvConfig
 from ..base.base_service_config import BaseServiceConfig
 from mani_skill.utils.building.articulations.partnet_mobility import _load_partnet_mobility_dataset, PARTNET_MOBILITY
-
+from vagen.env.utils.state_reward_text_utils import service_state_reward_wrapper
 
 class PrimitiveSkillService(BaseService):
     """
@@ -453,6 +453,7 @@ class PrimitiveSkillService(BaseService):
         
         return results
     
+    @service_state_reward_wrapper
     def step_batch(self, ids2actions: Dict[Any, Any]) -> Dict[Any, Tuple[Dict, float, bool, Dict]]:
         """
         Take a step in multiple PrimitiveSkill environments distributed across processes.

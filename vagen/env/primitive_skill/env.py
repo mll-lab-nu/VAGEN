@@ -10,7 +10,7 @@ from .maniskill.utils import build_env, handle_info, get_workspace_limits
 from .prompt import system_prompt, init_observation_template, action_template, format_prompt
 import vagen.env.primitive_skill.maniskill.env
 import random
-from vagen.env.utils.state_reward_utils import env_state_reward_wrapper
+from vagen.env.utils.state_reward_text_utils import env_state_reward_wrapper
 class PrimitiveSkillEnv(BaseEnv):
     def __init__(self, config: PrimitiveSkillEnvConfig):
         """
@@ -181,7 +181,7 @@ class PrimitiveSkillEnv(BaseEnv):
         Returns:
             float: Total reward accumulated during the current episode
         """
-        return self._compute_reward() + self.total_reward - self.initial_reward - self.steps * 0.1
+        return self._compute_reward() - self.initial_reward - self.steps * 0.1
 
     
     def _render(self, init_obs=True, valid_actions=None,seed=42):
