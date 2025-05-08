@@ -15,7 +15,7 @@ class PrimitiveSkillEnvConfig(BaseEnvConfig):
     # "free_think", "no_think", "grounding", "worldmodeling", "grounding_worldmodeling",
     # "grounding_structured","worldmodeling_structured","grounding_worldmodeling_structured"
     
-    use_accuracy_reward: bool = False
+    use_state_reward: bool = False
     
     
     def config_id(self) -> str:

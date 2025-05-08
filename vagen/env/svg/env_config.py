@@ -24,7 +24,7 @@ class SvgEnvConfig(BaseEnvConfig):
     # Prompt configuration
     prompt_format: str = "free_think" 
     # "free_think", "no_think", "grounding", "worldmodeling", "grounding_worldmodeling"
-    use_accuracy_reward: bool = False
+    use_state_reward: bool = False
     
     def __post_init__(self):
         """Process device configuration after initialization"""

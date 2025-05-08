@@ -5,10 +5,10 @@ import time
 import math
 from ai2thor.platform import CloudRendering
 from vagen.env.utils.context_utils import convert_numpy_to_PIL
-from vagen.env.utils.parse_utils_4 import parse_function_map
+from vagen.env.utils.parse_utils import PARSE_FUNC_MAP
 from .env_config import NavigationEnvConfig
 from .prompt import system_prompt,init_observation_template, action_template, format_prompt
-
+from vagen.env.utils.state_reward_utils import state_reward_wrapper
 
 class NavigationEnv(BaseEnv):
     """Navigation environment from embodied bench. """   
@@ -98,7 +98,7 @@ class NavigationEnv(BaseEnv):
         self.format_prompt_func = format_prompt[self.config.prompt_format]
         
         # Get the parse function based on the prompt format
-        self.parse_func = parse_function_map[self.config.prompt_format]
+        self.parse_func = PARSE_FUNC_MAP[self.config.prompt_format]
         
     def _get_dataset_path(self, eval_set):
         """Get the path to the dataset file."""
@@ -184,6 +184,7 @@ class NavigationEnv(BaseEnv):
         
         return self._render(init_obs=True), {}
     
+    @state_reward_wrapper
     def step(self, action_str: str):
         """Execute an action in the environment.
         
