@@ -205,7 +205,8 @@ class SokobanEnv(BaseEnv):
             "player_position": player_pos,
             "box_positions": box_positions,
             "target_positions": target_positions,
-            "wall_positions": wall_positions
+            "wall_positions": wall_positions,
+            "grid_size":room_state.shape
         }
     
     
