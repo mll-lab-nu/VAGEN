@@ -1,10 +1,5 @@
-## For Debugging
-```
-# Start a General Server in debug mode
-python vagen/server/server.py --debug
-```
-
 ## Environment Installation
+
 ### SVG
 ```
 pip install "bs4"
@@ -26,7 +21,7 @@ sudo apt-get update && sudo apt-get -y install libvulkan1
 sudo apt install vulkan-tools
 ```
 
-Below is outdated for backup purpose:
+Below is outdated information kept for backup purposes:
 ```
 # export CUDA_VISIBLE_DEVICES
 # For headless servers, additional setup is required:
@@ -57,7 +52,7 @@ pip3 install protobuf==3.20.3
 pip3 install "pydantic<2.0.0"
 pip3 uninstall frozenlist gradio murmurhash preshed spacy srsly thinc weasel aiosignal annotated-types blis catalogue cloudpathlib cymem
 
-#skip this two install if you already installed in navigation
+# skip this two install if you already installed in navigation
 apt-get install -y pciutils
 apt-get install -y xorg xserver-xorg-core xserver-xorg-video-dummy
 
@@ -74,28 +69,33 @@ python vagen/env/alfworld/startx.py 0
 python vagen/server/server.py
 ```
 
-
-
-### crossview
+### Crossview
+```
 cd vagen/env/crossview
 git clone https://huggingface.co/datasets/yinbq/CrossViewQA
 cd CrossViewQA
 git lfs pull
 mkdir -p extracted_images
 unzip other_all_image.zip -d extracted_images
+```
 
-## Benchmark your Env and Service
-env/service running time varies on different devices, you can benchmark current env/service or debug your own env/service as follow:
-### Start a env benchmark
+## Verify your Env and Service
+When you finish building your environment and service, you can test them using  ```verify_env.py``` and ```verify_service.py```
+
+See frozenlake example:
+
+### Env test:
 ```
 # run env script
 ./scripts/benchmark/env_benchmark/frozenlake/run.sh
 ```
-### Start a service benchmark
+
+### Service test
 ```
-# start a server
+# start a server in a tmux session
 python vagen/server/server.py
 
 # run service script
 ./scripts/benchmark/service_benchmark/frozenlake/run.sh
 ```
+
