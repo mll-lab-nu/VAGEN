@@ -314,7 +314,7 @@ class FrozenLakeEnv(BaseEnv):
         player_pos = self._get_player_position()
         return self.gym_env.desc[player_pos] in [b'G', b'H']
 
-    def get_state(self):
+    def get_env_state(self):
         """
         Get the current state of the environment as a dictionary.
         
