@@ -4,7 +4,7 @@ api:
   temperature: 0.1
   max_tokens: 500
   max_retries: 3
-  request_timeout: 120  # Increased for rate limiting
+  request_timeout: 60  # Increased for rate limiting
   qps_limit: 70        
   rpm_limit: 4400      
   tps_limit: 15000     
