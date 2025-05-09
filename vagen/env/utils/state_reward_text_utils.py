@@ -79,19 +79,20 @@ def service_state_reward_wrapper(step_batch_func):
                     
         if len(input_to_llm) > 0:
             # Use synchronous batch processing
-            scores = run_llm_judge(input_to_llm)
+            results = run_llm_judge(input_to_llm)
         else:
             return step_batch_results
         
         new_step_batch_results = {id: list(result) for id, result in step_batch_results.items()}
         
-        for item, score in zip(input_to_llm, scores):
+        for item, result in zip(input_to_llm, results):
             id = item["id"]
             env_config = self.env_configs[id]
-            if item["type"] == "observation":
+            score= result["score"]
+            if item["type"] == "grounding":
                 new_step_batch_results[id][3]["metrics"]["turn_metrics"]["grounding_reward"] = score * env_config.get("grounding_reward_weight", 0.5)
                 new_step_batch_results[id][1] += score * env_config.get("grounding_reward_weight", 0.5)
-            elif item["type"] == "prediction":
+            elif item["type"] == "worldmodeling":
                 new_step_batch_results[id][3]["metrics"]["turn_metrics"]["worldmodeling_reward"] = score * env_config.get("worldmodeling_reward_weight", 0.5)
                 new_step_batch_results[id][1] += score * env_config.get("worldmodeling_reward_weight", 0.5)
         

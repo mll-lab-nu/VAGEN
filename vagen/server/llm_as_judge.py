@@ -186,70 +186,172 @@ def run_llm_judge(input_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             match = re.search(r'<answer>(YES|NO)</answer>', response, re.IGNORECASE)
             return match.group(1) if match else "PARSE_FAILED"
         
-        # Function to sample and prepare table data
-        def prepare_table_data(results_subset, max_samples):
-            if not results_subset:
-                return []
+        # Function to prepare table data where each row represents a global step
+        # with columns for each sample and its fields
+        def prepare_table_data(results_subset, max_samples, global_step):
+            """
+            Prepare data for wandb table where each row represents a global step
+            with columns for each sample and its fields.
+            
+            Args:
+                results_subset: List of result dictionaries
+                max_samples: Maximum number of samples to include
+                global_step: Current global step
                 
+            Returns:
+                Dictionary with column names as keys and values as a single row
+            """
+            if not results_subset:
+                return {}
+            
             # Sample results (or take all if fewer than max_samples)
             samples = random.sample(results_subset, min(max_samples, len(results_subset)))
             
-            # Prepare data for table
-            return [
-                [
-                    r["id"],
-                    r["env_name"],
-                    r["prompt"],
-                    r["response"],
-                    extract_parsed_answer(r["response"])
+            # Create a dictionary where keys are column names and values are lists
+            row_data = {"step": global_step}
+            
+            # Add columns for each sample and its fields
+            for i, sample in enumerate(samples):
+                # For each sample, add columns with index for each required field
+                sample_idx = i + 1
+                row_data[f"sample_{sample_idx}_id"] = sample["id"]
+                row_data[f"sample_{sample_idx}_env_name"] = sample["env_name"]
+                row_data[f"sample_{sample_idx}_prompt"] = sample["prompt"]
+                row_data[f"sample_{sample_idx}_response"] = sample["response"]
+                row_data[f"sample_{sample_idx}_parsed_answer"] = extract_parsed_answer(sample["response"])
+            
+            return row_data
+
+        # Create and update tables with the global step structure
+        def log_tables_with_step(global_step):
+            # Define tables if they don't exist yet or get existing ones
+            if "correct_grounding_table" not in wandb.run.summary:
+                # Define columns for each table type
+                correct_grounding_columns = ["step"] + [
+                    f"sample_{i}_{field}" 
+                    for i in range(1, correct_grounding_samples + 1) 
+                    for field in ["id", "env_name", "prompt", "response", "parsed_answer"]
                 ]
-                for r in samples
-            ]
-        
-        # Create and log tables
-        correct_grounding_table = wandb.Table(
-            columns=columns,
-            data=prepare_table_data(correct_grounding, correct_grounding_samples)
-        )
-        
-        incorrect_grounding_table = wandb.Table(
-            columns=columns,
-            data=prepare_table_data(incorrect_grounding, incorrect_grounding_samples)
-        )
-        
-        correct_worldmodeling_table = wandb.Table(
-            columns=columns,
-            data=prepare_table_data(correct_worldmodeling, correct_worldmodeling_samples)
-        )
-        
-        incorrect_worldmodeling_table = wandb.Table(
-            columns=columns,
-            data=prepare_table_data(incorrect_worldmodeling, incorrect_worldmodeling_samples)
-        )
-        
-        parse_failed_table = wandb.Table(
-            columns=columns,
-            data=prepare_table_data(parse_failed, 3)  # Sample up to 3 parse failures
-        )
-        
-        # Create table for errors
-        error_columns = ["id", "env_name", "type", "error"]
+                correct_grounding_table = wandb.Table(columns=correct_grounding_columns)
+                
+                incorrect_grounding_columns = ["step"] + [
+                    f"sample_{i}_{field}" 
+                    for i in range(1, incorrect_grounding_samples + 1) 
+                    for field in ["id", "env_name", "prompt", "response", "parsed_answer"]
+                ]
+                incorrect_grounding_table = wandb.Table(columns=incorrect_grounding_columns)
+                
+                correct_worldmodeling_columns = ["step"] + [
+                    f"sample_{i}_{field}" 
+                    for i in range(1, correct_worldmodeling_samples + 1) 
+                    for field in ["id", "env_name", "prompt", "response", "parsed_answer"]
+                ]
+                correct_worldmodeling_table = wandb.Table(columns=correct_worldmodeling_columns)
+                
+                incorrect_worldmodeling_columns = ["step"] + [
+                    f"sample_{i}_{field}" 
+                    for i in range(1, incorrect_worldmodeling_samples + 1) 
+                    for field in ["id", "env_name", "prompt", "response", "parsed_answer"]
+                ]
+                incorrect_worldmodeling_table = wandb.Table(columns=incorrect_worldmodeling_columns)
+                
+                parse_failed_columns = ["step"] + [
+                    f"sample_{i}_{field}" 
+                    for i in range(1, 4)  # Up to 3 parse failure samples 
+                    for field in ["id", "env_name", "prompt", "response", "parsed_answer"]
+                ]
+                parse_failed_table = wandb.Table(columns=parse_failed_columns)
+                
+                # Initialize tables in wandb
+                wandb.run.summary["correct_grounding_table"] = correct_grounding_table
+                wandb.run.summary["incorrect_grounding_table"] = incorrect_grounding_table
+                wandb.run.summary["correct_worldmodeling_table"] = correct_worldmodeling_table
+                wandb.run.summary["incorrect_worldmodeling_table"] = incorrect_worldmodeling_table
+                wandb.run.summary["parse_failed_table"] = parse_failed_table
+            else:
+                # Get existing tables
+                correct_grounding_table = wandb.run.summary["correct_grounding_table"]
+                incorrect_grounding_table = wandb.run.summary["incorrect_grounding_table"]
+                correct_worldmodeling_table = wandb.run.summary["correct_worldmodeling_table"]
+                incorrect_worldmodeling_table = wandb.run.summary["incorrect_worldmodeling_table"]
+                parse_failed_table = wandb.run.summary["parse_failed_table"]
+            
+            # Prepare data rows for each table (one row per global step)
+            correct_grounding_data = prepare_table_data(correct_grounding, correct_grounding_samples, global_step)
+            incorrect_grounding_data = prepare_table_data(incorrect_grounding, incorrect_grounding_samples, global_step)
+            correct_worldmodeling_data = prepare_table_data(correct_worldmodeling, correct_worldmodeling_samples, global_step)
+            incorrect_worldmodeling_data = prepare_table_data(incorrect_worldmodeling, incorrect_worldmodeling_samples, global_step)
+            parse_failed_data = prepare_table_data(parse_failed, 3, global_step)  # Up to 3 parse failures
+            
+            # Add data rows to tables
+            if correct_grounding_data:
+                correct_grounding_table.add_data(**correct_grounding_data)
+            if incorrect_grounding_data:
+                incorrect_grounding_table.add_data(**incorrect_grounding_data)
+            if correct_worldmodeling_data:
+                correct_worldmodeling_table.add_data(**correct_worldmodeling_data)
+            if incorrect_worldmodeling_data:
+                incorrect_worldmodeling_table.add_data(**incorrect_worldmodeling_data)
+            if parse_failed_data:
+                parse_failed_table.add_data(**parse_failed_data)
+            
+            # Update the tables in wandb
+            wandb.run.summary["correct_grounding_table"] = correct_grounding_table
+            wandb.run.summary["incorrect_grounding_table"] = incorrect_grounding_table
+            wandb.run.summary["correct_worldmodeling_table"] = correct_worldmodeling_table
+            wandb.run.summary["incorrect_worldmodeling_table"] = incorrect_worldmodeling_table
+            wandb.run.summary["parse_failed_table"] = parse_failed_table
+            
+            # Also log the tables to the history
+            wandb.log({
+                "correct_grounding_examples": correct_grounding_table,
+                "incorrect_grounding_examples": incorrect_grounding_table,
+                "correct_worldmodeling_examples": correct_worldmodeling_table,
+                "incorrect_worldmodeling_examples": incorrect_worldmodeling_table,
+                "parse_failed_examples": parse_failed_table
+            }, step=global_step)
+
+        # Similarly update the error table:
+        def prepare_error_table_data(error_examples, max_samples, global_step):
+            if not error_examples:
+                return {}
+            
+            samples = error_examples[:max_samples]  # Take up to max_samples errors
+            
+            row_data = {"step": global_step}
+            for i, sample in enumerate(samples):
+                sample_idx = i + 1
+                row_data[f"error_{sample_idx}_id"] = sample["id"]
+                row_data[f"error_{sample_idx}_env_name"] = sample["env_name"]
+                row_data[f"error_{sample_idx}_type"] = sample["type"]
+                row_data[f"error_{sample_idx}_error"] = sample["error"]
+            
+            return row_data
+
+        # Process error examples
         error_examples = [r for r in results if not r["success"]]
-        error_data = [
-            [r["id"], r["env_name"], r["type"], r["error"]]
-            for r in error_examples[:3]  # Sample up to 3 errors
-        ]
-        error_table = wandb.Table(columns=error_columns, data=error_data)
         
-        # Log all tables with the current step
-        wandb.log({
-            "correct_grounding_examples": correct_grounding_table,
-            "incorrect_grounding_examples": incorrect_grounding_table,
-            "correct_worldmodeling_examples": correct_worldmodeling_table,
-            "incorrect_worldmodeling_examples": incorrect_worldmodeling_table,
-            "parse_failed_examples": parse_failed_table,
-            "error_examples": error_table
-        }, step=global_step)
+        # Create and update error table
+        if "error_table" not in wandb.run.summary:
+            error_columns = ["step"] + [
+                f"error_{i}_{field}" 
+                for i in range(1, 4)  # Up to 3 error samples
+                for field in ["id", "env_name", "type", "error"]
+            ]
+            error_table = wandb.Table(columns=error_columns)
+            wandb.run.summary["error_table"] = error_table
+        else:
+            error_table = wandb.run.summary["error_table"]
+
+        error_data = prepare_error_table_data(error_examples, 3, global_step)  # Sample up to 3 errors
+        if error_data:
+            error_table.add_data(**error_data)
+
+        wandb.run.summary["error_table"] = error_table
+        wandb.log({"error_examples": error_table}, step=global_step)
+        
+        # Replace the original table creation with the new approach
+        log_tables_with_step(global_step)
         
         return results
 
