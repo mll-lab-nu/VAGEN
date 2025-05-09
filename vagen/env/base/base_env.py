@@ -62,9 +62,11 @@ class BaseEnv(ABC):
         """
         pass
     
-    @abstractmethod
+   
     def compute_reward(self) -> float:
         """
         give final reward
+        Currently the reward calculation in rollout manager will be: sum(step_rewards)+env.compute_reward()
+        In most cases you can set this to 0.0 since the step rewards are already accumulated, but if you want to add some extra reward for the final step, define it here.
         """
-        pass
+        return 0.0

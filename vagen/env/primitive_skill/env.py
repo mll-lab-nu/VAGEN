@@ -71,7 +71,7 @@ class PrimitiveSkillEnv(BaseEnv):
                 - info: Dictionary containing metrics and parsed action data
         """
         reward = 0
-        rst = self.parse_func( response=action_str,
+        rst = self.parse_func(response=action_str,
             special_token_list=self.config.special_token_list,
             action_sep=self.config.action_sep,
             max_actions=self.config.max_actions_per_step)
@@ -111,7 +111,10 @@ class PrimitiveSkillEnv(BaseEnv):
         metrics["turn_metrics"]['action_is_valid'] = len(valid_actions) > 0 and len(valid_actions) == len(rst['actions'])
         if metrics["turn_metrics"]['action_is_valid'] and rst["format_correct"]:
             reward += self.config.format_reward
-        # Check for success
+            output_info["is_format_rewarded"] = True
+        else:
+            output_info["is_format_rewarded"] = False
+        
         if info.get('is_success', False):
             metrics["traj_metrics"]['success'] = True
         

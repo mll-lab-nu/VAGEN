@@ -139,9 +139,6 @@ class CrossViewEnv(BaseEnv):
 Given images and a question, first give your thought then answer.
 Your answer should be in the format of <think>...</think><answer>...</answer>.
 e.g. <think>I can see there're multiple images with different view. I can see from the second view the object is on the target's left.I think the correct answer is A</think><answer>A</answer>"""
-    
-    def compute_reward(self) -> float:
-        return 0.0 
 
 
 if __name__ == "__main__":

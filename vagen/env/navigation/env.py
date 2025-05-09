@@ -226,12 +226,10 @@ class NavigationEnv(BaseEnv):
         done = False
         info = {}
         info.update(rst)
-        
+            
+            
         # Execute valid actions
-        if metrics["turn_metrics"]["action_is_valid"]:
-            # Add format reward if actions were valid and format is correct
-            if rst.get("format_correct", True):
-                self.reward += self.config.format_reward
+        if metrics["turn_metrics"]["action_is_valid"] and rst.get("format_correct", True):
             
             for action in action_list:
                 action_lower = action.lower()
@@ -259,6 +257,12 @@ class NavigationEnv(BaseEnv):
                     done = True
                     break
         
+        if metrics['turn_metrics']['action_is_valid'] and rst.get("format_correct", True):
+            self.reward += self.config.format_reward
+            info["is_format_rewarded"] = True
+        else:
+            info["is_format_rewarded"] = False
+            
         # Check if the agent position has changed (action was effective)
         curr_pos = self.env.last_event.metadata["agent"]["position"]
         metrics['turn_metrics']['action_is_effective'] = curr_pos["x"] != prev_pos["x"] or curr_pos["z"] != prev_pos["z"]
@@ -387,14 +391,6 @@ class NavigationEnv(BaseEnv):
         
     
         return system_prompt(format=self.config.prompt_format) + '\n' + format_prompt_text
-    
-    def compute_reward(self):
-        """Compute the total reward for the episode.
-        
-        Returns:
-            Total reward
-        """
-        return 0.0
     
     def close(self):
         """Close the environment."""

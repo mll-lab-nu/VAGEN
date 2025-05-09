@@ -115,6 +115,9 @@ class SokobanEnv(BaseEnv):
                 break
         if metrics['turn_metrics']['action_is_valid'] and rst["format_correct"]:
             self.reward += self.config.format_reward
+            info["is_format_rewarded"] = True
+        else:
+            info["is_format_rewarded"] = False
         info["metrics"] = metrics
         metrics['turn_metrics']['action_is_effective'] = not np.array_equal(prev_player_position, self.env.player_position)
         self.total_reward += self.reward
@@ -128,9 +131,6 @@ class SokobanEnv(BaseEnv):
             add_example=True  # Always true for system prompt
         )
         return system_prompt() + "\n" + format_prompt
-    
-    def compute_reward(self):
-        return 0.0
     
     def close(self):
         self.env.close()

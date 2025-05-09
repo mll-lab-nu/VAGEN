@@ -180,6 +180,9 @@ class FrozenLakeEnv(BaseEnv):
         # Add format reward if actions were valid
         if metrics["turn_metrics"]['action_is_valid'] and rst["format_correct"]:
             self.reward += self.config.format_reward
+            info["is_format_rewarded"] = True
+        else:
+            info["is_format_rewarded"] = False
         
         
         # Check if position changed to determine if action was effective
@@ -209,17 +212,6 @@ class FrozenLakeEnv(BaseEnv):
         )
         
         return system_prompt() + '\n' + format_prompt_text
-
-    def compute_reward(self):
-        """
-        Get the cumulative reward for the episode.
-        
-        Returns:
-            float: Total reward accumulated during the current episode
-        """
-        # Now we accumulate reward in each step in rollout_manager
-        # Set it to non-zero only if you want to give a special trajectory reward
-        return 0.0 
 
     def close(self):
         self.gym_env.close()
