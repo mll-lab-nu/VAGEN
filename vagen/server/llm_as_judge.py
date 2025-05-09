@@ -15,11 +15,13 @@ import wandb
 import threading
 import random
 from contextlib import contextmanager
-
+from vagen.server.together_batch_request import run_together_request
 # Global variables for wandb tracking per process
 _WANDB_INITIALIZED = {}  # Track initialization status per process
 _GLOBAL_STEPS = {}  # Track global step count per process
 _PROCESS_LOCKS = {}  # Semaphore for each process
+_HYDRA_LOCKS = {}  # Semaphore for Hydra initialization
+_HYDRA_INITIALIZED = {}  # Track Hydra initialization per process
 
 # Context manager to ensure proper cleanup of wandb sessions
 @contextmanager
@@ -31,6 +33,38 @@ def wandb_run_context():
         # If wandb is running, finish the run
         if wandb.run is not None:
             wandb.finish()
+
+def _get_hydra_config(pid: int) -> DictConfig:
+    """
+    Get Hydra configuration in a thread-safe and process-safe manner.
+    
+    Args:
+        pid: Process ID
+        
+    Returns:
+        Hydra configuration
+    """
+    # Create a lock for this process if it doesn't exist
+    if pid not in _HYDRA_LOCKS:
+        _HYDRA_LOCKS[pid] = threading.Lock()
+    
+    # Use the lock to ensure thread safety within the process
+    with _HYDRA_LOCKS[pid]:
+        # Check if Hydra is already initialized for this process
+        if pid not in _HYDRA_INITIALIZED or not _HYDRA_INITIALIZED[pid]:
+            # Check if Hydra is globally initialized and reset if needed
+            if GlobalHydra.instance().is_initialized():
+                GlobalHydra.instance().clear()
+                
+            # Initialize Hydra with the config file
+            # Use a relative path for config_path
+            hydra.initialize(config_path="config")
+            
+            # Mark as initialized for this process
+            _HYDRA_INITIALIZED[pid] = True
+        
+        # Load and return the config
+        return hydra.compose(config_name="llm_as_judge")
             
 def run_llm_judge(input_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
@@ -41,13 +75,11 @@ def run_llm_judge(input_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         
     Returns:
         List of dictionaries with judgment results including scores
-        
-    This function manages wandb logging per process:
-    1. Initializes wandb if not already done for the current process
-    2. Uses a semaphore to ensure sequential calls within the same process
-    3. Tracks global step count per process
-    4. Logs statistics for the overall run and selected examples in wandb tables
     """
+    # Skip if no inputs
+    if not input_data:
+        return []
+    
     # Get the process ID to manage per-process variables
     pid = os.getpid()
     
@@ -65,44 +97,27 @@ def run_llm_judge(input_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         _GLOBAL_STEPS[pid] += 1
         global_step = _GLOBAL_STEPS[pid]
         
+        # Get Hydra config in a thread-safe and process-safe manner
+        config = _get_hydra_config(pid)
+        
         # Initialize wandb if not already done for this process
         if pid not in _WANDB_INITIALIZED or not _WANDB_INITIALIZED[pid]:
-            # Get the directory containing the current script file
-            script_dir = Path(__file__).parent
-            
-            # Initialize Hydra with the config file
-            if not GlobalHydra.instance().is_initialized():
-                hydra.initialize(config_path=str(script_dir))
-                
-            # Load the config
-            config = hydra.compose(config_name="llm_as_judge")
-            
             # Initialize wandb with values from config
             run_id = str(uuid.uuid4())[:8]
             wandb.init(
                 project=config.wandb.project,
                 name=f"{config.wandb.run_name}_{run_id}",
-                config={
-                    "model": config.model.name,
-                    "temperature": config.model.temperature,
-                    "max_tokens": config.model.max_tokens,
-                    "max_retries": config.api.max_retries,
-                    "request_timeout": config.api.request_timeout,
-                    "correct_grounding_samples": config.wandb.correct_grounding_samples,
-                    "incorrect_grounding_samples": config.wandb.incorrect_grounding_samples,
-                    "correct_worldmodeling_samples": config.wandb.correct_worldmodeling_samples,
-                    "incorrect_worldmodeling_samples": config.wandb.incorrect_worldmodeling_samples
-                }
+                config=OmegaConf.to_container(config, resolve=True),
             )
             
             _WANDB_INITIALIZED[pid] = True
         
         # Get sampling parameters from wandb config
-        config = wandb.config
-        correct_grounding_samples = config.get("correct_grounding_samples", 3)
-        incorrect_grounding_samples = config.get("incorrect_grounding_samples", 3)
-        correct_worldmodeling_samples = config.get("correct_worldmodeling_samples", 3)
-        incorrect_worldmodeling_samples = config.get("incorrect_worldmodeling_samples", 3)
+        wandb_config = wandb.config
+        correct_grounding_samples = wandb_config.get("correct_grounding_samples", 3)
+        incorrect_grounding_samples = wandb_config.get("incorrect_grounding_samples", 3)
+        correct_worldmodeling_samples = wandb_config.get("correct_worldmodeling_samples", 3)
+        incorrect_worldmodeling_samples = wandb_config.get("incorrect_worldmodeling_samples", 3)
         
         # Measure execution time
         start_time = time.time()
@@ -239,7 +254,7 @@ def run_llm_judge(input_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         return results
 
 
-def process_llm_judgments(input_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def process_llm_judgments(input_data: List[Dict[str, Any]], config: Optional[DictConfig] = None) -> List[Dict[str, Any]]:
     """
     Process a list of LLM judgment inputs and prepare prompts for evaluation.
     
@@ -250,28 +265,17 @@ def process_llm_judgments(input_data: List[Dict[str, Any]]) -> List[Dict[str, An
             - state: State information dictionary
             - type: Type of judgment ("grounding" or "worldmodeling")
             - env_name: Environment name
+        config: Optional configuration object from Hydra. If None, loads config in a thread/process-safe way.
     
     Returns:
         List of dictionaries with judgment results including scores
     """
-    # Get the directory containing the current script file
-    script_dir = Path(__file__).parent
+    # If config is not provided, load it in a thread/process-safe way
+    if config is None:
+        pid = os.getpid()
+        config = _get_hydra_config(pid)
     
-    # Initialize Hydra with the config file if not already initialized
-    if not GlobalHydra.instance().is_initialized():
-        hydra.initialize(config_path=str(script_dir))
-        
-    # Load the config - Hydra automatically resolves the ${...} references
-    config = hydra.compose(config_name="llm_as_judge")
-    
-    # Extract model configuration
-    model_config = {
-        "model": config.model.name,
-        "temperature": config.model.temperature,
-        "max_tokens": config.model.max_tokens,
-        "max_retries": config.api.max_retries,
-        "timeout": config.api.request_timeout
-    }
+    # Extract model configuration from the config
     
     # Create prompts for each input
     prompts = []
@@ -289,7 +293,7 @@ def process_llm_judgments(input_data: List[Dict[str, Any]]) -> List[Dict[str, An
         formatted_prompt = template.format(
             state_information_dict=item["state"],
             natural_language_description=item["content"],
-            max_tokens=config.model.max_tokens
+            max_tokens=config.api.max_tokens
         )
         
         prompts.append(formatted_prompt)
@@ -300,7 +304,7 @@ def process_llm_judgments(input_data: List[Dict[str, Any]]) -> List[Dict[str, An
         })
     
     # Call the request function to get LLM responses
-    llm_responses = run_together_request(prompts, model_config)
+    llm_responses = run_together_request(prompts,config.api)
     
     # Process the responses and extract scores
     results = []
@@ -328,128 +332,4 @@ def process_llm_judgments(input_data: List[Dict[str, Any]]) -> List[Dict[str, An
         }
         
         results.append(result)
-    return results
-
-def run_together_request(prompts: List[str], config: Dict[str, Any] = None) -> List[Dict[str, Any]]:
-    """
-    Process a list of prompts with Together AI, handling timeouts and retries.
-    This function manages async operations internally but returns a normal list.
-    
-    Args:
-        prompts: List of prompt strings to process
-        config: Configuration dictionary which may include:
-            - timeout: Maximum seconds to wait for all completions (default: 60)
-            - max_retries: Maximum number of retries per prompt (default: 3)
-            - retry_delay: Seconds to wait between retries (default: 1)
-            - model: Model name to use
-            - Other model parameters like temperature, max_tokens, etc.
-    
-    Returns:
-        List of dictionaries matching the order of input prompts, each containing:
-            - response: The completion text or error message
-            - success: Boolean indicating if the request succeeded within timeout
-            - retries: Number of retries performed (0 if succeeded on first try)
-            - error: Error message if applicable (None if successful)
-    """
-    # Set default configuration
-    default_config = {
-        "timeout": 60,
-        "max_retries": 3,
-        "retry_delay": 1,
-        "model": "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
-        "temperature": 0.1,
-        "max_tokens": 500
-    }
-    
-    # Merge default config with provided config
-    if config is None:
-        config = {}
-    
-    config = {**default_config, **config}
-    
-    # Define the async function to be run within this synchronous function
-    async def _async_batch_completions():
-        # Initialize async client
-        async_client = AsyncTogether()
-        
-        # Initialize results list with placeholders for each prompt
-        results = [{"response": "", "success": False, "retries": 0, "error": None} for _ in prompts]
-        
-        async def process_prompt(prompt: str, index: int) -> None:
-            """Process a single prompt with retries"""
-            retries = 0
-            
-            while retries <= config["max_retries"]:
-                try:
-                    # Extract model parameters from config
-                    model_params = {
-                        k: v for k, v in config.items() 
-                        if k not in ["timeout", "max_retries", "retry_delay"]
-                    }
-                    
-                    response = await async_client.completions.create(
-                        prompt=prompt,
-                        **model_params
-                    )
-                    
-                    # Update result for this prompt
-                    results[index] = {
-                        "response": response.choices[0].text,
-                        "success": True,
-                        "retries": retries,
-                        "error": None
-                    }
-                    return
-                    
-                except Exception as e:
-                    retries += 1
-                    if retries <= config["max_retries"]:
-                        await asyncio.sleep(config["retry_delay"])
-                    else:
-                        # Update result with error info after all retries failed
-                        results[index] = {
-                            "response": f"Error after {retries} attempts",
-                            "success": False,
-                            "retries": retries,
-                            "error": str(e)
-                        }
-                        return
-        
-        # Create tasks for each prompt
-        tasks = [process_prompt(prompt, i) for i, prompt in enumerate(prompts)]
-        
-        try:
-            # Run all tasks with timeout
-            await asyncio.wait_for(asyncio.gather(*tasks), timeout=config["timeout"])
-        except asyncio.TimeoutError:
-            # Timeout occurred, some tasks may not have completed
-            # Results list already has default "success": False for unfinished tasks
-            pass
-        
-        return results
-    
-    # Run the async function in an event loop and get the results
-    try:
-        # Check if we're already in an event loop (for environments that may have one running)
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # Create a new event loop if the current one is already running
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                results = loop.run_until_complete(_async_batch_completions())
-                loop.close()
-            else:
-                results = loop.run_until_complete(_async_batch_completions())
-        except RuntimeError:
-            # No event loop exists, create one
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            results = loop.run_until_complete(_async_batch_completions())
-            loop.close()
-    except Exception as e:
-        # Handle any unexpected errors in the async execution
-        return [{"response": f"Global error: {str(e)}", "success": False, "retries": 0, "error": str(e)} 
-                for _ in prompts]
-    
     return results

@@ -1,6 +1,9 @@
 defaults:
   - _self_
 
+
+use_llm_judge: true
+
 server:
   host: 0.0.0.0
   port: 5000

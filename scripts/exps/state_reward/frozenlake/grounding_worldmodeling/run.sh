@@ -78,4 +78,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.val_before_train=True \
     trainer.val_generations_to_log_to_wandb=8 \
     rollout_manager.n_trajectory=2 \
+    rollout_manager.use_service=True \
+    rollout_manager.timeout=300 \
+    rollout_manager.base_url="http://localhost:$PORT" \
     2>&1 | tee $EXPERIMENT_NAME.log

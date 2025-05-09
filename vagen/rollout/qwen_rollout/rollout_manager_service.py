@@ -669,7 +669,7 @@ class QwenVLRolloutManagerService():
             output_rst = self._single_recording_to_prompt(record, self.env_states[env_id]['step'], window_size=None, is_final=False)
             image= output_rst['image_data']
             done = self.env_states[env_id]['done']
-            score = reward_rst[env_id]
+            score = reward_rst[env_id]+ sum(output_rst['rewards'])
             
             
             metrics={
