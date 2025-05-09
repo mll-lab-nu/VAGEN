@@ -1,6 +1,6 @@
 api:
   # Existing parameters
-  name: "Qwen/Qwen3-235B-A22B-fp8-tput"
+  name: "meta-llama/Llama-4-Scout-17B-16E-Instruct"
   temperature: 0.1
   max_tokens: 500
   max_retries: 3
