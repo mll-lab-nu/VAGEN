@@ -11,6 +11,7 @@ env2:
     env_config:
         split: test
         render_mode: vision
+    train_size: 0
     test_size: 1200
     
 

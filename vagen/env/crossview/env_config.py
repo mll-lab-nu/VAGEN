@@ -4,7 +4,7 @@ from typing import Optional, List, Union
 
 @dataclass
 class CrossViewEnvConfig(BaseEnvConfig):
-    split="train"
+    split:str ="train"
     image_dir: str = "extracted_images"
     image_size: tuple = (300, 300)
     render_mode: str = "vision"
