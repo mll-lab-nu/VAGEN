@@ -1,19 +1,28 @@
 # Model
-name: "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8"
-temperature: 0.1
-max_tokens: 500
+model:
+  name: "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8"
+  temperature: 0.1
+  max_tokens: 500
 
 # API
-max_parallel_requests: 50
-max_retries: 3
-request_timeout: 15
+api:
+  max_parallel_requests: 50
+  max_retries: 3
+  request_timeout: 15
 
 # Log
-log_dir: "./logs/llm_judge"
+wandb:
+  project: "vagen_process_reward_judge"
+  run_name: "llm_judge"
+  correct_grounding_samples: 8
+  incorrect_grounding_samples: 8
+  correct_worldmodeling_samples: 8
+  incorrect_worldmodeling_samples: 8
 
 # Prompt
 prompt_templates:
-  sokoban:
+  # Default environment templates that other environments can reference
+  default_env:
     grounding: |
       Compare the natural language description with the state information dictionary.
       Answer YES if the description accurately matches the state, or NO if it doesn't.
@@ -23,7 +32,7 @@ prompt_templates:
       {state_information_dict}
       
       Description:
-      "{natural_language_description}"
+      {natural_language_description}
       
       Your answer should be within {max_tokens} tokens and MUST end with <answer>YES</answer> or <answer>NO</answer>.
     worldmodeling: |
@@ -35,84 +44,21 @@ prompt_templates:
       {state_information_dict}
       
       Description:
-      "{natural_language_description}"
+      {natural_language_description}
       
       Your answer should be within {max_tokens} tokens and MUST end with <answer>YES</answer> or <answer>NO</answer>.
+  sokoban:
+    grounding: ${prompt_templates.default_env.grounding}
+    worldmodeling: ${prompt_templates.default_env.worldmodeling}
   
   frozenlake:
-    grounding: |
-      Compare the natural language description with the state information dictionary.
-      Answer YES if the description accurately matches the state, or NO if it doesn't.
-      Think step by step and end with your answer in <answer>YES</answer> or <answer>NO</answer> format.
-      
-      State Information:
-      {state_information_dict}
-      
-      Description:
-      "{natural_language_description}"
-      
-      Your answer should be within {max_tokens} tokens and MUST end with <answer>YES</answer> or <answer>NO</answer>.
-    worldmodeling: |
-      Compare the natural language description with the state information dictionary.
-      Answer YES if the description accurately matches the state, or NO if it doesn't.
-      Think step by step and end with your answer in <answer>YES</answer> or <answer>NO</answer> format.
-      
-      State Information:
-      {state_information_dict}
-      
-      Description:
-      "{natural_language_description}"
-      
-      Your answer should be within {max_tokens} tokens and MUST end with <answer>YES</answer> or <answer>NO</answer>.
+    grounding: ${prompt_templates.default_env.grounding}
+    worldmodeling: ${prompt_templates.default_env.worldmodeling}
   
   maniskill:
-    grounding: |
-      Compare the natural language description with the state information dictionary.
-      Answer YES if the description accurately matches the state, or NO if it doesn't.
-      Think step by step and end with your answer in <answer>YES</answer> or <answer>NO</answer> format.
-      
-      State Information:
-      {state_information_dict}
-      
-      Description:
-      "{natural_language_description}"
-      
-      Your answer should be within {max_tokens} tokens and MUST end with <answer>YES</answer> or <answer>NO</answer>.
-    worldmodeling: |
-      Compare the natural language description with the state information dictionary.
-      Answer YES if the description accurately matches the state, or NO if it doesn't.
-      Think step by step and end with your answer in <answer>YES</answer> or <answer>NO</answer> format.
-      
-      State Information:
-      {state_information_dict}
-      
-      Description:
-      "{natural_language_description}"
-      
-      Your answer should be within {max_tokens} tokens and MUST end with <answer>YES</answer> or <answer>NO</answer>.
+    grounding: ${prompt_templates.default_env.grounding}
+    worldmodeling: ${prompt_templates.default_env.worldmodeling}
   
   navigation:
-    grounding: |
-      Compare the natural language description with the state information dictionary.
-      Answer YES if the description accurately matches the state, or NO if it doesn't.
-      Think step by step and end with your answer in <answer>YES</answer> or <answer>NO</answer> format.
-      
-      State Information:
-      {state_information_dict}
-      
-      Description:
-      "{natural_language_description}"
-      
-      Your answer should be within {max_tokens} tokens and MUST end with <answer>YES</answer> or <answer>NO</answer>.
-    worldmodeling: |
-      Compare the natural language description with the state information dictionary.
-      Answer YES if the description accurately matches the state, or NO if it doesn't.
-      Think step by step and end with your answer in <answer>YES</answer> or <answer>NO</answer> format.
-      
-      State Information:
-      {state_information_dict}
-      
-      Description:
-      "{natural_language_description}"
-      
-      Your answer should be within {max_tokens} tokens and MUST end with <answer>YES</answer> or <answer>NO</answer>.
+    grounding: ${prompt_templates.default_env.grounding}
+    worldmodeling: ${prompt_templates.default_env.worldmodeling}

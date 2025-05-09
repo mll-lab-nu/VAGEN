@@ -4,429 +4,452 @@ import re
 import json
 import os
 import time
-import logging
 import hydra
 import uuid
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, OmegaConf
 from datetime import datetime
 from together import AsyncTogether
+from pathlib import Path
+import wandb
+import threading
+import random
+from contextlib import contextmanager
 
-CONFIG_NAME = "llm_judge"
-CONFIG_PATH = "./"
+# Global variables for wandb tracking per process
+_WANDB_INITIALIZED = {}  # Track initialization status per process
+_GLOBAL_STEPS = {}  # Track global step count per process
+_PROCESS_LOCKS = {}  # Semaphore for each process
 
-def load_config() -> Dict[str, Any]:
-    """Load Hydra configuration safely"""
+# Context manager to ensure proper cleanup of wandb sessions
+@contextmanager
+def wandb_run_context():
+    """Context manager for wandb runs that ensures proper cleanup"""
     try:
-        # Clear existing Hydra instance if it exists
-        if GlobalHydra.instance().is_initialized():
-            GlobalHydra.instance().clear()
-        
-        with hydra.initialize(version_base=None, config_path=CONFIG_PATH):
-            config = hydra.compose(config_name=CONFIG_NAME)
-        return OmegaConf.to_container(config, resolve=True)
-    except Exception as e:
-        print(f"Error loading config: {str(e)}")
-        return get_default_config()
-
-def get_default_config() -> Dict[str, Any]:
-    """Return default configuration when Hydra is not available"""
-    return {
-        "name": "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
-        "max_parallel_requests": 10,
-        "temperature": 0.1,
-        "max_tokens": 200,
-        "max_retries": 3,
-        "request_timeout": 15,  # Default timeout in seconds
-        "log_dir": "./logs/llm_judge"
-    }
-
-def run_llm_judge(inputs: List[Dict[str, Any]]) -> List[float]:
+        yield
+    finally:
+        # If wandb is running, finish the run
+        if wandb.run is not None:
+            wandb.finish()
+            
+def run_llm_judge(input_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    Run LLM judge synchronously by handling asyncio internally.
-    This is the main function to call from other modules.
+    Process input data through the LLM judge and log results to Weights & Biases.
     
     Args:
-        inputs: A list of dicts: {"id": id, "content": content, "state": state, "type": "observation"/"prediction"}
+        input_data: List of dictionaries containing judgment inputs
         
     Returns:
-        list: A list of scores (0.0 or 1.0) for each input.
+        List of dictionaries with judgment results including scores
+        
+    This function manages wandb logging per process:
+    1. Initializes wandb if not already done for the current process
+    2. Uses a semaphore to ensure sequential calls within the same process
+    3. Tracks global step count per process
+    4. Logs statistics for the overall run and selected examples in wandb tables
     """
-    if not inputs:
-        return []
+    # Get the process ID to manage per-process variables
+    pid = os.getpid()
     
-    # Track overall start time
-    overall_start_time = time.time()
+    # Initialize the lock for this process if it doesn't exist
+    if pid not in _PROCESS_LOCKS:
+        _PROCESS_LOCKS[pid] = threading.Semaphore(1)
     
-    # Load configuration
-    config = load_config()
-    
-    # Setup logging
-    logger = setup_logging(config)
-    logger.info(f"Starting LLM judge with {len(inputs)} inputs")
-    
-    # Set up batch log file path - use a fixed name for appending across multiple batches
-    log_dir = config.get("log_dir", "./logs/llm_judge")
-    # Use a date-based filename rather than timestamp to group all batches from the same day
-    current_date = datetime.now().strftime("%Y%m%d")
-    batch_log_file = os.path.join(log_dir, f"batch_summary_{current_date}.json")
-    
-    # Initialize batch log data
-    batch_log = {
-        "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
-        "batch_size": len(inputs),
-        "model": config.get("name", "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8"),
-        "temperature": config.get("temperature", 0.1),
-        "max_tokens": config.get("max_tokens", 200),
-        "items": [],
-        "success_rate": 0,
-        "total_time_sec": 0,
-        "avg_time_per_item_sec": 0
-    }
-    
-    # Generate UUIDs for each input item and create a mapping to track original positions
-    uuid_to_position = {}
-    position_to_uuid = {}
-    for i, item in enumerate(inputs):
-        # Generate a UUID for this item
-        item_uuid = str(uuid.uuid4())
-        uuid_to_position[item_uuid] = i
-        position_to_uuid[i] = item_uuid
-    
-    # Initialize results array
-    results = [0.0] * len(inputs)
-    
-    # Create formatted prompt inputs
-    max_tokens = config.get("max_tokens", 200)
-    
-    eval_items = []
-    for i, item in enumerate(inputs):
-        # Find the matching environment template
-        env_name = None
-        templates = config.get("prompt_templates")
-        for template_env in templates.keys():
-            if template_env.lower() in str(item["env_name"]).lower():
-                env_name = template_env
-                break
+    # Use the semaphore to ensure this function is called sequentially within the process
+    with _PROCESS_LOCKS[pid]:
+        # Initialize global step for this process if not already done
+        if pid not in _GLOBAL_STEPS:
+            _GLOBAL_STEPS[pid] = 0
         
-        if not env_name:
-            # Default to frozenlake if no match
-            env_name = "frozenlake"
-            logger.warning(f"No matching template for env_name '{item['env_name']}', using default: {env_name}")
+        # Increment the global step
+        _GLOBAL_STEPS[pid] += 1
+        global_step = _GLOBAL_STEPS[pid]
         
-        # Get template type based on observation or prediction
-        template_type = 'grounding' if item["type"] == 'observation' else 'worldmodeling'
+        # Initialize wandb if not already done for this process
+        if pid not in _WANDB_INITIALIZED or not _WANDB_INITIALIZED[pid]:
+            # Get the directory containing the current script file
+            script_dir = Path(__file__).parent
+            
+            # Initialize Hydra with the config file
+            if not GlobalHydra.instance().is_initialized():
+                hydra.initialize(config_path=str(script_dir))
+                
+            # Load the config
+            config = hydra.compose(config_name="llm_as_judge")
+            
+            # Initialize wandb with values from config
+            run_id = str(uuid.uuid4())[:8]
+            wandb.init(
+                project=config.wandb.project,
+                name=f"{config.wandb.run_name}_{run_id}",
+                config={
+                    "model": config.model.name,
+                    "temperature": config.model.temperature,
+                    "max_tokens": config.model.max_tokens,
+                    "max_retries": config.api.max_retries,
+                    "request_timeout": config.api.request_timeout,
+                    "correct_grounding_samples": config.wandb.correct_grounding_samples,
+                    "incorrect_grounding_samples": config.wandb.incorrect_grounding_samples,
+                    "correct_worldmodeling_samples": config.wandb.correct_worldmodeling_samples,
+                    "incorrect_worldmodeling_samples": config.wandb.incorrect_worldmodeling_samples
+                }
+            )
+            
+            _WANDB_INITIALIZED[pid] = True
         
-        # Get the appropriate template
-        template = templates.get(env_name, {}).get(template_type, '')
-        if not template:
-            logger.error(f"Template not found for environment '{env_name}' and type '{template_type}'")
-            continue
+        # Get sampling parameters from wandb config
+        config = wandb.config
+        correct_grounding_samples = config.get("correct_grounding_samples", 3)
+        incorrect_grounding_samples = config.get("incorrect_grounding_samples", 3)
+        correct_worldmodeling_samples = config.get("correct_worldmodeling_samples", 3)
+        incorrect_worldmodeling_samples = config.get("incorrect_worldmodeling_samples", 3)
         
-        prompt = template.format(
-            state_information_dict=json.dumps(item["state"], indent=2),
-            natural_language_description=item["content"],
-            max_tokens=max_tokens
+        # Measure execution time
+        start_time = time.time()
+        
+        # Process the judgments
+        results = process_llm_judgments(input_data)
+        
+        # Calculate execution time
+        execution_time = time.time() - start_time
+        
+        # Calculate statistics
+        total_requests = len(results)
+        completed_requests = sum(1 for r in results if r["success"])
+        
+        # Split by type
+        grounding_results = [r for r in results if r["type"] == "grounding"]
+        worldmodeling_results = [r for r in results if r["type"] == "worldmodeling"]
+        
+        # Calculate accuracy metrics
+        overall_accuracy = sum(r["score"] for r in results) / total_requests if total_requests > 0 else 0
+        
+        grounding_accuracy = (
+            sum(r["score"] for r in grounding_results) / len(grounding_results) 
+            if grounding_results else 0
         )
         
-        # Use the generated UUID for tracking instead of memory ID
-        item_uuid = position_to_uuid[i]
+        worldmodeling_accuracy = (
+            sum(r["score"] for r in worldmodeling_results) / len(worldmodeling_results) 
+            if worldmodeling_results else 0
+        )
         
-        eval_items.append({
-            "uuid": item_uuid,  # Use UUID for internal tracking
-            "original_id": item.get("id", "unknown"),  # Store original ID for logging
-            "prompt": prompt,
-            "content": item["content"],  # Store original content for logging
-            "state": item["state"]  # Store state for logging
+        # Calculate parse success rate
+        parse_successes = sum(1 for r in results if r["success"] and (r["score"] == 1.0 or r["score"] == 0.0))
+        parse_success_rate = parse_successes / completed_requests if completed_requests > 0 else 0
+        
+        # Log scalar metrics to wandb with step to ensure proper plotting
+        wandb.log({
+            "global_step": global_step,
+            "execution_time": execution_time,
+            "total_requests": total_requests,
+            "completed_requests": completed_requests,
+            "completion_rate": completed_requests / total_requests if total_requests > 0 else 0,
+            "overall_accuracy": overall_accuracy,
+            "grounding_count": len(grounding_results),
+            "worldmodeling_count": len(worldmodeling_results),
+            "grounding_accuracy": grounding_accuracy,
+            "worldmodeling_accuracy": worldmodeling_accuracy,
+            "parse_success_rate": parse_success_rate,
+        }, step=global_step)
+        
+        # Create wandb tables for examples
+        
+        # Define common columns for all tables
+        columns = ["id", "env_name", "prompt", "response", "parsed_answer"]
+        
+        # Split results by category
+        correct_grounding = [r for r in grounding_results if r["success"] and r["score"] == 1.0]
+        incorrect_grounding = [r for r in grounding_results if r["success"] and r["score"] == 0.0]
+        correct_worldmodeling = [r for r in worldmodeling_results if r["success"] and r["score"] == 1.0]
+        incorrect_worldmodeling = [r for r in worldmodeling_results if r["success"] and r["score"] == 0.0]
+        parse_failed = [r for r in results if r["success"] and 
+                       not re.search(r'<answer>(YES|NO)</answer>', r["response"], re.IGNORECASE)]
+        
+        # Function to extract answer from response
+        def extract_parsed_answer(response):
+            match = re.search(r'<answer>(YES|NO)</answer>', response, re.IGNORECASE)
+            return match.group(1) if match else "PARSE_FAILED"
+        
+        # Function to sample and prepare table data
+        def prepare_table_data(results_subset, max_samples):
+            if not results_subset:
+                return []
+                
+            # Sample results (or take all if fewer than max_samples)
+            samples = random.sample(results_subset, min(max_samples, len(results_subset)))
+            
+            # Prepare data for table
+            return [
+                [
+                    r["id"],
+                    r["env_name"],
+                    r["prompt"],
+                    r["response"],
+                    extract_parsed_answer(r["response"])
+                ]
+                for r in samples
+            ]
+        
+        # Create and log tables
+        correct_grounding_table = wandb.Table(
+            columns=columns,
+            data=prepare_table_data(correct_grounding, correct_grounding_samples)
+        )
+        
+        incorrect_grounding_table = wandb.Table(
+            columns=columns,
+            data=prepare_table_data(incorrect_grounding, incorrect_grounding_samples)
+        )
+        
+        correct_worldmodeling_table = wandb.Table(
+            columns=columns,
+            data=prepare_table_data(correct_worldmodeling, correct_worldmodeling_samples)
+        )
+        
+        incorrect_worldmodeling_table = wandb.Table(
+            columns=columns,
+            data=prepare_table_data(incorrect_worldmodeling, incorrect_worldmodeling_samples)
+        )
+        
+        parse_failed_table = wandb.Table(
+            columns=columns,
+            data=prepare_table_data(parse_failed, 3)  # Sample up to 3 parse failures
+        )
+        
+        # Create table for errors
+        error_columns = ["id", "env_name", "type", "error"]
+        error_examples = [r for r in results if not r["success"]]
+        error_data = [
+            [r["id"], r["env_name"], r["type"], r["error"]]
+            for r in error_examples[:3]  # Sample up to 3 errors
+        ]
+        error_table = wandb.Table(columns=error_columns, data=error_data)
+        
+        # Log all tables with the current step
+        wandb.log({
+            "correct_grounding_examples": correct_grounding_table,
+            "incorrect_grounding_examples": incorrect_grounding_table,
+            "correct_worldmodeling_examples": correct_worldmodeling_table,
+            "incorrect_worldmodeling_examples": incorrect_worldmodeling_table,
+            "parse_failed_examples": parse_failed_table,
+            "error_examples": error_table
+        }, step=global_step)
+        
+        return results
+
+
+def process_llm_judgments(input_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Process a list of LLM judgment inputs and prepare prompts for evaluation.
+    
+    Args:
+        input_data: List of dictionaries containing:
+            - id: Unique identifier
+            - content: Natural language description
+            - state: State information dictionary
+            - type: Type of judgment ("grounding" or "worldmodeling")
+            - env_name: Environment name
+    
+    Returns:
+        List of dictionaries with judgment results including scores
+    """
+    # Get the directory containing the current script file
+    script_dir = Path(__file__).parent
+    
+    # Initialize Hydra with the config file if not already initialized
+    if not GlobalHydra.instance().is_initialized():
+        hydra.initialize(config_path=str(script_dir))
+        
+    # Load the config - Hydra automatically resolves the ${...} references
+    config = hydra.compose(config_name="llm_as_judge")
+    
+    # Extract model configuration
+    model_config = {
+        "model": config.model.name,
+        "temperature": config.model.temperature,
+        "max_tokens": config.model.max_tokens,
+        "max_retries": config.api.max_retries,
+        "timeout": config.api.request_timeout
+    }
+    
+    # Create prompts for each input
+    prompts = []
+    metadata = []  # Store additional info we'll need after getting responses
+    
+    for item in input_data:
+        # Get the appropriate prompt template
+        prompt_type = item["type"]  # "grounding" or "worldmodeling"
+        env_name = item["env_name"]  # e.g., "sokoban"
+        
+        # Access the prompt template - Hydra has already resolved ${...} references
+        template = config.prompt_templates[env_name][prompt_type]
+        
+        # Format the prompt template with the input data
+        formatted_prompt = template.format(
+            state_information_dict=item["state"],
+            natural_language_description=item["content"],
+            max_tokens=config.model.max_tokens
+        )
+        
+        prompts.append(formatted_prompt)
+        metadata.append({
+            "id": item["id"],
+            "type": item["type"],
+            "env_name": item["env_name"]
         })
     
-    # Process in batches using asyncio
-    current_batch = eval_items.copy()
-    max_retries = config.get("max_retries", 3)
-    retry_count = 0
+    # Call the request function to get LLM responses
+    llm_responses = run_together_request(prompts, model_config)
     
-    while current_batch and retry_count < max_retries:
-        batch_start_time = time.time()
+    # Process the responses and extract scores
+    results = []
+    for i, response_data in enumerate(llm_responses):
+        # Extract the YES/NO answer
+        score = 0.0  # Default score (NO or failure)
         
-        async def process_batch():
-            batch_results = []
-            failures = []
-            
-            # Process items in parallel with concurrency control
-            semaphore = asyncio.Semaphore(config.get("max_parallel_requests", 10))
-            
-            async def process_item(item):
-                try:
-                    async with semaphore:
-                        # Pass complete item information to avoid lookup later
-                        result, log_data = await async_judge_single_item(
-                            item["prompt"], 
-                            config, 
-                            logger, 
-                            original_id=item["original_id"],
-                            item_uuid=item["uuid"],
-                            item_content=item["content"],
-                            item_state=item["state"]  # Pass state to the function
-                        )
-                        return {
-                            "uuid": item["uuid"],  # Use UUID for tracking
-                            "result": result, 
-                            "success": True, 
-                            "log_data": log_data
-                        }
-                except Exception as e:
-                    error_msg = f"Error processing item {item['original_id']}: {str(e)}"
-                    logger.error(error_msg)
-                    return {"uuid": item["uuid"], "success": False, "error": str(e)}
-            
-            tasks = [process_item(item) for item in current_batch]
-            task_results = await asyncio.gather(*tasks)
-            
-            for result in task_results:
-                if result["success"]:
-                    batch_results.append(result)
-                    
-                    # Log successful judgment
-                    if "log_data" in result:
-                        log_entry = result["log_data"]
-                        logger.info(f"Item {log_entry['original_id']} - Answer: {log_entry['answer']}")
-                else:
-                    failures.append(next(item for item in current_batch if item["uuid"] == result["uuid"]))
-                    logger.warning(f"Failed item with UUID {result['uuid']}: {result.get('error', 'Unknown error')}")
-            
-            return batch_results, failures
+        if response_data["success"]:
+            # Use regex to find the answer tag
+            answer_match = re.search(r'<answer>(YES|NO)</answer>', response_data["response"], re.IGNORECASE)
+            if answer_match:
+                answer = answer_match.group(1).upper()
+                score = 1.0 if answer == "YES" else 0.0
         
-        # Run in a new event loop
-        try:
-            loop = asyncio.get_event_loop()
-            # Check if loop is closed
-            if loop.is_closed():
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+        # Create the result dictionary
+        result = {
+            "id": metadata[i]["id"],
+            "type": metadata[i]["type"],
+            "env_name": metadata[i]["env_name"],
+            "prompt": prompts[i],
+            "response": response_data["response"],
+            "success": response_data["success"],
+            "score": score,
+            "error": response_data["error"]
+        }
         
-        batch_results, next_batch = loop.run_until_complete(process_batch())
-        
-        # Calculate batch processing time
-        batch_time = time.time() - batch_start_time
-        
-        # Update results and collect log data for batch summary
-        for item in batch_results:
-            # Get original position using UUID
-            if item["uuid"] in uuid_to_position:
-                original_pos = uuid_to_position[item["uuid"]]
-                results[original_pos] = item["result"]
-                
-                                    # Add to batch log - only include necessary fields
-                if "log_data" in item:
-                    batch_log["items"].append({
-                        "id": item["log_data"]["original_id"],  # Use original ID for logging
-                        "content": item["log_data"]["content"],
-                        "state": item["log_data"]["state"],
-                        "response": item["log_data"]["response"],
-                        "answer": item["log_data"]["answer"]
-                    })
-            else:
-                logger.warning(f"UUID not found in position map: {item['uuid']}")
-        
-        # Log batch completion time
-        logger.info(f"Batch processed in {batch_time:.2f} seconds ({len(batch_results)} items)")
-        
-        # Prepare for retry if needed
-        if next_batch:
-            retry_count += 1
-            logger.info(f"Retrying {len(next_batch)} failed items (attempt {retry_count}/{max_retries})")
-            current_batch = next_batch
-            time.sleep(1)  # Small delay before retry
-        else:
-            break
-    
-    # Calculate overall metrics
-    overall_time = time.time() - overall_start_time
-    success_count = sum(1 for r in results if r > 0.5)
-    success_rate = success_count / len(results) if results else 0
-    
-    # Update batch log with final metrics
-    batch_log["success_rate"] = success_rate
-    batch_log["total_time_sec"] = overall_time
-    batch_log["avg_time_per_item_sec"] = overall_time / len(inputs) if inputs else 0
-    
-    # Read existing batches if file exists
-    all_batches = []
-    if os.path.exists(batch_log_file):
-        try:
-            with open(batch_log_file, 'r') as f:
-                all_batches = json.load(f)
-                # If the file just has one batch (not in a list), convert to list
-                if not isinstance(all_batches, list):
-                    all_batches = [all_batches]
-        except json.JSONDecodeError:
-            # If file is corrupted, start fresh
-            logger.warning(f"Could not read existing batch log file: {batch_log_file}. Starting fresh.")
-            all_batches = []
-    
-    # Add current batch to all batches
-    all_batches.append(batch_log)
-    
-    # Write all batches back to file
-    with open(batch_log_file, 'w') as f:
-        json.dump(all_batches, f, indent=2)
-    
-    # Log overall summary
-    logger.info(f"LLM judge completed: {success_count}/{len(results)} passed ({success_rate:.2%})")
-    logger.info(f"Total time: {overall_time:.2f} seconds, Average: {batch_log['avg_time_per_item_sec']:.2f} seconds per item")
-    logger.info(f"Batch appended to log file: {batch_log_file}")
-    
+        results.append(result)
     return results
 
-async def async_judge_single_item(
-    prompt: str, 
-    config: Dict[str, Any], 
-    logger: logging.Logger, 
-    original_id: Any, 
-    item_uuid: str,
-    item_content: str,
-    item_state: Dict[str, Any]  # Add state parameter
-) -> Tuple[float, Dict[str, Any]]:
+def run_together_request(prompts: List[str], config: Dict[str, Any] = None) -> List[Dict[str, Any]]:
     """
-    Judge a single item asynchronously and return both result and logging data
+    Process a list of prompts with Together AI, handling timeouts and retries.
+    This function manages async operations internally but returns a normal list.
     
     Args:
-        prompt: The prompt to send to the model
-        config: Configuration dictionary
-        logger: Logger instance
-        original_id: Original ID of the item (for logging)
-        item_uuid: UUID assigned to the item (for tracking)
-        item_content: Original content of the item
-        item_type: Type of the item (observation/prediction)
-        item_env_name: Environment name for the item
-        
+        prompts: List of prompt strings to process
+        config: Configuration dictionary which may include:
+            - timeout: Maximum seconds to wait for all completions (default: 60)
+            - max_retries: Maximum number of retries per prompt (default: 3)
+            - retry_delay: Seconds to wait between retries (default: 1)
+            - model: Model name to use
+            - Other model parameters like temperature, max_tokens, etc.
+    
     Returns:
-        Tuple containing the score (1.0 for YES, 0.0 for NO) and logging data
+        List of dictionaries matching the order of input prompts, each containing:
+            - response: The completion text or error message
+            - success: Boolean indicating if the request succeeded within timeout
+            - retries: Number of retries performed (0 if succeeded on first try)
+            - error: Error message if applicable (None if successful)
     """
-    # Extract parameters from config
-    model = config.get("name", "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8")
-    temperature = config.get("temperature", 0.1)
-    max_tokens = config.get("max_tokens", 200)
-    max_retries = config.get("max_retries", 3)
-    request_timeout = config.get("request_timeout", 15)  # Get timeout from config, default 15 seconds
-    
-    # Log the request being sent
-    logger.debug(f"Sending request for item {original_id} to model: {model} with timeout: {request_timeout}s")
-    
-    # Initialize async client
-    async_client = AsyncTogether(api_key=os.getenv("TOGETHER_API_KEY"), max_retries=max_retries)
-    
-    messages = [{"role": "user", "content": prompt}]
-    
-    # Track start time for performance logging
-    start_time = time.time()
-    
-    try:
-        # Add timeout control to prevent hanging requests
-        response = await asyncio.wait_for(
-            async_client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens
-            ),
-            timeout=request_timeout
-        )
-        
-        # Calculate response time
-        response_time = time.time() - start_time
-        
-        response_text = response.choices[0].message.content
-        answer = extract_answer(response_text)
-        
-    except asyncio.TimeoutError:
-        # Handle timeout case
-        logger.warning(f"Request for item {original_id} timed out after {request_timeout} seconds")
-        response_time = time.time() - start_time
-        response_text = f"[TIMEOUT AFTER {request_timeout} SECONDS]"
-        answer = "NO"  # Default to NO for timeouts
-    except Exception as e:
-        # Handle other errors
-        logger.error(f"Error in API call for item {original_id}: {str(e)}")
-        response_time = time.time() - start_time
-        response_text = f"[ERROR: {str(e)}]"
-        answer = "NO"  # Default to NO for errors
-    
-    # Create detailed log data with only necessary information
-    log_data = {
-        "original_id": original_id,
-        "uuid": item_uuid,
-        "model": model,
-        "content": item_content,
-        "state": item_state,  # Include state for logging
-        "response": response_text,
-        "answer": answer
+    # Set default configuration
+    default_config = {
+        "timeout": 60,
+        "max_retries": 3,
+        "retry_delay": 1,
+        "model": "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
+        "temperature": 0.1,
+        "max_tokens": 500
     }
     
-    return (1.0 if answer == "YES" else 0.0), log_data
-
-def extract_answer(response_text: str) -> str:
-    """Extract YES/NO answer from LLM response"""
-    match = re.search(r"<answer>(YES|NO)</answer>", response_text, re.IGNORECASE)
-    if match:
-        return match.group(1).upper()
+    # Merge default config with provided config
+    if config is None:
+        config = {}
     
-    # Fallback: Check if YES or NO appears in the text
-    if "YES" in response_text.upper() and "NO" not in response_text.upper():
-        return "YES"
-    elif "NO" in response_text.upper() and "YES" not in response_text.upper():
-        return "NO"
+    config = {**default_config, **config}
     
-    return "NO"  # Default to NO if nothing is found
-
-async def llm_judge(inputs: List[Dict[str, Any]]) -> List[float]:
-    """
-    Original async version - maintained for backwards compatibility.
-    New code should use run_llm_judge instead.
-    
-    Args:
-        inputs: A list of dicts with eval inputs
+    # Define the async function to be run within this synchronous function
+    async def _async_batch_completions():
+        # Initialize async client
+        async_client = AsyncTogether()
         
-    Returns:
-        list: A list of scores (0.0 or 1.0) for each input.
-    """
-    return run_llm_judge(inputs)
-
-def setup_logging(config: Dict[str, Any]) -> logging.Logger:
-    """Set up logging for the LLM judge module"""
-    log_dir = config.get("log_dir", "./logs/llm_judge")
+        # Initialize results list with placeholders for each prompt
+        results = [{"response": "", "success": False, "retries": 0, "error": None} for _ in prompts]
+        
+        async def process_prompt(prompt: str, index: int) -> None:
+            """Process a single prompt with retries"""
+            retries = 0
+            
+            while retries <= config["max_retries"]:
+                try:
+                    # Extract model parameters from config
+                    model_params = {
+                        k: v for k, v in config.items() 
+                        if k not in ["timeout", "max_retries", "retry_delay"]
+                    }
+                    
+                    response = await async_client.completions.create(
+                        prompt=prompt,
+                        **model_params
+                    )
+                    
+                    # Update result for this prompt
+                    results[index] = {
+                        "response": response.choices[0].text,
+                        "success": True,
+                        "retries": retries,
+                        "error": None
+                    }
+                    return
+                    
+                except Exception as e:
+                    retries += 1
+                    if retries <= config["max_retries"]:
+                        await asyncio.sleep(config["retry_delay"])
+                    else:
+                        # Update result with error info after all retries failed
+                        results[index] = {
+                            "response": f"Error after {retries} attempts",
+                            "success": False,
+                            "retries": retries,
+                            "error": str(e)
+                        }
+                        return
+        
+        # Create tasks for each prompt
+        tasks = [process_prompt(prompt, i) for i, prompt in enumerate(prompts)]
+        
+        try:
+            # Run all tasks with timeout
+            await asyncio.wait_for(asyncio.gather(*tasks), timeout=config["timeout"])
+        except asyncio.TimeoutError:
+            # Timeout occurred, some tasks may not have completed
+            # Results list already has default "success": False for unfinished tasks
+            pass
+        
+        return results
     
-    # Create log directory if it doesn't exist
-    os.makedirs(log_dir, exist_ok=True)
+    # Run the async function in an event loop and get the results
+    try:
+        # Check if we're already in an event loop (for environments that may have one running)
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # Create a new event loop if the current one is already running
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                results = loop.run_until_complete(_async_batch_completions())
+                loop.close()
+            else:
+                results = loop.run_until_complete(_async_batch_completions())
+        except RuntimeError:
+            # No event loop exists, create one
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            results = loop.run_until_complete(_async_batch_completions())
+            loop.close()
+    except Exception as e:
+        # Handle any unexpected errors in the async execution
+        return [{"response": f"Global error: {str(e)}", "success": False, "retries": 0, "error": str(e)} 
+                for _ in prompts]
     
-    # Create a timestamped log file
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = os.path.join(log_dir, f"llm_judge_{timestamp}.log")
-    
-    # Configure logging
-    logger = logging.getLogger("llm_judge")
-    logger.setLevel(logging.INFO)
-    
-    # File handler for logging to file
-    file_handler = logging.FileHandler(log_file)
-    file_handler.setLevel(logging.INFO)
-    
-    # Also log to console
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    
-    # Create a formatter
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    file_handler.setFormatter(formatter)
-    console_handler.setFormatter(formatter)
-    
-    # Add handlers to logger
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
-    
-    logger.info(f"Logging to {log_file}")
-    
-    return logger
+    return results
