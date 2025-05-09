@@ -2,7 +2,7 @@ defaults:
   - _self_
 
 
-use_llm_judge: true
+use_llm_judge: False
 
 server:
   host: 0.0.0.0
