@@ -22,6 +22,7 @@ class BaseEnvConfig(ABC):
         return getattr(self, key, default)
     
     def generate_seeds(self,size,seed=0,n_candidate: int = 20000,) -> list:
+        # you can define it in your own env_config to support customized seed geenration
         random.seed(seed)
         seeds=random.sample(range(0, n_candidate+size), size)
         return seeds
