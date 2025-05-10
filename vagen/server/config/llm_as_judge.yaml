@@ -18,6 +18,8 @@ wandb:
   incorrect_grounding_samples: 8
   correct_worldmodeling_samples: 8
   incorrect_worldmodeling_samples: 8
+  parse_failed_samples: 8
+  table_logging_frequency: 10
 
 # Prompt
 prompt_templates:
