@@ -8,3 +8,4 @@ class PrimitiveSkillServiceConfig(BaseServiceConfig):
     devices: list = field(default_factory=lambda: [0,1])
     spawn_method: str = field(default="fork")
     timeout: int = field(default=120)
+    use_state_reward: bool = False
