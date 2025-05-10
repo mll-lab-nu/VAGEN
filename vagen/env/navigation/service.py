@@ -25,6 +25,7 @@ class NavigationService(BaseService):
         self.environments = {}
         self.env_configs = {}
         self.config=config
+        print(f"[DEBUG] {self.config}")
     
     def create_environments_batch(self, ids2configs: Dict[str, Any]) -> None:
         """
