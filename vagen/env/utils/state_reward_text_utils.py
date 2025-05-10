@@ -55,6 +55,9 @@ def service_state_reward_wrapper(step_batch_func):
     def wrapped_step_batch(self, ids2actions):
         # Call the original step_batch function
         step_batch_results = step_batch_func(self, ids2actions)
+        if self.config.get("use_state_reward", False):
+            return step_batch_results
+        print("State reward wrapper enabled")
         input_to_llm = []
         for id, result in step_batch_results.items():
             obs, reward, done, info = result

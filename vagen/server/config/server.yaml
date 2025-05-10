@@ -2,24 +2,29 @@ defaults:
   - _self_
 
 
-use_llm_judge: False
+use_state_reward: False
 
 server:
   host: 0.0.0.0
   port: 5000
   debug: false
+  use_state_reward: ${use_state_reward}
 
 frozenlake:
   max_workers: 48
+  use_state_reward: ${use_state_reward}
 svg:
   max_workers: 48
   model_size: "small"
   device:
     dino: 1
     service: 2
+  use_state_reward: ${use_state_reward}
 navigation:
   max_workers: 48
   devices: [0,1,2,3]
+  use_state_reward: ${use_state_reward}
 primitive_skill:
   max_workers: 48
+  use_state_reward: ${use_state_reward}
 

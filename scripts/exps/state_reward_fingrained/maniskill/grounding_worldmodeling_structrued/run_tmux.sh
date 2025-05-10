@@ -47,7 +47,7 @@ tmux send-keys -t "$SERVER_SESSION" "export CUDA_VISIBLE_DEVICES=$CUDA_DEVICES" 
 tmux send-keys -t "$SERVER_SESSION" "export VLLM_ATTENTION_BACKEND=XFORMERS" C-m
 tmux send-keys -t "$SERVER_SESSION" "export PYTHONHASHSEED=0" C-m
 # Start the server
-tmux send-keys -t "$SERVER_SESSION" "python -m vagen.server.server server.port=$PORT use_llm_judge=True" C-m
+tmux send-keys -t "$SERVER_SESSION" "python -m vagen.server.server server.port=$PORT use_state_reward=True" C-m
 
 # Wait for server to start
 echo "Waiting for server to start on port $PORT..."

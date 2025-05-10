@@ -403,7 +403,7 @@ class BatchEnvServer:
             print("Server is already running")
             return
         
-        if self.config.get("use_llm_judge", False):
+        if self.config.get("use_state_reward", False):
             self.wandb_context = wandb_run_context()
             self.wandb_context.__enter__()
             print("Initialized wandb for LLM Judge")

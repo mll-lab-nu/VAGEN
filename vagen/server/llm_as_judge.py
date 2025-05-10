@@ -23,6 +23,15 @@ _PROCESS_LOCKS = {}  # Semaphore for each process
 _HYDRA_LOCKS = {}  # Semaphore for Hydra initialization
 _HYDRA_INITIALIZED = {}  # Track Hydra initialization per process
 _PID_CONFIG= {}  # Store config per process
+# Store wandb tables per process
+_WANDB_TABLES = {}  # Store wandb tables for each process with structure:
+# {pid: {
+#   'correct_grounding_table': wandb.Table,
+#   'incorrect_grounding_table': wandb.Table,
+#   'correct_worldmodeling_table': wandb.Table,
+#   'incorrect_worldmodeling_table': wandb.Table,
+#   'parse_failed_table': wandb.Table
+# }}
 # Context manager to ensure proper cleanup of wandb sessions
 @contextmanager
 def wandb_run_context():
@@ -32,6 +41,10 @@ def wandb_run_context():
     finally:
         # If wandb is running, finish the run
         if wandb.run is not None:
+            # Clear global table storage for this process before finishing
+            pid = os.getpid()
+            if pid in _WANDB_TABLES:
+                _WANDB_TABLES.pop(pid)
             wandb.finish()
 
 def _get_hydra_config(pid: int) -> DictConfig:
@@ -96,7 +109,7 @@ def run_llm_judge(input_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     with _PROCESS_LOCKS[pid]:
         # Initialize global step for this process if not already done
         if pid not in _GLOBAL_STEPS:
-            _GLOBAL_STEPS[pid] = 0
+            _GLOBAL_STEPS[pid] = -1
         
         # Increment the global step
         _GLOBAL_STEPS[pid] += 1
@@ -273,12 +286,23 @@ def run_llm_judge(input_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 for field in ["id", "env_name", "prompt", "response", "parsed_answer"]
             ]
             
-            # Create new tables for each step to avoid summary access issues
-            correct_grounding_table = wandb.Table(columns=correct_grounding_columns)
-            incorrect_grounding_table = wandb.Table(columns=incorrect_grounding_columns)
-            correct_worldmodeling_table = wandb.Table(columns=correct_worldmodeling_columns)
-            incorrect_worldmodeling_table = wandb.Table(columns=incorrect_worldmodeling_columns)
-            parse_failed_table = wandb.Table(columns=parse_failed_columns)
+            # Initialize or retrieve process tables from global storage
+            pid = os.getpid()
+            if pid not in _WANDB_TABLES:
+                _WANDB_TABLES[pid] = {
+                    'correct_grounding_table': wandb.Table(columns=correct_grounding_columns),
+                    'incorrect_grounding_table': wandb.Table(columns=incorrect_grounding_columns),
+                    'correct_worldmodeling_table': wandb.Table(columns=correct_worldmodeling_columns),
+                    'incorrect_worldmodeling_table': wandb.Table(columns=incorrect_worldmodeling_columns),
+                    'parse_failed_table': wandb.Table(columns=parse_failed_columns)
+                }
+            
+            # Retrieve existing tables from the global storage
+            correct_grounding_table = _WANDB_TABLES[pid]['correct_grounding_table']
+            incorrect_grounding_table = _WANDB_TABLES[pid]['incorrect_grounding_table']
+            correct_worldmodeling_table = _WANDB_TABLES[pid]['correct_worldmodeling_table']
+            incorrect_worldmodeling_table = _WANDB_TABLES[pid]['incorrect_worldmodeling_table']
+            parse_failed_table = _WANDB_TABLES[pid]['parse_failed_table']
             
             # Prepare data rows for each table (one row per global step)
             correct_grounding_data = prepare_table_data(correct_grounding, correct_grounding_samples, global_step)
@@ -299,13 +323,21 @@ def run_llm_judge(input_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             if parse_failed_data:
                 parse_failed_table.add_data(*parse_failed_data)
             
+            # Create new tables with all the accumulated data for logging
+            # This ensures we don't lose the history when logging to wandb
+            new_correct_grounding_table = wandb.Table(columns=correct_grounding_columns, data=correct_grounding_table.data)
+            new_incorrect_grounding_table = wandb.Table(columns=incorrect_grounding_columns, data=incorrect_grounding_table.data)
+            new_correct_worldmodeling_table = wandb.Table(columns=correct_worldmodeling_columns, data=correct_worldmodeling_table.data)
+            new_incorrect_worldmodeling_table = wandb.Table(columns=incorrect_worldmodeling_columns, data=incorrect_worldmodeling_table.data)
+            new_parse_failed_table = wandb.Table(columns=parse_failed_columns, data=parse_failed_table.data)
+            
             # Log the tables directly to history without using summary
             wandb.log({
-                "correct_grounding_examples": correct_grounding_table,
-                "incorrect_grounding_examples": incorrect_grounding_table,
-                "correct_worldmodeling_examples": correct_worldmodeling_table,
-                "incorrect_worldmodeling_examples": incorrect_worldmodeling_table,
-                "parse_failed_examples": parse_failed_table
+                "correct_grounding_examples": new_correct_grounding_table,
+                "incorrect_grounding_examples": new_incorrect_grounding_table,
+                "correct_worldmodeling_examples": new_correct_worldmodeling_table,
+                "incorrect_worldmodeling_examples": new_incorrect_worldmodeling_table,
+                "parse_failed_examples": new_parse_failed_table
             }, step=global_step)
 
         # Remove error data logging to wandb tables
