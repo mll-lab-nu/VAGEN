@@ -19,8 +19,8 @@ class FrozenLakeEnvConfig(BaseEnvConfig):
     
     # configs for process reward for grounding and world modeling
     use_state_reward: bool = False
-    grounding_reward_weight: float = 0.5
-    worldmodeling_reward_weight: float = 0.5
+    grounding_reward_weight: float = 2.0
+    worldmodeling_reward_weight: float = 2.0
     
     def config_id(self) -> str:
         id_fields=["is_slippery", "size", "p", "render_mode", "max_actions_per_step", "min_actions_to_succeed","format_reward"]

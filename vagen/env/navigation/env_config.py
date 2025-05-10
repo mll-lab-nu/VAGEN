@@ -22,8 +22,8 @@ class NavigationEnvConfig(BaseEnvConfig):
     # configs for process reward for grounding and world modeling
     max_objects_in_state: int = 10
     use_state_reward: bool = False
-    grounding_reward_weight: float = 0.5
-    worldmodeling_reward_weight: float = 0.5
+    grounding_reward_weight: float = 2.0
+    worldmodeling_reward_weight: float = 2.0
 
     def config_id(self) -> str:
         """Generate a unique identifier for this configuration."""
