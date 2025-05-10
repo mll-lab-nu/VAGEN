@@ -56,6 +56,7 @@ class PrimitiveSkillService(BaseService):
         
         # List to track the processes
         self.processes = []
+        self.config=config
         
         # Set up logging
         logging.basicConfig(

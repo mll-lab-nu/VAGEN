@@ -24,6 +24,7 @@ class NavigationService(BaseService):
         self.device_status={device_id:set() for device_id in config.devices}
         self.environments = {}
         self.env_configs = {}
+        self.config=config
     
     def create_environments_batch(self, ids2configs: Dict[str, Any]) -> None:
         """

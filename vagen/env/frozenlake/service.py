@@ -24,7 +24,7 @@ class FrozenLakeService(BaseService):
         self.max_workers = config.get('max_workers', 10)
         self.environments = {}
         self.env_configs = {}
-    
+        self.config= config
     def create_environments_batch(self, ids2configs: Dict[Any, Any]) -> None:
         """
         Create multiple FrozenLake environments in parallel.
