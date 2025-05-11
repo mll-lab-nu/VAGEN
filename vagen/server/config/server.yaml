@@ -27,4 +27,7 @@ navigation:
 primitive_skill:
   max_workers: 48
   use_state_reward: ${use_state_reward}
+sokoban:
+  max_workers: 48
+  use_state_reward: ${use_state_reward}
 
