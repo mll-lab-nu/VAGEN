@@ -28,25 +28,31 @@ prompt_templates:
     grounding: |
       Compare the description of the current state with the groundtruth current state information.
       Answer YES if the description matches the current state information, or NO if it doesn't.
-      
-      Groundtruth Current State Information:
+
+      # Context
+      You are evaluating whether an agent's description accurately reflects the actual state. The description must be both correct overall AND specifically relevant to the important elements of the current state. Generic observations (like "player, box and target is on the ground") that don't capture the meaningful relationships and positions in the state are insufficient. The description should demonstrate understanding of the specific configuration and relationships that matter for decision-making.
+
+      # Groundtruth Current State Information:
       {state_information_dict}
-      
-      State Description:
+
+      # State Description:
       {natural_language_description}
-      
+
       Think step by step and end with your answer.
       Your answer should be within {max_tokens} tokens and in the format of <think>...</think><answer>YES</answer> or <think>...</think><answer>NO</answer>.
     worldmodeling: |
       Compare the prediction of the next state with the groundtruth next state information.
       Answer YES if the prediction accurately matches the next state information, or NO if it doesn't.
-      
-      Groundtruth Next State Information:
+
+      # Context
+      You are evaluating whether an agent's prediction of the next state is accurate. The prediction must be both correct overall AND specifically relevant to the important elements of the next state. Generic predictions that don't capture the meaningful changes, relationships, and positions in the state are insufficient. The prediction should demonstrate understanding of the specific configuration and relationships that will result from the action, showing how the state will transform in ways that matter for decision-making.
+
+      # Groundtruth Next State Information:
       {state_information_dict}
-      
-      Next State Prediction:
+
+      # Next State Prediction:
       {natural_language_description}
-      
+
       Think step by step and end with your answer.
       Your answer should be within {max_tokens} tokens and in the format of <think>...</think><answer>YES</answer> or <think>...</think><answer>NO</answer>.
   sokoban:

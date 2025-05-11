@@ -18,8 +18,8 @@ class SokobanEnvConfig(BaseEnvConfig):
     
     # configs for process reward for grounding and world modeling
     use_state_reward: bool = False
-    grounding_reward_weight: float = 2.0
-    worldmodeling_reward_weight: float = 2.0
+    grounding_reward_weight: float = 0.5
+    worldmodeling_reward_weight: float = 0.5
     
     def config_id(self) -> str:
         id_fields = ["dim_room", "max_steps", "num_boxes", "render_mode", "min_actions_to_succeed", "max_actions_per_step"]
