@@ -231,14 +231,6 @@ class SVGEnv(BaseEnv):
         
         return system_prompt(format=self.prompt_format) + '\n' + format_prompt_text
         
-    def compute_reward(self) -> float:
-        """Return the total reward collected so far.
-        
-        Returns:
-            Total reward
-        """
-        return self.total_reward
-        
     def close(self):
         """Close the environment and clean up resources."""
         pass

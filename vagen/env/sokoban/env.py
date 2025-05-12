@@ -14,7 +14,7 @@ from .prompt import (
     format_prompt
 )
 from .env_config import SokobanEnvConfig
-from vagen.env.utils.state_reward_utils import state_reward_wrapper
+from vagen.env.utils.state_reward_text_utils import env_state_reward_wrapper
 
 class SokobanEnv(BaseEnv):
     GRID_LOOKUP = {
@@ -73,7 +73,7 @@ class SokobanEnv(BaseEnv):
         self.total_reward = 0
         return self._render(init_obs=True), {}
     
-    @state_reward_wrapper
+    @env_state_reward_wrapper
     def step(self, action_str: str):
         rst=self.parse_func(
             response=action_str,
@@ -115,6 +115,9 @@ class SokobanEnv(BaseEnv):
                 break
         if metrics['turn_metrics']['action_is_valid'] and rst["format_correct"]:
             self.reward += self.config.format_reward
+            info["is_format_rewarded"] = True
+        else:
+            info["is_format_rewarded"] = False
         info["metrics"] = metrics
         metrics['turn_metrics']['action_is_effective'] = not np.array_equal(prev_player_position, self.env.player_position)
         self.total_reward += self.reward
@@ -128,9 +131,6 @@ class SokobanEnv(BaseEnv):
             add_example=True  # Always true for system prompt
         )
         return system_prompt() + "\n" + format_prompt
-    
-    def compute_reward(self):
-        return self.total_reward
     
     def close(self):
         self.env.close()

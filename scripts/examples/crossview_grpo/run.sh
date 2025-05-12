@@ -18,12 +18,13 @@ python3 -m vagen.trainer.main_ppo \
     algorithm.high_level_gamma=0.95 \
     data.train_files=data/crossview/train.parquet \
     data.val_files=data/crossview/test.parquet \
-    data.train_batch_size=64 \
+    data.train_batch_size=32 \
+    data.val_batch_size=256 \
     data.max_prompt_length=1024 \
     data.max_response_length=648 \
     data.max_trajectory_length=3600 \
     data.image_key=images \
-    data.truncation=error \
+    data.truncation=left \
     actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=True \
@@ -61,8 +62,8 @@ python3 -m vagen.trainer.main_ppo \
     trainer.experiment_name='grpo_crossview' \
     trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \
-    trainer.save_freq=100 \
-    trainer.test_freq=20 \
+    trainer.save_freq=150 \
+    trainer.test_freq=40 \
     trainer.total_training_steps=300 \
     rollout_manager.max_turns=1 \
     rollout_manager.window_size=5 \

@@ -4,6 +4,7 @@ from typing import Optional, List, Union
 
 @dataclass
 class FrozenLakeEnvConfig(BaseEnvConfig):
+    env_name: str = "frozenlake"
     desc: Optional[List[str]] = None  # environment map
     is_slippery: bool = False
     size: int = 4
@@ -15,7 +16,11 @@ class FrozenLakeEnvConfig(BaseEnvConfig):
     # "free_think", "no_think", "grounding", "worldmodeling", "grounding_worldmodeling"
     # "grounding_symbolic", "worldmodeling_symbolic", "grounding_worldmodeling_symbolic"
     # "grounding_structured", "worldmodeling_structured", "grounding_worldmodeling_structured"
+    
+    # configs for process reward for grounding and world modeling
     use_state_reward: bool = False
+    grounding_reward_weight: float = 0.5
+    worldmodeling_reward_weight: float = 0.5
     
     def config_id(self) -> str:
         id_fields=["is_slippery", "size", "p", "render_mode", "max_actions_per_step", "min_actions_to_succeed","format_reward"]

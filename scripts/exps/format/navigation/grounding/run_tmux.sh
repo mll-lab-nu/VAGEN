@@ -81,7 +81,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     data.max_response_length=256 \\
     data.max_trajectory_length=5000 \\
     data.image_key=images \\
-    data.truncation=error \\
+    data.truncation=left \\
     actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \\
     actor_rollout_ref.actor.optim.lr=1e-6 \\
     actor_rollout_ref.model.use_remove_padding=True \\

@@ -4,6 +4,7 @@ from dataclasses import dataclass, field, fields
 @dataclass
 class NavigationEnvConfig(BaseEnvConfig):
     """Configuration class for the Navigation environment."""
+    env_name: str = "navigation"
     resolution: int = 255
     eval_set: str = 'base'
     down_sample_ratio: float = 1.0
@@ -16,8 +17,13 @@ class NavigationEnvConfig(BaseEnvConfig):
     gpu_device: int = 0
     prompt_format: str = "free_think" 
     # "free_think", "no_think", "grounding", "worldmodeling", "grounding_worldmodeling"
-    use_state_reward: bool = False
+    
+    
+    # configs for process reward for grounding and world modeling
     max_objects_in_state: int = 10
+    use_state_reward: bool = False
+    grounding_reward_weight: float = 0.5
+    worldmodeling_reward_weight: float = 0.5
 
     def config_id(self) -> str:
         """Generate a unique identifier for this configuration."""

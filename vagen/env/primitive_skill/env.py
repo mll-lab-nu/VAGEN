@@ -10,7 +10,7 @@ from .maniskill.utils import build_env, handle_info, get_workspace_limits
 from .prompt import system_prompt, init_observation_template, action_template, format_prompt
 import vagen.env.primitive_skill.maniskill.env
 import random
-from vagen.env.utils.state_reward_utils import state_reward_wrapper
+from vagen.env.utils.state_reward_text_utils import env_state_reward_wrapper
 class PrimitiveSkillEnv(BaseEnv):
     def __init__(self, config: PrimitiveSkillEnvConfig):
         """
@@ -55,7 +55,7 @@ class PrimitiveSkillEnv(BaseEnv):
         self.steps = 0
         return obs, {}
     
-    @state_reward_wrapper
+    @env_state_reward_wrapper
     def step(self, action_str):
         """
         Take a step in the environment based on the agent's action.
@@ -71,7 +71,7 @@ class PrimitiveSkillEnv(BaseEnv):
                 - info: Dictionary containing metrics and parsed action data
         """
         reward = 0
-        rst = self.parse_func( response=action_str,
+        rst = self.parse_func(response=action_str,
             special_token_list=self.config.special_token_list,
             action_sep=self.config.action_sep,
             max_actions=self.config.max_actions_per_step)
@@ -111,7 +111,10 @@ class PrimitiveSkillEnv(BaseEnv):
         metrics["turn_metrics"]['action_is_valid'] = len(valid_actions) > 0 and len(valid_actions) == len(rst['actions'])
         if metrics["turn_metrics"]['action_is_valid'] and rst["format_correct"]:
             reward += self.config.format_reward
-        # Check for success
+            output_info["is_format_rewarded"] = True
+        else:
+            output_info["is_format_rewarded"] = False
+        
         if info.get('is_success', False):
             metrics["traj_metrics"]['success'] = True
         
@@ -181,7 +184,7 @@ class PrimitiveSkillEnv(BaseEnv):
         Returns:
             float: Total reward accumulated during the current episode
         """
-        return self._compute_reward() + self.total_reward - self.initial_reward - self.steps * 0.1
+        return self._compute_reward() - self.initial_reward - self.steps * 0.1
 
     
     def _render(self, init_obs=True, valid_actions=None,seed=42):

@@ -32,4 +32,5 @@ echo "Installing Frozenlake dependencies"
 pip install 'gymnasium'
 pip install "gymnasium[toy-text]"
 
+pip install together # together ai api for process reward
 echo "Installation complete, to install dependencies for other environments, refer to env/readme"

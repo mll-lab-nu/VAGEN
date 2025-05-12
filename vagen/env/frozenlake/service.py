@@ -6,6 +6,7 @@ from vagen.server.serial import serialize_observation
 from .env import FrozenLakeEnv
 from .env_config import FrozenLakeEnvConfig
 from ..base.base_service_config import BaseServiceConfig
+from vagen.env.utils.state_reward_text_utils import service_state_reward_wrapper
 
 class FrozenLakeService(BaseService):
     """
@@ -23,7 +24,7 @@ class FrozenLakeService(BaseService):
         self.max_workers = config.get('max_workers', 10)
         self.environments = {}
         self.env_configs = {}
-    
+        self.config= config
     def create_environments_batch(self, ids2configs: Dict[Any, Any]) -> None:
         """
         Create multiple FrozenLake environments in parallel.
@@ -122,6 +123,7 @@ class FrozenLakeService(BaseService):
         
         return results
     
+    @service_state_reward_wrapper
     def step_batch(self, ids2actions: Dict[Any, Any]) -> Dict[Any, Tuple[Dict, float, bool, Dict]]:
         """
         Take a step in multiple FrozenLake environments in parallel.
