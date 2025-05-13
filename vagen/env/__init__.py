@@ -61,11 +61,4 @@ try:
 except ImportError:
     pass
 
-try:
-    from .crossview import CrossViewEnv, CrossViewEnvConfig
-    REGISTERED_ENV["crossview"] = {
-        "env_cls": CrossViewEnv,
-        "config_cls": CrossViewEnvConfig
-    }
-except ImportError:
-    pass
+
