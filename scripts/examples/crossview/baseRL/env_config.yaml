@@ -2,15 +2,15 @@ env1:
     env_name: crossview
     env_config:
         split: train
-        render_mode: vision
-    train_size: 10000
+        type: baseRL
+    train_size: 20000
     test_size: 0
 
 env2:
     env_name: crossview
     env_config:
+        type: baseRL
         split: test
-        render_mode: vision
     train_size: 0
     test_size: 1200
     
