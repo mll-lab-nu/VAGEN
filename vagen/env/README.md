@@ -73,6 +73,7 @@ python vagen/server/server.py
 ```
 cd vagen/env/crossview
 git clone https://huggingface.co/datasets/yinbq/CrossViewQA
+git clone git@github.com:QinengWang-Aiden/MindCube_RL_Data.git
 cd CrossViewQA
 git lfs pull
 mkdir -p extracted_images
