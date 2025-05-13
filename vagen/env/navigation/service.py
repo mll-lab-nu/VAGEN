@@ -5,6 +5,7 @@ from vagen.env.navigation.env import NavigationEnv
 from vagen.env.navigation.env_config import NavigationEnvConfig
 from vagen.server.serial import serialize_observation
 from .service_config import NavigationServiceConfig
+from vagen.env.utils.state_reward_text_utils import service_state_reward_wrapper
 
 class NavigationService(BaseService):
     """
@@ -23,6 +24,8 @@ class NavigationService(BaseService):
         self.device_status={device_id:set() for device_id in config.devices}
         self.environments = {}
         self.env_configs = {}
+        self.config=config
+        print(f"[DEBUG] {self.config}")
     
     def create_environments_batch(self, ids2configs: Dict[str, Any]) -> None:
         """
@@ -115,6 +118,7 @@ class NavigationService(BaseService):
         
         return results
     
+    @service_state_reward_wrapper
     def step_batch(self, ids2actions: Dict[str, Any]) -> Dict[str, Tuple[Dict, float, bool, Dict]]:
         """
         Take a step in multiple Navigation environments in parallel.

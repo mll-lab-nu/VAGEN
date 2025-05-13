@@ -6,11 +6,11 @@ from gymnasium.utils import seeding
 from gymnasium.envs.toy_text.frozen_lake import FrozenLakeEnv as GymFrozenLakeEnv
 from vagen.env.utils.env_utils import NoLoggerWarnings, set_seed
 from vagen.env.utils.context_utils import convert_numpy_to_PIL
-from vagen.env.utils.parse_utils_4 import parse_function_map
+from vagen.env.utils.parse_utils import PARSE_FUNC_MAP
 from .prompt import system_prompt, init_observation_template, action_template, format_prompt
 from .env_config import FrozenLakeEnvConfig
 from .utils import generate_random_map, is_valid
-
+from vagen.env.utils.state_reward_text_utils import env_state_reward_wrapper
 class FrozenLakeEnv(BaseEnv):
     """
     FrozenLake Environment for training and evaluating language models as agents.
@@ -78,7 +78,7 @@ class FrozenLakeEnv(BaseEnv):
         # Store the format prompt function for later use
         self.format_prompt_func = format_prompt[self.config.prompt_format]
         
-        self.parse_func = parse_function_map[self.config.prompt_format]
+        self.parse_func = PARSE_FUNC_MAP[self.config.prompt_format]
 
     def reset(self, seed=None):
         """
@@ -103,6 +103,7 @@ class FrozenLakeEnv(BaseEnv):
         self.total_reward = 0
         return self._render(init_obs=True), {}
 
+    @env_state_reward_wrapper
     def step(self, action_str: str):
         """
         Take a step in the environment based on the agent's action.
@@ -179,6 +180,9 @@ class FrozenLakeEnv(BaseEnv):
         # Add format reward if actions were valid
         if metrics["turn_metrics"]['action_is_valid'] and rst["format_correct"]:
             self.reward += self.config.format_reward
+            info["is_format_rewarded"] = True
+        else:
+            info["is_format_rewarded"] = False
         
         
         # Check if position changed to determine if action was effective
@@ -208,15 +212,6 @@ class FrozenLakeEnv(BaseEnv):
         )
         
         return system_prompt() + '\n' + format_prompt_text
-
-    def compute_reward(self):
-        """
-        Get the cumulative reward for the episode.
-        
-        Returns:
-            float: Total reward accumulated during the current episode
-        """
-        return self.total_reward
 
     def close(self):
         self.gym_env.close()
@@ -325,13 +320,11 @@ class FrozenLakeEnv(BaseEnv):
         # Get dimensions of the grid
         nrow, ncol = self.gym_env.desc.shape
         
-        # Get player position
-        player_position = self._get_player_position()  # Already returns (row, col)
+
+        player_position = player_position = tuple(map(int, self._get_player_position()))
         
-        # Find target/goal position (marked as 'G')
         target_position = tuple(map(int, np.argwhere(self.gym_env.desc == b'G')[0]))
         
-        # Find all hole positions (marked as 'H')
         hole_positions = [tuple(map(int, pos)) for pos in np.argwhere(self.gym_env.desc == b'H')]
         
         return {

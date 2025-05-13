@@ -3,6 +3,7 @@ from dataclasses import dataclass, field, fields
 from .utils import generate_seeds
 @dataclass
 class SokobanEnvConfig(BaseEnvConfig):
+    env_name: str = "sokoban"
     dim_room: tuple = (6, 6)
     max_steps: int = 100
     num_boxes: int = 1
@@ -13,7 +14,12 @@ class SokobanEnvConfig(BaseEnvConfig):
     # "free_think", "no_think", "grounding", "worldmodeling", "grounding_worldmodeling"
     # "grounding_symbolic", "worldmodeling_symbolic", "grounding_worldmodeling_symbolic"
     # "grounding_structured", "worldmodeling_structured", "grounding_worldmodeling_structured"
-    use_accuracy_reward: bool = False
+    
+    
+    # configs for process reward for grounding and world modeling
+    use_state_reward: bool = False
+    grounding_reward_weight: float = 0.5
+    worldmodeling_reward_weight: float = 0.5
     
     def config_id(self) -> str:
         id_fields = ["dim_room", "max_steps", "num_boxes", "render_mode", "min_actions_to_succeed", "max_actions_per_step"]

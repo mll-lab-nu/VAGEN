@@ -20,7 +20,10 @@ class BaseService(ABC):
             ids2configs (Dict[Any, Any]): 
                 A dictionary where each key is an environment ID and the corresponding
                 value is the configuration for that environment.
-
+            id: a string
+            config: {"env_name": env_name, "env_config": env_config}
+                env_name: The name of the environment to create.
+                env_config: A dictionary containing the configuration parameters for the environment.
         Returns:
             None
 

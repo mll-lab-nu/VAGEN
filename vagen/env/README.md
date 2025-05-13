@@ -1,10 +1,5 @@
-## For Debugging
-```
-# Start a General Server in debug mode
-python vagen/server/server.py --debug
-```
-
 ## Environment Installation
+
 ### SVG
 ```
 pip install "bs4"
@@ -26,7 +21,7 @@ sudo apt-get update && sudo apt-get -y install libvulkan1
 sudo apt install vulkan-tools
 ```
 
-Below is outdated for backup purpose:
+Below is outdated information kept for backup purposes:
 ```
 # export CUDA_VISIBLE_DEVICES
 # For headless servers, additional setup is required:
@@ -57,7 +52,7 @@ pip3 install protobuf==3.20.3
 pip3 install "pydantic<2.0.0"
 pip3 uninstall frozenlist gradio murmurhash preshed spacy srsly thinc weasel aiosignal annotated-types blis catalogue cloudpathlib cymem
 
-#skip this two install if you already installed in navigation
+# skip this two install if you already installed in navigation
 apt-get install -y pciutils
 apt-get install -y xorg xserver-xorg-core xserver-xorg-video-dummy
 
@@ -81,11 +76,13 @@ env/service running time varies on different devices, you can benchmark current 
 # run env script
 ./scripts/benchmark/env_benchmark/frozenlake/run.sh
 ```
-### Start a service benchmark
+
+### Service test
 ```
-# start a server
+# start a server in a tmux session
 python vagen/server/server.py
 
 # run service script
 ./scripts/benchmark/service_benchmark/frozenlake/run.sh
 ```
+

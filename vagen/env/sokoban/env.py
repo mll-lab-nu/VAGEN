@@ -6,7 +6,7 @@ from typing import Dict
 from vagen.env.utils.env_utils import NoLoggerWarnings, set_seed
 from vagen.env.utils.context_utils import convert_numpy_to_PIL
 import numpy as np
-from vagen.env.utils.parse_utils_4 import parse_function_map
+from vagen.env.utils.parse_utils import PARSE_FUNC_MAP
 from .prompt import (
     system_prompt, 
     init_observation_template, 
@@ -14,6 +14,7 @@ from .prompt import (
     format_prompt
 )
 from .env_config import SokobanEnvConfig
+from vagen.env.utils.state_reward_text_utils import env_state_reward_wrapper
 
 class SokobanEnv(BaseEnv):
     GRID_LOOKUP = {
@@ -49,7 +50,7 @@ class SokobanEnv(BaseEnv):
         # Call the function with add_example=True for system prompt
     
         
-        self.parse_func = parse_function_map[self.config.prompt_format]
+        self.parse_func = PARSE_FUNC_MAP[self.config.prompt_format]
         
     def reset(self, seed=None):
         with NoLoggerWarnings():
@@ -72,6 +73,7 @@ class SokobanEnv(BaseEnv):
         self.total_reward = 0
         return self._render(init_obs=True), {}
     
+    @env_state_reward_wrapper
     def step(self, action_str: str):
         rst=self.parse_func(
             response=action_str,
@@ -113,6 +115,9 @@ class SokobanEnv(BaseEnv):
                 break
         if metrics['turn_metrics']['action_is_valid'] and rst["format_correct"]:
             self.reward += self.config.format_reward
+            info["is_format_rewarded"] = True
+        else:
+            info["is_format_rewarded"] = False
         info["metrics"] = metrics
         metrics['turn_metrics']['action_is_effective'] = not np.array_equal(prev_player_position, self.env.player_position)
         self.total_reward += self.reward
@@ -126,9 +131,6 @@ class SokobanEnv(BaseEnv):
             add_example=True  # Always true for system prompt
         )
         return system_prompt() + "\n" + format_prompt
-    
-    def compute_reward(self):
-        return self.total_reward
     
     def close(self):
         self.env.close()
@@ -183,30 +185,33 @@ class SokobanEnv(BaseEnv):
         
         Returns:
             Dict: Contains player position, box positions, target positions, and wall positions
-                as simple coordinate tuples
+                as simple coordinate tuples with standard Python types for JSON serialization.
         """
         # Extract positions from room_state and room_fixed
         room_state = self.env.room_state
         
         # Find player position (codes 5: player on floor, 6: player on target)
-        player_pos = tuple(np.argwhere(np.logical_or(room_state == 5, room_state == 6))[0])
+        player_pos = tuple(map(int, np.argwhere(np.logical_or(room_state == 5, room_state == 6))[0]))
         
         # Find box positions (codes 3: box on target, 4: box not on target)
-        box_positions = [tuple(pos) for pos in np.argwhere(np.logical_or(room_state == 3, room_state == 4))]
+        box_positions = [tuple(map(int, pos)) for pos in np.argwhere(np.logical_or(room_state == 3, room_state == 4))]
         
         # Find target positions (codes 2: empty target, 3: box on target, 6: player on target)
         # For targets, we need to check both room_state and room_fixed
-        target_positions = [tuple(pos) for pos in np.argwhere(self.env.room_fixed == 2)]
+        target_positions = [tuple(map(int, pos)) for pos in np.argwhere(self.env.room_fixed == 2)]
         
         # Find wall positions (code 0: wall)
-        wall_positions = [tuple(pos) for pos in np.argwhere(room_state == 0)]
+        wall_positions = [tuple(map(int, pos)) for pos in np.argwhere(room_state == 0)]
+        
+        # Convert grid size dimensions to standard Python integers
+        grid_size = tuple(map(int, room_state.shape))
         
         return {
             "player_position": player_pos,
             "box_positions": box_positions,
             "target_positions": target_positions,
             "wall_positions": wall_positions,
-            "grid_size":room_state.shape
+            "grid_size": grid_size
         }
     
     

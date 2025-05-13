@@ -8,6 +8,7 @@ from vagen.env.base.base_service import BaseService
 from vagen.env.base.base_service_config import BaseServiceConfig
 import hydra
 from omegaconf import DictConfig
+from vagen.server.llm_as_judge import wandb_run_context
 
 class BatchEnvServer:
     """
@@ -29,6 +30,7 @@ class BatchEnvServer:
         self.port = config.server.port
         self.debug = config.server.debug
         self.config=config
+        self.wandb_context = None
         
         # Dictionary to store services by environment type
         self.services = {}
@@ -400,6 +402,11 @@ class BatchEnvServer:
         if self.is_running:
             print("Server is already running")
             return
+        
+        if self.config.get("use_state_reward", False):
+            self.wandb_context = wandb_run_context()
+            self.wandb_context.__enter__()
+            print("Initialized wandb for LLM Judge")
             
         if background:
             self.server_thread = threading.Thread(target=self._run_server)
@@ -441,11 +448,17 @@ class BatchEnvServer:
         if self.server_thread and self.server_thread.is_alive():
             import requests
             requests.post(f"http://{self.host}:{self.port}/shutdown")
-                
+        
+        
+        if self.wandb_context:
+            self.wandb_context.__exit__(None, None, None)
+            self.wandb_context = None
+            print("Closed wandb for LLM Judge")
+            
         print("Server stopped")
 
 
-@hydra.main(version_base=None, config_path="./", config_name="server")
+@hydra.main(version_base=None, config_path="config", config_name="server")
 def main(cfg: DictConfig):
     """
     Main function to start the batch environment server.

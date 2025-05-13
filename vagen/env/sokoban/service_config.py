@@ -3,4 +3,4 @@ from dataclasses import dataclass, fields, field
 
 @dataclass
 class SokobanServiceConfig(BaseServiceConfig):
-    pass
+    use_state_reward: bool = False

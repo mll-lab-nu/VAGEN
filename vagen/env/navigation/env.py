@@ -5,10 +5,10 @@ import time
 import math
 from ai2thor.platform import CloudRendering
 from vagen.env.utils.context_utils import convert_numpy_to_PIL
-from vagen.env.utils.parse_utils_4 import parse_function_map
+from vagen.env.utils.parse_utils import PARSE_FUNC_MAP
 from .env_config import NavigationEnvConfig
 from .prompt import system_prompt,init_observation_template, action_template, format_prompt
-
+from vagen.env.utils.state_reward_text_utils import env_state_reward_wrapper
 
 class NavigationEnv(BaseEnv):
     """Navigation environment from embodied bench. """   
@@ -65,6 +65,8 @@ class NavigationEnv(BaseEnv):
             "fieldOfView": config.fov,
             "platform": CloudRendering,
             "gpu_device": config.get('gpu_device', 0),
+            "server_timeout": 300,
+            "server_start_timeout": 300.0,
         }
         
         # Initialize AI2-THOR controller
@@ -98,7 +100,7 @@ class NavigationEnv(BaseEnv):
         self.format_prompt_func = format_prompt[self.config.prompt_format]
         
         # Get the parse function based on the prompt format
-        self.parse_func = parse_function_map[self.config.prompt_format]
+        self.parse_func = PARSE_FUNC_MAP[self.config.prompt_format]
         
     def _get_dataset_path(self, eval_set):
         """Get the path to the dataset file."""
@@ -184,6 +186,7 @@ class NavigationEnv(BaseEnv):
         
         return self._render(init_obs=True), {}
     
+    @env_state_reward_wrapper
     def step(self, action_str: str):
         """Execute an action in the environment.
         
@@ -225,12 +228,10 @@ class NavigationEnv(BaseEnv):
         done = False
         info = {}
         info.update(rst)
-        
+            
+            
         # Execute valid actions
-        if metrics["turn_metrics"]["action_is_valid"]:
-            # Add format reward if actions were valid and format is correct
-            if rst.get("format_correct", True):
-                self.reward += self.config.format_reward
+        if metrics["turn_metrics"]["action_is_valid"] and rst.get("format_correct", True):
             
             for action in action_list:
                 action_lower = action.lower()
@@ -258,6 +259,12 @@ class NavigationEnv(BaseEnv):
                     done = True
                     break
         
+        if metrics['turn_metrics']['action_is_valid'] and rst.get("format_correct", True):
+            self.reward += self.config.format_reward
+            info["is_format_rewarded"] = True
+        else:
+            info["is_format_rewarded"] = False
+            
         # Check if the agent position has changed (action was effective)
         curr_pos = self.env.last_event.metadata["agent"]["position"]
         metrics['turn_metrics']['action_is_effective'] = curr_pos["x"] != prev_pos["x"] or curr_pos["z"] != prev_pos["z"]
@@ -386,14 +393,6 @@ class NavigationEnv(BaseEnv):
         
     
         return system_prompt(format=self.config.prompt_format) + '\n' + format_prompt_text
-    
-    def compute_reward(self):
-        """Compute the total reward for the episode.
-        
-        Returns:
-            Total reward
-        """
-        return self.total_reward
     
     def close(self):
         """Close the environment."""
