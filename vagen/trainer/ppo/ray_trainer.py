@@ -1070,6 +1070,9 @@ class RayPPOTrainer(object):
             val_metrics = self._validate()
             pprint(f'Initial validation metrics: {val_metrics}')
             logger.log(data=val_metrics, step=self.global_steps)
+            score_key = next((k for k in val_metrics.keys() if 'score' in k and k.startswith('val/')), 'score')
+            best_score = val_metrics[score_key]
+            print(f'best_score: {best_score}')
             if self.config.trainer.get('val_only', False):
                 return
 
@@ -1214,10 +1217,20 @@ class RayPPOTrainer(object):
                             val_metrics: dict = self._validate()
                         metrics.update(val_metrics)
 
-                    if self.config.trainer.save_freq > 0 and \
-                            self.global_steps % self.config.trainer.save_freq == 0:
-                        with _timer('save_checkpoint', timing_raw):
-                            self._save_checkpoint()
+                        # save the best model
+                        print(f'val_metrics: {val_metrics}')
+                        if val_metrics['score'] > best_score:
+                            score_key = next((k for k in val_metrics.keys() if 'score' in k and k.startswith('val/')), 'score')
+                            best_score = val_metrics[score_key]
+                            print(f'best_score: {best_score} at global_steps: {self.global_steps}')
+                            if self.config.trainer.save_freq > 0:
+                                with _timer('save_checkpoint', timing_raw):
+                                    self._save_checkpoint()
+
+                    # if self.config.trainer.save_freq > 0 and \
+                    #         self.global_steps % self.config.trainer.save_freq == 0:
+                    #     with _timer('save_checkpoint', timing_raw):
+                    #         self._save_checkpoint()
 
                 # collect metrics
                 metrics.update(compute_data_metrics(batch=batch, use_critic=self.use_critic))
@@ -1235,8 +1248,8 @@ class RayPPOTrainer(object):
                         val_metrics = self._validate()
                         pprint(f'Final validation metrics: {val_metrics}')
                         logger.log(data=val_metrics, step=self.global_steps)
-                    if self.config.trainer.save_freq > 0 and \
-                            (self.global_steps - 1) % self.config.trainer.save_freq != 0:
-                        with _timer('save_checkpoint', timing_raw):
-                            self._save_checkpoint()
+                    # if self.config.trainer.save_freq > 0 and \
+                    #         (self.global_steps - 1) % self.config.trainer.save_freq != 0:
+                    #     with _timer('save_checkpoint', timing_raw):
+                    #         self._save_checkpoint()
                     return

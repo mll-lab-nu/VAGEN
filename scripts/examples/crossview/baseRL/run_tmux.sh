@@ -65,6 +65,7 @@ tmux send-keys -t "$TRAIN_SESSION" "set -x" C-m
 
 # First create the dataset
 tmux send-keys -t "$TRAIN_SESSION" "python -m vagen.env.create_dataset \\
+    --force_gen \\
     --yaml_path \"$SCRIPT_DIR/env_config.yaml\" \\
     --train_path \"data/$EXPERIMENT_NAME/train.parquet\" \\
     --test_path \"data/$EXPERIMENT_NAME/test.parquet\"" C-m
@@ -95,7 +96,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \\
     actor_rollout_ref.rollout.tensor_model_parallel_size=2 \\
     actor_rollout_ref.rollout.name=vllm \\
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.2 \\
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.5 \\
     actor_rollout_ref.rollout.enable_chunked_prefill=False \\
     actor_rollout_ref.rollout.enforce_eager=False \\
     actor_rollout_ref.rollout.free_cache_engine=False \\
@@ -121,13 +122,14 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     trainer.save_freq=60 \\
     trainer.test_freq=20 \\
     trainer.total_training_steps=120 \\
+    trainer.remove_previous_ckpt_in_save=True \\
     rollout_manager.max_turns=1 \\
     rollout_manager.window_size=5 \\
     rollout_manager.use_multi_turn_reward=False \\
     rollout_manager.use_loss_mask=True \\
     rollout_manager.use_gae_mask=True \\
     trainer.val_before_train=True \\
-    trainer.val_generations_to_log_to_wandb=8 \\
+    trainer.val_generations_to_log_to_wandb=1200 \\
     rollout_manager.n_trajectory=8 \\
     2>&1 | tee $EXPERIMENT_NAME.log" C-m
 
