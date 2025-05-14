@@ -75,9 +75,9 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     algorithm.high_level_gamma=1.0 \\
     data.train_files=data/$EXPERIMENT_NAME/train.parquet \\
     data.val_files=data/$EXPERIMENT_NAME/test.parquet \\
-    data.train_batch_size=64 \\
+    data.train_batch_size=32 \\
     data.max_prompt_length=1024 \\
-    data.max_response_length=256 \\
+    data.max_response_length=512 \\
     data.max_trajectory_length=3600 \\
     data.image_key=images \\
     data.truncation=left \\
@@ -121,17 +121,14 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     trainer.save_freq=60 \\
     trainer.test_freq=20 \\
     trainer.total_training_steps=120 \\
-    rollout_manager.max_turns=3 \\
+    rollout_manager.max_turns=1 \\
     rollout_manager.window_size=5 \\
     rollout_manager.use_multi_turn_reward=False \\
     rollout_manager.use_loss_mask=True \\
     rollout_manager.use_gae_mask=True \\
     trainer.val_before_train=True \\
     trainer.val_generations_to_log_to_wandb=8 \\
-    rollout_manager.n_trajectory=2 \\
-    rollout_manager.use_service=True \\
-    rollout_manager.timeout=300 \\
-    rollout_manager.base_url=\"http://localhost:$PORT\" \\
+    rollout_manager.n_trajectory=8 \\
     2>&1 | tee $EXPERIMENT_NAME.log" C-m
 
 echo "-----------------------------------------"

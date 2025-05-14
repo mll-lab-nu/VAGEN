@@ -85,7 +85,9 @@ class CrossViewEnv(BaseEnv):
         format_checking_result = self.format_checking(llm_raw_response)[0]
         parsed_answer=self.answer_extraction(llm_raw_response)
         gt_answer = self.current_data["gt_answer"]
-        success = parsed_answer.lower()==gt_answer.lower() and format_checking_result
+        if parsed_answer is None:
+            format_checking_result = False
+        success = format_checking_result and parsed_answer.lower()==gt_answer.lower()
         reward=0.0
         if format_checking_result:
             reward+=1.0
@@ -103,8 +105,9 @@ class CrossViewEnv(BaseEnv):
             },
             "llm_raw_response": llm_raw_response,
         }
-        
-        return obs, reward, self.done, info
+        self.done=success
+        obs=self._create_observation()
+        return obs, reward, True, info
     
     def close(self):
         """Close the environment"""

@@ -1,6 +1,6 @@
 from typing import Optional
 import re
-from .MindCube_RL_Data import extraction_base_sft_no_think, extraction_base_sft_think,extraction_baseRL,extraction_cogmap,extraction_cogmap_and_reasoning,extraction_ICLRL,extraction_reasoning
+from vagen.env.crossview.MindCube_RL_Data import extraction_base_sft_no_think, extraction_base_sft_think,extraction_baseRL,extraction_cogmap,extraction_cogmap_and_reasoning,extraction_ICLRL,extraction_reasoning
 
 ANSWER_EXTRACTION_MAP={
     "baseRL": extraction_baseRL.extract_answer,
