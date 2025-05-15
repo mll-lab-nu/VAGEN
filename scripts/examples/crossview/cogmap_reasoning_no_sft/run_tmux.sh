@@ -94,9 +94,9 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     actor_rollout_ref.actor.fsdp_config.param_offload=True \\
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=True \\
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \\
-    actor_rollout_ref.rollout.tensor_model_parallel_size=2 \\
+    actor_rollout_ref.rollout.tensor_model_parallel_size=4 \\
     actor_rollout_ref.rollout.name=vllm \\
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.3 \\
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.5 \\
     actor_rollout_ref.rollout.enable_chunked_prefill=False \\
     actor_rollout_ref.rollout.enforce_eager=False \\
     actor_rollout_ref.rollout.free_cache_engine=False \\
@@ -117,7 +117,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     trainer.logger=['console','wandb'] \\
     trainer.project_name='vagen_crossview' \\
     trainer.experiment_name=$EXPERIMENT_NAME \\
-    trainer.n_gpus_per_node=2 \\
+    trainer.n_gpus_per_node=4 \\
     trainer.nnodes=1 \\
     trainer.save_freq=60 \\
     trainer.test_freq=20 \\
@@ -128,7 +128,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     rollout_manager.use_multi_turn_reward=False \\
     rollout_manager.use_loss_mask=True \\
     rollout_manager.use_gae_mask=True \\
-    trainer.val_before_train=False \\
+    trainer.val_before_train=True \\
     trainer.val_generations_to_log_to_wandb=1200 \\
     trainer.val_only=False \\
     rollout_manager.n_trajectory=8 \\

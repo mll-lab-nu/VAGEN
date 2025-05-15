@@ -714,7 +714,10 @@ class RayPPOTrainer(object):
         if has_images:
             columns = ["step"]
             for i in range(len(samples)):
-                columns.extend([f"input_{i+1}", f"output_{i+1}", f"score_{i+1}"]) if len(question_ids)==0 else columns.extend([f"input_{i+1}", f"output_{i+1}", f"score_{i+1}", f"question_id_{i+1}"])
+                if len(question_ids) == 0:
+                    columns.extend([f"input_{i+1}", f"output_{i+1}", f"score_{i+1}"])
+                else:
+                    columns.extend([f"input_{i+1}", f"output_{i+1}", f"score_{i+1}", f"question_id_{i+1}"])
                 columns.extend([f"image_{i+1}_{j+1}" for j in range(max_images_per_sample)])
         else:
             if len(question_ids) == 0:
@@ -1087,7 +1090,7 @@ class RayPPOTrainer(object):
         # perform validation before training
         # currently, we only support validation using the reward_function.
         if self.val_reward_fn is not None and self.config.trainer.get('val_before_train', True):
-            val_metrics = self._validate(map_to_id=True)
+            val_metrics = self._validate(map_to_id=self.config.trainer.get('val_only', False))
             pprint(f'Initial validation metrics: {val_metrics}')
             logger.log(data=val_metrics, step=self.global_steps)
             score_key = next((k for k in val_metrics.keys() if 'score' in k and k.startswith('val/')), 'score')
@@ -1095,6 +1098,8 @@ class RayPPOTrainer(object):
             print(f'best_score: {best_score}')
             if self.config.trainer.get('val_only', False):
                 return
+        else:
+            best_score = float('-inf')
 
         # we start from step 1
         self.global_steps += 1
