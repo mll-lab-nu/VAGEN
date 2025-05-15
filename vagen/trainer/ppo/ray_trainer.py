@@ -677,23 +677,26 @@ class RayPPOTrainer(object):
         outputs=[]
         scores=[]
         images=[]
-        
+        question_ids=[]
+
         for item in log_rst:
             inputs.append(item['config_id'])
             outputs.append(item['output_str'])
             scores.append(item['metrics']['score'])
             images.append(item['image_data'])
+            if 'question_id' in item:
+                question_ids.append(item['question_id'])
         
         
         
         # Handle the case where images might not be provided
         if images is None:
-            samples = list(zip(inputs, outputs, scores))
+            samples = list(zip(inputs, outputs, scores)) if len(question_ids)==0 else list(zip(inputs, outputs, scores, question_ids))
             has_images = False
             max_images_per_sample = 0
         else:
             # Here, images is expected to be a list of lists, where each inner list contains images for one sample
-            samples = list(zip(inputs, outputs, scores, images))
+            samples = list(zip(inputs, outputs, scores, images)) if len(question_ids)==0 else list(zip(inputs, outputs, scores, question_ids, images))
             has_images = True
             # Find maximum number of images in any sample
             max_images_per_sample = max(len(img_list) if isinstance(img_list, (list, tuple)) else 1 for img_list in images)
@@ -711,10 +714,13 @@ class RayPPOTrainer(object):
         if has_images:
             columns = ["step"]
             for i in range(len(samples)):
-                columns.extend([f"input_{i+1}", f"output_{i+1}", f"score_{i+1}"])
+                columns.extend([f"input_{i+1}", f"output_{i+1}", f"score_{i+1}"]) if len(question_ids)==0 else columns.extend([f"input_{i+1}", f"output_{i+1}", f"score_{i+1}", f"question_id_{i+1}"])
                 columns.extend([f"image_{i+1}_{j+1}" for j in range(max_images_per_sample)])
         else:
-            columns = ["step"] + sum([[f"input_{i+1}", f"output_{i+1}", f"score_{i+1}"] for i in range(len(samples))], [])
+            if len(question_ids) == 0:
+                columns = ["step"] + sum([[f"input_{i+1}", f"output_{i+1}", f"score_{i+1}"] for i in range(len(samples))], [])
+            else:
+                columns = ["step"] + sum([[f"input_{i+1}", f"output_{i+1}", f"score_{i+1}", f"question_id_{i+1}"] for i in range(len(samples))], [])
 
         if not hasattr(self, 'validation_table'):
             # Initialize the table on first call
@@ -729,8 +735,12 @@ class RayPPOTrainer(object):
         
         for sample in samples:
             if has_images:
-                input_text, output_text, score, sample_images = sample
-                row_data.extend([input_text, output_text, score])
+                if len(question_ids)==0:
+                    input_text, output_text, score, sample_images = sample
+                    row_data.extend([input_text, output_text, score])
+                else:
+                    input_text, output_text, score, question_id, sample_images = sample
+                    row_data.extend([input_text, output_text, score, question_id])
                 
                 # Handle if sample_images is a single image or list of images
                 if not isinstance(sample_images, (list, tuple)):
@@ -755,7 +765,7 @@ class RayPPOTrainer(object):
         wandb.log({"val/generations": new_table}, step=self.global_steps)
         self.validation_table = new_table
     
-    def _validate(self):
+    def _validate(self, map_to_id=False):
         print(f"[DEBUG] validation at global step {self.global_steps} begins")
         # Lists to collect samples for the table
     
@@ -777,6 +787,7 @@ class RayPPOTrainer(object):
                 )
         
         validation_rst=[]
+        env_id_2_question_id = {} # for CrossViewEnv
         
         
         for batch_dict in self.val_dataloader:
@@ -799,9 +810,18 @@ class RayPPOTrainer(object):
                     for i in range(len(batch))
                 ]
             
-            self.test_rollout_manager.reset(env_configs)
+            initial_obs, initial_info = self.test_rollout_manager.reset(env_configs)
             self.test_rollout_manager.rollout_loop()
             micro_validation_rst = self.test_rollout_manager.recording_to_log() # data source == inputs in our current setting, outputs=whole trjecotry
+            
+            if map_to_id:
+                for env_id, info in initial_info.items():
+                    env_id_2_question_id[env_id] = info["question_id"]
+                for item in micro_validation_rst:
+                    env_id = item.get("env_id")
+                    if env_id in env_id_2_question_id:
+                        item["question_id"] = env_id_2_question_id[env_id]
+
             validation_rst.extend(micro_validation_rst)
         
         self._maybe_log_val_generations_to_wandb(validation_rst)
@@ -1067,7 +1087,7 @@ class RayPPOTrainer(object):
         # perform validation before training
         # currently, we only support validation using the reward_function.
         if self.val_reward_fn is not None and self.config.trainer.get('val_before_train', True):
-            val_metrics = self._validate()
+            val_metrics = self._validate(map_to_id=True)
             pprint(f'Initial validation metrics: {val_metrics}')
             logger.log(data=val_metrics, step=self.global_steps)
             score_key = next((k for k in val_metrics.keys() if 'score' in k and k.startswith('val/')), 'score')
@@ -1219,8 +1239,8 @@ class RayPPOTrainer(object):
 
                         # save the best model
                         print(f'val_metrics: {val_metrics}')
-                        if val_metrics['score'] > best_score:
-                            score_key = next((k for k in val_metrics.keys() if 'score' in k and k.startswith('val/')), 'score')
+                        score_key = next((k for k in val_metrics.keys() if 'score' in k and k.startswith('val/')), 'score')
+                        if val_metrics[score_key] > best_score:
                             best_score = val_metrics[score_key]
                             print(f'best_score: {best_score} at global_steps: {self.global_steps}')
                             if self.config.trainer.save_freq > 0:

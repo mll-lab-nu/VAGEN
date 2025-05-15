@@ -78,11 +78,11 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     data.val_files=data/$EXPERIMENT_NAME/test.parquet \\
     data.train_batch_size=32 \\
     data.max_prompt_length=1024 \\
-    data.max_response_length=512 \\
+    data.max_response_length=1536 \\
     data.max_trajectory_length=3600 \\
     data.image_key=images \\
     data.truncation=left \\
-    actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \\
+    actor_rollout_ref.model.path=/home/ubuntu/Work/MindCube/MindCube-Qwen2.5VL-cogmap-and-reasoning \\
     actor_rollout_ref.actor.optim.lr=1e-6 \\
     actor_rollout_ref.model.use_remove_padding=True \\
     actor_rollout_ref.actor.ppo_mini_batch_size=32 \\
@@ -94,9 +94,9 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     actor_rollout_ref.actor.fsdp_config.param_offload=True \\
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=True \\
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \\
-    actor_rollout_ref.rollout.tensor_model_parallel_size=2 \\
+    actor_rollout_ref.rollout.tensor_model_parallel_size=4 \\
     actor_rollout_ref.rollout.name=vllm \\
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.5 \\
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.3 \\
     actor_rollout_ref.rollout.enable_chunked_prefill=False \\
     actor_rollout_ref.rollout.enforce_eager=False \\
     actor_rollout_ref.rollout.free_cache_engine=False \\
@@ -107,7 +107,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     actor_rollout_ref.rollout.temperature=0.7 \\
     critic.optim.lr=1e-5 \\
     critic.model.use_remove_padding=True \\
-    critic.model.path=Qwen/Qwen2.5-VL-3B-Instruct \\
+    critic.model.path=/home/ubuntu/Work/MindCube/MindCube-Qwen2.5VL-cogmap-and-reasoning \\
     critic.model.enable_gradient_checkpointing=True \\
     critic.ppo_micro_batch_size_per_gpu=1 \\
     critic.model.fsdp_config.param_offload=False \\
@@ -121,7 +121,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     trainer.nnodes=1 \\
     trainer.save_freq=60 \\
     trainer.test_freq=20 \\
-    trainer.total_training_steps=120 \\
+    trainer.total_training_steps=180 \\
     trainer.remove_previous_ckpt_in_save=True \\
     rollout_manager.max_turns=1 \\
     rollout_manager.window_size=5 \\
@@ -130,6 +130,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     rollout_manager.use_gae_mask=True \\
     trainer.val_before_train=True \\
     trainer.val_generations_to_log_to_wandb=1200 \\
+    trainer.val_only=False \\
     rollout_manager.n_trajectory=8 \\
     2>&1 | tee $EXPERIMENT_NAME.log" C-m
 

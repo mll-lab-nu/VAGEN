@@ -358,11 +358,11 @@ def format_checking_pipeline(answer_str: str) -> Tuple[bool, int]:
     """
     Check the format of the answer string.
     """
-    # 0. extract the response from the text
-    response = extract_response_from_text(answer_str)
-    if response is None:
-        print(f"No response found in the answer string")
-        return False, 0 # "No response found in the answer string"
+    # # 0. extract the response from the text
+    # response = extract_response_from_text(answer_str)
+    # if response is None:
+    #     print(f"No response found in the answer string")
+    #     return False, 0 # "No response found in the answer string"
     
     # 1. extract the json from the text
     json_obj = extract_json_from_text(answer_str)
