@@ -121,7 +121,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     trainer.nnodes=1 \\
     trainer.save_freq=60 \\
     trainer.test_freq=20 \\
-    trainer.total_training_steps=180 \\
+    trainer.total_training_steps=220 \\
     trainer.remove_previous_ckpt_in_save=True \\
     rollout_manager.max_turns=1 \\
     rollout_manager.window_size=5 \\
