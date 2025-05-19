@@ -20,7 +20,7 @@ from PIL import Image
 from typing import Dict, Any, Optional, Tuple, List
 from pathlib import Path
 
-class AlfEnv(BaseEnv):
+class ALFWorldEnv(BaseEnv):
     """ALFRED environment for training and evaluating language models as agents.
     
     This environment implements a text-based world where an agent must complete
