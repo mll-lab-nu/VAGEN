@@ -308,8 +308,8 @@ class InferenceRolloutService(BaseRollout):
             else:
                 return obj
         
-        # Get final rewards for all environments
-        reward_results = self.env_client.compute_reward_batch(list(self.envs.keys()))
+        # Get final rewards for all environments (no longer used)
+        # reward_results = self.env_client.compute_reward_batch(list(self.envs.keys()))
         
         for env_id in self.envs:
             # Get environment configuration ID
@@ -350,12 +350,28 @@ class InferenceRolloutService(BaseRollout):
             # Get completion status
             done = self.env_states[env_id]["done"]
             
-            # Get final score/reward
-            score = convert_numpy_types(reward_results[env_id])
+            # ======= Key Modifications =======
+            # Accumulate rewards from each step
+            accumulated_rewards = sum(self.env_states[env_id]["rewards"])
+            
+            # Collect grounding and worldmodeling rewards
+            all_turn_metrics = self.env_states[env_id]["metrics"].get("turn_metrics", {})
+            grounding_rewards = all_turn_metrics.get("grounding_reward", [])
+            worldmodeling_rewards = all_turn_metrics.get("worldmodeling_reward", [])
+            
+            # Calculate total rewards
+            total_grounding_reward = sum(grounding_rewards) if isinstance(grounding_rewards, list) else grounding_rewards
+            total_worldmodeling_reward = sum(worldmodeling_rewards) if isinstance(worldmodeling_rewards, list) else worldmodeling_rewards
+            
+            # Total score = step rewards + grounding rewards + worldmodeling rewards
+            total_score = accumulated_rewards + total_grounding_reward + total_worldmodeling_reward
+            
+            print(f"[SCORE DEBUG] env_id={env_id}, steps={accumulated_rewards}, grounding={total_grounding_reward}, worldmodeling={total_worldmodeling_reward}, total={total_score}")
+            # ======= End of Modifications =======
             
             # Collect metrics
             metrics = {
-                "score": score,
+                "score": convert_numpy_types(total_score),  # Use our calculated total score
                 "done": 1.0 if done else 0.0,
                 "step": convert_numpy_types(step_count),
             }

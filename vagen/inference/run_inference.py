@@ -7,21 +7,17 @@ import wandb
 import pandas as pd
 import numpy as np
 from datetime import datetime
-import pandas as pd
-import numpy as np
-from datetime import datetime
 from typing import Dict, List, Any
 from collections import defaultdict
 
 from vagen.inference.model_interface.factory_model import ModelFactory
 from vagen.rollout.inference_rollout.inference_rollout_service import InferenceRolloutService
-from vagen.inference.utils.logging import maybe_log_val_generations_to_wandb
+from vagen.inference.utils.logging import log_results_to_wandb
 
 logger = logging.getLogger(__name__)
 
 def parse_args():
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description="Run inference with models")
     parser = argparse.ArgumentParser(description="Run inference with models")
     
     parser.add_argument("--inference_config_path", type=str, required=True,
@@ -57,7 +53,7 @@ def load_environment_configs_from_parquet(val_files_path: str) -> List[Dict]:
     
     return env_configs
 
-def setup_wandb(model_name: str,wandb_path_name: str,  model_config: Dict, inference_config: Dict) -> None:
+def setup_wandb(model_name: str, wandb_path_name: str, model_config: Dict, inference_config: Dict) -> None:
     """Initialize wandb run."""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_name = f"{model_name}_{wandb_path_name}_inference"
@@ -71,59 +67,6 @@ def setup_wandb(model_name: str,wandb_path_name: str,  model_config: Dict, infer
             "inference_config": inference_config
         }
     )
-
-def log_results_to_wandb(results: List[Dict], inference_config: Dict) -> None:
-    """Log results to wandb with improved organization."""
-    # Log generations table
-    val_generations_to_log = inference_config.get('val_generations_to_log_to_wandb', 10)
-    maybe_log_val_generations_to_wandb(results, val_generations_to_log, 0)
-    
-    # Extract metrics and log by example index
-    for metric_name in {k for r in results for k in r['metrics'].keys()}:
-        values = []
-        for i, r in enumerate(results):
-            if metric_name in r['metrics'] and isinstance(r['metrics'][metric_name], (int, float)):
-                values.append([i, float(r['metrics'][metric_name])])
-        
-        if not values:
-            continue
-        
-        table = wandb.Table(data=values, columns=["example_idx", "value"])
-        wandb.log({
-            f"eval/{metric_name}_by_example": wandb.plot.line(
-                table, 
-                "example_idx", 
-                "value",
-                title=f"{metric_name} by Example Index"
-            )
-        })
-    
-    # Log summary metrics
-    summary_metrics = {}
-    
-    # Basic counts and rates
-    summary_metrics['summary/total_examples'] = len(results)
-    summary_metrics['summary/num_successful'] = sum(1 for r in results if r['metrics'].get('success', 0) > 0)
-    summary_metrics['summary/num_done'] = sum(1 for r in results if r['metrics'].get('done', 0) > 0)
-    
-    if len(results) > 0:
-        summary_metrics['summary/success_rate'] = summary_metrics['summary/num_successful'] / len(results)
-        summary_metrics['summary/completion_rate'] = summary_metrics['summary/num_done'] / len(results)
-    
-    # Calculate means and standard deviations
-    metric_values = defaultdict(list)
-    for result in results:
-        for metric_name, value in result['metrics'].items():
-            if isinstance(value, (int, float)):
-                metric_values[metric_name].append(float(value))
-    
-    for metric_name, values in metric_values.items():
-        if len(values) > 0:
-            summary_metrics[f'summary/{metric_name}_mean'] = np.mean(values)
-            if len(values) > 1:
-                summary_metrics[f'summary/{metric_name}_std'] = np.std(values)
-    
-    wandb.log(summary_metrics)
 
 def main():
     """Main entry point for inference."""
@@ -174,8 +117,7 @@ def main():
             service.run(max_steps=inference_config.get('max_steps', 10))
             results = service.recording_to_log()
             
-            # Log results to wandb
-            # Log results to wandb
+            # Log results to wandb (using the combined logging function)
             if inference_config.get('use_wandb', True):
                 log_results_to_wandb(results, inference_config)
             
@@ -189,10 +131,24 @@ def main():
             print(f"Successful: {success_count}")
             print(f"Completed: {done_count}")
             
-            # Print individual results
-            print("\nIndividual results:")
-            for i, result in enumerate(results):
-                print(f"Environment {i}: score={result['metrics'].get('score', 0)}, done={result['metrics'].get('done', 0)}, steps={result['metrics'].get('step', 0)}")
+            # Collect metrics by config_id for display
+            metrics_by_config = defaultdict(dict)
+            for item in results:
+                config_id = item['config_id']
+                for k, v in item['metrics'].items():
+                    if isinstance(v, (int, float)):
+                        if k not in metrics_by_config[config_id]:
+                            metrics_by_config[config_id][k] = []
+                        metrics_by_config[config_id][k].append(v)
+            
+            # Calculate and print averages for each config_id
+            print("\nMetrics by Config ID:")
+            for config_id, metrics in metrics_by_config.items():
+                print(f"  {config_id}:")
+                for k, values in metrics.items():
+                    if values:
+                        avg = sum(values) / len(values)
+                        print(f"    {k}: {avg:.4f}")
             
         except Exception as e:
             logger.error(f"Error during inference for model {model_name}: {str(e)}")
@@ -204,7 +160,7 @@ def main():
                 service.close()
             
             # Finish wandb run
-            if wandb.run:
+            if wandb.run is not None:
                 wandb.finish()
     
     logger.info("Inference pipeline completed")

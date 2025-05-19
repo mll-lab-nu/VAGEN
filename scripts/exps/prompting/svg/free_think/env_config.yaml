@@ -3,7 +3,7 @@ env1:
     env_config:
         prompt_format: free_think
         split: train
-        dino_weight: 0.0
+        dino_weight: 0.001
         structural_weight: 0.0
         dreamsim_weight: 5.0
         device:

@@ -12,6 +12,12 @@ models:
   #   model_name: qwen/qwen2.5-vl-3b-instruct:free
   #   max_tokens: 150
   #   temperature: 0.7
+  
+  # qwen_vl_72b:
+  #   provider: together
+  #   model_name: Qwen/Qwen2.5-VL-72B-Instruct
+  #   max_tokens: 150
+  #   temperature: 0.7
 
   # VLM-R1-MATH:
   #   provider: vllm
@@ -19,15 +25,15 @@ models:
   #   max_tokens: 150
   #   temperature: 0.7
 
-  qwen_vl_3b_api:
-    provider: routerapi
-    model_name: qwen/qwen2.5-vl-3b-instruct:free
-    max_tokens: 150
-    temperature: 0.7
+  # qwen_vl_3b_api:
+  #   provider: routerapi
+  #   model_name: qwen/qwen2.5-vl-3b-instruct:free
+  #   max_tokens: 150
+  #   temperature: 0.7
 
-  # gpt4o:
-  #   provider: openai
-  #   model_name: gpt-4o
+  # claude_3_sonnet:
+  #   provider: claude
+  #   model_name: claude-3-7-sonnet-20250219
   #   max_tokens: 150
   #   temperature: 0.7
   #   presence_penalty: 0.0
@@ -35,17 +41,27 @@ models:
   #   max_retries: 3
   #   timeout: 60
 
-  claude_3_sonnet:
-    provider: claude
-    model_name: claude-3-7-sonnet-20250219
-    max_tokens: 150
-    temperature: 0.7
+  # claude_3_sonnet:
+  #   provider: claude
+  #   model_name: claude-3-7-sonnet-20250219
+  #   max_tokens: 150
+  #   temperature: 0.7
+  #   presence_penalty: 0.0
+  #   frequency_penalty: 0.0
+  #   max_retries: 3
+  #   timeout: 60
+
+  # claude_3_sonnet:
+  #   provider: claude
+  #   model_name: claude-3-7-sonnet-20250219
+  #   max_tokens: 150
+  #   temperature: 0.7
   
-  # Gemini_2.5_flask:
-  #     provider: gemini
-  #     model_name: gemini-2.5-flash-preview-04-17
-  #     max_tokens: 150
-  #     temperature: 0.7
+  Gemini_2.0_flask:
+      provider: gemini
+      model_name: gemini-2.0-flash
+      max_tokens: 150
+      temperature: 0.7
   
   # # Batch processing configuration example
   # claude_3_haiku_batch:
