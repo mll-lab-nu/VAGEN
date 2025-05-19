@@ -124,10 +124,10 @@ Env_feedback: Success"""
         
     base_prompt_text = """You are a home robot and perform navigation tasks according to instructions.
 Actions you can take: moveahead, moveback, moveright, moveleft, rotateright, rotateleft, lookup, lookdown. 
-moveahead: Move forward by 0.4 meter
-moveback: Move backward by 0.4 meter
-moveright: Move rightward by 0.4 meter
-moveleft: Move leftward by 0.4 meter
+moveahead: Move forward by some distance
+moveback: Move backward by some distance
+moveright: Move rightward by some distance
+moveleft: Move leftward by some distance
 rotateright: Rotate to the right by 90 degrees
 rotateleft: Rotate to the left by 90 degrees
 lookup: Tilt the camera upward by 30 degrees

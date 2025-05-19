@@ -12,7 +12,6 @@ from vagen.env.utils.state_reward_text_utils import env_state_reward_wrapper
 
 class NavigationEnv(BaseEnv):
     """Navigation environment from embodied bench. """   
-    SUCCESS_THRESHOLD = 1.5
 
     ValidEvalSets = [
         'base', 'common_sense', 'complex_instruction', 'visual_appearance', 'long_horizon'
@@ -51,7 +50,8 @@ class NavigationEnv(BaseEnv):
         """
         super().__init__()
         self.config = config
-        
+        self.success_threshold = self.config.success_threshold
+        self.step_length = self.config.step_length
         # Environment setup
         self.resolution = config.resolution
         self.thor_config = {
@@ -292,13 +292,13 @@ class NavigationEnv(BaseEnv):
             action_index: Index of the action to execute
         """
         if action_index == 1:  # Move forward by 0.25 meter
-            self._last_event = self.env.step(action="MoveAhead", moveMagnitude=0.5)
+            self._last_event = self.env.step(action="MoveAhead", moveMagnitude=self.step_length)
         elif action_index == 2:  # Move backward by 0.25 meter
-            self._last_event = self.env.step(action="MoveBack", moveMagnitude=0.5)
+            self._last_event = self.env.step(action="MoveBack", moveMagnitude=self.step_length)
         elif action_index == 3:  # Move right by 0.25 meter
-            self._last_event = self.env.step(action="MoveRight", moveMagnitude=0.5)
+            self._last_event = self.env.step(action="MoveRight", moveMagnitude=self.step_length)
         elif action_index == 4:  # Move left by 0.25 meter
-            self._last_event = self.env.step(action="MoveLeft", moveMagnitude=0.5)
+            self._last_event = self.env.step(action="MoveLeft", moveMagnitude=self.step_length)
         elif action_index == 5:  # Rotate clockwise by 90 degrees
             self._last_event = self.env.step(action="RotateRight", degrees=90)
         elif action_index == 6:  # Rotate counterclockwise by 90 degrees
@@ -321,7 +321,7 @@ class NavigationEnv(BaseEnv):
             (agent_position["x"] - target_position["x"])**2 +
             (agent_position["z"] - target_position["z"])**2
         )
-        success = (dist <= self.SUCCESS_THRESHOLD)
+        success = (dist <= self.success_threshold)
         return float(success), dist
     
     def _render(self, init_obs=True):
