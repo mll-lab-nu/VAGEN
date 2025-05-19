@@ -1,0 +1,10 @@
+env1:
+    env_name: sokoban  
+    env_config:
+        render_mode: vision
+        prompt_format: grounding_worldmodeling
+        use_state_reward: True
+        grounding_reward_weight: 100
+        worldmodeling_reward_weight: 100
+    train_size: 10000  
+    test_size: 48

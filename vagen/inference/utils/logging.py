@@ -1,8 +1,8 @@
-import wandb
-import logging
-from typing import List, Dict, Any, Optional
-import numpy as np
+from typing import List, Dict, Any
 from collections import defaultdict
+import logging
+import wandb
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ class ValidationTableManager:
         global_steps: int = 0  # Default to 0 for inference
     ) -> None:
         """Log a table of validation samples."""
-        if generations_to_log == 0:
+        if generations_to_log <= 0:
             return
             
         if wandb.run is None:
@@ -97,109 +97,69 @@ class ValidationTableManager:
                 input_text, output_text, score = sample
                 table.add_data(input_text, output_text, score)
         
-        # Log the table
-        wandb.log({"val/generations": table})
+        # Log the table with a dedicated 'table' section
+        wandb.log({"table": table}, step=global_steps)
 
+
+def log_rst_to_metrics_dict(rst, mode='val'):
+    """
+    Convert raw results to metrics dictionary organized by config_id.
+    
+    Args:
+        rst: List of result dictionaries from rollout
+        mode: Mode prefix for metrics (default: 'val')
+    
+    Returns:
+        Dictionary with metrics
+    """
+    metric_dict = {}
+    metrics_by_config_id = defaultdict(lambda: defaultdict(list))
+    
+    for item in rst:
+        config_id = item["config_id"]
+        for k, v in item["metrics"].items():
+            # Skip complex data types that can't be averaged
+            if isinstance(v, (list, dict, tuple)) or v is None:
+                continue
+            
+            # Ensure we only collect numeric values
+            if isinstance(v, (int, float)):
+                metrics_by_config_id[config_id][k].append(v)
+    
+    # For each config_id, calculate average metrics
+    for config_id, metrics in metrics_by_config_id.items():
+        for k, values in metrics.items():
+            if values:  # Check if we have any values to calculate mean
+                # Calculate mean safely (avoid numpy for potentially mixed types)
+                try:
+                    metric_dict[f'{mode}/{k}/{config_id}'] = sum(values) / len(values)
+                except (TypeError, ValueError):
+                    # If we can't calculate mean, skip this metric
+                    logger.warning(f"Could not calculate mean for metric {k} with values {values}")
+                    continue
+    
+    return metric_dict
 
 # Global instance for maintaining table state across calls
 validation_table_manager = ValidationTableManager()
 
+def maybe_log_val_generations_to_wandb(log_rst: List[Dict[str, Any]], generations_to_log: int = 10, global_steps: int = 0):
+    """Log a table of validation samples with multiple images per sample to wandb"""
+    validation_table_manager.log_generations_to_wandb(log_rst, generations_to_log, global_steps)
 
-def maybe_log_val_generations_to_wandb(
-    results: List[Dict[str, Any]], 
-    generations_to_log: int, 
-    global_step: int = 0  # Default to 0 for inference
-) -> None:
+def log_results_to_wandb(results: List[Dict], inference_config: Dict, global_steps: int = 0) -> None:
     """
-    Log validation generation examples to wandb as a table.
-    Uses the global ValidationTableManager to maintain state.
-    """
-    validation_table_manager.log_generations_to_wandb(
-        log_rst=results,
-        generations_to_log=generations_to_log,
-        global_steps=global_step
-    )
-
-
-def aggregate_metrics_for_summary(
-    results: List[Dict[str, Any]]
-) -> Dict[str, Any]:
-    """
-    Create a summary dictionary with mean, std, min, max for all numeric metrics.
+    Log results to wandb with same format as trainer.
     
     Args:
-        results: List of result dictionaries
-        
-    Returns:
-        Dictionary of summary metrics
+        results: List of result dictionaries from rollout
+        inference_config: Inference configuration dictionary
+        global_steps: Global step counter (default: 0)
     """
-    summary = {}
+    # Log metrics by config_id
+    metric_dict = log_rst_to_metrics_dict(results, mode='val')
+    wandb.log(metric_dict, step=global_steps)
     
-    # Basic counts
-    summary['summary/total_examples'] = len(results)
-    summary['summary/num_successful'] = sum(1 for r in results if r['metrics'].get('success', 0) > 0)
-    summary['summary/num_done'] = sum(1 for r in results if r['metrics'].get('done', 0) > 0)
-    
-    # Calculate rates
-    if len(results) > 0:
-        summary['summary/success_rate'] = summary['summary/num_successful'] / len(results)
-        summary['summary/completion_rate'] = summary['summary/num_done'] / len(results)
-    
-    # Collect all metrics across examples
-    metrics_values = defaultdict(list)
-    for result in results:
-        for metric_name, value in result['metrics'].items():
-            if isinstance(value, (int, float)):
-                metrics_values[metric_name].append(float(value))
-    
-    # Calculate statistics for each metric
-    for metric_name, values in metrics_values.items():
-        if values:
-            summary[f'summary/{metric_name}_mean'] = float(np.mean(values))
-            if len(values) > 1:
-                summary[f'summary/{metric_name}_std'] = float(np.std(values))
-            summary[f'summary/{metric_name}_min'] = float(np.min(values))
-            summary[f'summary/{metric_name}_max'] = float(np.max(values))
-    
-    return summary
-
-
-def log_metrics_by_example(
-    results: List[Dict[str, Any]]
-) -> Dict[str, List[Dict[str, Any]]]:
-    """
-    Organize metrics by example for line plots.
-    
-    Args:
-        results: List of result dictionaries
-        
-    Returns:
-        Dictionary mapping metric names to lists of (example_idx, value) pairs
-    """
-    # Get all unique metric names
-    all_metric_names = set()
-    for result in results:
-        all_metric_names.update(result['metrics'].keys())
-    
-    # Collect values for each metric across all examples
-    metrics_data = {}
-    for metric_name in all_metric_names:
-        # Skip non-numeric metrics
-        sample_value = next((r['metrics'].get(metric_name) for r in results 
-                           if metric_name in r['metrics']), None)
-        if not isinstance(sample_value, (int, float)):
-            continue
-        
-        # Collect (example_idx, value) pairs
-        data_points = []
-        for idx, result in enumerate(results):
-            if metric_name in result['metrics']:
-                data_points.append({
-                    'example_idx': idx,
-                    'value': float(result['metrics'][metric_name])
-                })
-        
-        if data_points:
-            metrics_data[f'eval/{metric_name}'] = data_points
-    
-    return metrics_data
+    # Log generations table
+    val_generations_to_log = inference_config.get('val_generations_to_log_to_wandb', 10)
+    maybe_log_val_generations_to_wandb(results, val_generations_to_log, global_steps)
