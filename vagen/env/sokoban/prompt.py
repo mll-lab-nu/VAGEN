@@ -7,11 +7,6 @@ Symbols (If image is provided there are no symbols):
 Rules:
 1. Push boxes (can't pull).
 2. Avoid walls.
-3. You must clearly describe the position relationships between:
-   - Player and Boxes (e.g., "The box is Up from my position")
-   - Boxes and Targets (e.g., "The target is Right of the box")
-4. For diagonal positions, always use two directional terms (e.g., "Up and Right", "Down and Left") that match the available actions.
-5. Focus only on the relevant positioning of player, boxes, and targets - avoid unnecessary details.
 Actions you can take: Left, Down, Right, Up."""
 
 def init_observation_template(**kwargs):
@@ -33,73 +28,73 @@ FORMAT_CONFIGS = {
     "free_think": {
         "format": "<think>...</think><answer>...</answer>",
         "description": "You should first give your reasoning, and then your answer.",
-        "example": "<think>I see that the box is Up and Right from my position, and the target is further Right from the box. I need to move Up first to align with the box's row, then move Right to position myself behind it, and finally push the box Right toward the target.</think><answer>Up{action_sep}Right{action_sep}Right</answer>"
+        "example": "<think><reasoning>The box is one step below me, and the target is two steps below me, I need to go down then push the box down to the target.</reasoning></think><answer>Down{action_sep}Down</answer>"
     },
     
     "no_think": {
         "format": "<answer>...</answer>",
         "description": "You should provide only your answer.",
-        "example": "<answer>Up{action_sep}Right{action_sep}Right</answer>"
+        "example": "<answer>Down{action_sep}Down</answer>"
     },
     
     "grounding": {
         "format": "<think><observation>...</observation><reasoning>...</reasoning></think><answer>...</answer>",
         "description": "You should first give the description of your observation, then your reasoning, and finally your answer.",
-        "example": "<think><observation>The box is Up and Right from my position. The target is further Right from the box. There are no walls blocking the path.</observation><reasoning>I need to move Up first to align with the box's row, then move Right to position myself behind the box, and finally push the box Right toward the target.</reasoning></think><answer>Up{action_sep}Right{action_sep}Right</answer>"
+        "example": "<think><observation>The box is below the player and the target is below the box</observation><reasoning>I need to go down then push the box down to the target</reasoning></think><answer>Down{action_sep}Down</answer>"
     },
     
     "worldmodeling": {
         "format": "<think><reasoning>...</reasoning><prediction>...</prediction></think><answer>...</answer>",
         "description": "You should first give your reasoning, then predict the next state, and finally your answer.",
-        "example": "<think><reasoning>The box is Up and Left from my position, and the target is further Up from the box. I need to move Up to align with the box's column, then move Left to position myself behind it, and finally push the box Up toward the target.</reasoning><prediction>After my moves, I will be positioned Down from the box, and the box will be on the target.</prediction></think><answer>Up{action_sep}Left{action_sep}Up</answer>"
+        "example": "<think><reasoning>I need to go right then push the box down to the target.</reasoning><prediction>The player will be above the box, the target and box will be at the same place.</prediction></think><answer>Right{action_sep}Down</answer>"
     },
     
     "grounding_worldmodeling": {
         "format": "<think><observation>...</observation><reasoning>...</reasoning><prediction>...</prediction></think><answer>...</answer>",
         "description": "You should first give the description of your observation, then your reasoning, then predict the next state, and finally your answer.",
-        "example": "<think><observation>The box is Down and Right from my position. The target is Down from the box. There are no walls blocking the path.</observation><reasoning>I need to first move Down to align with the box's column, then move Right to position myself behind the box, and finally push the box Down toward the target.</reasoning><prediction>After my moves, I will be positioned Up from the box, and the box will be on the target.</prediction></think><answer>Down{action_sep}Right{action_sep}Down</answer>"
+        "example": "<think><observation>The box is below the player and the target is below the box</observation><reasoning>I need to go down then push the box down to the target</reasoning><prediction>The player will be above the box, the target and box will be at the same place.</prediction></think><answer>Down{action_sep}Down</answer>"
     },
     
     "grounding_symbolic": {
         "format": "<think><observation>...</observation><reasoning>...</reasoning></think><answer>...</answer>",
         "description": "You should first give the description of your observation as a grid, then your reasoning, and finally your answer.",
         "additional_info": "The state should be represented as a grid using the symbols: # Wall | _ Floor | O Target | X Box | P You | √ Box on Target | S You on Target.",
-        "example": "<think><observation>####\n#P_#\n#_X#\n#__#\n#O_#</observation><reasoning>I observe that the box is Down and Right from my position, and the target is Down from the box. I need to move Down to align with the box's row, then move Right to get behind it, and finally push it Down toward the target.</reasoning></think><answer>Down{action_sep}Right{action_sep}Down</answer>"
+        "example": "<think><observation>####\n#_P#\n#__#\n#_X#\n#_O#</observation><reasoning>I need to go down then push the box down to reach the target</reasoning></think><answer>Down{action_sep}Down</answer>"
     },
     
     "worldmodeling_symbolic": {
         "format": "<think><reasoning>...</reasoning><prediction>...</prediction></think><answer>...</answer>",
         "description": "You should first give your reasoning, then predict the next state as a grid, and finally your answer.",
         "additional_info": "The state should be represented as a grid using the symbols: # Wall | _ Floor | O Target | X Box | P You | √ Box on Target | S You on Target.",
-        "example": "<think><reasoning>The box is Right and Up from my position, and the target is further Up from the box. I need to move Up to align with the box's column, then move Right to get behind it, and finally push it Up toward the target.</reasoning><prediction>####\n#_√#\n#_P#\n#__#\n####</prediction></think><answer>Up{action_sep}Right{action_sep}Up</answer>"
+        "example": "<think><reasoning>I need to go down then push the box down to reach the target</reasoning><prediction>####\n#__#\n#__#\n#_P#\n#_√#</prediction></think><answer>Down{action_sep}Down</answer>"
     },
     
     "grounding_worldmodeling_symbolic": {
         "format": "<think><observation>...</observation><reasoning>...</reasoning><prediction>...</prediction></think><answer>...</answer>",
         "description": "You should first give the description of your observation as a grid, then your reasoning, then predict the next state as a grid, and finally your answer.",
         "additional_info": "The observation and state should be represented as grids using the symbols: # Wall | _ Floor | O Target | X Box | P You | √ Box on Target | S You on Target.",
-        "example": "<think><observation>####\n#O_#\n#_X#\n#__#\n#_P#</observation><reasoning>The box is Up and Right from my position, and the target is further Up from the box. I need to move Up to align with the box's row, then move Right to get behind it, and finally push it Up toward the target.</reasoning><prediction>####\n#√_#\n#_P#\n#__#\n#__#</prediction></think><answer>Up{action_sep}Right{action_sep}Up</answer>"
+        "example": "<think><observation>####\n#_P#\n#__#\n#_X#\n#_O#</observation><reasoning>I need to go down then push the box down to reach the target</reasoning><prediction>####\n#__#\n#__#\n#_P#\n#_√#</prediction></think><answer>Down{action_sep}Down</answer>"
     },
     
     "grounding_structured": {
         "format": "<think><observation>...</observation><reasoning>...</reasoning></think><answer>...</answer>",
         "description": "You should first give the description of your observation, then your reasoning, and finally your answer.",
         "additional_info": "The observation should be in the format of {\"player\":(row,column),\"box\":(row,column),\"target\":(row,column)}",
-        "example": "<think><observation>{{\"player\":(4,2),\"box\":(2,3),\"target\":(1,3)}}</observation><reasoning>Based on the coordinates, the box is Up and Right from my position, and the target is Up from the box. I need to move Up to align with the box's column, then move Right to get behind the box, and finally push it Up to the target.</reasoning></think><answer>Up{action_sep}Up{action_sep}Right{action_sep}Up</answer>"
+        "example": "<think><observation>{{\"player\":(1,2),\"box\":(3,2),\"target\":(4,2)}}</observation><reasoning>I need to go down then push the box down to the target</reasoning></think><answer>Down{action_sep}Down</answer>"
     },
     
     "worldmodeling_structured": {
         "format": "<think><reasoning>...</reasoning><prediction>...</prediction></think><answer>...</answer>",
         "description": "You should first give your reasoning, then predict the next state, and finally your answer.",
         "additional_info": "The prediction should be in the format of {\"player\":(row,column),\"box\":(row,column),\"target\":(row,column)}",
-        "example": "<think><reasoning>The box is Left and Down from my position, and the target is further Left from the box. I need to move Left to align with the box's row, then move Down to get behind it, and finally push it Left toward the target.</reasoning><prediction>{{\"player\":(3,2),\"box\":(3,1),\"target\":(3,1)}}</prediction></think><answer>Left{action_sep}Down{action_sep}Left</answer>"
+        "example": "<think><reasoning>I need to go down then push the box down to the target</reasoning><prediction>{{\"player\":(3,2),\"box\":(4,2),\"target\":(4,2)}}</prediction></think><answer>Down{action_sep}Down</answer>"
     },
     
     "grounding_worldmodeling_structured": {
         "format": "<think><observation>...</observation><reasoning>...</reasoning><prediction>...</prediction></think><answer>...</answer>",
         "description": "You should first give the description of your observation, then your reasoning, then predict the next state, and finally your answer.",
         "additional_info": "The observation and prediction should be in the format of {\"player\":(row,column),\"box\":(row,column),\"target\":(row,column)}",
-        "example": "<think><observation>{{\"player\":(2,1),\"box\":(1,3),\"target\":(1,4)}}</observation><reasoning>Based on the coordinates, the box is Up and Right from my position, and the target is Right from the box. I need to move Up first, then Right to position myself behind the box, and finally push it Right to reach the target.</reasoning><prediction>{{\"player\":(1,3),\"box\":(1,4),\"target\":(1,4)}}</prediction></think><answer>Up{action_sep}Right{action_sep}Right</answer>"
+        "example": "<think><observation>{{\"player\":(1,2),\"box\":(3,2),\"target\":(4,2)}}</observation><reasoning>I need to go down then push the box down to the target</reasoning><prediction>{{\"player\":(3,2),\"box\":(4,2),\"target\":(4,2)}}</prediction></think><answer>Down{action_sep}Down</answer>"
     },
 }
 
