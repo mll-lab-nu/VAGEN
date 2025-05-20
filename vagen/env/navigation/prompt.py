@@ -4,27 +4,31 @@ FORMAT_CONFIGS = {
     "free_think": {
         "description": "You should first give your thought process, and then your answer.",
         "format": "<think>...</think><answer>...</answer>",
-        "example": """<think>I can see from the sight the target object is right in the top left of me, I will move forward, then move left to access it.</think><answer>moveahead{action_sep}moveahead{action_sep}moveahead{action_sep}moveleft{action_sep}moveleft</answer>"""
+        "example": """<think>The target object is directly ahead and to the right of me. There are no obstacles blocking my path to reach it. I'll move forward multiple times and then right to approach the target.</think><answer>moveahead{action_sep}moveahead{action_sep}moveahead{action_sep}moveright{action_sep}moveahead</answer>"""
     },
+    
     "no_think": {
         "description": "You should provide only your answer.",
         "format": "<answer>...</answer>",
-        "example": """<answer>moveahead{action_sep}moveahead{action_sep}moveahead{action_sep}moveleft{action_sep}moveleft</answer>"""
+        "example": """<answer>moveahead{action_sep}moveahead{action_sep}moveahead{action_sep}moveright{action_sep}moveahead</answer>"""
     },
+    
     "grounding": {
         "description": "You should first give your thought process with your observation and reasoning, and finally your answer.\nThe observation should be described in detail about what you see in the environment.",
         "format": "<think><observation>...</observation><reasoning>...</reasoning></think><answer>...</answer>",
-        "example": """e.g. <think><observation>I am in a living room. There is a couch to my left, a TV in front of me, and a doorway to the kitchen on my right. The target object, a vase, appears to be on a shelf near the kitchen doorway.</observation><reasoning>I need to move toward the kitchen doorway to reach the vase. I'll move forward to get closer to the center of the room, then turn right and move toward the kitchen.</reasoning></think><answer>moveahead{action_sep}moveahead{action_sep}rotateright{action_sep}moveahead{action_sep}moveahead</answer>"""
+        "example": """<think><observation>The target vase is to my right. There's a clear path with no obstacles between me and the target.</observation><reasoning>Since the target is to my right and there are no obstacles, I'll move forward multiple times and then right to reach it.</reasoning></think><answer>moveahead{action_sep}moveahead{action_sep}moveahead{action_sep}moveright{action_sep}moveahead</answer>"""
     },
+    
     "worldmodeling": {
-        "description": "You should first give your thought process with reasoning and prediction of next state,  then your answer.\nThe prediction should describe what you expect to see after your actions are executed.",
+        "description": "You should first give your thought process with reasoning and prediction of next state, then your answer.\nThe prediction should describe what you expect to see after your actions are executed.",
         "format": "<think><reasoning>...</reasoning><prediction>...</prediction></think><answer>...</answer>",
-        "example": """<think><reasoning>I can see the kitchen doorway to my right, and I need to go there to find the refrigerator. I'll turn right and move forward.</reasoning><prediction>I am now in the kitchen doorway. In front of me is the kitchen counter with a sink. To the left I can see a refrigerator against the wall. There's a kitchen island in the center of the room.</prediction></think><answer>rotateright{action_sep}moveahead{action_sep}moveahead</answer>"""
+        "example": """<think><reasoning>The refrigerator is to my right. There are no obstacles in my path. I'll move forward multiple times and then right to reach it.</reasoning><prediction>After my movements, the refrigerator should be directly in front of me with no obstacles between us.</prediction></think><answer>moveahead{action_sep}moveahead{action_sep}moveahead{action_sep}rotateright{action_sep}moveahead</answer>"""
     },
+    
     "grounding_worldmodeling": {
         "description": "You should first give your thought process with the your observation, reasoning, and prediction of next state, then your answer.\nBoth the observation and prediction should describe what you see or expect to see in the environment.",
         "format": "<think><observation>...</observation><reasoning>...</reasoning><prediction>...</prediction></think><answer>...</answer>",
-        "example": """<think><observation>I am at the entrance of a bedroom. There is a bed to the left, a desk with a lamp on the right, and a closet straight ahead. The target object, a book, appears to be on the desk.</observation><reasoning>I need to move toward the desk to reach the book. I'll turn right and move forward.</reasoning><prediction>I am now standing in front of the desk. The desk has a lamp, a computer, and several books on it. The target book is within reach on the right side of the desk.</prediction></think><answer>rotateright{action_sep}moveahead{action_sep}moveahead</answer>"""
+        "example": """<think><observation>The target book is on the desk to my right. There are no obstacles blocking my path to the desk.</observation><reasoning>Since the target is to my right with no obstacles, I'll move forward multiple times then right to reach it.</reasoning><prediction>After my movements, the book should be directly in front of me with no obstacles between us.</prediction></think><answer>moveahead{action_sep}moveahead{action_sep}moveahead{action_sep}moveright{action_sep}moveahead</answer>"""
     }
 }
 
@@ -138,7 +142,10 @@ Achieve the human instruction: +10.0
 The instruction will be provided with each observation. Look at the image carefully and navigate to complete the instruction.
 Hints:
 1. You can take multiple actions at a time, in most cases, if you find the target object is far away from you, you can call moveahead, moveleft and move right multiple times.
-2. If you find yourself seems to be stuck, you can lookdown to see if there's any object above or below you, you can also rotate to see if there's any object behind you."""
+2. If you find yourself seems to be stuck, you can lookdown to see if there's any object above or below you, you can also rotate to see if there's any object behind you.
+3. You must clearly specify the target object's position relative to you using directional terms (ahead, left, right).
+4. When describing your navigation plan, use the same directional terms as the available actions (moveahead, moveleft, moveright).
+"""
     return base_prompt_text + '\n' + example
 
 # init_observation_template and action_template from your second code block
