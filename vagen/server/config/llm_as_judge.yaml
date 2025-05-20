@@ -79,6 +79,21 @@ prompt_templates:
       - Since 2 < 4, player is to the LEFT of the box
       - Correct description: "The box is Up and Right of the player" or "The Player is Down and Left of the box"
 
+      Example: # State Description: The player is at the bottom left corner, the box is at the bottom right corner, and the target is at the bottom right corner.
+      - This should be No, because it does not contain the relationship between player and box, or box and target, or player and target.
+
+      Exmaple: # State Description: The player is at the left side of the screen, the box is in the middle, and the target is at the right side of the screen.
+      - This should be No, because it does not contain the relationship between player and box, or box and target, or player and target.
+
+      Example: # State Description: The player is at the left side of the box and the target is at the right side of the box.
+      - This should be No, because it does not contain the relationship between player and box, or box and target, or player and target.
+
+      Example: {'player_position': (1, 4), 'box_positions': [(2, 3)], 'target_positions': [(4, 3)], 'wall_positions': [(0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (1, 0), (1, 1), (1, 2), (1, 5), (2, 0), (2, 1), (2, 2), (2, 5), (3, 0), (3, 1), (3, 2), (3, 5), (4, 0), (4, 1), (4, 2), (4, 5), (5, 0), (5, 1), (5, 2), (5, 3), (5, 4), (5, 5)], 'grid_size': (6, 6)}  # State Description: The player is to the left of the box and the target is to the right of the box.
+      - This should be No, because 4 > 3 indicate player is right to the box, and 3 = 3 indicate target and box are same vertically
+
+      Exmaple: {'player_position': (4, 2), 'box_positions': [(3, 1)], 'target_positions': [(2, 4)], 'wall_positions': [(0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (1, 0), (1, 1), (1, 2), (1, 3), (1, 5), (2, 0), (2, 1), (2, 5), (3, 0), (3, 1), (3, 2), (3, 5), (4, 0), (4, 1), (4, 2), (4, 5), (5, 0), (5, 1), (5, 2), (5, 3), (5, 4), (5, 5)], 'grid_size': (6, 6)}  # State Description: The player is to the down of the box and the target is to the up of the box.
+      - This should be Yes, because 4 > 3 indicate player is down to the box, and 2 < 3 indicate target is up to the box
+
       # Groundtruth Current State Information:
       {state_information_dict}
 
@@ -114,6 +129,15 @@ prompt_templates:
       - Since 3 > 2, player will be BELOW the box
       - Since 2 < 4, player will be to the LEFT of the box
       - Correct prediction: "After my move, the box will be Up and Right of me" or "I will be positioned Down and Left of the box"
+
+      Exmaple: # Next State Prediction: The player will move up to the top left corner.
+      - This should be No, because it does not include relationship between player and box or target
+
+      Example: {'player_position': (4, 3), 'box_positions': [(3, 3)], 'target_positions': [(1, 3)], 'wall_positions': [(0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (1, 0), (1, 5), (2, 0), (2, 4), (2, 5), (3, 0), (3, 1), (3, 2), (3, 4), (3, 5), (4, 0), (4, 1), (4, 2), (4, 4), (4, 5), (5, 0), (5, 1), (5, 2), (5, 3), (5, 4), (5, 5)], 'grid_size': (6, 6)} # Next State Prediction: The player will go up, then push the box up to the target.
+      - This should be Yes, because 4 > 3, the player is below box, could push box up. And 3 < 1, box is below target, push box up would closer to target.
+
+      Example: {'player_position': (3, 1), 'box_positions': [(2, 2)], 'target_positions': [(1, 1)], 'wall_positions': [(0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (1, 0), (1, 5), (2, 0), (2, 4), (2, 5), (3, 0), (3, 3), (3, 4), (3, 5), (4, 0), (4, 1), (4, 2), (4, 3), (4, 4), (4, 5), (5, 0), (5, 1), (5, 2), (5, 3), (5, 4), (5, 5)], 'grid_size': (6, 6)} # Next State Prediction: The player will be to the left of the box, and the box will be to the left of the target.
+      - This should be No, because for box and target: 2 > 1, box is to the right of target
 
       # Groundtruth Next State Information:
       {state_information_dict}
@@ -152,6 +176,18 @@ prompt_templates:
       - Since 1 < 2, player is to the LEFT of the goal
       - Correct description: "The goal is Down and Right of the player"
 
+      Example: # State Description: The player is on the right side of the frozen lake.
+      - This description should be No, because it does not contain positional relationship between Player and Goal
+
+      Example: # State Description: The player is on the right side of the grid.
+      - This description should be No, because it does not contain positional relationship between Player and Goal
+
+      Example: {'player_position': (3, 0), 'target_position': (3, 3), 'hole_positions': [(0, 0), (2, 3)], 'grid_size': (4, 4)}  # State Description: The player is on the left the target
+      - This description should be Yes, because it contain correct positional relationship (0 < 3)
+
+      Example: {'player_position': (3, 0), 'target_position': (3, 3), 'hole_positions': [(0, 0), (2, 3)], 'grid_size': (4, 4)}  # State Description: The player is on the above the target
+      - This description should be No, since 3 = 3, they are same horizontally
+
       If there's a hole at (2,1) directly between player and goal, the description should mention this obstacle.
 
       # Groundtruth Current State Information:
@@ -187,10 +223,22 @@ prompt_templates:
         - If col1 < col2: The first object is to the LEFT of the second object
         - If col1 > col2: The first object is to the RIGHT of the second object
       
-      Example: If after the move, player will be at (2,2) and goal is at (3,3):
-      - Since 2 < 3, player will be ABOVE the goal
-      - Since 2 < 3, player will be to the LEFT of the goal
-      - Correct prediction: "After my move, the goal will be Down and Right of me"
+      Example: If current state, player is at (2,2) and goal is at (3,3):
+      - Since 2 < 3, player is ABOVE the goal
+      - Since 2 < 3, player is to the LEFT of the goal
+      - Correct prediction: "Player will move Down to reach the goal" or "Player will move Right to reach the goal"
+
+      Example: {'player_position': (1, 2), 'target_position': (1, 3), 'hole_positions': [(2, 3), (3, 2)], 'grid_size': (4, 4)}  # Next State Prediction: The player will move right.
+      - This should be No, beacuse it does not contain the information of goal
+
+      Example: {'player_position': (2, 0), 'target_position': (3, 3), 'hole_positions': [(0, 1), (1, 3), (2, 1), (2, 3)], 'grid_size': (4, 4)} # Next State Prediction: The player will move to the right to reach the goal.
+      - This should be Yes, because 0 < 3, move right will closer to goal
+
+      Example: {'player_position': (2, 0), 'target_position': (3, 3), 'hole_positions': [(0, 1), (1, 3), (2, 1), (2, 3)], 'grid_size': (4, 4)} # Next State Prediction: The player will move to the down to reach the goal.
+      - This should be Yes, because 2 < 3, move down will closer to goal
+
+      Example: {'player_position': (2, 2), 'target_position': (3, 2), 'hole_positions': [(0, 1), (1, 3), (2, 1), (2, 3)], 'grid_size': (4, 4)} # Next State Prediction: The player will move to the right to reach the goal.
+      - This should be No, because 2 = 2, move right will far away from goal
 
       If there's a hole in the planned path, the prediction should acknowledge this risk.
 
@@ -228,6 +276,22 @@ prompt_templates:
       3. The overall spatial relationships and object identifications should be correct
       4. If the description includes a dict-formatted state information, that's good but not required
 
+      Example: # Groundtruth Next State Information: {'red_cube_position': (24, 71, 20), 'green_cube_position': (6, -119, 20), 'purple_cube_position': (-91, -78, 20)}  # State Description: {'red_cube':(24, 71, 20), 'green_cube':(6, -119, 20), 'purple_cube':(24, 71, 20)}
+      - This should be No, because the purple cube's position is far away from groundtruth
+
+      Example: # Groundtruth Next State Information: {'apple_position': (-499, -533, 220), 'drawer_position': (-500, -537, 200)}  # State Description: {'apple':(-500,-537,220), 'drawer':(-500,-537,200)}
+      - This should be Yes, becuase the x and y coordinates of apple is close to groundtruth within 10 units
+
+      Example: # Groundtruth Next State Information: {'apple_position': (-355, -190, 37), 'drawer_position': (-500, -537, 200)}  # State Description: ...
+      - This should be No, because the prediction "..." indicate nothing
+
+      Exmaple: {'left_target_position': (80, -100, 0), 'right_target_position': (80, 100, 0), 'red_cube_position': (83, -101, 20), 'green_cube_position': (78, 102, 20)}  # State Description: {'red_cube':(80,-100,0), 'green_cube':(78,102,20}}
+      - This should be Yes, becuase for this target task, if red_cube or green_cube is on target_position, should also be true
+
+      Exmaple: # Groundtruth Next State Information: {'left_target_position': (80, -100, 0), 'right_target_position': (80, 100, 0), 'red_cube_position': (-16, -78, 20), 'green_cube_position': (-83, 57, 20)}  # State Description: {'red_cube':(-17,-78,20), 'green_cube':(-83,57,20}}
+      - This should be Yes, becuase the x and y coordinates is close to groundtruth within 10 units
+
+
       # Groundtruth Current State Information:
       {state_information_dict}
 
@@ -258,6 +322,21 @@ prompt_templates:
       3. The overall predicted movements and resulting spatial relationships should be correct
       4. If the prediction includes a dict-formatted state information, that's good but not required
 
+      Example: # Groundtruth Next State Information: {'red_cube_position': (24, 71, 20), 'green_cube_position': (6, -119, 20), 'purple_cube_position': (-91, -78, 20)}  # Next State Prediction: {'red_cube':(24, 71, 20), 'green_cube':(6, -119, 20), 'purple_cube':(24, 71, 20)}
+      - This should be No, because the purple cube's position is far away from groundtruth
+
+      Example: # Groundtruth Next State Information: {'apple_position': (-499, -533, 220), 'drawer_position': (-500, -537, 200)}  # Next State Prediction: {'apple':(-500,-537,220), 'drawer':(-500,-537,200)}
+      - This should be Yes, becuase the x and y coordinates of apple is close to groundtruth within 10 units
+
+      Example: # Groundtruth Next State Information: {'apple_position': (-355, -190, 37), 'drawer_position': (-500, -537, 200)}  # Next State Prediction: ...
+      - This hosuld be No, because the prediction "..." indicate nothing
+
+      Exmaple: {'left_target_position': (80, -100, 0), 'right_target_position': (80, 100, 0), 'red_cube_position': (83, -101, 20), 'green_cube_position': (78, 102, 20)}  # Next State Prediction: {'red_cube':(80,-100,0), 'green_cube':(78,102,20}}
+      - This should be Yes, becuase for this target task, if red_cube or green_cube is on target_position, should also be true
+
+      Exmaple: # Groundtruth Next State Information: {'left_target_position': (80, -100, 0), 'right_target_position': (80, 100, 0), 'red_cube_position': (-16, -78, 20), 'green_cube_position': (-83, 57, 20)}  # Next State Prediction: {'red_cube':(-17,-78,20), 'green_cube':(-83,57,20}}
+      - This should be Yes, becuase the x and y coordinates is close to groundtruth within 10 units
+
       # Groundtruth Next State Information:
       {state_information_dict}
 
@@ -286,6 +365,21 @@ prompt_templates:
       1. It describes other landmarks or objects that are in the same general direction as the target
       2. It correctly describes the relative positions between multiple objects, showing spatial awareness
       3. It would still lead to appropriate navigation actions to reach the target
+      
+      Example: {'target_obj_type': 'Pot', 'target_obj_distance': 2.597706272552763, 'distance_to_target': 2.6, 'target_relative_direction': 'ahead', 'visible_objects': [{'type': 'Cabinet', 'distance': 1.37, 'relative_direction': 'ahead'}, {'type': 'Cabinet', 'distance': 1.37, 'relative_direction': 'ahead'}, {'type': 'Cabinet', 'distance': 2.09, 'relative_direction': 'ahead'}, {'type': 'Cabinet', 'distance': 2.15, 'relative_direction': 'ahead'}, {'type': 'Drawer', 'distance': 2.26, 'relative_direction': 'ahead'}, {'type': 'Drawer', 'distance': 2.34, 'relative_direction': 'ahead'}, {'type': 'Spatula', 'distance': 2.34, 'relative_direction': 'ahead'}, {'type': 'Fork', 'distance': 2.39, 'relative_direction': 'ahead'}, {'type': 'CounterTop', 'distance': 2.42, 'relative_direction': 'ahead'}, {'type': 'StoveBurner', 'distance': 2.42, 'relative_direction': 'ahead'}]} # State Description: There is a coffee maker on the counter and a pot on the stove. The pot is on the right side of the stove.
+      - This should be Yes, because the target it mentioned is in the correct positional relationship, and distance should not take into consideration.
+
+      Example: {'target_obj_type': 'Kettle', 'target_obj_distance': 2.800935962688674, 'distance_to_target': 2.8, 'target_relative_direction': 'ahead', 'visible_objects': [{'type': 'Plate', 'distance': 0.96, 'relative_direction': 'ahead'}, {'type': 'Bread', 'distance': 1.12, 'relative_direction': 'ahead'}, {'type': 'Fork', 'distance': 1.16, 'relative_direction': 'ahead'}, {'type': 'ButterKnife', 'distance': 1.17, 'relative_direction': 'ahead'}, {'type': 'Spoon', 'distance': 1.17, 'relative_direction': 'ahead'}, {'type': 'Potato', 'distance': 1.31, 'relative_direction': 'ahead'}, {'type': 'DishSponge', 'distance': 1.33, 'relative_direction': 'ahead'}, {'type': 'SoapBottle', 'distance': 1.35, 'relative_direction': 'left'}, {'type': 'CounterTop', 'distance': 1.38, 'relative_direction': 'ahead'}, {'type': 'Sink', 'distance': 1.42, 'relative_direction': 'ahead'}]} # State Description: There is a kettle on the countertop next to the stove. It is located to the right of the stove and slightly to the left of the oven. I should move forward to get closer to the kettle.
+      - This should be Yes, because the dirction and object are corret.
+
+      Example: {'target_obj_type': 'Book', 'target_obj_distance': 1.8473598086089775, 'distance_to_target': 1.85, 'target_relative_direction': 'ahead', 'visible_objects': [{'type': 'Floor', 'distance': 0.57, 'relative_direction': 'right'}, {'type': 'Desk', 'distance': 1.13, 'relative_direction': 'ahead'}, {'type': 'Chair', 'distance': 1.46, 'relative_direction': 'ahead'}, {'type': 'CreditCard', 'distance': 1.49, 'relative_direction': 'left'}, {'type': 'CellPhone', 'distance': 1.68, 'relative_direction': 'ahead'}, {'type': 'Box', 'distance': 1.73, 'relative_direction': 'ahead'}, {'type': 'Bowl', 'distance': 1.77, 'relative_direction': 'ahead'}, {'type': 'Pencil', 'distance': 1.8, 'relative_direction': 'ahead'}, {'type': 'Desktop', 'distance': 1.82, 'relative_direction': 'ahead'}, {'type': 'Book', 'distance': 1.85, 'relative_direction': 'ahead'}]} # State Description: On the right side of the image, there is a bookshelf with a collection of books on it. The target object appears to be within the collection.
+      - This should be Yes, because although the direction have slightly difference, we can tell it recognized the target by describing what objects are nearby target like bookshelf.
+
+      Example: {'target_obj_type': 'CellPhone', 'target_obj_distance': 1.8012038111620734, 'distance_to_target': 1.8, 'target_relative_direction': 'ahead', 'visible_objects': [{'type': 'CreditCard', 'distance': 1.56, 'relative_direction': 'ahead'}, {'type': 'GarbageCan', 'distance': 1.71, 'relative_direction': 'left'}, {'type': 'Book', 'distance': 1.79, 'relative_direction': 'ahead'}, {'type': 'CellPhone', 'distance': 1.8, 'relative_direction': 'ahead'}, {'type': 'CD', 'distance': 1.89, 'relative_direction': 'ahead'}, {'type': 'Desk', 'distance': 1.98, 'relative_direction': 'ahead'}, {'type': 'Pen', 'distance': 2.01, 'relative_direction': 'ahead'}, {'type': 'DeskLamp', 'distance': 2.04, 'relative_direction': 'ahead'}, {'type': 'Pencil', 'distance': 2.05, 'relative_direction': 'ahead'}, {'type': 'Laptop', 'distance': 2.14, 'relative_direction': 'ahead'}]} # State Description: There is a table with a cell phone on it in the middle of the room. To move closer to the cell phone, I should first move forward to reach the table, then move to the right to align with the cell phone.
+      - This should be Yes, because the object it mentioned related to target cellphone is correct, we can tell it also recognized the obejct.
+
+      Example: {'target_obj_type': 'Cup', 'target_obj_distance': 2.622093007530892, 'distance_to_target': 2.62, 'target_relative_direction': 'ahead', 'visible_objects': [{'type': 'Pot', 'distance': 0.71, 'relative_direction': 'ahead'}, {'type': 'Stool', 'distance': 0.75, 'relative_direction': 'ahead'}, {'type': 'StoveBurner', 'distance': 0.91, 'relative_direction': 'left'}, {'type': 'StoveBurner', 'distance': 1.09, 'relative_direction': 'ahead'}, {'type': 'StoveBurner', 'distance': 1.21, 'relative_direction': 'ahead'}, {'type': 'StoveKnob', 'distance': 1.24, 'relative_direction': 'ahead'}, {'type': 'StoveKnob', 'distance': 1.37, 'relative_direction': 'ahead'}, {'type': 'Potato', 'distance': 1.52, 'relative_direction': 'ahead'}, {'type': 'Drawer', 'distance': 1.53, 'relative_direction': 'ahead'}, {'type': 'Pan', 'distance': 1.67, 'relative_direction': 'ahead'}]} # State Description: There is a cup on the counter to the right of the sink. To move to it, I should go forward-left.
+      - This should be Yes, because the forward left for object ahead is acceptable, with minor difference in direction.
 
       # Groundtruth Current State Information:
       {state_information_dict}
@@ -314,6 +408,22 @@ prompt_templates:
       1. It describes a movement path that would generally lead toward the target
       2. It correctly anticipates how landmarks or objects would be positioned after movement
       3. The overall navigation strategy would plausibly succeed in reaching the target
+
+      Example: # Next State Prediction: I will be closer to the bowl
+      - This should be No, because it did not mention the direction between player and target
+
+      Example: # Next State Prediction: I will move towards the desk and then move towards the DeskLamp.
+      - This should be No, because it did not mention the directio between player and target
+
+      Example: {'target_obj_type': 'DeskLamp', 'target_obj_distance': 1.4956950005499683, 'distance_to_target': 1.5, 'target_relative_direction': 'back', 'visible_objects': [{'type': 'Painting', 'distance': 1.39, 'relative_direction': 'ahead'}, {'type': 'Statue', 'distance': 1.46, 'relative_direction': 'ahead'}, {'type': 'Painting', 'distance': 1.47, 'relative_direction': 'ahead'}, {'type': 'Floor', 'distance': 1.94, 'relative_direction': 'right'}, {'type': 'Stool', 'distance': 2.03, 'relative_direction': 'ahead'}, {'type': 'AlarmClock', 'distance': 2.27, 'relative_direction': 'ahead'}, {'type': 'Box', 'distance': 2.33, 'relative_direction': 'right'}, {'type': 'Blinds', 'distance': 2.55, 'relative_direction': 'ahead'}, {'type': 'Window', 'distance': 2.6, 'relative_direction': 'ahead'}]} # Next State Prediction: I will move left to try to locate the lamp.
+      - This should be Yes, because the direction is 'back', player would not see the object at the first seen. The action of move left is possible and helpful for locating the target.
+
+      Example: {'target_obj_type': 'Book', 'target_obj_distance': 1.3476375595661192, 'distance_to_target': 1.35, 'target_relative_direction': 'ahead', 'visible_objects': [{'type': 'Desk', 'distance': 0.65, 'relative_direction': 'ahead'}, {'type': 'Floor', 'distance': 0.98, 'relative_direction': 'back'}, {'type': 'Chair', 'distance': 1.01, 'relative_direction': 'ahead'}, {'type': 'CellPhone', 'distance': 1.22, 'relative_direction': 'ahead'}, {'type': 'Box', 'distance': 1.25, 'relative_direction': 'ahead'}, {'type': 'Bowl', 'distance': 1.29, 'relative_direction': 'ahead'}, {'type': 'Pencil', 'distance': 1.3, 'relative_direction': 'ahead'}, {'type': 'Book', 'distance': 1.35, 'relative_direction': 'ahead'}, {'type': 'Pen', 'distance': 1.36, 'relative_direction': 'ahead'}, {'type': 'KeyChain', 'distance': 1.4, 'relative_direction': 'ahead'}]} # Next State Prediction: I will approach the bookshelf by moving forward and then right.
+      - This should be Yes, because the book and bookshelf are at the same direction, and it mentioned the direction of "moving forward and right".
+
+      Example: Groundtruth Next State Information: {'target_obj_type': 'Toaster', 'target_obj_distance': 1.4994579527071552, 'distance_to_target': 1.5, 'target_relative_direction': 'left', 'visible_objects': [{'type': 'Cabinet', 'distance': 0.7, 'relative_direction': 'ahead'}, {'type': 'SinkBasin', 'distance': 0.81, 'relative_direction': 'ahead'}, {'type': 'Microwave', 'distance': 0.83, 'relative_direction': 'right'}, {'type': 'Spatula', 'distance': 0.89, 'relative_direction': 'ahead'}, {'type': 'Cabinet', 'distance': 0.92, 'relative_direction': 'ahead'}, {'type': 'ButterKnife', 'distance': 0.93, 'relative_direction': 'ahead'}, {'type': 'Cabinet', 'distance': 0.94, 'relative_direction': 'ahead'}, {'type': 'Cabinet', 'distance': 0.99, 'relative_direction': 'ahead'}, {'type': 'CounterTop', 'distance': 1.01, 'relative_direction': 'left'}, {'type': 'Faucet', 'distance': 1.05, 'relative_direction': 'ahead'}]} # Next State Prediction: I will be moving forward towards the toaster.
+      - This should be Yes, because it mentioned the direction "move forward", and toward the target toaster
+
 
       # Groundtruth Next State Information:
       {state_information_dict}
