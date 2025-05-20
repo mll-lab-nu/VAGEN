@@ -531,6 +531,8 @@ class QwenVLRolloutManagerService():
         row_dict['position_ids'] = position_ids
         index = row_dict.get("extra_info", {}).get("index", 0)
         row_dict["index"] = index
+        row_dict["step_reward_sum"]= sum(rewards)
+        
         return row_dict
 
     @torch.no_grad()
@@ -641,7 +643,7 @@ class QwenVLRolloutManagerService():
                 step=self.env_states[env_id]['step'],
                 window_size=None,
             )
-            step_reward_sum= sum(row_dict['rewards'])
+            step_reward_sum= row_dict['step_reward_sum']
     
             row_dict['reward_model'] = {"style": "given", "ground_truth": {"reward": reward_rst[env_id]+step_reward_sum}}
             if self.config.use_multi_turn_reward:
