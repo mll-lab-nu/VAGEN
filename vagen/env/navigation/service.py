@@ -146,11 +146,13 @@ class NavigationService(BaseService):
                 except Exception as e:
                     print(f"Error resetting navigation environment {env_id} after step failure: {e}")
                     env.close()
-                    self.environments.pop(env_id, None)
-                    observation={"obs_str":"error"}
+                    config=self.env_configs[env_id]
+                    env=NavigationEnv(config)
+                    self.environments[env_id]=env
+                    observation,info=env.reset()
                     reward=0.0
                     done=True
-                    info={}
+                    
             serialized_observation = serialize_observation(observation)
             return env_id, (serialized_observation, reward, done, info), None
             
