@@ -77,6 +77,6 @@ python3 -m vagen.trainer.main_ppo \
     trainer.val_generations_to_log_to_wandb=8 \
     rollout_manager.n_trajectory=2 \
     rollout_manager.use_service=True \
-    rollout_manager.timeout=240 \
+    rollout_manager.timeout=500 \
     rollout_manager.base_url="http://localhost:5000" \
     2>&1 | tee aico_primitive_skill_vision.log
