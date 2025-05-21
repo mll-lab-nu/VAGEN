@@ -65,8 +65,8 @@ class NavigationEnv(BaseEnv):
             "fieldOfView": config.fov,
             "platform": CloudRendering,
             "gpu_device": config.get('gpu_device', 0),
-            "server_timeout": 600,
-            "server_start_timeout": 600,
+            "server_timeout": 300,
+            "server_start_timeout": 300,
         }
         
         # Initialize AI2-THOR controller
