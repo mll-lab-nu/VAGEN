@@ -1,0 +1,84 @@
+# Prompt
+prompt_templates:
+  # Default environment templates that other environments can reference
+  default_env:
+    grounding: |
+      Compare the description of the current state with the groundtruth current state information.
+      Answer YES if the description matches the current state information, or NO if it doesn't.
+
+      # Context
+      You are evaluating whether an agent's description accurately reflects the actual state. The description must be both correct overall AND specifically relevant to the important elements of the current state. Generic observations (like "player, box and target is on the ground") that don't capture the meaningful relationships and positions in the state are insufficient. The description should demonstrate understanding of the specific configuration and relationships that matter for decision-making.
+
+      # Groundtruth Current State Information:
+      {state_information_dict}
+
+      # State Description:
+      {natural_language_description}
+
+      Think step by step and end with your answer.
+      Your answer should be within {max_tokens} tokens and in the format of <think>...</think><answer>YES</answer> or <think>...</think><answer>NO</answer>.
+    worldmodeling: |
+      Compare the prediction of the next state with the groundtruth next state information.
+      Answer YES if the prediction accurately matches the next state information, or NO if it doesn't.
+
+      # Context
+      You are evaluating whether an agent's prediction of the next state is accurate. The prediction must be both correct overall AND specifically relevant to the important elements of the next state. Generic predictions that don't capture the meaningful changes, relationships, and positions in the state are insufficient. The prediction should demonstrate understanding of the specific configuration and relationships that will result from the action, showing how the state will transform in ways that matter for decision-making.
+
+      # Groundtruth Next State Information:
+      {state_information_dict}
+
+      # Next State Prediction:
+      {natural_language_description}
+
+      Think step by step and end with your answer.
+      Your answer should be within {max_tokens} tokens and in the format of <think>...</think><answer>YES</answer> or <think>...</think><answer>NO</answer>.
+  sokoban:
+    grounding: ${prompt_templates.default_env.grounding}
+    worldmodeling: ${prompt_templates.default_env.worldmodeling}
+  
+  frozenlake:
+    grounding: ${prompt_templates.default_env.grounding}
+    worldmodeling: ${prompt_templates.default_env.worldmodeling}
+  
+  maniskill:
+    grounding: |
+      Compare the description of the current state with the groundtruth current state information.
+      Answer YES if the description matches the current state information, or NO if it doesn't.
+
+      # Context
+      You are evaluating whether an agent's description accurately reflects the actual state. The description must be both correct overall AND specifically relevant to the important elements of the current state. Generic observations (like "player, box and target is on the ground") that don't capture the meaningful relationships and positions in the state are insufficient. The description should demonstrate understanding of the specific configuration and relationships that matter for decision-making.
+      Please also tell if the description includes a dict-formatted state information, if not, please answer NO.
+
+      # Groundtruth Current State Information:
+      {state_information_dict}
+
+      # State Description:
+      {natural_language_description}
+
+      Think step by step and end with your answer.
+      Your answer should be within {max_tokens} tokens and in the format of <think>...</think><answer>YES</answer> or <think>...</think><answer>NO</answer>.
+
+    worldmodeling: |
+      Compare the prediction of the next state with the groundtruth next state information.
+      Answer YES if the prediction accurately matches the next state information, or NO if it doesn't.
+
+      # Context
+      You are evaluating whether an agent's prediction of the next state is accurate. The prediction must be both correct overall AND specifically relevant to the important elements of the next state. Generic predictions that don't capture the meaningful changes, relationships, and positions in the state are insufficient. The prediction should demonstrate understanding of the specific configuration and relationships that will result from the action, showing how the state will transform in ways that matter for decision-making.
+      Please also tell if the prediction includes a dict-formatted state information, if not, please answer NO.
+
+      Groundtruth Next State Information:
+      {state_information_dict}
+      
+      Next State Prediction:
+      {natural_language_description}
+      
+      Please also allow some errors in the prediction, 
+      For example, if the prediction is {"red_cube":(15,30,20)} and the groundtruth is {"red_cube":(12,32,21)}, that should be considered correct.
+      For x,y coordinates, the error tolerance is 7, and for z coordinates, the error tolerance is 10.
+      
+      Think step by step and end with your answer.
+      Your answer should be within {max_tokens} tokens and in the format of <think>...</think><answer>YES</answer> or <think>...</think><answer>NO</answer>.
+  
+  navigation:
+    grounding: ${prompt_templates.default_env.grounding}
+    worldmodeling: ${prompt_templates.default_env.worldmodeling}
