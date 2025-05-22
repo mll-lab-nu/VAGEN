@@ -100,7 +100,7 @@ def _process_batch(prompts: List[str], config) -> List[Dict[str, Any]]:
                         await rate_limiter.wait_if_needed(total_estimated_tokens)
                         
                         response = await async_client.chat.completions.create(
-                            model=config.get("name", "gpt-4.1-nano"),
+                            model=config.get("name", "gpt-4.1-nano-2025-04-14"),
                             messages=[
                                 {"role": "user", "content": prompt}
                             ],
