@@ -34,7 +34,7 @@ python vagen/env/navigation/startx.py 1
 
 ### PrimitiveSkill
 ```
-pip install --upgrade mani_skill
+pip install mani_skill==3.0.0b20
 python -m mani_skill.utils.download_asset "PickSingleYCB-v1" -y
 python -m mani_skill.utils.download_asset partnet_mobility_cabinet -y
 
