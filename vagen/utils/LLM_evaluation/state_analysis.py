@@ -2,6 +2,39 @@ import json
 import argparse
 from pathlib import Path
 import pandas as pd
+import tiktoken
+
+def get_token_count(text, model="gpt-4"):
+    """
+    Calculate the number of tokens in the text for a given model.
+    
+    Args:
+        text (str): The text to count tokens for.
+        model (str): The model name to use for token counting.
+    
+    Returns:
+        int: Number of tokens in the text.
+    """
+    if not text:
+        return 0
+    
+    try:
+        # Get the encoding for the model
+        # For most GPT models, we can use the cl100k_base encoding
+        if "gpt-4" in model.lower() or "gpt-3.5" in model.lower():
+            encoding = tiktoken.get_encoding("cl100k_base")
+        else:
+            # Fallback to a common encoding
+            encoding = tiktoken.get_encoding("cl100k_base")
+        
+        # Count tokens
+        tokens = encoding.encode(text)
+        return len(tokens)
+    
+    except Exception as e:
+        print(f"Warning: Could not count tokens for model {model}: {e}")
+        # Fallback to rough estimation (1 token ≈ 4 characters for English)
+        return len(text) // 4
 
 def read_jsonl(file_path):
     """
@@ -43,11 +76,16 @@ def calculate_accuracy(data, groupby=None):
         type_name = item.get("type", "")
         human_answer = item.get("human_answer", "")
         parsed_answer = item.get("parsed_answer", "")
+        response = item.get("response", "")
         
         # Determine if the answer is correct
-        is_correct = None
+        # If parsed_answer is null/empty, it's considered wrong
+        is_correct = False
         if parsed_answer and human_answer:
             is_correct = parsed_answer.upper() == human_answer.upper()
+        
+        # Calculate response token count using the model name
+        response_token_count = get_token_count(response, model)
         
         # Add to analysis data
         analysis_data.append({
@@ -56,14 +94,12 @@ def calculate_accuracy(data, groupby=None):
             "type": type_name,
             "human_answer": human_answer,
             "parsed_answer": parsed_answer,
-            "is_correct": is_correct
+            "is_correct": is_correct,
+            "response_token_count": response_token_count
         })
     
     # Convert to DataFrame for easier analysis
     df = pd.DataFrame(analysis_data)
-    
-    # Drop rows with missing values
-    df = df.dropna(subset=["is_correct"])
     
     # Group by specified field(s)
     if groupby == 'env':
@@ -73,14 +109,21 @@ def calculate_accuracy(data, groupby=None):
     else:  # Both env and type
         groups = df.groupby(["model", "env", "type"])
     
-    # Calculate statistics
+    # Calculate statistics - only the 4 required fields
     stats = groups.agg(
-        total=("is_correct", "count"),
         correct=("is_correct", "sum"),
+        response_len=("response_token_count", "mean"),
     )
     
-    # Calculate accuracy
+    # Add total count and calculate accuracy
+    stats["total"] = groups.size()
     stats["accuracy"] = (stats["correct"] / stats["total"]) * 100
+    
+    # Round the response length for readability
+    stats["response_len"] = stats["response_len"].round(2)
+    
+    # Reorder columns to match the requested order: total, correct, response_len, accuracy
+    stats = stats[["total", "correct", "response_len", "accuracy"]]
     
     return stats
 
@@ -109,7 +152,7 @@ def main():
     """
     Main function to run the script with command line arguments.
     """
-    parser = argparse.ArgumentParser(description='Calculate model accuracy statistics')
+    parser = argparse.ArgumentParser(description='Calculate model accuracy statistics with token counting')
     parser.add_argument('--input', type=str, required=True,
                         help='Path to the input JSONL file with all data')
     parser.add_argument('--output', type=str, default='analysis/stats.jsonl',
@@ -127,10 +170,13 @@ def main():
     output_file.parent.mkdir(parents=True, exist_ok=True)
     
     # Load data
+    print(f"Loading data from: {input_file}")
     data = read_jsonl(input_file)
+    print(f"Loaded {len(data)} records")
     
     # Calculate statistics
     groupby = None if args.groupby == 'both' else args.groupby
+    print(f"Calculating statistics grouped by: {args.groupby}")
     stats = calculate_accuracy(data, groupby)
     
     # Save statistics to JSONL

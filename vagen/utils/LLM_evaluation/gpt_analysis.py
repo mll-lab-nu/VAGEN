@@ -30,38 +30,6 @@ def extract_answer(response_text):
         print("Warning: Could not extract answer from response.")
         return None
 
-def get_gpt_response(client, prompt, max_tokens=1500):
-    """
-    Get response from GPT model for the given prompt.
-    
-    Args:
-        client (OpenAI): The OpenAI client instance.
-        prompt (str): The input prompt to send to GPT.
-        max_tokens (int): Maximum number of tokens to generate in the response.
-        
-    Returns:
-        str: The response from GPT.
-    """
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4.1-nano",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.7,
-            max_tokens=max_tokens
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        print(f"Error calling GPT API: {e}")
-        # Wait and retry on rate limit errors
-        if "rate limit" in str(e).lower() or "quota" in str(e).lower():
-            print("Rate limit hit. Waiting for 20 seconds...")
-            time.sleep(20)
-            return get_gpt_response(client, prompt, max_tokens)
-        return f"Error: {e}"
-
 def read_jsonl(file_path):
     """
     Read samples from a JSONL file.
@@ -79,7 +47,40 @@ def read_jsonl(file_path):
                 samples.append(json.loads(line.strip()))
     return samples
 
-def process_sample(client, sample, output_path, max_tokens):
+def get_gpt_response(client, prompt, model, max_tokens=1500):
+    """
+    Get response from GPT model for the given prompt.
+    
+    Args:
+        client (OpenAI): The OpenAI client instance.
+        prompt (str): The input prompt to send to GPT.
+        model (str): The model name to use.
+        max_tokens (int): Maximum number of tokens to generate in the response.
+        
+    Returns:
+        str: The response from GPT.
+    """
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=max_tokens
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        print(f"Error calling GPT API: {e}")
+        # Wait and retry on rate limit errors
+        if "rate limit" in str(e).lower() or "quota" in str(e).lower():
+            print("Rate limit hit. Waiting for 20 seconds...")
+            time.sleep(20)
+            return get_gpt_response(client, prompt, model, max_tokens) 
+        return f"Error: {e}"
+
+def process_sample(client, sample, output_path, model, model_name, max_tokens):
     """
     Process a single sample using GPT and save result.
     
@@ -87,6 +88,8 @@ def process_sample(client, sample, output_path, max_tokens):
         client (OpenAI): The OpenAI client instance.
         sample (dict): The sample to process.
         output_path (str): Path to save the results JSONL file.
+        model (str): The model name to use for API calls.
+        model_name (str): The model name to record in results.
         max_tokens (int): Maximum number of tokens to generate in the response.
     """
     sample_id = sample["id"]
@@ -100,14 +103,14 @@ def process_sample(client, sample, output_path, max_tokens):
     print(f"Processing sample id: {sample_id}")
     
     # Get response from GPT
-    response = get_gpt_response(client, prompt, max_tokens)
+    response = get_gpt_response(client, prompt, model, max_tokens)
     
     # Extract answer from response
     parsed_answer = extract_answer(response)
     
     # Create comprehensive result with consistent field order
     result = {
-        "model": "gpt-4.1-nano",
+        "model": model_name, 
         "id": sample_id,
         "env": env,
         "type": type_name,
@@ -125,14 +128,15 @@ def process_sample(client, sample, output_path, max_tokens):
     
     return sample_id
 
-def analyze_samples(samples_path, output_path, model_name="gpt-4.1-nano", max_parallel=8, max_tokens=1500):
+def analyze_samples(samples_path, output_path, model_name, model, max_parallel=8, max_tokens=1500):
     """
     Analyze samples using GPT and save results using parallel processing.
     
     Args:
         samples_path (str): Path to the samples JSONL file.
         output_path (str): Path to save the results JSONL file.
-        model_name (str): GPT model to use.
+        model_name (str): Name to use for the model in the output.
+        model (str): GPT model to use for API calls.
         max_parallel (int): Maximum number of parallel requests.
         max_tokens (int): Maximum number of tokens to generate in the response.
     """
@@ -155,13 +159,14 @@ def analyze_samples(samples_path, output_path, model_name="gpt-4.1-nano", max_pa
         print(f"Deleted existing output file: {output_path}")
     
     print(f"Processing {len(samples)} samples")
+    print(f"Using model: {model} (recorded as: {model_name})")
     print(f"Using parallel processing with max {max_parallel} workers")
     print(f"Using max_tokens: {max_tokens}")
     
     # Process samples in parallel using ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=max_parallel) as executor:
         # Submit all tasks
-        futures = [executor.submit(process_sample, client, sample, output_path, max_tokens) 
+        futures = [executor.submit(process_sample, client, sample, output_path, model, model_name, max_tokens) 
                   for sample in samples]
         
         # Wait for all futures to complete
@@ -183,10 +188,10 @@ def main():
                         help='Path to the samples JSONL file')
     parser.add_argument('--output', type=str, default='analysis/gpt_results.jsonl',
                         help='Path to save the results JSONL file')
-    parser.add_argument('--model', type=str, default='gpt-4.1-nano',
-                        help='GPT model to use')
-    parser.add_argument('--model_name', type=str, default='gpt-4.1-nano',
-                        help='Name to use for the model in the output')
+    parser.add_argument('--model', type=str, default='gpt-4o-mini',
+                        help='GPT model to use for API calls')
+    parser.add_argument('--model_name', type=str, default=None,
+                        help='Name to use for the model in the output (defaults to same as --model)')
     parser.add_argument('--max_parallel', type=int, default=8,
                         help='Maximum number of parallel requests')
     parser.add_argument('--max_tokens', type=int, default=500,
@@ -194,11 +199,15 @@ def main():
     
     args = parser.parse_args()
     
+    # If model_name is not specified, use the same as model
+    if args.model_name is None:
+        args.model_name = args.model
+    
     # Create output directory if it doesn't exist
     output_dir = Path(args.output).parent
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    analyze_samples(args.samples, args.output, args.model, args.max_parallel, args.max_tokens)
+    analyze_samples(args.samples, args.output, args.model_name, args.model, args.max_parallel, args.max_tokens)
 
 if __name__ == "__main__":
     main()
