@@ -416,8 +416,10 @@ def process_llm_judgments(input_data: List[Dict[str, Any]], config: Optional[Dic
                 answer = answer_match.group(1).upper()
                 score = 1.0 if answer == "YES" else 0.0
                 parse_success = True
-            else:
-                parse_success = False
+        else:
+            parse_success = False
+    
+            
         
         # Create the result dictionary
         result = {
