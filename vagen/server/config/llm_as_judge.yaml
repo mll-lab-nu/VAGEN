@@ -1,5 +1,5 @@
 api:
-  name: "gpt-4.1.nano"
+  name: "gpt-4.1-nano-2025-04-14"
   temperature: 0.1
   max_tokens: 400
   max_retries: 2
