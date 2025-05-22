@@ -302,23 +302,23 @@ prompt_templates:
       4. If the description includes a dict-formatted state information, that's good but not required
 
       Example:
-      Groundtruth Current State Information: {'red_cube_position': (119, -58, 20), 'green_cube_position': (-77, 192, 20), 'purple_cube_position': (-46, 51, 20)}
-      State Description: {'red_cube':(119,-58,20), 'green_cube':(-46,51,20), 'purple_cube':(-77,192,20)}
+      Groundtruth Current State Information: {{'red_cube_position': (119, -58, 20), 'green_cube_position': (-77, 192, 20), 'purple_cube_position': (-46, 51, 20)}}
+      State Description: {{'red_cube':(119,-58,20), 'green_cube':(-46,51,20), 'purple_cube':(-77,192,20)}}
       - <think>According to the ground truth data, the red cube position is (119, -58, 20) and the described position is (119, -58, 20). Since 119 = 119, -58 = -58, and 20 = 20, the red cube position is exactly correct. The green cube position is (-77, 192, 20) and the described position is (-46, 51, 20). The difference in x-coordinate is |-46 - (-77)| = 31, the difference in y-coordinate is |51 - 192| = 141, and the difference in z-coordinate is |20 - 20| = 0. Since both x and y differences exceed the 10-unit threshold, the green cube position is incorrect. The purple cube position is (-46, 51, 20) and the described position is (-77, 192, 20). The differences also exceed the 10-unit threshold. It appears the positions for the green and purple cubes have been swapped in the description. Therefore, this description is No.</think><answer>NO</answer>
 
       Example:
-      Groundtruth Current State Information: {'left_target_position': (80, -100, 0), 'right_target_position': (80, 100, 0), 'red_cube_position': (83, -102, 20), 'green_cube_position': (-47, 95, 20)}
-      State Description: {'red_cube':(83,-102,20),'green_cube':(-47,95,20),'left_target':(80,-100,0),'right_target':(80,100,0)}
+      Groundtruth Current State Information: {{'left_target_position': (80, -100, 0), 'right_target_position': (80, 100, 0), 'red_cube_position': (83, -102, 20), 'green_cube_position': (-47, 95, 20)}}
+      State Description: {{'red_cube':(83,-102,20),'green_cube':(-47,95,20),'left_target':(80,-100,0),'right_target':(80,100,0)}}
       - <think>According to the ground truth data, the red cube position is (83, -102, 20) and the described position is (83, -102, 20). Since 83 = 83, -102 = -102, and 20 = 20, the red cube position is exactly correct. The green cube position is (-47, 95, 20) and the described position is (-47, 95, 20). Since -47 = -47, 95 = 95, and 20 = 20, the green cube position is exactly correct. The left target position is (80, -100, 0) and the described position is (80, -100, 0). Since 80 = 80, -100 = -100, and 0 = 0, the left target position is exactly correct. The right target position is (80, 100, 0) and the described position is (80, 100, 0). Since 80 = 80, 100 = 100, and 0 = 0, the right target position is exactly correct. Therefore, this description is Yes.</think><answer>YES</answer>
 
       Example:
-      Groundtruth Current State Information: {'red_cube_position': (-219, 87, 20), 'green_cube_position': (-87, 61, 20), 'purple_cube_position': (-94, 62, 60)}
-      State Description: {'red_cube':(-219,87,20),'green_cube':(-87,61,20),'purple_cube':(-94,62,60)}
+      Groundtruth Current State Information: {{'red_cube_position': (-219, 87, 20), 'green_cube_position': (-87, 61, 20), 'purple_cube_position': (-94, 62, 60)}}
+      State Description: {{'red_cube':(-219,87,20),'green_cube':(-87,61,20),'purple_cube':(-94,62,60)}}
       - <think>According to the ground truth data, the red cube position is (-219, 87, 20) and the described position is (-219, 87, 20). Since -219 = -219, 87 = 87, and 20 = 20, the red cube position is exactly correct. The green cube position is (-87, 61, 20) and the described position is (-87, 61, 20). Since -87 = -87, 61 = 61, and 20 = 20, the green cube position is exactly correct. The purple cube position is (-94, 62, 60) and the described position is (-94, 62, 60). Since -94 = -94, 62 = 62, and 60 = 60, the purple cube position is exactly correct. Therefore, this description is Yes.</think><answer>YES</answer>
 
       Example:
-      Groundtruth Current State Information: {'apple_position': (-456, -520, 38), 'drawer_position': (-500, -775, 200)}
-      State Description: {'apple':(-456,-520,38),'drawer':(-500,-775,200)}
+      Groundtruth Current State Information: {{'apple_position': (-456, -520, 38), 'drawer_position': (-500, -775, 200)}}
+      State Description: {{'apple':(-456,-520,38),'drawer':(-500,-775,200)}}
       - <think>According to the ground truth data, the apple position is (-456, -520, 38) and the described position is (-456, -520, 38). Since -456 = -456, -520 = -520, and 38 = 38, the apple position is exactly correct. The drawer position is (-500, -775, 200) and the described position is (-500, -775, 200). Since -500 = -500, -775 = -775, and 200 = 200, the drawer position is exactly correct. Therefore, this description is Yes.</think><answer>YES</answer>
 
       # Groundtruth Current State Information:
@@ -355,22 +355,22 @@ prompt_templates:
       4. If the prediction includes a dict-formatted state information, that's good but not required
 
       Example:
-      Groundtruth Next State Information: {'red_cube_position': (-1, -193, 20), 'green_cube_position': (-5, 151, 20)}
-      Next State Prediction: {'red_cube':(-1,-193,20),'green_cube':(0,157,20)}
+      Groundtruth Next State Information: {{'red_cube_position': (-1, -193, 20), 'green_cube_position': (-5, 151, 20)}}
+      Next State Prediction: {{'red_cube':(-1,-193,20),'green_cube':(0,157,20)}}
       - <think>According to the ground truth data, the red cube position is (-1, -193, 20) and the described position is (-1, -193, 20). Since -1 = -1, -193 = -193, and 20 = 20, the red cube position is exactly correct. The green cube position is (-5, 151, 20) and the described position is (0, 157, 20). The difference in x-coordinate is |0 - (-5)| = 5, the difference in y-coordinate is |157 - 151| = 6, and the difference in z-coordinate is |20 - 20| = 0. Since all differences are within 10 units, the green cube position is considered correct. Therefore, this description is Yes.</think><answer>YES</answer>
 
       Example:
-      Groundtruth Next State Information: {'left_target_position': (80, -100, 0), 'right_target_position': (80, 100, 0), 'red_cube_position': (-57, 79, 20), 'green_cube_position': (83, 102, 20)}
-      Next State Prediction: {'green_cube':(80,100,0)}
+      Groundtruth Next State Information: {{'left_target_position': (80, -100, 0), 'right_target_position': (80, 100, 0), 'red_cube_position': (-57, 79, 20), 'green_cube_position': (83, 102, 20)}}
+      Next State Prediction: {{'green_cube':(80,100,0)}}
       - <think>According to the ground truth data, the red cube position is (-57, 79, 20) and there is no described position for the red cube. The green cube position is (83, 102, 20) and the described position is (80, 100, 0). The difference in x-coordinate is |80 - 83| = 3, the difference in y-coordinate is |100 - 102| = 2, and the difference in z-coordinate is |0 - 20| = 20. While the x and y differences are within 10 units, the z-coordinate difference exceeds the 10-unit threshold. Additionally, the description only mentions the green cube and completely omits information about the red cube. Therefore, this description is No.</think><answer>NO</answer>
 
       Example:
-      Groundtruth Next State Information: {'red_cube_position': (-1, 97, 20), 'green_cube_position': (106, 195, 20)}
-      Next State Prediction: {'red_cube':(0,96,20),'green_cube':(106,195,20)}
+      Groundtruth Next State Information: {{'red_cube_position': (-1, 97, 20), 'green_cube_position': (106, 195, 20)}}
+      Next State Prediction: {{'red_cube':(0,96,20),'green_cube':(106,195,20)}}
       - <think>According to the ground truth data, the red cube position is (-1, 97, 20) and the described position is (0, 96, 20). The difference in x-coordinate is |0 - (-1)| = 1, the difference in y-coordinate is |96 - 97| = 1, and the difference in z-coordinate is |20 - 20| = 0. Since all differences are within 10 units, the red cube position is considered correct. The green cube position is (106, 195, 20) and the described position is (106, 195, 20). Since 106 = 106, 195 = 195, and 20 = 20, the green cube position is exactly correct. Therefore, this description is Yes.</think><answer>YES</answer>
 
       Example:
-      Groundtruth Next State Information: {'apple_position': (-504, -537, 36), 'drawer_position': (-500, -732, 200)}
+      Groundtruth Next State Information: {{'apple_position': (-504, -537, 36), 'drawer_position': (-500, -732, 200)}}
       Next State Prediction: Apple is on the floor, drawer is open.
       -  <think>According to the ground truth data, the apple position is (-504, -537, 36) and the drawer position is (-500, -732, 200). The description states 'Apple is on the floor, drawer is open' but does not provide any coordinate information or spatial positioning for either object. Without specifying the position coordinates or relative spatial relationships, the description fails to provide the necessary positional information. Therefore, this description is No.</think><answer>NO</answer>
 
@@ -398,22 +398,22 @@ prompt_templates:
       You are evaluating whether the description effectively conveys where the target object is located relative to the agent. The exact directional terminology (left, right, ahead, etc.) may differ between the state information and the description, but the important factor is whether the description would lead to correct navigation.
 
       Example:
-      Groundtruth Current State Information: {"target_obj_type":"Pot","target_distance_to_player":3,"target_direction_to_player":"ahead","visible_objects":[{"type":"Sink","distance_to_player":1,"direction_to_player":"left"},{"type":"SinkBasin","distance_to_player":1,"direction_to_player":"left"},{"type":"Tomato","distance_to_player":1,"direction_to_player":"left"},{"type":"Floor","distance_to_player":1,"direction_to_player":"left"},{"type":"Cabinet","distance_to_player":1,"direction_to_player":"ahead"}]}
+      Groundtruth Current State Information: {{"target_obj_type":"Pot","target_distance_to_player":3,"target_direction_to_player":"ahead","visible_objects":[{{"type":"Sink","distance_to_player":1,"direction_to_player":"left"}},{{"type":"SinkBasin","distance_to_player":1,"direction_to_player":"left"}},{{"type":"Tomato","distance_to_player":1,"direction_to_player":"left"}},{{"type":"Floor","distance_to_player":1,"direction_to_player":"left"}},{{"type":"Cabinet","distance_to_player":1,"direction_to_player":"ahead"}}]}}
       State Description: There is a red tomato on the left side of the sink, a red apple on the countertop, a plastic bag hanging on the left side, a kitchen sink, a kitchen counter with a knife, a knife holder, a small bowl on the counter, a pot on the right side of the counter, and a window above the counter.
       - <think>The state descirption does not contain spatial relationship between agent and pot.  Therefore, this description is No.</think><answer>NO</answer>
 
       Example:
-      Groundtruth Current State Information: {"target_obj_type":"DeskLamp","target_distance_to_player":2,"target_direction_to_player":"right","visible_objects":[{"type":"Chair","distance_to_player":1,"direction_to_player":"ahead"},{"type":"Laptop","distance_to_player":1,"direction_to_player":"ahead"},{"type":"Desk","distance_to_player":1,"direction_to_player":"ahead"},{"type":"CellPhone","distance_to_player":1,"direction_to_player":"ahead"},{"type":"Drawer","distance_to_player":1,"direction_to_player":"right"}]}
+      Groundtruth Current State Information: {{"target_obj_type":"DeskLamp","target_distance_to_player":2,"target_direction_to_player":"right","visible_objects":[{{"type":"Chair","distance_to_player":1,"direction_to_player":"ahead"}},{{"type":"Laptop","distance_to_player":1,"direction_to_player":"ahead"}},{{"type":"Desk","distance_to_player":1,"direction_to_player":"ahead"}},{{"type":"CellPhone","distance_to_player":1,"direction_to_player":"ahead"}},{{"type":"Drawer","distance_to_player":1,"direction_to_player":"right"}}]}}
       State Description: There is a lamp on the desk to the right of the computer monitor. The lamp is brighter and more prominent than the computer monitor.
       - <think>The state descirption does not contain spatial relationship between agent and lamp.  Therefore, this description is No.</think><answer>NO</answer>
 
       Example:
-      Groundtruth Current State Information: {"target_obj_type":"Plate","target_distance_to_player":2,"target_direction_to_player":"ahead","visible_objects":[{"type":"Floor","distance_to_player":1,"direction_to_player":"left"},{"type":"Box","distance_to_player":1,"direction_to_player":"ahead"},{"type":"Plate","distance_to_player":2,"direction_to_player":"ahead"},{"type":"Vase","distance_to_player":2,"direction_to_player":"ahead"},{"type":"Chair","distance_to_player":2,"direction_to_player":"ahead"}]}
+      Groundtruth Current State Information: {{"target_obj_type":"Plate","target_distance_to_player":2,"target_direction_to_player":"ahead","visible_objects":[{{"type":"Floor","distance_to_player":1,"direction_to_player":"left"}},{{"type":"Box","distance_to_player":1,"direction_to_player":"ahead"}},{{"type":"Plate","distance_to_player":2,"direction_to_player":"ahead"}},{{"type":"Vase","distance_to_player":2,"direction_to_player":"ahead"}},{{"type":"Chair","distance_to_player":2,"direction_to_player":"ahead"}}]}}
       State Description: here is a flat dish on the table in the background. It is located slightly to the left and ahead of me.
       - <think>The state description contains spatial relationship between agent and plate, do further analysis. According to the ground truth data, the plate is in the 'ahead' direction. The description states the plate is 'slightly to the left and ahead of me', which aligns with the target direction being 'ahead'. Therefore, this description is Yes.</think><answer>YES</answer>
 
       Example:
-      Groundtruth Current State Information: {"target_obj_type":"AlarmClock","target_distance_to_player":3,"target_direction_to_player":"ahead","visible_objects":[{"type":"Bed","distance_to_player":2,"direction_to_player":"right"},{"type":"Box","distance_to_player":2,"direction_to_player":"ahead"},{"type":"Book","distance_to_player":2,"direction_to_player":"ahead"},{"type":"Floor","distance_to_player":3,"direction_to_player":"ahead"},{"type":"Drawer","distance_to_player":3,"direction_to_player":"ahead"}]}
+      Groundtruth Current State Information: {{"target_obj_type":"AlarmClock","target_distance_to_player":3,"target_direction_to_player":"ahead","visible_objects":[{{"type":"Bed","distance_to_player":2,"direction_to_player":"right"}},{{"type":"Box","distance_to_player":2,"direction_to_player":"ahead"}},{{"type":"Book","distance_to_player":2,"direction_to_player":"ahead"}},{{"type":"Floor","distance_to_player":3,"direction_to_player":"ahead"}},{{"type":"Drawer","distance_to_player":3,"direction_to_player":"ahead"}}]}}
       State Description: There is a trash can in the room. To move to the trash can, I should first move forward.
       - <think>The state description contains spatial relationship between agent and trash can, do further analysis. According to the ground truth data, the AlarmClock is in the 'ahead' direction. The description instructs to 'move forward' which correctly matches the target direction. Therefore, this description is Yes.</think><answer>YES</answer>
 
@@ -447,22 +447,22 @@ prompt_templates:
       Remember: The Next State Prediction is made BEFORE the Groundtruth Next State exists. Your task is to check if the prediction correctly anticipated what actually happened.
 
       Example:
-      Groundtruth Current State Information: {"target_obj_type":"GarbageCan","target_distance_to_player":3,"target_direction_to_player":"ahead","visible_objects":[{"type":"CellPhone","distance_to_player":1,"direction_to_player":"right"},{"type":"Chair","distance_to_player":1,"direction_to_player":"ahead"},{"type":"Plate","distance_to_player":1,"direction_to_player":"ahead"},{"type":"DiningTable","distance_to_player":2,"direction_to_player":"right"},{"type":"Chair","distance_to_player":2,"direction_to_player":"ahead"}]}
+      Groundtruth Current State Information: {{"target_obj_type":"GarbageCan","target_distance_to_player":3,"target_direction_to_player":"ahead","visible_objects":[{{"type":"CellPhone","distance_to_player":1,"direction_to_player":"right"}},{{"type":"Chair","distance_to_player":1,"direction_to_player":"ahead"}},{{"type":"Plate","distance_to_player":1,"direction_to_player":"ahead"}},{{"type":"DiningTable","distance_to_player":2,"direction_to_player":"right"}},{{"type":"Chair","distance_to_player":2,"direction_to_player":"ahead"}}]}}
       State Description: There is a trash can in the lower left corner of the image. To move there, I can go forward-left.
       - <think>The prediction state contains spatial relationship between agent and trash can, do further analysis. According to the ground truth data, the GarbageCan is in the 'ahead' direction. The description places it in the 'lower left corner' and suggests 'forward-left' movement. Given that the target direction is 'ahead', the 'forward-left' specification provides a reasonable directional interpretation. Therefore, this description is Yes.</think><answer>YES</answer>
 
       Example:
-      Groundtruth Current State Information: {"target_obj_type":"Book","target_distance_to_player":3,"target_direction_to_player":"ahead","visible_objects":[{"type":"Laptop","distance_to_player":1,"direction_to_player":"ahead"},{"type":"Floor","distance_to_player":1,"direction_to_player":"right"},{"type":"CreditCard","distance_to_player":2,"direction_to_player":"ahead"},{"type":"Desk","distance_to_player":2,"direction_to_player":"ahead"},{"type":"Chair","distance_to_player":2,"direction_to_player":"ahead"}]}
+      Groundtruth Current State Information: {{"target_obj_type":"Book","target_distance_to_player":3,"target_direction_to_player":"ahead","visible_objects":[{{"type":"Laptop","distance_to_player":1,"direction_to_player":"ahead"}},{{"type":"Floor","distance_to_player":1,"direction_to_player":"right"}},{{"type":"CreditCard","distance_to_player":2,"direction_to_player":"ahead"}},{{"type":"Desk","distance_to_player":2,"direction_to_player":"ahead"}},{{"type":"Chair","distance_to_player":2,"direction_to_player":"ahead"}}]}}
       State Description: I will move towards the table to reach the bound collection of pages.
       - <think>The prediction state does not contain spatial relationship between agent and book. Therefore, this description is No.</think><answer>NO</answer>
 
       Example:
-      Groundtruth Next State Information: {"target_obj_type":"Lettuce","target_distance_to_player":2,"target_direction_to_player":"left","visible_objects":[{"type":"Knife","distance_to_player":1,"direction_to_player":"ahead"},{"type":"SaltShaker","distance_to_player":1,"direction_to_player":"ahead"},{"type":"GarbageCan","distance_to_player":1,"direction_to_player":"ahead"},{"type":"Spatula","distance_to_player":1,"direction_to_player":"ahead"},{"type":"CounterTop","distance_to_player":1,"direction_to_player":"ahead"}]}
+      Groundtruth Next State Information: {{"target_obj_type":"Lettuce","target_distance_to_player":2,"target_direction_to_player":"left","visible_objects":[{{"type":"Knife","distance_to_player":1,"direction_to_player":"ahead"}},{{"type":"SaltShaker","distance_to_player":1,"direction_to_player":"ahead"}},{{"type":"GarbageCan","distance_to_player":1,"direction_to_player":"ahead"}},{{"type":"Spatula","distance_to_player":1,"direction_to_player":"ahead"}},{{"type":"CounterTop","distance_to_player":1,"direction_to_player":"ahead"}}]}}
       Next State Prediction: I will be close to the lettuce.
       - <think>The prediction state does not contain spatial relationship between agent and lettuce.  Therefore, this description is No.</think><answer>NO</answer>
 
       Example:
-      Groundtruth Next State Information: {"target_obj_type":"DeskLamp","target_distance_to_player":3,"target_direction_to_player":"ahead","visible_objects":[{"type":"Curtains","distance_to_player":2,"direction_to_player":"left"},{"type":"KeyChain","distance_to_player":2,"direction_to_player":"ahead"},{"type":"Window","distance_to_player":2,"direction_to_player":"left"},{"type":"Pillow","distance_to_player":2,"direction_to_player":"ahead"},{"type":"Sofa","distance_to_player":3,"direction_to_player":"ahead"}]}
+      Groundtruth Next State Information: {{"target_obj_type":"DeskLamp","target_distance_to_player":3,"target_direction_to_player":"ahead","visible_objects":[{{"type":"Curtains","distance_to_player":2,"direction_to_player":"left"}},{{"type":"KeyChain","distance_to_player":2,"direction_to_player":"ahead"}},{{"type":"Window","distance_to_player":2,"direction_to_player":"left"}},{{"type":"Pillow","distance_to_player":2,"direction_to_player":"ahead"}},{{"type":"Sofa","distance_to_player":3,"direction_to_player":"ahead"}}]}}
       Next State Prediction: I should move forward and slightly to the right to get closer to the desk lamp.
       - <think>The prediction state contains spatial relationship between agent and DeskLamp, do further analysis. According to the ground truth data, the DeskLamp is in the 'ahead' direction. The description indicates movement 'forward and slightly to the right' is needed to reach the lamp. The 'forward' direction aligns with the target being 'ahead'. Therefore, this description is Yes.</think><answer>YES</answer>
 
