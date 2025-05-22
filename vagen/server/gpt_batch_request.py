@@ -6,11 +6,7 @@ from openai import AsyncOpenAI
 
 class RateLimiter:
     """Rate limiter for OpenAI GPT API"""
-    def __init__(self, rpm_limit=10000, tpm_limit=2000000):
-        # OpenAI API limits (adjust based on your tier)
-        # Tier 1: 500 RPM, 10,000 TPM
-        # Tier 2: 5,000 RPM, 450,000 TPM  
-        # Tier 3: 10,000 RPM, 2,000,000 TPM
+    def __init__(self, rpm_limit=5000, tpm_limit=4000000):
         self.rpm_limit = rpm_limit
         self.tpm_limit = tpm_limit
         self.request_timestamps = []
