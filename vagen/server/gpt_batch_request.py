@@ -79,8 +79,8 @@ def _process_batch(prompts: List[str], config) -> List[Dict[str, Any]]:
             api_key=config.get("api_key") or None  # Uses OPENAI_API_KEY env var if None
         )
         rate_limiter = RateLimiter(
-            rpm_limit=config.get("rpm_limit", 70),
-            tpm_limit=config.get("tpm_limit", 4000)
+            rpm_limit=config.get("rpm_limit", 5000),
+            tpm_limit=config.get("tpm_limit", 4000000)
         )
         
         results = [{"response": "", "success": False, "retries": 0, "error": None} for _ in prompts]
@@ -89,7 +89,7 @@ def _process_batch(prompts: List[str], config) -> List[Dict[str, Any]]:
             retries = 0
             # Estimate tokens (1 token ≈ 4 chars for English text)
             estimated_prompt_tokens = len(prompt) // 4
-            estimated_completion_tokens = config.get("max_tokens", 1500)
+            estimated_completion_tokens = config.get("max_tokens", 500)
             total_estimated_tokens = estimated_prompt_tokens + estimated_completion_tokens
             
             while retries <= config.get("max_retries", 3):
