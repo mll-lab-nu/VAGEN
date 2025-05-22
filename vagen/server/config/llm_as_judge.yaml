@@ -65,33 +65,26 @@ prompt_templates:
       2. The box(es) and the target(s)
 
       The description doesn't need to be perfectly precise or mention every detail - it just needs to have the correct directional relationships (Up, Down, Left, Right). 
-
-      # How to interpret coordinates:
-      - If comparing coordinates (row1, col1) and (row2, col2):
-        - If row1 < row2: The first object is ABOVE the second object
-        - If row1 > row2: The first object is BELOW the second object
-        - If col1 < col2: The first object is to the LEFT of the second object
-        - If col1 > col2: The first object is to the RIGHT of the second object
       
-      Example: If player is at (3,2) and box is at (2,4):
-      - Since 3 > 2, player is BELOW the box
-      - Since 2 < 4, player is to the LEFT of the box
-      - Correct description: "The box is Up and Right of the player" or "The Player is Down and Left of the box"
+      Example:
+      Groundtruth Current State Information: ['box0 is at the same row and to the left of the player', 'target0 is above and on the left side of the player', 'target0 is above and on the left side of box0']
+      State Description: The player is below the box and the target is below the box.
+      - <think>The state description contains spatial relationship information, do further analysis. According to the ground truth data, box0 is at the same row and to the left of the player, target0 is above and on the left side of the player, target0 is above and on the left side of box0. The description states 'The player is below the box and the target is below the box.' The player is actually at the same row as the box (not below), and the target is actually above the box (not below). Both directional relationships are incorrectly identified.</think><answer>NO</answer>
 
-      Example: # State Description: The player is at the bottom left corner, the box is at the bottom right corner, and the target is at the bottom right corner.
-      - This should be No, because it does not contain the relationship between player and box, or box and target, or player and target.
+      Example:
+      Groundtruth Current State Information: ['box0 is above and on the right side of the player', 'target0 is above and at the same column as the player', 'target0 is above and on the left side of box0']
+      State Description: The box is above the player and the target is to the left of the box
+      - <think>The state description contains spatial relationship information, do further analysis. According to the ground truth data, box0 is above and on the right side of the player, target0 is above and at the same column as the player, target0 is above and on the left side of box0. The description states 'The box is above the player and the target is to the left of the box.' It correctly identifies that the box is above the player (box0 is above and on the right side of the player). It also correctly identifies that the target is to the left of the box (target0 is above and on the left side of box0). Both key directional relationships are accurately described.</think><answer>YES</answer>
 
-      Exmaple: # State Description: The player is at the left side of the screen, the box is in the middle, and the target is at the right side of the screen.
-      - This should be No, because it does not contain the relationship between player and box, or box and target, or player and target.
+      Example:
+      Groundtruth Current State Information: Player will likely move to the top-left corner.
+      State Description: Player will likely move to the top-left corner.
+      - <think>The state description does not contain spatial relationship between player and target.  Therefore, this description is No.</think><answer>NO</answer>
 
-      Example: # State Description: The player is at the left side of the box and the target is at the right side of the box.
-      - This should be No, because it does not contain the relationship between player and box, or box and target, or player and target.
-
-      Example: {'player_position': (1, 4), 'box_positions': [(2, 3)], 'target_positions': [(4, 3)], 'wall_positions': [(0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (1, 0), (1, 1), (1, 2), (1, 5), (2, 0), (2, 1), (2, 2), (2, 5), (3, 0), (3, 1), (3, 2), (3, 5), (4, 0), (4, 1), (4, 2), (4, 5), (5, 0), (5, 1), (5, 2), (5, 3), (5, 4), (5, 5)], 'grid_size': (6, 6)}  # State Description: The player is to the left of the box and the target is to the right of the box.
-      - This should be No, because 4 > 3 indicate player is right to the box, and 3 = 3 indicate target and box are same vertically
-
-      Exmaple: {'player_position': (4, 2), 'box_positions': [(3, 1)], 'target_positions': [(2, 4)], 'wall_positions': [(0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (1, 0), (1, 1), (1, 2), (1, 3), (1, 5), (2, 0), (2, 1), (2, 5), (3, 0), (3, 1), (3, 2), (3, 5), (4, 0), (4, 1), (4, 2), (4, 5), (5, 0), (5, 1), (5, 2), (5, 3), (5, 4), (5, 5)], 'grid_size': (6, 6)}  # State Description: The player is to the down of the box and the target is to the up of the box.
-      - This should be Yes, because 4 > 3 indicate player is down to the box, and 2 < 3 indicate target is up to the box
+      Example:
+      Groundtruth Current State Information: The player is on the left side, the box is on the left side, the target is on the left side.
+      State Description: The player is on the left side, the box is on the left side, the target is on the left side.
+      - <think>The state description does not contain spatial relationship between player and target.  Therefore, this description is No.</think><answer>NO</answer>
 
       # Groundtruth Current State Information:
       {state_information_dict}
@@ -100,9 +93,20 @@ prompt_templates:
       {natural_language_description}
 
       Think step by step:
-      1. Identify the coordinates of player, box(es), and target(s) from the state information
-      2. Determine the correct directional relationships based on coordinate comparison
-      3. Check if the description mentions these directional relationships correctly
+        1. Relative Relationship Requirements:
+          - Must describe at least one relationships BETWEEN entities (player-box, player-target, box-target)
+          - Absolute positions like "player is on the left side" are insufficient
+          - Need relational descriptions like "player is left of target"
+        
+        2. Essential Relationships to Check
+          - Player-Target relationship (highest priority)
+          - Player-Box relationship 
+          - Box-Target relationship
+
+        3. Equivalent Expression Recognition
+          - "box is above player" = "player is below box"
+          - "target is left of box" = "box is right of target"
+          - Must recognize these as identical spatial relationships. Absolute position is not allowed
 
       Your answer should be in the format of <think>...</think><answer>YES</answer> or <think>...</think><answer>NO</answer>.
 
@@ -115,28 +119,29 @@ prompt_templates:
       1. The future position of the player relative to the box(es)
       2. The future position of the box(es) relative to the target(s)
 
-      The prediction doesn't need to be perfectly precise or mention every detail - it just needs to correctly anticipate the directional relationships (Up, Down, Left, Right) that will exist after the move.
+      # Important: The Prediction Comes First
+      Remember: The Next State Prediction is made BEFORE the Groundtruth Next State exists. Your task is to check if the prediction correctly anticipated what actually happened.
+      If the box and target are at same position, this prediciton is seen as success immediately (YES)
 
-      # How to interpret coordinates:
-      - If comparing coordinates (row1, col1) and (row2, col2):
-        - If row1 < row2: The first object is ABOVE the second object
-        - If row1 > row2: The first object is BELOW the second object
-        - If col1 < col2: The first object is to the LEFT of the second object
-        - If col1 > col2: The first object is to the RIGHT of the second object
-      
-      Example: If after the move, player will be at (3,2) and box will be at (2,4):
-      - Since 3 > 2, player will be BELOW the box
-      - Since 2 < 4, player will be to the LEFT of the box
-      - Correct prediction: "After my move, the box will be Up and Right of me" or "I will be positioned Down and Left of the box"
+      Example:
+      Groundtruth Next State Information: ['box0 is above and on the right side of the player', 'target0 is above and on the left side of the player', 'target0 is above and on the left side of box0']
+      Next State Prediction: The player will be to the left of the box, and the box will be to the right of the target.
+      - <think>The prediction state contains spatial relationship between player and target, do further analysis. According to the ground truth data, box0 is above and on the right side of the player, target0 is above and on the left side of the player, target0 is above and on the left side of box0. The description states 'The player will be to the left of the box, and the box will be to the right of the target.' It correctly identifies that the player is to the left of the box (since box0 is on the right side of the player). It also correctly identifies that the box is to the right of the target (since target0 is on the left side of box0). Therefore, this description correctly identifies the key directional relationships.</think><answer>YES</answer>
 
-      Exmaple: # Next State Prediction: The player will move up to the top left corner.
-      - This should be No, because it does not include relationship between player and box or target
+      Example:
+      Groundtruth Next State Information: ['box0 is above and at the same column as the player', 'target0 is above and on the right side of the player', 'target0 is below and on the right side of box0']
+      Next State Prediction: The player will be at the right side of the screen, the box will be at the right side of the screen, and the target will be at the right side of the screen.
+      - <think>The prediction state does not contain spatial relationship between player and target.  Therefore, this description is No.</think><answer>NO</answer>
 
-      Example: {'player_position': (4, 3), 'box_positions': [(3, 3)], 'target_positions': [(1, 3)], 'wall_positions': [(0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (1, 0), (1, 5), (2, 0), (2, 4), (2, 5), (3, 0), (3, 1), (3, 2), (3, 4), (3, 5), (4, 0), (4, 1), (4, 2), (4, 4), (4, 5), (5, 0), (5, 1), (5, 2), (5, 3), (5, 4), (5, 5)], 'grid_size': (6, 6)} # Next State Prediction: The player will go up, then push the box up to the target.
-      - This should be Yes, because 4 > 3, the player is below box, could push box up. And 3 < 1, box is below target, push box up would closer to target.
+      Example:
+      Groundtruth Next State Information: ['box0 is above and at the same column as the player', 'target0 is above and on the left side of the player', 'target0 is at the same row and to the left of box0']
+      Next State Prediction: The player will be to the right of the box, and the box will be to the right of the target.
+      - <think>The prediction state contains spatial relationship between player and target, do further analysis. According to the ground truth data, box0 is above and at the same column as the player, target0 is above and on the left side of the player, target0 is at the same row and to the left of box0. The description states 'The player will be to the right of the box, and the box will be to the right of the target.' The player is actually directly below the box (same column), not to the right of it. However, it correctly identifies that the box is to the right of the target. Since the player-box relationship is incorrectly described, this description is inaccurate.</think><answer>NO</answer>
 
-      Example: {'player_position': (3, 1), 'box_positions': [(2, 2)], 'target_positions': [(1, 1)], 'wall_positions': [(0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (1, 0), (1, 5), (2, 0), (2, 4), (2, 5), (3, 0), (3, 3), (3, 4), (3, 5), (4, 0), (4, 1), (4, 2), (4, 3), (4, 4), (4, 5), (5, 0), (5, 1), (5, 2), (5, 3), (5, 4), (5, 5)], 'grid_size': (6, 6)} # Next State Prediction: The player will be to the left of the box, and the box will be to the left of the target.
-      - This should be No, because for box and target: 2 > 1, box is to the right of target
+      Example:
+      Groundtruth Next State Information: ['box0 is at the same row and to the left of the player', 'target0 is above and on the left side of the player', 'target0 is above and on the left side of box0']
+      Next State Prediction: The player will push the box to the target.
+      - <think>The prediction state does not contain spatial relationship between player and target.  Therefore, this description is No.</think><answer>NO</answer>
 
       # Groundtruth Next State Information:
       {state_information_dict}
@@ -145,49 +150,55 @@ prompt_templates:
       {natural_language_description}
 
       Think step by step:
-      1. Identify the coordinates of player, box(es), and target(s) that will exist in the next state
-      2. Determine the correct directional relationships based on coordinate comparison
-      3. Check if the prediction mentions these directional relationships correctly
+        1. Relative Relationship Requirements:
+          - Must describe at least one relationships BETWEEN entities (player-box, player-target, box-target)
+          - Absolute positions like "player is on the left side" are insufficient
+          - Need relational descriptions like "player is left of target"
+        
+        2. Essential Relationships to Check
+          - Player-Target relationship (highest priority)
+          - Player-Box relationship 
+          - Box-Target relationship
+
+        3. Equivalent Expression Recognition
+          - "box is above player" = "player is below box"
+          - "target is left of box" = "box is right of target"
+          - Must recognize these as identical spatial relationships. Absolute position is not allowed
 
       Your answer should be in the format of <think>...</think><answer>YES</answer> or <think>...</think><answer>NO</answer>.
   
   frozenlake:
     grounding: |
       Evaluate whether the description accurately captures the key position relationships in the FrozenLake game state.
-      Answer YES if the directional relationships are correct and any relevant holes are mentioned, or NO if there are errors.
+      Answer YES if the directional relationships are correct, or NO if there are errors.
 
       # Context
       You are evaluating whether the description correctly identifies:
-      1. The directional relationship between the player and the goal
-      2. Any holes that are in the direct path between player and goal (if applicable)
 
-      The description doesn't need to be perfectly precise - it just needs to have the correct directional relationships (Up, Down, Left, Right) and mention any critical holes that would block a direct path.
+      1. The directional relationship between the player and the goal (MUST Have)
+      2. The directional relationship between the player and the hole (if present)
 
-      # How to interpret coordinates:
-      - If comparing coordinates (row1, col1) and (row2, col2):
-        - If row1 < row2: The first object is ABOVE the second object
-        - If row1 > row2: The first object is BELOW the second object
-        - If col1 < col2: The first object is to the LEFT of the second object
-        - If col1 > col2: The first object is to the RIGHT of the second object
+      The description doesn't need to be perfectly precise - it just needs to have the correct directional relationships between the player and target (Up, Down, Left, Right), and between the player and hole if applicable.
+            
+      Example:
+      Groundtruth Current State Information: ['target is above and at the same column as the player', 'hole0 is above and at the same column as the player', 'hole1 is above and on the right side of the player', 'hole2 is above and on the right side of the player', 'hole3 is above and on the right side of the player', 'hole4 is at the same row and to the right of the player']
+      State Description: The player is above the target
+      -  <think>The state description contains spatial relationship between player and target, do further analysis. According to the ground truth data, the target is above and at the same column as the player. The description states 'The player is on the above the target' which incorrectly states that the player is above the target (when the target is actually above the player). Therefore, this description is No.</think><answer>NO</answer>
+
+      Example:
+      Groundtruth Current State Information: ['target is above and on the right side of the player', 'hole0 is above and on the right side of the player', 'hole1 is above and on the right side of the player'] 
+      State Description: The player is at the bottom left corner of the frozen lake. There is a goal (G) at the top right corner. The player is standing on a frozen tile.
+      - <think>The state description does not contain spatial relationship between player and target. Therefore, this description is No.</think><answer>NO</answer>
+
+      Example:
+      Groundtruth Current State Information: ['target is above and on the right side of the player', 'hole0 is above and on the right side of the player', 'hole1 is above and on the right side of the player', 'hole2 is at the same row and to the right of the player', 'hole3 is below and at the same column as the player']
+      State Description: The player is near the hole and the goal is to the right
+      - <think>The state description contains spatial relationship between player and target, do further analysis. According to the ground truth data, the target is above and on the right side of the player. The description states 'The player is near the hole and the goal is to the right' which correctly identifies that the goal is to the right of the player. While it mentions the hole but not the complete spatial relationship with the target (missing that the target is also above), the directional information provided is partially accurate. Therefore, this description is Yes.</think><answer>YES</answer>
       
-      Example: If player is at (1,1) and goal is at (3,2):
-      - Since 1 < 3, player is ABOVE the goal
-      - Since 1 < 2, player is to the LEFT of the goal
-      - Correct description: "The goal is Down and Right of the player"
-
-      Example: # State Description: The player is on the right side of the frozen lake.
-      - This description should be No, because it does not contain positional relationship between Player and Goal
-
-      Example: # State Description: The player is on the right side of the grid.
-      - This description should be No, because it does not contain positional relationship between Player and Goal
-
-      Example: {'player_position': (3, 0), 'target_position': (3, 3), 'hole_positions': [(0, 0), (2, 3)], 'grid_size': (4, 4)}  # State Description: The player is on the left the target
-      - This description should be Yes, because it contain correct positional relationship (0 < 3)
-
-      Example: {'player_position': (3, 0), 'target_position': (3, 3), 'hole_positions': [(0, 0), (2, 3)], 'grid_size': (4, 4)}  # State Description: The player is on the above the target
-      - This description should be No, since 3 = 3, they are same horizontally
-
-      If there's a hole at (2,1) directly between player and goal, the description should mention this obstacle.
+      Example:
+      Groundtruth Current State Information: ['target is above and on the right side of the player', 'hole0 is above and on the right side of the player', 'hole1 is above and on the right side of the player', 'hole2 is at the same row and to the right of the player', 'hole3 is below and at the same column as the player']
+      State Description: The player is near the hole and the goal is to the right
+      - <think>The state description contains spatial relationship between player and target, do further analysis. According to the ground truth data, the target is above and on the right side of the player. The description states 'The player is near the hole and the goal is to the right' which correctly identifies that the goal is to the right of the player. While it mentions the hole but not the complete spatial relationship with the target (missing that the target is also above), the directional information provided is partially accurate. Therefore, this description is Yes. </think><answer>YES</answer>
 
       # Groundtruth Current State Information:
       {state_information_dict}
@@ -196,11 +207,20 @@ prompt_templates:
       {natural_language_description}
 
       Think step by step:
-      1. Identify the coordinates of player and goal from the state information
-      2. Determine the correct directional relationship based on coordinate comparison
-      3. Check if there are any holes directly in the path between player and goal
-      4. Verify if the description mentions the correct directional relationship
-      5. Verify if the description acknowledges any critical holes in the path (if they exist)
+      1. Player relationshpi with Goal
+        - Goal (Target) MUST include in state description, without target the description is automatically wrong (NO)
+        - If there is no direction between player and goal, like "player is right to the target", the description is automatically wrong (NO)
+        - This takes highest priority over all other considerations
+
+      2. Equivalent Expression Recognition
+        - "goal is above player" = "player is below goal"
+        - "target is left of box" = "box is right of target"
+        - Must recognize these as identical spatial relationships. Absolute position is not allowed
+
+      3. Simple Judgment Rule
+        - If player at goal → YES
+        - If direction aligns with needed movement → YES
+        - Otherwise → NO
 
       Your answer should be in the format of <think>...</think><answer>YES</answer> or <think>...</think><answer>NO</answer>.
 
@@ -210,39 +230,33 @@ prompt_templates:
 
       # Context
       You are evaluating whether the prediction correctly identifies:
-      1. The future position relationship between the player and the goal after the move
-      2. Whether the planned movement path avoids holes or acknowledges the risk of falling
+      1. The position relationship between the player and the goal after the prediction
 
-      The prediction doesn't need to perfectly describe every aspect of the next state - it just needs to correctly anticipate the directional relationships (Up, Down, Left, Right) and address any dangers from holes.
+      # Important: The Prediction Comes First
+      Remember: The Next State Prediction is made BEFORE the Groundtruth Next State exists. Your task is to check if the prediction correctly anticipated what actually happened.
 
-      # How to interpret coordinates:
-      - If comparing coordinates (row1, col1) and (row2, col2):
-        - If row1 < row2: The first object is ABOVE the second object
-        - If row1 > row2: The first object is BELOW the second object
-        - If col1 < col2: The first object is to the LEFT of the second object
-        - If col1 > col2: The first object is to the RIGHT of the second object
+      The prediction doesn't need to perfectly describe every aspect of the next state - it just needs to correctly anticipate the directional relationships (Up, Down, Left, Right) or address any dangers from holes.
       
-      Example: If current state, player is at (2,2) and goal is at (3,3):
-      - Since 2 < 3, player is ABOVE the goal
-      - Since 2 < 3, player is to the LEFT of the goal
-      - Correct prediction: "Player will move Down to reach the goal" or "Player will move Right to reach the goal"
+      Example:
+      Groundtruth Next State Information: ['target is at the same place as the player', 'hole0 is above and at the same column as the player']
+      Next State Prediction: the player will move to the left or down.
+      - <think>The prediction state does not contain spatial relationship between player and target. Therefore, this description is No.</think><answer>NO</answer>
+      
+      Example:
+      Groundtruth Next State Information: ['target is at the same place as the player', 'hole0 is above and on the right side of the player', 'hole1 is at the same row and to the right of the player']
+      Next State Prediction: The player will reach the target
+      -  <think>The prediction state contains spatial relationship between player and target, do further analysis. According to the ground truth data, the target is at the same place as the player. The prediction states 'The player will reach the target' which correctly acknowledges that the player can reach the target since they are already at the same position. Therefore, this description is Yes.</think><answer>YES</answer>
 
-      Example: {'player_position': (1, 2), 'target_position': (1, 3), 'hole_positions': [(2, 3), (3, 2)], 'grid_size': (4, 4)}  # Next State Prediction: The player will move right.
-      - This should be No, beacuse it does not contain the information of goal
+      Example:
+      Groundtruth Next State Information: ['target is at the same row and to the left of the player', 'hole0 is below and on the left side of the player']
+      Next State Prediction: The player should move right first to avoid the frozen blocks and then move up to reach the goal.
+      - <think>The prediction state does not contain spatial relationship between player and target. Therefore, this description is No.</think><answer>NO</answer>
 
-      Example: {'player_position': (2, 0), 'target_position': (3, 3), 'hole_positions': [(0, 1), (1, 3), (2, 1), (2, 3)], 'grid_size': (4, 4)} # Next State Prediction: The player will move to the right to reach the goal.
-      - This should be Yes, because 0 < 3, move right will closer to goal
-
-      Example: {'player_position': (2, 0), 'target_position': (3, 3), 'hole_positions': [(0, 1), (1, 3), (2, 1), (2, 3)], 'grid_size': (4, 4)} # Next State Prediction: The player will move to the down to reach the goal.
-      - This should be Yes, because 2 < 3, move down will closer to goal
-
-      Example: {'player_position': (2, 2), 'target_position': (3, 2), 'hole_positions': [(0, 1), (1, 3), (2, 1), (2, 3)], 'grid_size': (4, 4)} # Next State Prediction: The player will move to the right to reach the goal.
-      - This should be No, because 2 = 2, move right will far away from goal
-
-      If there's a hole in the planned path, the prediction should acknowledge this risk.
-
-      # CRITICAL: If the prediction suggests a path that would go directly through a hole, the answer should be NO.
-
+      Example:
+      Groundtruth Next State Information: ['target is above and at the same column as the player', 'hole0 is above and on the right side of the player', 'hole1 is at the same row and to the left of the player']
+      Next State Prediction: the player will reach the target
+      - <think>The prediction state contains spatial relationship between player and target, do further analysis. According to the ground truth data, the target is above and at the same column as the player. The prediction states 'the player will reach the target' which acknowledges the relationship between player and target but does not mention the specific directional information (that the target is above). Therefore, this description is No.</think><answer>NO</answer>      
+      
       # Groundtruth Next State Information:
       {state_information_dict}
 
@@ -250,12 +264,24 @@ prompt_templates:
       {natural_language_description}
 
       Think step by step:
-      1. Identify the coordinates of player and goal in the next state
-      2. Determine the correct directional relationship based on coordinate comparison
-      3. Check if the planned movement path would encounter any holes
-      4. Verify if the prediction mentions the correct directional relationship
-      5. Verify if the prediction recognizes any risks from holes in the planned path
-      6. If the prediction suggests moving through a hole, the answer must be NO
+      1. Player relationshpi with Goal
+        - If player is already at the goal position, the prediction is automatically correct (YES)
+        - Goal (Target) MUST include in prediction state, without target the prediction is automatically wrong (NO)
+        - If there is no direction between player and goal, like "player is right to the target", the prediction is automatically wrong (NO)
+        - This takes highest priority over all other considerations
+
+      2. Directional Correctness
+        - Evaluate if the predicted movement direction aligns with the relative position between player and goal
+        - For example, if player is left of goal, moving right is correct
+        - **CRITICAL: Recognize equivalent expressions of the same spatial relationship**
+          * "player is above target" = "target is below player"
+          * "player is left of target" = "target is right of player"
+          * These are the SAME relationship expressed from different perspectives
+
+      3. Simple Judgment Rule
+        - If player at goal → YES
+        - If direction aligns with needed movement → YES
+        - Otherwise → NO
 
       Your answer should be in the format of <think>...</think><answer>YES</answer> or <think>...</think><answer>NO</answer>.
   
@@ -270,26 +296,30 @@ prompt_templates:
       Important evaluation criteria:
       1. If the description includes coordinates, they don't need to be exact matches with the groundtruth
       2. For coordinate values, consider them correct if they are within these error tolerances:
-        - For x and y coordinates: within ±10 units of groundtruth
-        - For z coordinates: within ±10 units of groundtruth
+        - For x and y coordinates: within +10 or -10 units of groundtruth
+        - For z coordinates: within +10 or -10 units of groundtruth
       3. The overall spatial relationships and object identifications should be correct
       4. If the description includes a dict-formatted state information, that's good but not required
 
-      Example: # Groundtruth Next State Information: {'red_cube_position': (24, 71, 20), 'green_cube_position': (6, -119, 20), 'purple_cube_position': (-91, -78, 20)}  # State Description: {'red_cube':(24, 71, 20), 'green_cube':(6, -119, 20), 'purple_cube':(24, 71, 20)}
-      - This should be No, because the purple cube's position is far away from groundtruth
+      Example:
+      Groundtruth Current State Information: {'red_cube_position': (119, -58, 20), 'green_cube_position': (-77, 192, 20), 'purple_cube_position': (-46, 51, 20)}
+      State Description: {'red_cube':(119,-58,20), 'green_cube':(-46,51,20), 'purple_cube':(-77,192,20)}
+      - <think>According to the ground truth data, the red cube position is (119, -58, 20) and the described position is (119, -58, 20). Since 119 = 119, -58 = -58, and 20 = 20, the red cube position is exactly correct. The green cube position is (-77, 192, 20) and the described position is (-46, 51, 20). The difference in x-coordinate is |-46 - (-77)| = 31, the difference in y-coordinate is |51 - 192| = 141, and the difference in z-coordinate is |20 - 20| = 0. Since both x and y differences exceed the 10-unit threshold, the green cube position is incorrect. The purple cube position is (-46, 51, 20) and the described position is (-77, 192, 20). The differences also exceed the 10-unit threshold. It appears the positions for the green and purple cubes have been swapped in the description. Therefore, this description is No.</think><answer>NO</answer>
 
-      Example: # Groundtruth Next State Information: {'apple_position': (-499, -533, 220), 'drawer_position': (-500, -537, 200)}  # State Description: {'apple':(-500,-537,220), 'drawer':(-500,-537,200)}
-      - This should be Yes, becuase the x and y coordinates of apple is close to groundtruth within 10 units
+      Example:
+      Groundtruth Current State Information: {'left_target_position': (80, -100, 0), 'right_target_position': (80, 100, 0), 'red_cube_position': (83, -102, 20), 'green_cube_position': (-47, 95, 20)}
+      State Description: {'red_cube':(83,-102,20),'green_cube':(-47,95,20),'left_target':(80,-100,0),'right_target':(80,100,0)}
+      - <think>According to the ground truth data, the red cube position is (83, -102, 20) and the described position is (83, -102, 20). Since 83 = 83, -102 = -102, and 20 = 20, the red cube position is exactly correct. The green cube position is (-47, 95, 20) and the described position is (-47, 95, 20). Since -47 = -47, 95 = 95, and 20 = 20, the green cube position is exactly correct. The left target position is (80, -100, 0) and the described position is (80, -100, 0). Since 80 = 80, -100 = -100, and 0 = 0, the left target position is exactly correct. The right target position is (80, 100, 0) and the described position is (80, 100, 0). Since 80 = 80, 100 = 100, and 0 = 0, the right target position is exactly correct. Therefore, this description is Yes.</think><answer>YES</answer>
 
-      Example: # Groundtruth Next State Information: {'apple_position': (-355, -190, 37), 'drawer_position': (-500, -537, 200)}  # State Description: ...
-      - This should be No, because the prediction "..." indicate nothing
+      Example:
+      Groundtruth Current State Information: {'red_cube_position': (-219, 87, 20), 'green_cube_position': (-87, 61, 20), 'purple_cube_position': (-94, 62, 60)}
+      State Description: {'red_cube':(-219,87,20),'green_cube':(-87,61,20),'purple_cube':(-94,62,60)}
+      - <think>According to the ground truth data, the red cube position is (-219, 87, 20) and the described position is (-219, 87, 20). Since -219 = -219, 87 = 87, and 20 = 20, the red cube position is exactly correct. The green cube position is (-87, 61, 20) and the described position is (-87, 61, 20). Since -87 = -87, 61 = 61, and 20 = 20, the green cube position is exactly correct. The purple cube position is (-94, 62, 60) and the described position is (-94, 62, 60). Since -94 = -94, 62 = 62, and 60 = 60, the purple cube position is exactly correct. Therefore, this description is Yes.</think><answer>YES</answer>
 
-      Exmaple: {'left_target_position': (80, -100, 0), 'right_target_position': (80, 100, 0), 'red_cube_position': (83, -101, 20), 'green_cube_position': (78, 102, 20)}  # State Description: {'red_cube':(80,-100,0), 'green_cube':(78,102,20}}
-      - This should be Yes, becuase for this target task, if red_cube or green_cube is on target_position, should also be true
-
-      Exmaple: # Groundtruth Next State Information: {'left_target_position': (80, -100, 0), 'right_target_position': (80, 100, 0), 'red_cube_position': (-16, -78, 20), 'green_cube_position': (-83, 57, 20)}  # State Description: {'red_cube':(-17,-78,20), 'green_cube':(-83,57,20}}
-      - This should be Yes, becuase the x and y coordinates is close to groundtruth within 10 units
-
+      Example:
+      Groundtruth Current State Information: {'apple_position': (-456, -520, 38), 'drawer_position': (-500, -775, 200)}
+      State Description: {'apple':(-456,-520,38),'drawer':(-500,-775,200)}
+      - <think>According to the ground truth data, the apple position is (-456, -520, 38) and the described position is (-456, -520, 38). Since -456 = -456, -520 = -520, and 38 = 38, the apple position is exactly correct. The drawer position is (-500, -775, 200) and the described position is (-500, -775, 200). Since -500 = -500, -775 = -775, and 200 = 200, the drawer position is exactly correct. Therefore, this description is Yes.</think><answer>YES</answer>
 
       # Groundtruth Current State Information:
       {state_information_dict}
@@ -313,28 +343,36 @@ prompt_templates:
       # Context
       You are evaluating whether an agent's prediction of the next state is accurate. The prediction should capture the meaningful changes and relationships that will result from the planned actions.
       
+      # Important: The Prediction Comes First
+      Remember: The Next State Prediction is made BEFORE the Groundtruth Next State exists. Your task is to check if the prediction correctly anticipated what actually happened.
+
       Important evaluation criteria:
       1. If the prediction includes coordinates, they don't need to be exact matches with the groundtruth
       2. For coordinate values, consider them correct if they are within these error tolerances:
-        - For x and y coordinates: within ±10 units of groundtruth
-        - For z coordinates: within ±10 units of groundtruth
+        - For x and y coordinates: within +10 or -10 units of groundtruth
+        - For z coordinates: within +10 or -10 units of groundtruth
       3. The overall predicted movements and resulting spatial relationships should be correct
       4. If the prediction includes a dict-formatted state information, that's good but not required
 
-      Example: # Groundtruth Next State Information: {'red_cube_position': (24, 71, 20), 'green_cube_position': (6, -119, 20), 'purple_cube_position': (-91, -78, 20)}  # Next State Prediction: {'red_cube':(24, 71, 20), 'green_cube':(6, -119, 20), 'purple_cube':(24, 71, 20)}
-      - This should be No, because the purple cube's position is far away from groundtruth
+      Example:
+      Groundtruth Next State Information: {'red_cube_position': (-1, -193, 20), 'green_cube_position': (-5, 151, 20)}
+      Next State Prediction: {'red_cube':(-1,-193,20),'green_cube':(0,157,20)}
+      - <think>According to the ground truth data, the red cube position is (-1, -193, 20) and the described position is (-1, -193, 20). Since -1 = -1, -193 = -193, and 20 = 20, the red cube position is exactly correct. The green cube position is (-5, 151, 20) and the described position is (0, 157, 20). The difference in x-coordinate is |0 - (-5)| = 5, the difference in y-coordinate is |157 - 151| = 6, and the difference in z-coordinate is |20 - 20| = 0. Since all differences are within 10 units, the green cube position is considered correct. Therefore, this description is Yes.</think><answer>YES</answer>
 
-      Example: # Groundtruth Next State Information: {'apple_position': (-499, -533, 220), 'drawer_position': (-500, -537, 200)}  # Next State Prediction: {'apple':(-500,-537,220), 'drawer':(-500,-537,200)}
-      - This should be Yes, becuase the x and y coordinates of apple is close to groundtruth within 10 units
+      Example:
+      Groundtruth Next State Information: {'left_target_position': (80, -100, 0), 'right_target_position': (80, 100, 0), 'red_cube_position': (-57, 79, 20), 'green_cube_position': (83, 102, 20)}
+      Next State Prediction: {'green_cube':(80,100,0)}
+      - <think>According to the ground truth data, the red cube position is (-57, 79, 20) and there is no described position for the red cube. The green cube position is (83, 102, 20) and the described position is (80, 100, 0). The difference in x-coordinate is |80 - 83| = 3, the difference in y-coordinate is |100 - 102| = 2, and the difference in z-coordinate is |0 - 20| = 20. While the x and y differences are within 10 units, the z-coordinate difference exceeds the 10-unit threshold. Additionally, the description only mentions the green cube and completely omits information about the red cube. Therefore, this description is No.</think><answer>NO</answer>
 
-      Example: # Groundtruth Next State Information: {'apple_position': (-355, -190, 37), 'drawer_position': (-500, -537, 200)}  # Next State Prediction: ...
-      - This hosuld be No, because the prediction "..." indicate nothing
+      Example:
+      Groundtruth Next State Information: {'red_cube_position': (-1, 97, 20), 'green_cube_position': (106, 195, 20)}
+      Next State Prediction: {'red_cube':(0,96,20),'green_cube':(106,195,20)}
+      - <think>According to the ground truth data, the red cube position is (-1, 97, 20) and the described position is (0, 96, 20). The difference in x-coordinate is |0 - (-1)| = 1, the difference in y-coordinate is |96 - 97| = 1, and the difference in z-coordinate is |20 - 20| = 0. Since all differences are within 10 units, the red cube position is considered correct. The green cube position is (106, 195, 20) and the described position is (106, 195, 20). Since 106 = 106, 195 = 195, and 20 = 20, the green cube position is exactly correct. Therefore, this description is Yes.</think><answer>YES</answer>
 
-      Exmaple: {'left_target_position': (80, -100, 0), 'right_target_position': (80, 100, 0), 'red_cube_position': (83, -101, 20), 'green_cube_position': (78, 102, 20)}  # Next State Prediction: {'red_cube':(80,-100,0), 'green_cube':(78,102,20}}
-      - This should be Yes, becuase for this target task, if red_cube or green_cube is on target_position, should also be true
-
-      Exmaple: # Groundtruth Next State Information: {'left_target_position': (80, -100, 0), 'right_target_position': (80, 100, 0), 'red_cube_position': (-16, -78, 20), 'green_cube_position': (-83, 57, 20)}  # Next State Prediction: {'red_cube':(-17,-78,20), 'green_cube':(-83,57,20}}
-      - This should be Yes, becuase the x and y coordinates is close to groundtruth within 10 units
+      Example:
+      Groundtruth Next State Information: {'apple_position': (-504, -537, 36), 'drawer_position': (-500, -732, 200)}
+      Next State Prediction: Apple is on the floor, drawer is open.
+      -  <think>According to the ground truth data, the apple position is (-504, -537, 36) and the drawer position is (-500, -732, 200). The description states 'Apple is on the floor, drawer is open' but does not provide any coordinate information or spatial positioning for either object. Without specifying the position coordinates or relative spatial relationships, the description fails to provide the necessary positional information. Therefore, this description is No.</think><answer>NO</answer>
 
       # Groundtruth Next State Information:
       {state_information_dict}
@@ -359,26 +397,26 @@ prompt_templates:
       # Context
       You are evaluating whether the description effectively conveys where the target object is located relative to the agent. The exact directional terminology (left, right, ahead, etc.) may differ between the state information and the description, but the important factor is whether the description would lead to correct navigation.
 
-      # Key evaluation principle:
-      Even if the directional terms don't exactly match (e.g., state says "ahead" but description says "left"), consider the description CORRECT if:
-      1. It describes other landmarks or objects that are in the same general direction as the target
-      2. It correctly describes the relative positions between multiple objects, showing spatial awareness
-      3. It would still lead to appropriate navigation actions to reach the target
-      
-      Example: {'target_obj_type': 'Pot', 'target_obj_distance': 2.597706272552763, 'distance_to_target': 2.6, 'target_relative_direction': 'ahead', 'visible_objects': [{'type': 'Cabinet', 'distance': 1.37, 'relative_direction': 'ahead'}, {'type': 'Cabinet', 'distance': 1.37, 'relative_direction': 'ahead'}, {'type': 'Cabinet', 'distance': 2.09, 'relative_direction': 'ahead'}, {'type': 'Cabinet', 'distance': 2.15, 'relative_direction': 'ahead'}, {'type': 'Drawer', 'distance': 2.26, 'relative_direction': 'ahead'}, {'type': 'Drawer', 'distance': 2.34, 'relative_direction': 'ahead'}, {'type': 'Spatula', 'distance': 2.34, 'relative_direction': 'ahead'}, {'type': 'Fork', 'distance': 2.39, 'relative_direction': 'ahead'}, {'type': 'CounterTop', 'distance': 2.42, 'relative_direction': 'ahead'}, {'type': 'StoveBurner', 'distance': 2.42, 'relative_direction': 'ahead'}]} # State Description: There is a coffee maker on the counter and a pot on the stove. The pot is on the right side of the stove.
-      - This should be Yes, because the target it mentioned is in the correct positional relationship, and distance should not take into consideration.
+      Example:
+      Groundtruth Current State Information: {"target_obj_type":"Pot","target_distance_to_player":3,"target_direction_to_player":"ahead","visible_objects":[{"type":"Sink","distance_to_player":1,"direction_to_player":"left"},{"type":"SinkBasin","distance_to_player":1,"direction_to_player":"left"},{"type":"Tomato","distance_to_player":1,"direction_to_player":"left"},{"type":"Floor","distance_to_player":1,"direction_to_player":"left"},{"type":"Cabinet","distance_to_player":1,"direction_to_player":"ahead"}]}
+      State Description: There is a red tomato on the left side of the sink, a red apple on the countertop, a plastic bag hanging on the left side, a kitchen sink, a kitchen counter with a knife, a knife holder, a small bowl on the counter, a pot on the right side of the counter, and a window above the counter.
+      - <think>The state descirption does not contain spatial relationship between agent and pot.  Therefore, this description is No.</think><answer>NO</answer>
 
-      Example: {'target_obj_type': 'Kettle', 'target_obj_distance': 2.800935962688674, 'distance_to_target': 2.8, 'target_relative_direction': 'ahead', 'visible_objects': [{'type': 'Plate', 'distance': 0.96, 'relative_direction': 'ahead'}, {'type': 'Bread', 'distance': 1.12, 'relative_direction': 'ahead'}, {'type': 'Fork', 'distance': 1.16, 'relative_direction': 'ahead'}, {'type': 'ButterKnife', 'distance': 1.17, 'relative_direction': 'ahead'}, {'type': 'Spoon', 'distance': 1.17, 'relative_direction': 'ahead'}, {'type': 'Potato', 'distance': 1.31, 'relative_direction': 'ahead'}, {'type': 'DishSponge', 'distance': 1.33, 'relative_direction': 'ahead'}, {'type': 'SoapBottle', 'distance': 1.35, 'relative_direction': 'left'}, {'type': 'CounterTop', 'distance': 1.38, 'relative_direction': 'ahead'}, {'type': 'Sink', 'distance': 1.42, 'relative_direction': 'ahead'}]} # State Description: There is a kettle on the countertop next to the stove. It is located to the right of the stove and slightly to the left of the oven. I should move forward to get closer to the kettle.
-      - This should be Yes, because the dirction and object are corret.
+      Example:
+      Groundtruth Current State Information: {"target_obj_type":"DeskLamp","target_distance_to_player":2,"target_direction_to_player":"right","visible_objects":[{"type":"Chair","distance_to_player":1,"direction_to_player":"ahead"},{"type":"Laptop","distance_to_player":1,"direction_to_player":"ahead"},{"type":"Desk","distance_to_player":1,"direction_to_player":"ahead"},{"type":"CellPhone","distance_to_player":1,"direction_to_player":"ahead"},{"type":"Drawer","distance_to_player":1,"direction_to_player":"right"}]}
+      State Description: There is a lamp on the desk to the right of the computer monitor. The lamp is brighter and more prominent than the computer monitor.
+      - <think>The state descirption does not contain spatial relationship between agent and lamp.  Therefore, this description is No.</think><answer>NO</answer>
 
-      Example: {'target_obj_type': 'Book', 'target_obj_distance': 1.8473598086089775, 'distance_to_target': 1.85, 'target_relative_direction': 'ahead', 'visible_objects': [{'type': 'Floor', 'distance': 0.57, 'relative_direction': 'right'}, {'type': 'Desk', 'distance': 1.13, 'relative_direction': 'ahead'}, {'type': 'Chair', 'distance': 1.46, 'relative_direction': 'ahead'}, {'type': 'CreditCard', 'distance': 1.49, 'relative_direction': 'left'}, {'type': 'CellPhone', 'distance': 1.68, 'relative_direction': 'ahead'}, {'type': 'Box', 'distance': 1.73, 'relative_direction': 'ahead'}, {'type': 'Bowl', 'distance': 1.77, 'relative_direction': 'ahead'}, {'type': 'Pencil', 'distance': 1.8, 'relative_direction': 'ahead'}, {'type': 'Desktop', 'distance': 1.82, 'relative_direction': 'ahead'}, {'type': 'Book', 'distance': 1.85, 'relative_direction': 'ahead'}]} # State Description: On the right side of the image, there is a bookshelf with a collection of books on it. The target object appears to be within the collection.
-      - This should be Yes, because although the direction have slightly difference, we can tell it recognized the target by describing what objects are nearby target like bookshelf.
+      Example:
+      Groundtruth Current State Information: {"target_obj_type":"Plate","target_distance_to_player":2,"target_direction_to_player":"ahead","visible_objects":[{"type":"Floor","distance_to_player":1,"direction_to_player":"left"},{"type":"Box","distance_to_player":1,"direction_to_player":"ahead"},{"type":"Plate","distance_to_player":2,"direction_to_player":"ahead"},{"type":"Vase","distance_to_player":2,"direction_to_player":"ahead"},{"type":"Chair","distance_to_player":2,"direction_to_player":"ahead"}]}
+      State Description: here is a flat dish on the table in the background. It is located slightly to the left and ahead of me.
+      - <think>The state description contains spatial relationship between agent and plate, do further analysis. According to the ground truth data, the plate is in the 'ahead' direction. The description states the plate is 'slightly to the left and ahead of me', which aligns with the target direction being 'ahead'. Therefore, this description is Yes.</think><answer>YES</answer>
 
-      Example: {'target_obj_type': 'CellPhone', 'target_obj_distance': 1.8012038111620734, 'distance_to_target': 1.8, 'target_relative_direction': 'ahead', 'visible_objects': [{'type': 'CreditCard', 'distance': 1.56, 'relative_direction': 'ahead'}, {'type': 'GarbageCan', 'distance': 1.71, 'relative_direction': 'left'}, {'type': 'Book', 'distance': 1.79, 'relative_direction': 'ahead'}, {'type': 'CellPhone', 'distance': 1.8, 'relative_direction': 'ahead'}, {'type': 'CD', 'distance': 1.89, 'relative_direction': 'ahead'}, {'type': 'Desk', 'distance': 1.98, 'relative_direction': 'ahead'}, {'type': 'Pen', 'distance': 2.01, 'relative_direction': 'ahead'}, {'type': 'DeskLamp', 'distance': 2.04, 'relative_direction': 'ahead'}, {'type': 'Pencil', 'distance': 2.05, 'relative_direction': 'ahead'}, {'type': 'Laptop', 'distance': 2.14, 'relative_direction': 'ahead'}]} # State Description: There is a table with a cell phone on it in the middle of the room. To move closer to the cell phone, I should first move forward to reach the table, then move to the right to align with the cell phone.
-      - This should be Yes, because the object it mentioned related to target cellphone is correct, we can tell it also recognized the obejct.
+      Example:
+      Groundtruth Current State Information: {"target_obj_type":"AlarmClock","target_distance_to_player":3,"target_direction_to_player":"ahead","visible_objects":[{"type":"Bed","distance_to_player":2,"direction_to_player":"right"},{"type":"Box","distance_to_player":2,"direction_to_player":"ahead"},{"type":"Book","distance_to_player":2,"direction_to_player":"ahead"},{"type":"Floor","distance_to_player":3,"direction_to_player":"ahead"},{"type":"Drawer","distance_to_player":3,"direction_to_player":"ahead"}]}
+      State Description: There is a trash can in the room. To move to the trash can, I should first move forward.
+      - <think>The state description contains spatial relationship between agent and trash can, do further analysis. According to the ground truth data, the AlarmClock is in the 'ahead' direction. The description instructs to 'move forward' which correctly matches the target direction. Therefore, this description is Yes.</think><answer>YES</answer>
 
-      Example: {'target_obj_type': 'Cup', 'target_obj_distance': 2.622093007530892, 'distance_to_target': 2.62, 'target_relative_direction': 'ahead', 'visible_objects': [{'type': 'Pot', 'distance': 0.71, 'relative_direction': 'ahead'}, {'type': 'Stool', 'distance': 0.75, 'relative_direction': 'ahead'}, {'type': 'StoveBurner', 'distance': 0.91, 'relative_direction': 'left'}, {'type': 'StoveBurner', 'distance': 1.09, 'relative_direction': 'ahead'}, {'type': 'StoveBurner', 'distance': 1.21, 'relative_direction': 'ahead'}, {'type': 'StoveKnob', 'distance': 1.24, 'relative_direction': 'ahead'}, {'type': 'StoveKnob', 'distance': 1.37, 'relative_direction': 'ahead'}, {'type': 'Potato', 'distance': 1.52, 'relative_direction': 'ahead'}, {'type': 'Drawer', 'distance': 1.53, 'relative_direction': 'ahead'}, {'type': 'Pan', 'distance': 1.67, 'relative_direction': 'ahead'}]} # State Description: There is a cup on the counter to the right of the sink. To move to it, I should go forward-left.
-      - This should be Yes, because the forward left for object ahead is acceptable, with minor difference in direction.
 
       # Groundtruth Current State Information:
       {state_information_dict}
@@ -387,42 +425,46 @@ prompt_templates:
       {natural_language_description}
 
       Think step by step:
-      1. Identify where the target object is located relative to the agent from the state information
-      2. Look at what other objects or landmarks are mentioned in both the state information and the description
-      3. Check if the description correctly relates these objects/landmarks to each other spatially
-      4. Determine if following the spatial understanding in the description would reasonably lead to the target, regardless of exact terminology used
-      5. If the description mentions moving in a direction that would approximately lead toward the target, consider this correct even if the exact terms differ
+      1. Check if the description contains spatial relationship between agent and target object
+        - If no spatial relationship is mentioned, answer NO
+      2. If spatial relationship exists, check if the predicted direction is consistent with the target direction
+        - "ahead/forward" = "ahead"  
+        - "left" = "left"
+        - "right" = "right"
+        - Combined directions like "forward-left", "forward-right" are acceptable if they include the correct primary direction
+      3. The prediction is correct if it mentions moving toward the target in a direction that reasonably aligns with the groundtruth direction
 
       Your answer should be in the format of <think>...</think><answer>YES</answer> or <think>...</think><answer>NO</answer>.
 
     worldmodeling: |
       Evaluate whether the prediction effectively anticipates how the agent would navigate toward the target object, even if the exact directional terms differ.
-      Answer YES if the overall navigation plan is reasonable, or NO if it fundamentally misunderstands the spatial layout.
+      Answer YES if the overall navigation plan is reasonable, or NO if it misunderstands or did not mention the spatial layout.
 
       # Context
       You are evaluating whether the prediction effectively anticipates how the agent would move to reach the target object. The exact directional terminology (left, right, ahead, etc.) may differ between the state information and the prediction, but the important factor is whether the prediction would lead to successful navigation.
 
-      # Key evaluation principle:
-      Even if the directional terms don't exactly match (e.g., state says "ahead" but prediction says "left"), consider the prediction CORRECT if:
-      1. It describes a movement path that would generally lead toward the target
-      2. It correctly anticipates how landmarks or objects would be positioned after movement
-      3. The overall navigation strategy would plausibly succeed in reaching the target
+      # Important: The Prediction Comes First
+      Remember: The Next State Prediction is made BEFORE the Groundtruth Next State exists. Your task is to check if the prediction correctly anticipated what actually happened.
 
-      Example: # Next State Prediction: I will be closer to the bowl
-      - This should be No, because it did not mention the direction between player and target
+      Example:
+      Groundtruth Current State Information: {"target_obj_type":"GarbageCan","target_distance_to_player":3,"target_direction_to_player":"ahead","visible_objects":[{"type":"CellPhone","distance_to_player":1,"direction_to_player":"right"},{"type":"Chair","distance_to_player":1,"direction_to_player":"ahead"},{"type":"Plate","distance_to_player":1,"direction_to_player":"ahead"},{"type":"DiningTable","distance_to_player":2,"direction_to_player":"right"},{"type":"Chair","distance_to_player":2,"direction_to_player":"ahead"}]}
+      State Description: There is a trash can in the lower left corner of the image. To move there, I can go forward-left.
+      - <think>The prediction state contains spatial relationship between agent and trash can, do further analysis. According to the ground truth data, the GarbageCan is in the 'ahead' direction. The description places it in the 'lower left corner' and suggests 'forward-left' movement. Given that the target direction is 'ahead', the 'forward-left' specification provides a reasonable directional interpretation. Therefore, this description is Yes.</think><answer>YES</answer>
 
-      Example: # Next State Prediction: I will move towards the desk and then move towards the DeskLamp.
-      - This should be No, because it did not mention the directio between player and target
+      Example:
+      Groundtruth Current State Information: {"target_obj_type":"Book","target_distance_to_player":3,"target_direction_to_player":"ahead","visible_objects":[{"type":"Laptop","distance_to_player":1,"direction_to_player":"ahead"},{"type":"Floor","distance_to_player":1,"direction_to_player":"right"},{"type":"CreditCard","distance_to_player":2,"direction_to_player":"ahead"},{"type":"Desk","distance_to_player":2,"direction_to_player":"ahead"},{"type":"Chair","distance_to_player":2,"direction_to_player":"ahead"}]}
+      State Description: I will move towards the table to reach the bound collection of pages.
+      - <think>The prediction state does not contain spatial relationship between agent and book. Therefore, this description is No.</think><answer>NO</answer>
 
-      Example: {'target_obj_type': 'DeskLamp', 'target_obj_distance': 1.4956950005499683, 'distance_to_target': 1.5, 'target_relative_direction': 'back', 'visible_objects': [{'type': 'Painting', 'distance': 1.39, 'relative_direction': 'ahead'}, {'type': 'Statue', 'distance': 1.46, 'relative_direction': 'ahead'}, {'type': 'Painting', 'distance': 1.47, 'relative_direction': 'ahead'}, {'type': 'Floor', 'distance': 1.94, 'relative_direction': 'right'}, {'type': 'Stool', 'distance': 2.03, 'relative_direction': 'ahead'}, {'type': 'AlarmClock', 'distance': 2.27, 'relative_direction': 'ahead'}, {'type': 'Box', 'distance': 2.33, 'relative_direction': 'right'}, {'type': 'Blinds', 'distance': 2.55, 'relative_direction': 'ahead'}, {'type': 'Window', 'distance': 2.6, 'relative_direction': 'ahead'}]} # Next State Prediction: I will move left to try to locate the lamp.
-      - This should be Yes, because the direction is 'back', player would not see the object at the first seen. The action of move left is possible and helpful for locating the target.
+      Example:
+      Groundtruth Next State Information: {"target_obj_type":"Lettuce","target_distance_to_player":2,"target_direction_to_player":"left","visible_objects":[{"type":"Knife","distance_to_player":1,"direction_to_player":"ahead"},{"type":"SaltShaker","distance_to_player":1,"direction_to_player":"ahead"},{"type":"GarbageCan","distance_to_player":1,"direction_to_player":"ahead"},{"type":"Spatula","distance_to_player":1,"direction_to_player":"ahead"},{"type":"CounterTop","distance_to_player":1,"direction_to_player":"ahead"}]}
+      Next State Prediction: I will be close to the lettuce.
+      - <think>The prediction state does not contain spatial relationship between agent and lettuce.  Therefore, this description is No.</think><answer>NO</answer>
 
-      Example: {'target_obj_type': 'Book', 'target_obj_distance': 1.3476375595661192, 'distance_to_target': 1.35, 'target_relative_direction': 'ahead', 'visible_objects': [{'type': 'Desk', 'distance': 0.65, 'relative_direction': 'ahead'}, {'type': 'Floor', 'distance': 0.98, 'relative_direction': 'back'}, {'type': 'Chair', 'distance': 1.01, 'relative_direction': 'ahead'}, {'type': 'CellPhone', 'distance': 1.22, 'relative_direction': 'ahead'}, {'type': 'Box', 'distance': 1.25, 'relative_direction': 'ahead'}, {'type': 'Bowl', 'distance': 1.29, 'relative_direction': 'ahead'}, {'type': 'Pencil', 'distance': 1.3, 'relative_direction': 'ahead'}, {'type': 'Book', 'distance': 1.35, 'relative_direction': 'ahead'}, {'type': 'Pen', 'distance': 1.36, 'relative_direction': 'ahead'}, {'type': 'KeyChain', 'distance': 1.4, 'relative_direction': 'ahead'}]} # Next State Prediction: I will approach the bookshelf by moving forward and then right.
-      - This should be Yes, because the book and bookshelf are at the same direction, and it mentioned the direction of "moving forward and right".
-
-      Example: Groundtruth Next State Information: {'target_obj_type': 'Toaster', 'target_obj_distance': 1.4994579527071552, 'distance_to_target': 1.5, 'target_relative_direction': 'left', 'visible_objects': [{'type': 'Cabinet', 'distance': 0.7, 'relative_direction': 'ahead'}, {'type': 'SinkBasin', 'distance': 0.81, 'relative_direction': 'ahead'}, {'type': 'Microwave', 'distance': 0.83, 'relative_direction': 'right'}, {'type': 'Spatula', 'distance': 0.89, 'relative_direction': 'ahead'}, {'type': 'Cabinet', 'distance': 0.92, 'relative_direction': 'ahead'}, {'type': 'ButterKnife', 'distance': 0.93, 'relative_direction': 'ahead'}, {'type': 'Cabinet', 'distance': 0.94, 'relative_direction': 'ahead'}, {'type': 'Cabinet', 'distance': 0.99, 'relative_direction': 'ahead'}, {'type': 'CounterTop', 'distance': 1.01, 'relative_direction': 'left'}, {'type': 'Faucet', 'distance': 1.05, 'relative_direction': 'ahead'}]} # Next State Prediction: I will be moving forward towards the toaster.
-      - This should be Yes, because it mentioned the direction "move forward", and toward the target toaster
-
+      Example:
+      Groundtruth Next State Information: {"target_obj_type":"DeskLamp","target_distance_to_player":3,"target_direction_to_player":"ahead","visible_objects":[{"type":"Curtains","distance_to_player":2,"direction_to_player":"left"},{"type":"KeyChain","distance_to_player":2,"direction_to_player":"ahead"},{"type":"Window","distance_to_player":2,"direction_to_player":"left"},{"type":"Pillow","distance_to_player":2,"direction_to_player":"ahead"},{"type":"Sofa","distance_to_player":3,"direction_to_player":"ahead"}]}
+      Next State Prediction: I should move forward and slightly to the right to get closer to the desk lamp.
+      - <think>The prediction state contains spatial relationship between agent and DeskLamp, do further analysis. According to the ground truth data, the DeskLamp is in the 'ahead' direction. The description indicates movement 'forward and slightly to the right' is needed to reach the lamp. The 'forward' direction aligns with the target being 'ahead'. Therefore, this description is Yes.</think><answer>YES</answer>
 
       # Groundtruth Next State Information:
       {state_information_dict}
@@ -431,10 +473,16 @@ prompt_templates:
       {natural_language_description}
 
       Think step by step:
-      1. Identify the planned movements and where the target object would be located after these movements
-      2. Look at what other objects or landmarks are mentioned in both the state information and the prediction
-      3. Check if the prediction correctly anticipates how these objects/landmarks would be positioned relative to each other after movement
-      4. Determine if the navigation strategy described would plausibly lead toward the target
-      5. If the prediction mentions future positions or movements that would approximately lead toward the target, consider this correct even if the exact terms differ
+      1. First, check if the prediction explicitly uses EXACT directional terms that appear in the groundtruth state: "ahead", "left", "right", "up", "down". 
+        - Terms like "move towards", "closer to", "near", "approaching", "in front of", "by", "at" DO NOT qualify
+        - "Will be on the left/right/ahead" or "Will move left/right/forward" DO qualify
+        - If no exact directional match to groundtruth is present, conclude with NO immediately
+      2. If explicit direction words exist, verify that they EXACTLY match the target object's direction in the groundtruth:
+        - If target is "ahead", prediction must specify "ahead", "forward", "slightly left", OR "slightly right" (special case: we allow slightly left/right for ahead targets)
+        - If target is "right", prediction must specify "right" 
+        - If target is "left", prediction must specify "left"
+      3. Even if the prediction mentions intermediate objects correctly, it MUST explicitly state the correct final direction to the target object
+      4. The prediction cannot substitute object references for directions (saying "move to X" instead of "move right")
+      5. Remember that the prediction was made BEFORE the groundtruth state was determined
 
       Your answer should be in the format of <think>...</think><answer>YES</answer> or <think>...</think><answer>NO</answer>.
