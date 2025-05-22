@@ -408,7 +408,7 @@ def process_llm_judgments(input_data: List[Dict[str, Any]], config: Optional[Dic
     for i, response_data in enumerate(llm_responses):
         # Extract the YES/NO answer
         score = 0.0  # Default score (NO or failure)
-        
+        parse_success = False
         if response_data["success"]:
             # Use regex to find the answer tag
             answer_match = re.search(r'<answer>(YES|NO)</answer>', response_data["response"], re.IGNORECASE)
@@ -416,8 +416,7 @@ def process_llm_judgments(input_data: List[Dict[str, Any]], config: Optional[Dic
                 answer = answer_match.group(1).upper()
                 score = 1.0 if answer == "YES" else 0.0
                 parse_success = True
-        else:
-            parse_success = False
+       
     
             
         

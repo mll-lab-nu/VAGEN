@@ -285,7 +285,7 @@ prompt_templates:
 
       Your answer should be in the format of <think>...</think><answer>YES</answer> or <think>...</think><answer>NO</answer>.
   
-  maniskill:
+  primitive_skill:
     grounding: |
       Compare the description of the current state with the groundtruth current state information.
       Answer YES if the description reasonably matches the current state information, or NO if it doesn't.
