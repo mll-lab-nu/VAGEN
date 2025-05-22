@@ -3,7 +3,7 @@ from typing import Any, Dict, Union
 import numpy as np
 import torch
 
-from mani_skill.agents.robots import Fetch, Panda, Xmate3Robotiq
+from mani_skill.agents.robots import Fetch, Panda
 from mani_skill.envs.sapien_env import BaseEnv
 from mani_skill.envs.utils import randomization
 from mani_skill.sensors.camera import CameraConfig
@@ -20,7 +20,7 @@ from collections import defaultdict
 class PlaceTwoCubeEnv(BaseEnv):
 
     SUPPORTED_ROBOTS = ["panda", "xmate3_robotiq", "fetch"]
-    agent: Union[Panda, Xmate3Robotiq, Fetch]
+    agent: Union[Panda, Fetch]
     skill_config=None
     vlm_info_keys=[]
     state_keys=["red_cube_position", "green_cube_position","left_target_position","right_target_position"]
