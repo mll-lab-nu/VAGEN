@@ -7,7 +7,7 @@ api:
   qps_limit: 70        
   rpm_limit: 4000      
   tps_limit: 1500000     
-  batch_size: 128      
+  batch_size: 256      
 
 # Log
 wandb:
