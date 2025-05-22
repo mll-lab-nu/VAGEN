@@ -16,8 +16,8 @@ class NavigationEnvConfig(BaseEnvConfig):
     format_reward: float = 0.5
     gpu_device: int = 0
     prompt_format: str = "free_think" 
-    success_threshold: float = 1.0
-    step_length: float = 0.25
+    success_threshold: float = 1.5
+    step_length: float = 0.5
     # "free_think", "no_think", "grounding", "worldmodeling", "grounding_worldmodeling"
     
     
