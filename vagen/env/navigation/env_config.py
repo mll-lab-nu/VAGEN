@@ -22,7 +22,7 @@ class NavigationEnvConfig(BaseEnvConfig):
     
     
     # configs for process reward for grounding and world modeling
-    max_objects_in_state: int = 10
+    max_objects_in_state: int = 5
     use_state_reward: bool = False
     grounding_reward_weight: float = 0.5
     worldmodeling_reward_weight: float = 0.5

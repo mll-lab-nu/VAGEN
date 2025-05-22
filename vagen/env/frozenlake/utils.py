@@ -62,3 +62,63 @@ def is_valid(board: List[List[str]], max_size: int) -> bool:
                 if board[r_new][c_new] != "H":
                     frontier.append((r_new, c_new))
     return False
+
+
+def state_to_sentences(state_dict):
+    """
+    Convert game state dictionary to descriptive sentences about spatial relationships.
+    
+    Args:
+        state_dict (dict): Dictionary containing:
+            - player_position: tuple (row, col)
+            - target_position: tuple (row, col) 
+            - hole_positions: list of tuples [(row, col), ...]
+            - grid_size: tuple (rows, cols)
+    
+    Returns:
+        list: List of descriptive sentences
+    """
+    sentences = []
+    
+    player_pos = state_dict['player_position']
+    target_pos = state_dict['target_position']
+    hole_positions = state_dict['hole_positions']
+    
+    def get_relative_position(pos1, pos2):
+        """
+        Get relative position description between two positions.
+        pos1 is the reference point, pos2 is described relative to pos1.
+        """
+        row1, col1 = pos1
+        row2, col2 = pos2
+        
+        if pos1 == pos2:
+            return "at the same place as"
+        
+        # Determine row relationship
+        if row1 == row2:
+            if col1 > col2:
+                return "at the same row and to the left of"
+            else:  # col1 < col2
+                return "at the same row and to the right of"
+        elif col1 == col2:
+            if row1 > row2:
+                return "above and at the same column as"
+            else:  # row1 < row2
+                return "below and at the same column as"
+        else:
+            # Different row and column
+            row_desc = "above" if row1 > row2 else "below"
+            col_desc = "on the left side" if col1 > col2 else "on the right side"
+            return f"{row_desc} and {col_desc} of"
+    
+    # Describe target relative to player
+    target_relation = get_relative_position(player_pos, target_pos)
+    sentences.append(f"target is {target_relation} the player")
+    
+    # Describe each hole relative to player
+    for i, hole_pos in enumerate(hole_positions):
+        hole_relation = get_relative_position(player_pos, hole_pos)
+        sentences.append(f"hole{i} is {hole_relation} the player")
+    
+    return sentences

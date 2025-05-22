@@ -473,18 +473,17 @@ class NavigationEnv(BaseEnv):
                 # Store object information
                 visible_objects.append({
                     "type": obj["objectType"],
-                    "distance": obj_distance,
-                    "relative_direction": relative_direction,
+                    "direction_to_player": relative_direction,
+                    "distance_to_player": obj_distance,
                 })
     
         # Sort objects by distance (closest first)
-        visible_objects.sort(key=lambda x: x["distance"])
+        visible_objects.sort(key=lambda x: x["distance_to_player"])
         
         return {
             "target_obj_type": target_type, 
-            "target_obj_distance": distance,
-            "distance_to_target": round(distance, 2), 
-            "target_relative_direction": target_relative_direction,
+            "target_distance_to_player": round(distance, 2), 
+            "target_direction_to_player": target_relative_direction,
             "visible_objects": visible_objects[:self.config.max_objects_in_state],   
         }
 

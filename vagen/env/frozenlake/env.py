@@ -11,6 +11,7 @@ from .prompt import system_prompt, init_observation_template, action_template, f
 from .env_config import FrozenLakeEnvConfig
 from .utils import generate_random_map, is_valid
 from vagen.env.utils.state_reward_text_utils import env_state_reward_wrapper
+from .utils import state_to_sentences
 class FrozenLakeEnv(BaseEnv):
     """
     FrozenLake Environment for training and evaluating language models as agents.
@@ -326,13 +327,13 @@ class FrozenLakeEnv(BaseEnv):
         target_position = tuple(map(int, np.argwhere(self.gym_env.desc == b'G')[0]))
         
         hole_positions = [tuple(map(int, pos)) for pos in np.argwhere(self.gym_env.desc == b'H')]
-        
-        return {
+        state_dict={
             "player_position": player_position,
             "target_position": target_position,
             "hole_positions": hole_positions,
             "grid_size": (nrow, ncol),
         }
+        return state_to_sentences(state_dict)
 
 if __name__ == "__main__":
     """

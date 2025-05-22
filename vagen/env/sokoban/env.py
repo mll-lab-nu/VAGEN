@@ -15,7 +15,7 @@ from .prompt import (
 )
 from .env_config import SokobanEnvConfig
 from vagen.env.utils.state_reward_text_utils import env_state_reward_wrapper
-
+from .utils import sokoban_state_to_sentences
 class SokobanEnv(BaseEnv):
     GRID_LOOKUP = {
         0: " # \t",  # wall
@@ -206,14 +206,14 @@ class SokobanEnv(BaseEnv):
         # Convert grid size dimensions to standard Python integers
         grid_size = tuple(map(int, room_state.shape))
         
-        return {
+        state_dict= {
             "player_position": player_pos,
             "box_positions": box_positions,
             "target_positions": target_positions,
             "wall_positions": wall_positions,
             "grid_size": grid_size
         }
-    
+        return sokoban_state_to_sentences(state_dict)
     
 if __name__ == "__main__":
     kwargs = {
