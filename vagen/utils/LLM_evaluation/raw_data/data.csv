@@ -1,0 +1,21 @@
+Id,Task,Type,Gt_state,Predicted_state,Human_answer
+61,maniskill,worldmodeling,"{'left_target_position': (80, -100, 0), 'right_target_position': (80, 100, 0), 'red_cube_position': (79, -102, 20), 'green_cube_position': (76, 100, 20)}  ","{'red_cube':(80,-100,0), 'green_cube':(76,100,20)}",No
+62,maniskill,worldmodeling,"{'left_target_position': (80, -100, 0), 'right_target_position': (80, 100, 0), 'red_cube_position': (83, -101, 20), 'green_cube_position': (78, 102, 20)} ","{'red_cube':(80,-100,0), 'green_cube':(78,102,20}}",No
+63,maniskill,worldmodeling," {'left_target_position': (80, -100, 0), 'right_target_position': (80, 100, 0), 'red_cube_position': (-16, -78, 20), 'green_cube_position': (-83, 57, 20)}","{'red_cube':(-17,-78,20), 'green_cube':(-83,57,20}}",Yes
+64,maniskill,worldmodeling,"{'red_cube_position': (24, 71, 20), 'green_cube_position': (6, -119, 20), 'purple_cube_position': (-91, -78, 20)}","{'red_cube':(24, 71, 20), 'green_cube':(6, -119, 20), 'purple_cube':(24, 71, 20)}",No
+65,maniskill,worldmodeling,"{'apple_position': (-521, -546, 36), 'drawer_position': (-500, -800, 200)}","{'apple':(-500,-782,200)}",No
+66,maniskill,worldmodeling,"{'apple_position': (-499, -533, 220), 'drawer_position': (-500, -537, 200)}","{'apple':(-500,-537,500), 'drawer':(-500,-537,200)}",No
+67,maniskill,worldmodeling,"{'apple_position': (-355, -190, 37), 'drawer_position': (-500, -537, 200)} ",...,No
+68,maniskill,worldmodeling,"{'red_cube_position': (169, -49, 20), 'green_cube_position': (139, 124, 20)}","red_cube_position': '(160, -49, 20)', 'green_cube_position': '(135, 124, 20)'",Yes
+69,maniskill,worldmodeling,"{'red_cube_position': (132, 123, 20), 'green_cube_position': (185, 132, 20)}","Red Cube: (132, 132, 20) | Green Cube: (185, 132, 20)",Yes
+70,maniskill,worldmodeling,"{'left_target_position': (80, -100, 0), 'right_target_position': (80, 100, 0), 'red_cube_position': (80, -104, 20), 'green_cube_position': (-37, -9, 20)}","{'red_cube':(80,-100,0),'green_cube':(80,100,0)}",No
+71,maniskill,grounding,"{'red_cube_position': (-4, 72, 20), 'green_cube_position': (21, -118, 20), 'purple_cube_position': (-92, -73, 20)}","{'red_cube':(21, -118, 20), 'green_cube':(-4, 72, 20), 'purple_cube':(-92, -73, 20)}",No
+72,maniskill,grounding,"{'apple_position': (-132, 155, 36), 'drawer_position': (-500, -537, 200)}","Apple position: (-132, 155, 36) Drawer position: (-500, -537, 200) Drawer open value: 263",Yes
+73,maniskill,grounding,"{'left_target_position': (80, -100, 0), 'right_target_position': (80, 100, 0), 'red_cube_position': (-35, 44, 20), 'green_cube_position': (-29, -59, 20)}","{'red_cube':(80,-100,0),'green_cube':(80,100,0),'left_target':(-35,44,20),'right_target':(-29,-59,20)}",No
+74,maniskill,grounding,"{'apple_position': (-148, 180, 36), 'drawer_position': (-500, -537, 200)}","Apple position: (-148, 180, 36)",Yes
+75,maniskill,grounding,"{'red_cube_position': (54, -44, 20), 'green_cube_position': (108, 39, 20), 'purple_cube_position': (-71, -17, 20)}","{'red_cube':(54,-44,20),'green_cube':(108,39,20),'purple_cube':(54,-44,60)}",No
+76,maniskill,grounding,"{'red_cube_position': (-2, 69, 20), 'green_cube_position': (128, 185, 20)}","{'red_cube':(-2,69,20), 'green_cube':(128,185,20)}",Yes
+77,maniskill,grounding,"{'left_target_position': (80, -100, 0), 'right_target_position': (80, 100, 0), 'red_cube_position': (-1, -82, 20), 'green_cube_position': (-28, 65, 20)}","{'red_cube':(-1,-82,20),'green_cube':(-28,65,20),'left_target':(80,-100,0),'right_target':(80,100,0)}",Yes
+78,maniskill,grounding,"{'apple_position': (-503, -535, 220), 'drawer_position': (-500, -537, 200)}","{'apple':(-503,-535,220),'drawer':(-500,-537,200)}",Yes
+79,maniskill,grounding,"{'red_cube_position': (-74, 181, 60), 'green_cube_position': (-71, 176, 20), 'purple_cube_position': (112, 151, 20)}","{'red_cube':(-71,176,60),'green_cube':(-71,176,20),'purple_cube':(112,151,60)}",No
+80,maniskill,grounding,"{'left_target_position': (80, -100, 0), 'right_target_position': (80, 100, 0), 'red_cube_position': (79, -102, 20), 'green_cube_position': (77, 101, 20)}","...",No

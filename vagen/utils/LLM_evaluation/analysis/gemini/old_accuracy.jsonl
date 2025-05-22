@@ -1,0 +1,8 @@
+{"model": "gemini", "env": "frozenlake", "type": "grounding", "total": 10, "correct": 6, "response_len": 85.8, "accuracy": 60.0}
+{"model": "gemini", "env": "frozenlake", "type": "worldmodeling", "total": 10, "correct": 4, "response_len": 93.3, "accuracy": 40.0}
+{"model": "gemini", "env": "maniskill", "type": "grounding", "total": 10, "correct": 7, "response_len": 120.6, "accuracy": 70.0}
+{"model": "gemini", "env": "maniskill", "type": "worldmodeling", "total": 10, "correct": 7, "response_len": 264.8, "accuracy": 70.0}
+{"model": "gemini", "env": "navigation", "type": "grounding", "total": 10, "correct": 5, "response_len": 107.1, "accuracy": 50.0}
+{"model": "gemini", "env": "navigation", "type": "worldmodeling", "total": 10, "correct": 8, "response_len": 120.0, "accuracy": 80.0}
+{"model": "gemini", "env": "sokoban", "type": "grounding", "total": 10, "correct": 5, "response_len": 139.6, "accuracy": 50.0}
+{"model": "gemini", "env": "sokoban", "type": "worldmodeling", "total": 10, "correct": 6, "response_len": 166.0, "accuracy": 60.0}

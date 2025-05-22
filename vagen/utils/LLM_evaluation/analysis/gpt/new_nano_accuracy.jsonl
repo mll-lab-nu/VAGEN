@@ -1,0 +1,8 @@
+{"model": "gpt-4.1-nano", "env": "frozenlake", "type": "grounding", "total": 10, "correct": 9, "response_len": 137.6, "accuracy": 90.0}
+{"model": "gpt-4.1-nano", "env": "frozenlake", "type": "worldmodeling", "total": 10, "correct": 8, "response_len": 176.4, "accuracy": 80.0}
+{"model": "gpt-4.1-nano", "env": "maniskill", "type": "grounding", "total": 10, "correct": 10, "response_len": 193.4, "accuracy": 100.0}
+{"model": "gpt-4.1-nano", "env": "maniskill", "type": "worldmodeling", "total": 10, "correct": 8, "response_len": 206.3, "accuracy": 80.0}
+{"model": "gpt-4.1-nano", "env": "navigation", "type": "grounding", "total": 10, "correct": 10, "response_len": 164.4, "accuracy": 100.0}
+{"model": "gpt-4.1-nano", "env": "navigation", "type": "worldmodeling", "total": 10, "correct": 9, "response_len": 167.2, "accuracy": 90.0}
+{"model": "gpt-4.1-nano", "env": "sokoban", "type": "grounding", "total": 10, "correct": 8, "response_len": 221.6, "accuracy": 80.0}
+{"model": "gpt-4.1-nano", "env": "sokoban", "type": "worldmodeling", "total": 10, "correct": 9, "response_len": 231.3, "accuracy": 90.0}
