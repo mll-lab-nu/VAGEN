@@ -6,15 +6,15 @@ from openai import AsyncOpenAI
 
 class RateLimiter:
     """Rate limiter for OpenAI GPT API"""
-    def __init__(self, rpm_limit=5000, tpm_limit=4000000):
+    def __init__(self, qps_limit=70, rpm_limit=4000, tps_limit=15000):
+        self.qps_limit = qps_limit
         self.rpm_limit = rpm_limit
-        self.tpm_limit = tpm_limit
+        self.tps_limit = tps_limit
         self.request_timestamps = []
         self.token_counts = []
-        # Conservative concurrent request limit
-        self.semaphore = asyncio.Semaphore(50)
+        self.semaphore = asyncio.Semaphore(qps_limit)
     
-    async def wait_if_needed(self, estimated_tokens=1000):
+    async def wait_if_needed(self, estimated_tokens=500):
         now = time.time()
         # Clean up old timestamps (older than 60 seconds)
         self.request_timestamps = [ts for ts in self.request_timestamps if now - ts < 60]
@@ -24,19 +24,22 @@ class RateLimiter:
         rpm_current = len(self.request_timestamps)
         if rpm_current >= self.rpm_limit:
             oldest = self.request_timestamps[0]
-            wait_time = 60 - (now - oldest) + 0.1
+            wait_time = 60 - (now - oldest)
             if wait_time > 0:
                 await asyncio.sleep(wait_time)
                 return await self.wait_if_needed(estimated_tokens)
         
-        # Check TPM limit
-        total_tokens = sum(self.token_counts)
-        if total_tokens + estimated_tokens >= self.tpm_limit:
-            oldest = self.request_timestamps[0]
-            wait_time = 60 - (now - oldest) + 0.1
-            if wait_time > 0:
-                await asyncio.sleep(wait_time)
-                return await self.wait_if_needed(estimated_tokens)
+        # Check QPS limit (last 1 second)
+        recent_requests = sum(1 for ts in self.request_timestamps if now - ts < 1)
+        if recent_requests >= self.qps_limit:
+            await asyncio.sleep(0.1)
+            return await self.wait_if_needed(estimated_tokens)
+        
+        # Check TPS limit (last 1 second)
+        recent_tokens = sum(tokens for ts, tokens in zip(self.request_timestamps, self.token_counts) if now - ts < 1)
+        if recent_tokens + estimated_tokens >= self.tps_limit:
+            await asyncio.sleep(0.2)
+            return await self.wait_if_needed(estimated_tokens)
         
         # Update tracking
         self.request_timestamps.append(now)
@@ -54,7 +57,7 @@ def run_gpt_request(prompts: List[str], config) -> List[Dict[str, Any]]:
         List of dictionaries with results for each prompt
     """
     # Process in batches if needed
-    batch_size = config.get("batch_size", 10)
+    batch_size = config.get("batch_size", 20)
     if len(prompts) <= batch_size:
         return _process_batch(prompts, config)
     
@@ -68,26 +71,25 @@ def run_gpt_request(prompts: List[str], config) -> List[Dict[str, Any]]:
         batch_results = _process_batch(batch, config)
         all_results.extend(batch_results)
         if i < len(batches) - 1:
-            time.sleep(1)  # Slightly longer delay between batches
+            time.sleep(0.5)
     
     return all_results
 
 def _process_batch(prompts: List[str], config) -> List[Dict[str, Any]]:
     """Process a single batch with rate limiting"""
     async def _async_batch_completions():
-        async_client = AsyncOpenAI(
-            api_key=config.get("api_key") or None  # Uses OPENAI_API_KEY env var if None
-        )
+        async_client = AsyncOpenAI()
         rate_limiter = RateLimiter(
-            rpm_limit=config.get("rpm_limit", 5000),
-            tpm_limit=config.get("tpm_limit", 4000000)
+            qps_limit=config.get("qps_limit", 70),
+            rpm_limit=config.get("rpm_limit", 4000),
+            tps_limit=config.get("tps_limit", 15000)
         )
         
         results = [{"response": "", "success": False, "retries": 0, "error": None} for _ in prompts]
         
         async def process_prompt(prompt: str, index: int) -> None:
             retries = 0
-            # Estimate tokens (1 token ≈ 4 chars for English text)
+            # Estimate tokens (1 token ≈ 4 chars)
             estimated_prompt_tokens = len(prompt) // 4
             estimated_completion_tokens = config.get("max_tokens", 500)
             total_estimated_tokens = estimated_prompt_tokens + estimated_completion_tokens
@@ -97,55 +99,40 @@ def _process_batch(prompts: List[str], config) -> List[Dict[str, Any]]:
                     async with rate_limiter.semaphore:
                         await rate_limiter.wait_if_needed(total_estimated_tokens)
                         
-                        # Use chat completions for GPT models
                         response = await async_client.chat.completions.create(
-                            model=config.get("model", "gpt-4.1-nano"),
+                            model=config.get("name", "gpt-4.1-nano"),
                             messages=[
-                                {"role": "system", "content": config.get("system_message", "You are a helpful assistant.")},
                                 {"role": "user", "content": prompt}
                             ],
                             temperature=config.get("temperature", 0.1),
-                            max_tokens=estimated_completion_tokens,
-                            timeout=config.get("request_timeout", 120)
+                            max_tokens=estimated_completion_tokens
                         )
                         
                         results[index] = {
                             "response": response.choices[0].message.content,
                             "success": True,
                             "retries": retries,
-                            "error": None,
-                            "usage": {
-                                "prompt_tokens": response.usage.prompt_tokens,
-                                "completion_tokens": response.usage.completion_tokens,
-                                "total_tokens": response.usage.total_tokens
-                            }
+                            "error": None
                         }
                         return
-                        
                 except Exception as e:
                     error_str = str(e)
                     retries += 1
                     
-                    # Handle different types of errors
-                    if "rate_limit" in error_str.lower() or "rate limit" in error_str.lower():
-                        # Exponential backoff for rate limit errors
-                        backoff_time = config.get("retry_delay", 2) * (2 ** (retries - 1))
+                    # Exponential backoff for rate limit errors
+                    if "rate_limit" in error_str.lower():
+                        backoff_time = config.get("retry_delay", 1) * (2 ** (retries - 1))
                         backoff_time += random.uniform(0, 1)  # Add jitter
-                        backoff_time = min(backoff_time, 60)  # Cap at 60s
-                        print(f"Rate limit hit, waiting {backoff_time:.1f}s before retry {retries}")
+                        backoff_time = min(backoff_time, 30)  # Cap at 30s
                         await asyncio.sleep(backoff_time)
-                    elif "timeout" in error_str.lower():
-                        print(f"Timeout error on attempt {retries}, retrying...")
-                        await asyncio.sleep(config.get("retry_delay", 2))
                     elif retries <= config.get("max_retries", 3):
-                        await asyncio.sleep(config.get("retry_delay", 2))
+                        await asyncio.sleep(config.get("retry_delay", 1))
                     else:
                         results[index] = {
-                            "response": f"Error after {retries} attempts: {error_str}",
+                            "response": f"Error after {retries} attempts",
                             "success": False,
                             "retries": retries,
-                            "error": error_str,
-                            "usage": None
+                            "error": error_str
                         }
                         return
         
@@ -154,10 +141,10 @@ def _process_batch(prompts: List[str], config) -> List[Dict[str, Any]]:
         try:
             await asyncio.wait_for(
                 asyncio.gather(*tasks, return_exceptions=True), 
-                timeout=config.get("batch_timeout", 300)  # 5 minutes for the entire batch
+                timeout=config.get("request_timeout", 120)
             )
         except asyncio.TimeoutError:
-            print("Batch processing timed out")
+            pass
         
         return results
     
@@ -177,8 +164,7 @@ def _process_batch(prompts: List[str], config) -> List[Dict[str, Any]]:
             results = loop.run_until_complete(_async_batch_completions())
             loop.close()
     except Exception as e:
-        print(f"Global error: {str(e)}")
-        return [{"response": f"Global error: {str(e)}", "success": False, "retries": 0, "error": str(e), "usage": None} 
+        return [{"response": f"Global error: {str(e)}", "success": False, "retries": 0, "error": str(e)} 
                 for _ in prompts]
     
     return results

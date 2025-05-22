@@ -1,14 +1,13 @@
 api:
-  # Existing parameters
-  name: "meta-llama/Llama-4-Scout-17B-16E-Instruct"
+  name: "gpt-4.1.nano"
   temperature: 0.1
-  max_tokens: 500
-  max_retries: 3
-  request_timeout: 30  # Increased for rate limiting
+  max_tokens: 400
+  max_retries: 2
+  request_timeout: 30 
   qps_limit: 70        
-  rpm_limit: 4400      
-  tps_limit: 15000     
-  batch_size: 300      
+  rpm_limit: 4000      
+  tps_limit: 1500000     
+  batch_size: 128      
 
 # Log
 wandb:
