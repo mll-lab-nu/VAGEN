@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import sapien.core as sapien
 
-from mani_skill.agents.robots import Fetch, Panda, Xmate3Robotiq
+from mani_skill.agents.robots import Fetch, Panda
 from mani_skill.envs.sapien_env import BaseEnv
 from mani_skill.envs.utils import randomization
 from mani_skill.sensors.camera import CameraConfig
@@ -20,7 +20,7 @@ from collections import defaultdict
 @register_env("PutAppleInDrawer", max_episode_steps=3000)
 class PutAppleInDrawerEnv(BaseEnv):
     SUPPORTED_ROBOTS = ["panda", "xmate3_robotiq", "fetch"]
-    agent: Union[Panda, Xmate3Robotiq, Fetch]
+    agent: Union[Panda, Fetch]
     vlm_info_keys=["drawer_open_value"]
     state_keys=["apple_position", "drawer_position"]
     # Asset configuration and constants

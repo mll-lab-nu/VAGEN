@@ -16,11 +16,13 @@ class NavigationEnvConfig(BaseEnvConfig):
     format_reward: float = 0.5
     gpu_device: int = 0
     prompt_format: str = "free_think" 
+    success_threshold: float = 1.5
+    step_length: float = 0.5
     # "free_think", "no_think", "grounding", "worldmodeling", "grounding_worldmodeling"
     
     
     # configs for process reward for grounding and world modeling
-    max_objects_in_state: int = 10
+    max_objects_in_state: int = 5
     use_state_reward: bool = False
     grounding_reward_weight: float = 0.5
     worldmodeling_reward_weight: float = 0.5

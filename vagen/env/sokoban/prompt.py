@@ -52,6 +52,7 @@ FORMAT_CONFIGS = {
     "grounding_worldmodeling": {
         "format": "<think><observation>...</observation><reasoning>...</reasoning><prediction>...</prediction></think><answer>...</answer>",
         "description": "You should first give the description of your observation, then your reasoning, then predict the next state, and finally your answer.",
+        "additional_info": "The desription and prediction should contain the positional relationship betweent the player, target and boxes.",
         "example": "<think><observation>The box is below the player and the target is below the box</observation><reasoning>I need to go down then push the box down to the target</reasoning><prediction>The player will be above the box, the target and box will be at the same place.</prediction></think><answer>Down{action_sep}Down</answer>"
     },
     

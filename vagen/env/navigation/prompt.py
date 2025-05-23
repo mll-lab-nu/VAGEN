@@ -14,7 +14,7 @@ FORMAT_CONFIGS = {
     "grounding": {
         "description": "You should first give your thought process with your observation and reasoning, and finally your answer.\nThe observation should be described in detail about what you see in the environment.",
         "format": "<think><observation>...</observation><reasoning>...</reasoning></think><answer>...</answer>",
-        "example": """e.g. <think><observation>I am in a living room. There is a couch to my left, a TV in front of me, and a doorway to the kitchen on my right. The target object, a vase, appears to be on a shelf near the kitchen doorway.</observation><reasoning>I need to move toward the kitchen doorway to reach the vase. I'll move forward to get closer to the center of the room, then turn right and move toward the kitchen.</reasoning></think><answer>moveahead{action_sep}moveahead{action_sep}rotateright{action_sep}moveahead{action_sep}moveahead</answer>"""
+        "example": """<think><observation>I am in a living room. There is a couch to my left, a TV in front of me, and a doorway to the kitchen on my right. The target object, a vase, appears to be on a shelf near the kitchen doorway.</observation><reasoning>I need to move toward the kitchen doorway to reach the vase. I'll move forward to get closer to the center of the room, then turn right and move toward the kitchen.</reasoning></think><answer>moveahead{action_sep}moveahead{action_sep}rotateright{action_sep}moveahead{action_sep}moveahead</answer>"""
     },
     "worldmodeling": {
         "description": "You should first give your thought process with reasoning and prediction of next state,  then your answer.\nThe prediction should describe what you expect to see after your actions are executed.",
@@ -124,10 +124,10 @@ Env_feedback: Success"""
         
     base_prompt_text = """You are a home robot and perform navigation tasks according to instructions.
 Actions you can take: moveahead, moveback, moveright, moveleft, rotateright, rotateleft, lookup, lookdown. 
-moveahead: Move forward by 0.4 meter
-moveback: Move backward by 0.4 meter
-moveright: Move rightward by 0.4 meter
-moveleft: Move leftward by 0.4 meter
+moveahead: Move forward by some distance
+moveback: Move backward by some distance
+moveright: Move rightward by some distance
+moveleft: Move leftward by some distance
 rotateright: Rotate to the right by 90 degrees
 rotateleft: Rotate to the left by 90 degrees
 lookup: Tilt the camera upward by 30 degrees

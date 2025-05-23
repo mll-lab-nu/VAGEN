@@ -1,62 +1,62 @@
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Dict, List, Tuple, Optional, Any, Union
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from vagen.env.base.base_service import BaseService
-from vagen.env.navigation.env import NavigationEnv
-from vagen.env.navigation.env_config import NavigationEnvConfig
-from vagen.server.serial import serialize_observation
-from .service_config import NavigationServiceConfig
+from vagen.env.base.base_service_config import BaseServiceConfig
 from vagen.env.utils.state_reward_text_utils import service_state_reward_wrapper
+from vagen.server.serial import serialize_observation
 
-class NavigationService(BaseService):
+from .env import SokobanEnv
+from .env_config import SokobanEnvConfig
+class SokobanService(BaseService):
     """
-    Service class for Navigation environments based on AI2-THOR.
+    Service class for Sokoban environments.
     Implements batch operations with parallel processing for efficiency.
     """
     
-    def __init__(self, config:NavigationServiceConfig):
+    def __init__(self, config: BaseServiceConfig):
         """
-        Initialize the NavigationService.
+        Initialize the SokobanService.
         
         Args:
-            max_workers: Maximum number of worker threads for parallel processing
+            config: Configuration object containing settings like max_workers
         """
-        self.max_workers = config.max_workers
-        self.device_status={device_id:set() for device_id in config.devices}
+        self.max_workers = config.get('max_workers', 10)
         self.environments = {}
         self.env_configs = {}
-        self.config=config
-        print(f"[DEBUG] {self.config}")
+        self.config= config
     
-    def create_environments_batch(self, ids2configs: Dict[str, Any]) -> None:
+    def create_environments_batch(self, ids2configs: Dict[Any, Any]) -> None:
         """
-        Create multiple Navigation environments in parallel.
+        Create multiple Sokoban environments in parallel.
         
         Args:
             ids2configs: A dictionary where each key is an environment ID and the corresponding
                         value is the configuration for that environment.
                 Each config should contain:
-                - env_name: Should be "navigation"
-                - env_config: Navigation specific configuration
+                - env_name: Should be "sokoban"
+                - env_config: Sokoban specific configuration
         """
         # Define worker function
         def create_single_env(env_id, config):
             # Verify environment type
-            env_name = config.get('env_name', 'navigation')
-            if env_name != 'navigation':
-                return env_id, None, f"Expected environment type 'navigation', got '{env_name}'"
+            env_name = config.get('env_name', 'sokoban')
+            if env_name != 'sokoban':
+                return env_id, None, f"Expected environment type 'sokoban', got '{env_name}'"
             
-            env_config_dict = config['env_config']
-            env_config = NavigationEnvConfig(**env_config_dict)
-            env = NavigationEnv(env_config)
-            return env_id, (env, env_config), None
-           
+            try:
+                # Get Sokoban specific configuration
+                env_config_dict = config.get('env_config', {})
+                
+                # Create environment config
+                env_config = SokobanEnvConfig(**env_config_dict)
+                
+                # Create environment
+                env = SokobanEnv(env_config)
+                
+                return env_id, (env, env_config), None
+            except Exception as e:
+                return env_id, None, str(e)
         
-        for i, env_id in enumerate(ids2configs.keys()):
-            # Select GPU with the least load
-            selected_gpu = min(self.device_status, key=lambda x: len(self.device_status[x]))
-            ids2configs[env_id]['env_config']['gpu_device'] = selected_gpu
-            self.device_status[selected_gpu].add(env_id)
-            
         # Use ThreadPoolExecutor for parallel creation
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             # Submit all environment creation tasks
@@ -77,9 +77,9 @@ class NavigationService(BaseService):
                 self.environments[env_id] = env
                 self.env_configs[env_id] = env_config
     
-    def reset_batch(self, ids2seeds: Dict[str, Any]) -> Dict[str, Tuple[Any, Any]]:
+    def reset_batch(self, ids2seeds: Dict[Any, Any]) -> Dict[Any, Tuple[Any, Any]]:
         """
-        Reset multiple Navigation environments in parallel.
+        Reset multiple Sokoban environments in parallel.
         
         Args:
             ids2seeds: A dictionary where each key is an environment ID and the corresponding
@@ -91,12 +91,17 @@ class NavigationService(BaseService):
         results = {}
         
         # Define worker function
-        def reset_single_env(env_id, seed):     
-            env = self.environments[env_id]
-            observation, info = env.reset(seed=seed)
-            serialized_observation = serialize_observation(observation)
-            return env_id, (serialized_observation, info), None
-            
+        def reset_single_env(env_id, seed):
+            try:
+                if env_id not in self.environments:
+                    return env_id, None, f"Environment {env_id} not found"
+                
+                env = self.environments[env_id]
+                observation, info = env.reset(seed=seed)
+                serialized_observation = serialize_observation(observation)
+                return env_id, (serialized_observation, info), None
+            except Exception as e:
+                return env_id, None, str(e)
         
         # Use ThreadPoolExecutor for parallel reset
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -119,9 +124,9 @@ class NavigationService(BaseService):
         return results
     
     @service_state_reward_wrapper
-    def step_batch(self, ids2actions: Dict[str, Any]) -> Dict[str, Tuple[Dict, float, bool, Dict]]:
+    def step_batch(self, ids2actions: Dict[Any, Any]) -> Dict[Any, Tuple[Dict, float, bool, Dict]]:
         """
-        Take a step in multiple Navigation environments in parallel.
+        Take a step in multiple Sokoban environments in parallel.
         
         Args:
             ids2actions: A dictionary where each key is an environment ID and the corresponding
@@ -134,28 +139,16 @@ class NavigationService(BaseService):
         
         # Define worker function
         def step_single_env(env_id, action):
-            env = self.environments[env_id]
             try:
+                if env_id not in self.environments:
+                    return env_id, None, f"Environment {env_id} not found"
+                
+                env = self.environments[env_id]
                 observation, reward, done, info = env.step(action)
+                serialized_observation = serialize_observation(observation)
+                return env_id, (serialized_observation, reward, done, info), None
             except Exception as e:
-                print(f"Error stepping navigation environment {env_id}: {e}")
-                try:
-                    observation,info=env.reset()
-                    reward=0.0
-                    done=True 
-                except Exception as e:
-                    print(f"Error resetting navigation environment {env_id} after step failure: {e}")
-                    env.close()
-                    config=self.env_configs[env_id]
-                    env=NavigationEnv(config)
-                    self.environments[env_id]=env
-                    observation,info=env.reset()
-                    reward=0.0
-                    done=True
-                    
-            serialized_observation = serialize_observation(observation)
-            return env_id, (serialized_observation, reward, done, info), None
-            
+                return env_id, None, str(e)
         
         # Use ThreadPoolExecutor for parallel step
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -177,9 +170,9 @@ class NavigationService(BaseService):
         
         return results
     
-    def compute_reward_batch(self, env_ids: List[str]) -> Dict[str, float]:
+    def compute_reward_batch(self, env_ids: List[str]) -> Dict[Any, float]:
         """
-        Compute the total reward for multiple Navigation environments in parallel.
+        Compute the total reward for multiple Sokoban environments in parallel.
         
         Args:
             env_ids: A list of environment IDs
@@ -191,9 +184,14 @@ class NavigationService(BaseService):
         
         # Define worker function
         def compute_reward_single_env(env_id):
-            env = self.environments[env_id]
-            return env_id, env.compute_reward(), None
-           
+            try:
+                if env_id not in self.environments:
+                    return env_id, None, f"Environment {env_id} not found"
+                
+                env = self.environments[env_id]
+                return env_id, env.compute_reward(), None
+            except Exception as e:
+                return env_id, None, str(e)
         
         # Use ThreadPoolExecutor for parallel computation
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -215,9 +213,9 @@ class NavigationService(BaseService):
         
         return results
     
-    def get_system_prompts_batch(self, env_ids: List[str]) -> Dict[str, str]:
+    def get_system_prompts_batch(self, env_ids: List[str]) -> Dict[Any, str]:
         """
-        Get system prompts for multiple Navigation environments in parallel.
+        Get system prompts for multiple Sokoban environments in parallel.
         
         Args:
             env_ids: A list of environment IDs
@@ -229,9 +227,14 @@ class NavigationService(BaseService):
         
         # Define worker function
         def get_system_prompt_single_env(env_id):
-            env = self.environments[env_id]
-            return env_id, env.system_prompt(), None
-       
+            try:
+                if env_id not in self.environments:
+                    return env_id, None, f"Environment {env_id} not found"
+                
+                env = self.environments[env_id]
+                return env_id, env.system_prompt(), None
+            except Exception as e:
+                return env_id, None, str(e)
         
         # Use ThreadPoolExecutor for parallel retrieval
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -255,7 +258,7 @@ class NavigationService(BaseService):
     
     def close_batch(self, env_ids: Optional[List[str]] = None) -> None:
         """
-        Close multiple Navigation environments and clean up resources in parallel.
+        Close multiple Sokoban environments and clean up resources in parallel.
         
         Args:
             env_ids: Optional list of environment IDs to close. If None, close all environments.
@@ -265,11 +268,16 @@ class NavigationService(BaseService):
             env_ids = list(self.environments.keys())
         
         # Define worker function
-        def close_single_env(env_id):      
-            env = self.environments[env_id]
-            env.close()
-            return None
-            
+        def close_single_env(env_id):
+            try:
+                if env_id not in self.environments:
+                    return f"Environment {env_id} not found"
+                
+                env = self.environments[env_id]
+                env.close()
+                return None
+            except Exception as e:
+                return str(e)
         
         # Use ThreadPoolExecutor for parallel closing
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -286,4 +294,3 @@ class NavigationService(BaseService):
         for env_id in env_ids:
             self.environments.pop(env_id, None)
             self.env_configs.pop(env_id, None)
-            self.device_status.pop(env_id, None)

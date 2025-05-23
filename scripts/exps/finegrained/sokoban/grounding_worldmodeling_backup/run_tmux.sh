@@ -47,7 +47,7 @@ tmux send-keys -t "$SERVER_SESSION" "export CUDA_VISIBLE_DEVICES=$CUDA_DEVICES" 
 tmux send-keys -t "$SERVER_SESSION" "export VLLM_ATTENTION_BACKEND=XFORMERS" C-m
 tmux send-keys -t "$SERVER_SESSION" "export PYTHONHASHSEED=0" C-m
 # Start the server
-tmux send-keys -t "$SERVER_SESSION" "python -m vagen.server.server server.port=$PORT use_state_reward=False" C-m
+tmux send-keys -t "$SERVER_SESSION" "python -m vagen.server.server server.port=$PORT" C-m
 
 # Wait for server to start
 echo "Waiting for server to start on port $PORT..."
@@ -129,9 +129,6 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     trainer.val_before_train=True \\
     trainer.val_generations_to_log_to_wandb=8 \\
     rollout_manager.n_trajectory=1 \\
-    rollout_manager.use_service=True \\
-    rollout_manager.timeout=300 \\
-    rollout_manager.base_url=\"http://localhost:$PORT\" \\
     2>&1 | tee $EXPERIMENT_NAME.log" C-m
 
 echo "-----------------------------------------"

@@ -54,7 +54,8 @@ FORMAT_CONFIGS = {
     "grounding_worldmodeling": {
         "format": "<think><observation>...</observation><reasoning>...</reasoning><prediction>...</prediction></think><answer>...</answer>",
         "description": "You should first describe the observation, then your reasoning, then predict the next state, and finally your answer.",
-        "example": "<think><observation>The player is on the above the target</observation><reasoning>I should go down then left to reach the target</reasoning><prediction>The player will reach the target</prediction></think><answer>Down{action_sep}Left</answer>"
+        "additional_info": "The desription and prediction should contain the positional relationship betweent the player, target and holes.",
+        "example": "<think><observation>The player is above and on the right side of target, there is a hole at the left of the player</observation><reasoning>I should go down then left to reach the target</reasoning><prediction>The player will at the same place as the target</prediction></think><answer>Down{action_sep}Left</answer>"
     },
     
     "grounding_symbolic": {

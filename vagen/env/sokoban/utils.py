@@ -673,3 +673,69 @@ CHANGE_COORDINATES = {
     2: (0, -1),
     3: (0, 1)
 }
+def sokoban_state_to_sentences(state_dict):
+    """
+    Convert Sokoban game state dictionary to descriptive sentences about spatial relationships.
+    
+    Args:
+        state_dict (dict): Dictionary containing:
+            - player_position: tuple (row, col)
+            - box_positions: list of tuples [(row, col), ...]
+            - target_positions: list of tuples [(row, col), ...]
+            - wall_positions: list of tuples [(row, col), ...] (ignored)
+            - grid_size: tuple (rows, cols)
+    
+    Returns:
+        list: List of descriptive sentences
+    """
+    sentences = []
+    
+    player_pos = state_dict['player_position']
+    box_positions = state_dict['box_positions']
+    target_positions = state_dict['target_positions']
+    
+    def get_relative_position(pos1, pos2):
+        """
+        Get relative position description between two positions.
+        pos1 is the reference point, pos2 is described relative to pos1.
+        """
+        row1, col1 = pos1
+        row2, col2 = pos2
+        
+        if pos1 == pos2:
+            return "at the same place as"
+        
+        # Determine row relationship
+        if row1 == row2:
+            if col1 > col2:
+                return "at the same row and to the left of"
+            else:  # col1 < col2
+                return "at the same row and to the right of"
+        elif col1 == col2:
+            if row1 > row2:
+                return "above and at the same column as"
+            else:  # row1 < row2
+                return "below and at the same column as"
+        else:
+            # Different row and column
+            row_desc = "above" if row1 > row2 else "below"
+            col_desc = "on the left side" if col1 > col2 else "on the right side"
+            return f"{row_desc} and {col_desc} of"
+    
+    # Describe each box relative to player
+    for i, box_pos in enumerate(box_positions):
+        box_relation = get_relative_position(player_pos, box_pos)
+        sentences.append(f"box{i} is {box_relation} the player")
+    
+    # Describe each target relative to player
+    for i, target_pos in enumerate(target_positions):
+        target_relation = get_relative_position(player_pos, target_pos)
+        sentences.append(f"target{i} is {target_relation} the player")
+    
+    # Describe each target relative to each box
+    for i, target_pos in enumerate(target_positions):
+        for j, box_pos in enumerate(box_positions):
+            target_box_relation = get_relative_position(box_pos, target_pos)
+            sentences.append(f"target{i} is {target_box_relation} box{j}")
+    
+    return sentences

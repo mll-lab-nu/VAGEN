@@ -16,6 +16,7 @@ import threading
 import random
 from contextlib import contextmanager
 from vagen.server.together_batch_request import run_together_request
+from vagen.server.gpt_batch_request import run_gpt_request
 # Global variables for wandb tracking per process
 _WANDB_INITIALIZED = {}  # Track initialization status per process
 _GLOBAL_STEPS = {}  # Track global step count per process
@@ -400,14 +401,14 @@ def process_llm_judgments(input_data: List[Dict[str, Any]], config: Optional[Dic
         })
     
     # Call the request function to get LLM responses
-    llm_responses = run_together_request(prompts,config.api)
+    llm_responses = run_gpt_request(prompts,config.api)
     
     # Process the responses and extract scores
     results = []
     for i, response_data in enumerate(llm_responses):
         # Extract the YES/NO answer
         score = 0.0  # Default score (NO or failure)
-        
+        parse_success = False
         if response_data["success"]:
             # Use regex to find the answer tag
             answer_match = re.search(r'<answer>(YES|NO)</answer>', response_data["response"], re.IGNORECASE)
@@ -415,8 +416,9 @@ def process_llm_judgments(input_data: List[Dict[str, Any]], config: Optional[Dic
                 answer = answer_match.group(1).upper()
                 score = 1.0 if answer == "YES" else 0.0
                 parse_success = True
-            else:
-                parse_success = False
+       
+    
+            
         
         # Create the result dictionary
         result = {
