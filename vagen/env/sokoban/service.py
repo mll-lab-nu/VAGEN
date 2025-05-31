@@ -7,6 +7,7 @@ from vagen.server.serial import serialize_observation
 from .env import SokobanEnv
 from .env_config import SokobanEnvConfig
 from .prompt import visual_reasoning_reward_prompt
+from vagen.env.utils.state_matching import calculate_visual_reasoning_reward_bipartite
 class SokobanService(BaseService):
     
     def __init__(self, config: BaseServiceConfig):
@@ -78,6 +79,18 @@ class SokobanService(BaseService):
     def gen_visual_reasoning_prompt(self, content,**kwargs) -> str:
         return visual_reasoning_reward_prompt.format(prediction=content)
     
-    def calculate_visual_reasoning_reward(self,response,state):
-        pass
+    def calculate_visual_reasoning_reward(self, response,state) -> float:
+        """
+        Calculate the visual reasoning reward based on the response and state.
+        
+        Args:
+            response: The response from the LLM.
+            state: The current state of the environment.
+        
+        Returns:
+            A float representing the calculated reward.
+        """
+        object_weights={"target": 0.5,"box": 0.5}
+        
+        return calculate_visual_reasoning_reward_bipartite(response, state,object_weights)
         

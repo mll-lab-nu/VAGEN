@@ -154,7 +154,7 @@ def service_state_reward_wrapper_new(step_batch_func):
             id = item["id"]
             state=item["state"]
             env_config = self.env_configs[id]
-            response= result["response"]
+            response= result["parsed_response"]
             score=self.calculate_visual_reasoning_reward(response,state)
             if item["type"] == "grounding":
                 new_step_batch_results[id][3]["metrics"]["turn_metrics"]["grounding_reward"] = score * env_config.get("grounding_reward_weight", 0.5)

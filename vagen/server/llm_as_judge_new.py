@@ -397,7 +397,8 @@ def process_llm_judgments(input_data: List[Dict[str, Any]], config: Optional[Dic
     for i, response_data in enumerate(llm_responses):
         # Extract the YES/NO answer
         score = 0.0  # Default score (NO or failure)
-        parse_success = True if parse_llm_json_response_flexible(response_data["response"]) else False
+        parsed_response=parse_llm_json_response_flexible(response_data["response"])
+        parse_success = True if parsed_response else False
         # Create the result dictionary
         result = {
             "id": metadata[i]["id"],
@@ -408,7 +409,8 @@ def process_llm_judgments(input_data: List[Dict[str, Any]], config: Optional[Dic
             "success": response_data["success"],
             "score": score,
             "error": response_data["error"],
-            "parse_success": parse_success
+            "parse_success": parse_success,
+            "parsed_response": parsed_response
         }
         
         results.append(result)

@@ -8,6 +8,7 @@ from .env_config import FrozenLakeEnvConfig
 from ..base.base_service_config import BaseServiceConfig
 from vagen.env.utils.state_reward_text_utils import service_state_reward_wrapper_new as service_state_reward_wrapper
 from .prompt import visual_reasoning_reward_prompt
+from vagen.env.utils.state_matching import calculate_visual_reasoning_reward_bipartite
 class FrozenLakeService(BaseService):
     """
     Service class for FrozenLake environments.
@@ -297,3 +298,18 @@ class FrozenLakeService(BaseService):
     
     def gen_visual_reasoning_prompt(self, content,**kwargs) -> str:
         return visual_reasoning_reward_prompt.format(prediction=content)
+    
+    def calculate_visual_reasoning_reward(self, response,state) -> float:
+        """
+        Calculate the visual reasoning reward based on the response and state.
+        
+        Args:
+            response: The response from the LLM.
+            state: The current state of the environment.
+        
+        Returns:
+            A float representing the calculated reward.
+        """
+        object_weights={"target": 0.7,"hole": 0.3}
+        
+        return calculate_visual_reasoning_reward_bipartite(response, state,object_weights)
