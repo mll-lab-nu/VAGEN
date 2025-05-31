@@ -1,12 +1,12 @@
 from typing import Dict, List, Tuple, Optional, Any, Union
 from vagen.env.base.base_service import BaseService
 from vagen.env.base.base_service_config import BaseServiceConfig
-from vagen.env.utils.state_reward_text_utils import service_state_reward_wrapper
+from vagen.env.utils.state_reward_text_utils import service_state_reward_wrapper_new as service_state_reward_wrapper
 from vagen.server.serial import serialize_observation
 
 from .env import SokobanEnv
 from .env_config import SokobanEnvConfig
-
+from .prompt import visual_reasoning_reward_prompt
 class SokobanService(BaseService):
     
     def __init__(self, config: BaseServiceConfig):
@@ -74,3 +74,10 @@ class SokobanService(BaseService):
         for env_id in env_ids:
             self.environments.pop(env_id, None)
             self.env_configs.pop(env_id, None)
+    
+    def gen_visual_reasoning_prompt(self, content,**kwargs) -> str:
+        return visual_reasoning_reward_prompt.format(prediction=content)
+    
+    def calculate_visual_reasoning_reward(self,response,state):
+        pass
+        
