@@ -13,8 +13,10 @@
 <!--
 VAGEN is a multi-turn reinforcement learning framework designed specifically for training VLM Agents. VAGEN leverages the TRICO algorithm to efficiently train VLMs for visual agentic tasks.
 -->
-We introduce Visual Reasoning RL, a reinforcement learning approach that improves multi-turn performance of vision-language models (VLMs) by explicitly supervising visual state reasoning.
-We propose **VAGEN**, a scalable training framework that enables this method across diverse visual environments
+<!-- We propose **VAGEN**, a scalable training framework that enables this method across diverse visual environments -->
+We propose **VAGEN**, a multi-turn reinforcement learning framework designed specifically for training vision-language models (VLMs) Agents.
+Based on VAGEN, we introduce **Visual Reasoning RL**, a reinforcement learning approach that improves multi-turn performance of VLMs by explicitly supervising visual state reasoning.
+
 
 <!--
 ![vagen_new](https://github.com/user-attachments/assets/83c84052-89ba-4a77-9c13-85d882f52a3b)
@@ -45,7 +47,29 @@ Traditional RL frameworks for LLM agents treat all tokens in a trajectory equall
 VAGEN addresses these challenges by focusing optimization on the most critical decision-making tokens and creating a more nuanced reward structure across interaction turns.
 -->
 
-## Key Innovations
+## Key Innovation of VAGEN
+
+Two key innovations are introduced in VAGEN:
+
+1. **Selective Token Masking** - Focuses optimization on action-critical tokens through:
+   - Loss masking (`M^loss`): Identifies tokens to update during policy optimization
+   - Advantage masking (`M^adv`): Determines tokens to include in advantage calculations
+
+2. **Cross-turn Credit Assignment** - Enables more effective credit attribution through:
+   - Bi-level advantage estimation with separate discount factors for cross-turn (`γ_turn`) and within-turn (`γ_token`) calculations
+   - Turn-level rewards applied at each interaction boundary
+
+## Why VAGEN Works Better for VLM Agents
+
+Traditional RL frameworks for LLM agents treat all tokens in a trajectory equally. This approach is suboptimal for VLM agents due to:
+
+- **Distribution Shift**: Most VLMs aren't pretrained to generate image tokens
+- **State Redundancy**: Visual tasks contain excessive low-level information in long-context inputs
+
+VAGEN addresses these challenges by focusing optimization on the most critical decision-making tokens and creating a more nuanced reward structure across interaction turns.
+
+
+## Why Visual Reasoning
 Standard RL methods applied to VLMs struggle with multi-turn agentic tasks due to:
 1. **Visual State Ambiguity**: VLMs lack mechanisms to explicitly interpret and track evolving visual environments
 2. **Precision Bottlenecks**: Existing representations fall short in tasks requiring fine-grained spatial or temporal understanding
