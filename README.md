@@ -1,4 +1,4 @@
-<h1 align="center">Reinforcing Visual State Reasoning for Multi-Turn VLM Agents</h1>
+<h1 align="center">VAGEN: Reinforcing Visual State Reasoning for Multi-Turn VLM Agents</h1>
 <!-- <p align="center" style="font-size: 18px;">
   Reinforcing Visual State Reasoning for Multi-Turn VLM Agents<br>
 </p> -->
