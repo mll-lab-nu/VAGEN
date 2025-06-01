@@ -92,6 +92,7 @@ bash scripts/install.sh
 **Note:** VAGEN currently supports several environments: sokoban, frozenlake, svg, navigation, and primitive skill. 
 <img width="1084" alt="image" src="https://github.com/user-attachments/assets/f59f9a65-b93a-44b7-81c1-89df0da91b2e" />
 
+```
 # Login to wandb
 wandb login
 
