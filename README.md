@@ -92,8 +92,6 @@ bash scripts/install.sh
 **Note:** VAGEN currently supports several environments: sokoban, frozenlake, svg, navigation, and primitive skill. 
 <img width="1084" alt="image" src="https://github.com/user-attachments/assets/f59f9a65-b93a-44b7-81c1-89df0da91b2e" />
 
-For simplifying installation and execution, we have **commented out** all environments except sokoban and frozenlake. If you wish to run other environments, please **uncomment** the corresponding sections in `scripts/install.sh` and `vagen/env/__init__.py`.
-```
 # Login to wandb
 wandb login
 
