@@ -162,7 +162,7 @@ If you find our repo useful, we appreciate it if you could cite our work at:
 ```bibtex
 @misc{VAGEN,
   title={VAGEN: Training VLM Agents with Multi-Turn Reinforcement Learning},
-  author={Kangrui Wang* and Pingyue Zhang* and Zihan Wang* and Qineng Wang* and Yaning Gao* and Linjie Li* and Zhengyuan Yang and Chi Wan and Hanyang Chen and Yiping Lu and Manling Li},
+  author={Kangrui Wang* and Pingyue Zhang* and Zihan Wang* and Yaning Gao* and Linjie Li* and Qineng Wang and Hanyang Chen and Yiping Lu and Zhengyuan Yang and Lijuan Wang and Ranjay Krishna and Jiajun Wu and Li Fei-Fei and Yejin Choi and Manling Li},
   url={https://github.com/RAGEN-AI/VAGEN},
   year={2025},
 }
