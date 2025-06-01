@@ -1,6 +1,6 @@
-<h1 align="center">VAGEN: Training VLM Agents with Multi-Turn Reinforcement Learning</h1>
+<h1 align="center">VAGEN: Reinforcing Visual State Reasoning for Multi-Turn VLM Agents</h1>
 <!-- <p align="center" style="font-size: 18px;">
-  <strong>VAGEN</strong>: Multi-turn Reinforcement Learning for Visual Reasoning Agents<br>
+  <strong>VAGEN</strong>: Reinforcing Visual State Reasoning for Multi-Turn VLM Agents<br>
 </p> -->
 <p align="center">
   <a href="https://vagen.readthedocs.io/en/latest"><img src="https://img.shields.io/badge/📚_Documentation-4285F4?style=for-the-badge&logoColor=white" alt="Documentation"></a>
@@ -161,8 +161,8 @@ If you find our repo useful, we appreciate it if you could cite our work at:
 
 ```bibtex
 @misc{VAGEN,
-  title={VAGEN: Training VLM Agents with Multi-Turn Reinforcement Learning},
-  author={Kangrui Wang* and Pingyue Zhang* and Zihan Wang* and Yaning Gao* and Linjie Li* and Qineng Wang and Hanyang Chen and Yiping Lu and Zhengyuan Yang and Lijuan Wang and Ranjay Krishna and Jiajun Wu and Li Fei-Fei and Yejin Choi and Manling Li},
+  title={Reinforcing Visual State Reasoning for Multi-Turn VLM Agents},
+  author={Kangrui Wang* and Pingyue Zhang* and Zihan Wang* and Yaning Gao* and Linjie Li* and Qineng Wang and Hanyang Chen and Chi Wan and Yiping Lu and Zhengyuan Yang and Lijuan Wang and Ranjay Krishna and Jiajun Wu and Li Fei-Fei and Yejin Choi and Manling Li},
   url={https://github.com/RAGEN-AI/VAGEN},
   year={2025},
 }
