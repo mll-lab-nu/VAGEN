@@ -10,16 +10,19 @@
 
 
 
-<--
+<!--
 VAGEN is a multi-turn reinforcement learning framework designed specifically for training VLM Agents. VAGEN leverages the TRICO algorithm to efficiently train VLMs for visual agentic tasks.
-!-->
+-->
 We introduce Visual Reasoning RL, a reinforcement learning approach that improves multi-turn performance of vision-language models (VLMs) by explicitly supervising visual state reasoning.
-We propose VAGEN, a scalable training framework that enables this method across diverse visual environments
+We propose **VAGEN**, a scalable training framework that enables this method across diverse visual environments
 
+<!--
 ![vagen_new](https://github.com/user-attachments/assets/83c84052-89ba-4a77-9c13-85d882f52a3b)
+-->
+<img width="1835" alt="image" src="https://github.com/user-attachments/assets/e5b70eeb-21de-4808-90c0-9ee7d990acd1" />
 
 
-
+<!--
 ## Key Innovations
 
 VAGEN introduces the **Turn-aware Reason-Interaction Chain Optimization (TRICO)** algorithm which extends the traditional RICO approach with two key innovations:
@@ -40,6 +43,19 @@ Traditional RL frameworks for LLM agents treat all tokens in a trajectory equall
 - **State Redundancy**: Visual tasks contain excessive low-level information in long-context inputs
 
 VAGEN addresses these challenges by focusing optimization on the most critical decision-making tokens and creating a more nuanced reward structure across interaction turns.
+-->
+
+## Why better visual state reasoning
+Standard RL methods applied to VLMs struggle with multi-turn agentic tasks due to:
+1. **Visual State Ambiguity**: VLMs lack mechanisms to explicitly interpret and track evolving visual environments
+2. **Precision Bottlenecks**: Existing representations fall short in tasks requiring fine-grained spatial or temporal understanding
+
+Our framework addresses through:
+1. **Visual State Reasoning Prompts** – Injects structured prompts like \grd (current state description) and \wm (future state prediction) to scaffold the model’s internal reasoning
+2. **Visual Reasoning RL** – Reinforces visual understanding with:
+   - **Turn-level reasoning rewards** for supervising accuracy
+   - **Bi-Level GAE** for fine-grained credit assignment at both turn and token levels
+
 
 ## News
 
