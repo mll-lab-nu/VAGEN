@@ -1,6 +1,6 @@
-<h1 align="center">VAGEN: Reinforcing Visual State Reasoning for Multi-Turn VLM Agents</h1>
+<h1 align="center">Reinforcing Visual State Reasoning for Multi-Turn VLM Agents</h1>
 <!-- <p align="center" style="font-size: 18px;">
-  <strong>VAGEN</strong>: Reinforcing Visual State Reasoning for Multi-Turn VLM Agents<br>
+  Reinforcing Visual State Reasoning for Multi-Turn VLM Agents<br>
 </p> -->
 <p align="center">
   <a href="https://vagen.readthedocs.io/en/latest"><img src="https://img.shields.io/badge/📚_Documentation-4285F4?style=for-the-badge&logoColor=white" alt="Documentation"></a>
@@ -10,8 +10,11 @@
 
 
 
-
+<--
 VAGEN is a multi-turn reinforcement learning framework designed specifically for training VLM Agents. VAGEN leverages the TRICO algorithm to efficiently train VLMs for visual agentic tasks.
+!-->
+We introduce Visual Reasoning RL, a reinforcement learning approach that improves multi-turn performance of vision-language models (VLMs) by explicitly supervising visual state reasoning.
+We propose VAGEN, a scalable training framework that enables this method across diverse visual environments
 
 ![vagen_new](https://github.com/user-attachments/assets/83c84052-89ba-4a77-9c13-85d882f52a3b)
 
