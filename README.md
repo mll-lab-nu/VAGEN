@@ -45,13 +45,13 @@ Traditional RL frameworks for LLM agents treat all tokens in a trajectory equall
 VAGEN addresses these challenges by focusing optimization on the most critical decision-making tokens and creating a more nuanced reward structure across interaction turns.
 -->
 
-## Why better visual state reasoning
+## Key Innovations
 Standard RL methods applied to VLMs struggle with multi-turn agentic tasks due to:
 1. **Visual State Ambiguity**: VLMs lack mechanisms to explicitly interpret and track evolving visual environments
 2. **Precision Bottlenecks**: Existing representations fall short in tasks requiring fine-grained spatial or temporal understanding
 
 Our framework addresses through:
-1. **Visual State Reasoning Prompts** – Injects structured prompts like \grd (current state description) and \wm (future state prediction) to scaffold the model’s internal reasoning
+1. **Visual State Reasoning Prompts** – Injects structured prompts like grounding (current state description) and world modeling (future state prediction) to scaffold the model’s internal reasoning
 2. **Visual Reasoning RL** – Reinforces visual understanding with:
    - **Turn-level reasoning rewards** for supervising accuracy
    - **Bi-Level GAE** for fine-grained credit assignment at both turn and token levels
@@ -90,6 +90,8 @@ bash scripts/install.sh
 ## Examples
 
 **Note:** VAGEN currently supports several environments: sokoban, frozenlake, svg, navigation, and primitive skill. 
+<img width="1084" alt="image" src="https://github.com/user-attachments/assets/f59f9a65-b93a-44b7-81c1-89df0da91b2e" />
+
 For simplifying installation and execution, we have **commented out** all environments except sokoban and frozenlake. If you wish to run other environments, please **uncomment** the corresponding sections in `scripts/install.sh` and `vagen/env/__init__.py`.
 ```
 # Login to wandb
@@ -118,6 +120,7 @@ See our [Creating Environments](./docs/envs/create-env.md) guide. You may also w
 1. Refer to [VERL](https://verl.readthedocs.io/en/latest/index.html) for adding new MLLM.
 2. Refer to [QwenVLRolloutManager](vagen/rollout/qwen_rollout/rollout_manager.py) to understand how rollout works. In most cases, you can use QwenVLRolloutManager directly with only minor modifications to the model's special tokens
 
+<!--
 ## Experimental Results
 > To reproduce our experiment, please refer to document: [Reproduce Experiments](docs/reproduce-exp.md)
 
@@ -133,9 +136,18 @@ Our experiments on visual Sokoban using a Qwen-VL 3B model show:
 <img width="800" alt="image" src="./public/2.png" />
 
 <img width="800" alt="image" src="./public/3.png" />
+-->
+## Experimental Results
+We benchmark closed- and open-sourced models on five environments. Reasoning on visual states, including both grounding and world modeling, can significantly improve
+the RL performance. 
+<img width="1093" alt="image" src="https://github.com/user-attachments/assets/162820e8-a4f3-49b7-b8f8-c7963a5ac6f1" />
+
+Incorporating Visual Reasoning RL leads to improved performance
+<img width="1319" alt="image" src="https://github.com/user-attachments/assets/cba16487-c24b-4b25-9ecf-a668d4cd8ac6" />
 
 
 
+<!--
 ## Cases
 We present several cases selected from validation steps during training models with AICO and TRICO, as shown below. You can view all the cases in our [Experiment Log](https://api.wandb.ai/links/ragen-V/nlb40e7l).
 
@@ -148,6 +160,9 @@ We present several cases selected from validation steps during training models w
 ![image (6)](https://github.com/user-attachments/assets/60b251a2-e395-4079-a9aa-ceb4455b0a7a)
 
 ![image (7)](https://github.com/user-attachments/assets/ddea7352-0a14-45a5-94a9-655a07c9fe3e)
+-->
+## Cases
+<img width="1261" alt="image" src="https://github.com/user-attachments/assets/59fbce0c-4932-4f82-ab87-d407d84ebad4" />
 
 
 # Project Roadmap
