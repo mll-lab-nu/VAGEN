@@ -21,7 +21,12 @@ Based on VAGEN, we introduce **Visual Reasoning RL**, a reinforcement learning a
 <!--
 ![vagen_new](https://github.com/user-attachments/assets/83c84052-89ba-4a77-9c13-85d882f52a3b)
 -->
-<img width="1835" alt="image" src="https://github.com/user-attachments/assets/e5b70eeb-21de-4808-90c0-9ee7d990acd1" />
+
+## framework
+
+We present the framework of **VAGEN** in the image below. The `rollout.py` module facilitates interactions between `ray_trainer.py` and various environments. Our framework operates with two forms of “language”: token sequences (used by the model) and structured information from the environments. `rollout.py` serves as a translator, parsing structured environment data into tokens for the model and converting model outputs back into structured actions or observations. It also records data of each step to form the entire trajectory.
+![framework](https://github.com/user-attachments/assets/4e671ba0-efaf-4298-904e-e059cb9350c9)
+
 
 
 <!--
@@ -80,8 +85,11 @@ Our framework addresses through:
    - **Turn-level reasoning rewards** for supervising accuracy
    - **Bi-Level GAE** for fine-grained credit assignment at both turn and token levels
 
+<img width="1835" alt="image" src="https://github.com/user-attachments/assets/e5b70eeb-21de-4808-90c0-9ee7d990acd1" />
 
 ## News
+
+**[2025/06]** We introduce **Visual Reasoning RL** in our incoming paper.
 
 **[2025/04]** We've introduced a new modular design for environments and services in VAGEN:
 - Enhanced environment framework for easier creation of custom environments
@@ -111,11 +119,7 @@ bash scripts/install.sh
 ```
 
 
-## Examples
-
-**Note:** VAGEN currently supports several environments: sokoban, frozenlake, svg, navigation, and primitive skill. 
-<img width="1084" alt="image" src="https://github.com/user-attachments/assets/f59f9a65-b93a-44b7-81c1-89df0da91b2e" />
-
+## Usage
 ```
 # Login to wandb
 wandb login
@@ -184,6 +188,13 @@ We present several cases selected from validation steps during training models w
 
 ![image (7)](https://github.com/user-attachments/assets/ddea7352-0a14-45a5-94a9-655a07c9fe3e)
 -->
+
+## Environments
+
+**Note:** VAGEN currently supports several environments: sokoban, frozenlake, svg, navigation, and primitive skill. 
+<img width="1084" alt="image" src="https://github.com/user-attachments/assets/f59f9a65-b93a-44b7-81c1-89df0da91b2e" />
+
+
 ## Cases
 <img width="1261" alt="image" src="https://github.com/user-attachments/assets/59fbce0c-4932-4f82-ab87-d407d84ebad4" />
 
