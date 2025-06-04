@@ -22,7 +22,7 @@ Based on VAGEN, we introduce **Visual Reasoning RL**, a reinforcement learning a
 ![vagen_new](https://github.com/user-attachments/assets/83c84052-89ba-4a77-9c13-85d882f52a3b)
 -->
 
-## framework
+## Framework
 
 We present the framework of **VAGEN** in the image below. The `rollout.py` module facilitates interactions between `ray_trainer.py` and various environments. Our framework operates with two forms of “language”: token sequences (used by the model) and structured information from the environments. `rollout.py` serves as a translator, parsing structured environment data into tokens for the model and converting model outputs back into structured actions or observations. It also records data of each step to form the entire trajectory.
 ![framework](https://github.com/user-attachments/assets/4e671ba0-efaf-4298-904e-e059cb9350c9)
@@ -84,8 +84,11 @@ Our framework addresses through:
 2. **Visual Reasoning RL** – Reinforces visual understanding with:
    - **Turn-level reasoning rewards** for supervising accuracy
    - **Bi-Level GAE** for fine-grained credit assignment at both turn and token levels
-
+<!--
 <img width="1835" alt="image" src="https://github.com/user-attachments/assets/e5b70eeb-21de-4808-90c0-9ee7d990acd1" />
+-->
+![bi-level-gae](https://github.com/user-attachments/assets/fbf0ec24-6bb4-40ce-b545-818d83d04e05)
+
 
 ## News
 
