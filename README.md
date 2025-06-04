@@ -25,7 +25,7 @@ Based on VAGEN, we introduce **Visual Reasoning RL**, a reinforcement learning a
 ## Framework
 
 We present the framework of **VAGEN** in the image below. The `rollout.py` module facilitates interactions between `ray_trainer.py` and various environments. Our framework operates with two forms of “language”: token sequences (used by the model) and structured information from the environments. `rollout.py` serves as a translator, parsing structured environment data into tokens for the model and converting model outputs back into structured actions or observations. It also records data of each step to form the entire trajectory.
-![framework](https://github.com/user-attachments/assets/4e671ba0-efaf-4298-904e-e059cb9350c9)
+![framework](https://github.com/user-attachments/assets/183cea78-2345-4b5e-82c5-a0679c5f112a)
 
 
 
