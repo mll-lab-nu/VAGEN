@@ -15,7 +15,7 @@ from typing import List, Dict, Any
 import asyncio
 import time
 from vagen.server.llm_as_judge import run_llm_judge
-from vagen.server.llm_as_judge_new import run_llm_judge as run_llm_judge_new
+from vagen.server.llm_as_judge_sokoban_frozenlake import run_llm_judge as run_llm_judge_new
 
 def env_state_reward_wrapper(step_func):
     def wrapped_step(self, action_str):
