@@ -56,7 +56,7 @@ FORMAT_CONFIGS = {
     "grounding_worldmodeling": {
         "format": "<think><observation>...</observation><reasoning>...</reasoning><prediction>...</prediction></think><answer>...</answer>",
         "description": "You should first describe the observation, then your reasoning, then predict the next state, and finally your answer.",
-        "additional_info": "For the content you provide within the `<observation>` and `<prediction>` tags, you must strictly describe the relative position of the `target` and any visible `hole` objects **relative to the player**. Your description/prediction must include **both** a vertical and a horizontal directional relationship for each object. Use ONLY the terms `above`, `below`, `left`, `right`, or `same` for describing these relationships.",
+        "additional_info": "For the content you provide within the `<observation>` and `<prediction>` tags, you must strictly describe the relative position of the `target` (the gift box) and any visible `hole` (blue circles) objects **relative to the player**. Your description/prediction must include **both** a vertical and a horizontal directional relationship for each object. Use ONLY the terms `above`, `below`, `left`, `right`, or `same` for describing these relationships.",
         "example": "<think><observation>The player is above and on the right side of target. There is a hole below and at the left of the player</observation><reasoning>I should go down then left to reach the target</reasoning><prediction>The player will at the same place as the target</prediction></think><answer>Down{action_sep}Left</answer>"
     },
     
@@ -159,7 +159,7 @@ visual_reasoning_reward_prompt="""You are a text parser assistant. Your task is 
 **Output:** You must output a JSON array. Each object in the array describes the relationship of one specific non-player object to the player.
 
 **Objects to Look For:**
-- target
+- target (If the input text has the mention of "gift box", that could referring the target, if the input has the mention of player and hole and another object, that also could be referring the target)
 - **hole** (Treat any mention of 'hole', 'hole0', 'hole1', etc., as referring to the general 'hole' type.)
 
 **Required JSON Output Format:**
@@ -257,6 +257,16 @@ Expected JSON Output:
 []
 ```
 
+**Example 5 (No Relevant Info):**
+Input Text:
+The player should move to the gift box to avoid the hole and reach the target.
+
+Objects to Look For: target, hole
+
+Expected JSON Output:
+```json
+[]
+```
 ---
 Input Text to Parse:
 {prediction}
