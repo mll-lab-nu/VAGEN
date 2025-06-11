@@ -92,7 +92,7 @@ Our framework addresses through:
 
 ## News
 
-**[2025/06]** We introduce **Visual Reasoning RL** in our incoming paper.
+**[2025/05]** We introduce **Visual Reasoning RL** in our incoming paper.
 
 **[2025/04]** We've introduced a new modular design for environments and services in VAGEN:
 - Enhanced environment framework for easier creation of custom environments
@@ -100,6 +100,8 @@ Our framework addresses through:
 - Check out our new guides:
   - [Creating Environments](./docs/envs/create-env.md): New environment protocal.
   - [Creating Services](./docs/envs/create-service.md): We now support hosting environments in a separate process
+ 
+**[2025/03]** We release VAGEN, a multi-turn reinforcement learning framework for training VLM Agents!
 
 ## Installation
 
