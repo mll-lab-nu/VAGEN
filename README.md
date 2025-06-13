@@ -21,6 +21,18 @@ Based on VAGEN, we introduce **Visual Reasoning RL**, a reinforcement learning a
 <!--
 ![vagen_new](https://github.com/user-attachments/assets/83c84052-89ba-4a77-9c13-85d882f52a3b)
 -->
+## News
+
+**[2025/05]** We introduce **Visual Reasoning RL** in our incoming paper.
+
+**[2025/04]** We've introduced a new modular design for environments and services in VAGEN:
+- Enhanced environment framework for easier creation of custom environments
+- New service architecture for efficient distributed training
+- Check out our new guides:
+  - [Creating Environments](./docs/envs/create-env.md): New environment protocal.
+  - [Creating Services](./docs/envs/create-service.md): We now support hosting environments in a separate process
+ 
+**[2025/03]** We release VAGEN, a multi-turn reinforcement learning framework for training VLM Agents!
 
 ## Framework
 
@@ -88,20 +100,6 @@ Our framework addresses through:
 <img width="1835" alt="image" src="https://github.com/user-attachments/assets/e5b70eeb-21de-4808-90c0-9ee7d990acd1" />
 -->
 ![bi-level-gae](https://github.com/user-attachments/assets/fbf0ec24-6bb4-40ce-b545-818d83d04e05)
-
-
-## News
-
-**[2025/05]** We introduce **Visual Reasoning RL** in our incoming paper.
-
-**[2025/04]** We've introduced a new modular design for environments and services in VAGEN:
-- Enhanced environment framework for easier creation of custom environments
-- New service architecture for efficient distributed training
-- Check out our new guides:
-  - [Creating Environments](./docs/envs/create-env.md): New environment protocal.
-  - [Creating Services](./docs/envs/create-service.md): We now support hosting environments in a separate process
- 
-**[2025/03]** We release VAGEN, a multi-turn reinforcement learning framework for training VLM Agents!
 
 ## Installation
 
