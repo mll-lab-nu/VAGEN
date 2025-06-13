@@ -197,149 +197,55 @@ def calculate_visual_reasoning_reward_bipartite(
     return weighted_f1_sum / total_weight_for_normalization # This gives a score between 0 and 1
 
 
-# --- Example Usage ---
-if __name__ == "__main__":
-    # Example Predicted and Groundtruth lists (FrozenLake Format)
-    predicted_fl_1 = [
-    {
-        "object_id": "target",
-        "vertical_relation": "below",
-        "horizontal_relation": "right"
-    },
-    {
-        "object_id": "hole",
-        "vertical_relation": "below",
-        "horizontal_relation": "right"
-    },
-    ]
-
-    groundtruth_fl_1 = [
-    {
-        "object_id": "target",
-        "vertical_relation": "below",
-        "horizontal_relation": "left" # Different horizontal
-    },
-    {
-        "object_id": "hole",
-        "vertical_relation": "below",
-        "horizontal_relation": "right" # Exact match
-    },
-    ]
-
-    # Example with multiple objects of the same ID (Sokoban Format)
-    predicted_sokoban_2 = [
-        {"object_id": "box", "vertical_relation": "above", "horizontal_relation": "left"},       # Box A
-        {"object_id": "box", "vertical_relation": "same", "horizontal_relation": "right"},      # Box B
-        {"object_id": "target", "vertical_relation": "above", "horizontal_relation": "same"},    # Target A (Matches GT target)
-        {"object_id": "target", "vertical_relation": "below", "horizontal_relation": "left"},     # Target B (Extra)
-    ]
-
-    groundtruth_sokoban_2 = [
-        {"object_id": "box", "vertical_relation": "above", "horizontal_relation": "left"},       # Box X (Matches Pred Box A, score 1.0)
-        {"object_id": "box", "vertical_relation": "above", "horizontal_relation": "right"},      # Box Y (Matches Pred Box A vertically (0.5), matches Pred Box B horizontally (0.5))
-        {"object_id": "target", "vertical_relation": "above", "horizontal_relation": "same"},    # Target X (Matches Pred Target A, score 1.0)
-    ]
-    # Optimal box matching: (Pred Box A <-> GT Box X) score 1.0. Pred Box B has no other GT box to match perfectly.
-    # Pred Box B (same, right) vs GT Box Y (above, right). V match=0, H match=1. Score = 0.5.
-    # Max matching: (Pred Box A <-> GT Box X) score 1.0 + (Pred Box B <-> GT Box Y) score 0.5. Total Match Score for Box = 1.5.
-    # Total Pred Boxes = 2, Total GT Boxes = 2. F1_box = calculate_f1_score(1.5, 2, 2) = 2 * (1.5/2 * 1.5/2) / (1.5/2 + 1.5/2) = 2 * (0.75*0.75) / 1.5 = 2 * 0.5625 / 1.5 = 1.125 / 1.5 = 0.75.
-
-    # Target matching: (Pred Target A <-> GT Target X) score 1.0. Pred Target B has no other GT target.
-    # Max matching: (Pred Target A <-> GT Target X) score 1.0. Total Match Score for Target = 1.0.
-    # Total Pred Targets = 2, Total GT Targets = 1. F1_target = calculate_f1_score(1.0, 2, 1) = 2 * (1.0/2 * 1.0/1) / (1.0/2 + 1.0/1) = 2 * (0.5 * 1.0) / (0.5 + 1.0) = 2 * 0.5 / 1.5 = 1 / 1.5 = 0.6667.
-    # Weighted F1 = 0.4 * 0.6667 + 0.6 * 0.75 = 0.2667 + 0.45 = 0.7167. Reward = 0.7167.
-
-
-    # Example with missing relations
-    predicted_sokoban_3 = [
-        {"object_id": "box", "vertical_relation": "above", "horizontal_relation": None},       # Partial prediction
-        {"object_id": "target", "vertical_relation": "same", "horizontal_relation": "same"},   # Perfect match
-    ]
-    groundtruth_sokoban_3 = [
-        {"object_id": "box", "vertical_relation": "above", "horizontal_relation": "left"},       # GT is complete
-        {"object_id": "target", "vertical_relation": "same", "horizontal_relation": "same"},   # GT is complete
-    ]
-    # Box: Pred: [('above', None)]. GT: [('above', 'left')]. Similarity = (1 + 0)/2 = 0.5. Total Match Score = 0.5.
-    # Total Pred Boxes = 1, Total GT Boxes = 1. F1_box = calculate_f1_score(0.5, 1, 1) = 2 * (0.5/1 * 0.5/1) / (0.5/1 + 0.5/1) = 2 * (0.5*0.5) / 1.0 = 0.5.
-    # Target: Pred: [('same', 'same')]. GT: [('same', 'same')]. Similarity = (1+1)/2 = 1.0. Total Match Score = 1.0.
-    # Total Pred Targets = 1, Total GT Targets = 1. F1_target = calculate_f1_score(1.0, 1, 1) = 1.0.
-    # Weighted F1 = 0.4 * 1.0 + 0.6 * 0.5 = 0.4 + 0.3 = 0.7. Reward = 0.7.
-
-    # Define weights for FrozenLake
-    frozenlake_weights = {"target": 0.7, "hole": 0.3}
-
-    # Define weights for Sokoban
-    sokoban_weights = {"target": 0.5, "box": 0.5} # Example weights
-
-
-    print("--- FrozenLake Example 1 (Bipartite Matching) ---")
-    reward_fl_1_bipartite = calculate_visual_reasoning_reward_bipartite(predicted_fl_1, groundtruth_fl_1, frozenlake_weights)
-    print(f"Reward: {reward_fl_1_bipartite:.4f}") # Expected: 0.5
-
-    print("\n--- Sokoban Example 2 (Bipartite Matching) ---")
-    reward_sokoban_2_bipartite = calculate_visual_reasoning_reward_bipartite(predicted_sokoban_2, groundtruth_sokoban_2, sokoban_weights)
-    print(f"Reward: {reward_sokoban_2_bipartite:.4f}") # Expected: ~0.7167
-
-    print("\n--- Sokoban Example 3 (Bipartite Matching & Partial) ---")
-    reward_sokoban_3_bipartite = calculate_visual_reasoning_reward_bipartite(predicted_sokoban_3, groundtruth_sokoban_3, sokoban_weights)
-    print(f"Reward: {reward_sokoban_3_bipartite:.4f}") # Expected: 0.7
-
-
-    print("\n--- Edge Case: Both lists empty, weights exist ---")
-    reward_empty_both = calculate_visual_reasoning_reward_bipartite([], [], frozenlake_weights)
-    print(f"Reward: {reward_empty_both:.4f}") # Expected: 1.0
-
-    print("\n--- Edge Case: Pred empty, GT has relevant objects ---")
-    reward_pred_empty = calculate_visual_reasoning_reward_bipartite([], [{"object_id":"target", "vertical_relation":"above","horizontal_relation":"left"}], frozenlake_weights)
-    print(f"Reward: {reward_pred_empty:.4f}") # Expected: 0.0
-
-    print("\n--- Edge Case: GT empty, Pred has relevant objects ---")
-    reward_gt_empty = calculate_visual_reasoning_reward_bipartite([{"object_id":"target", "vertical_relation":"above","horizontal_relation":"left"}], [], frozenlake_weights)
-    print(f"Reward: {reward_gt_empty:.4f}") # Expected: 0.0
-
-    print("\n--- Edge Case: Lists have objects, but not in weights ---")
-    reward_irrelevant_objects = calculate_visual_reasoning_reward_bipartite([{"object_id":"irrelevant", "vertical_relation":"above","horizontal_relation":"left"}], [{"object_id":"another", "vertical_relation":"above","horizontal_relation":"left"}], frozenlake_weights)
-    print(f"Reward: {reward_irrelevant_objects:.4f}") # Expected: 0.0
-
-    # Example: multiple objects, some with None
-    predicted_sokoban_4 = [
-        {"object_id": "box", "vertical_relation": "above", "horizontal_relation": "left"},       # Box A (Match GT Box X)
-        {"object_id": "box", "vertical_relation": "above", "horizontal_relation": None},       # Box B (Partial match GT Box Y vert)
-        {"object_id": "target", "vertical_relation": "above", "horizontal_relation": "same"},    # Target A (Match GT Target X)
-        {"object_id": "box", "vertical_relation": "below", "horizontal_relation": "right"},      # Box C (No GT match)
-    ]
-
-    groundtruth_sokoban_4 = [
-        {"object_id": "box", "vertical_relation": "above", "horizontal_relation": "left"},       # Box X
-        {"object_id": "box", "vertical_relation": "above", "horizontal_relation": "right"},      # Box Y
-        {"object_id": "target", "vertical_relation": "above", "horizontal_relation": "same"},    # Target X
-    ]
-
-    print("\n--- Sokoban Example 4 (Bipartite Matching & Partial & Extra) ---")
-    reward_sokoban_4_bipartite = calculate_visual_reasoning_reward_bipartite(predicted_sokoban_4, groundtruth_sokoban_4, sokoban_weights)
-    print(f"Reward: {reward_sokoban_4_bipartite:.4f}")
-    # Box: Pred: [('above', 'left'), ('above', None), ('below', 'right')]. Count = 3.
-    # Box: GT: [('above', 'left'), ('above', 'right')]. Count = 2.
-    # Weights:
-    # ('above', 'left') vs ('above', 'left') -> (1+1)/2 = 1.0
-    # ('above', 'left') vs ('above', 'right') -> (1+0)/2 = 0.5
-    # ('above', None) vs ('above', 'left') -> (1+0)/2 = 0.5
-    # ('above', None) vs ('above', 'right') -> (1+0)/2 = 0.5
-    # ('below', 'right') vs ('above', 'left') -> (0+0)/2 = 0.0
-    # ('below', 'right') vs ('above', 'right') -> (0+1)/2 = 0.5
-    # Weight matrix (Pred rows, GT cols):
-    # [[1.0, 0.5],
-    #  [0.5, 0.5],
-    #  [0.0, 0.5]]
-    # Assignment on negative cost matrix:
-    # (0,0) [cost -1.0] + (1,1) [cost -0.5] -> total cost -1.5 -> total weight 1.5
-    # (0,1) [cost -0.5] + (1,0) [cost -0.5] -> total cost -1.0 -> total weight 1.0
-    # (0,0) [cost -1.0] + (2,1) [cost -0.5] -> total cost -1.5 -> total weight 1.5  <-- Optimal (also others might tie)
-    # e.g., match (Pred Box A <-> GT Box X) score 1.0, (Pred Box B <-> GT Box Y) score 0.5. Total match score = 1.5.
-    # TP_box = 1.5. Total Pred Box = 3, Total GT Box = 2.
-    # F1_box = calculate_f1_score(1.5, 3, 2) = 2 * (1.5/3 * 1.5/2) / (1.5/3 + 1.5/2) = 2 * (0.5 * 0.75) / (0.5 + 0.75) = 2 * 0.375 / 1.25 = 0.75 / 1.25 = 0.6.
-    # Target: Pred: [('above', 'same')]. Count = 1.
-    # Target: GT: [('above', 'same')]. Count = 1.
-    # Match: ('above', 'same') vs ('above', 'same'). Similarity = 1.0. Total Match Score = 1.0.
-    # TP_target = 1.0. Total Pred Target = 1, Total GT Target = 1. F1_target = calculate_f1_score(1.0, 1, 1) = 1.0.
-    # Weighted F1 = 0.4 * 1.0 + 0.6 * 0.6 = 0.4 + 0.36 = 0.76. Reward = 0.76.
+def calculate_f1_with_max_matching(p_list, gt_list, match_func):
+    """
+    Calculate F1 score between predicted list and ground truth list using maximum matching algorithm
+    
+    Args:
+        p_list: predicted list
+        gt_list: ground truth list  
+        match_func: matching function that takes two parameters (item1, item2) and returns boolean
+        
+    Returns:
+        dict: dictionary containing precision, recall, f1, matches, total_predicted, total_ground_truth
+    """
+    
+    # Build bipartite graph matching matrix
+    # Use greedy algorithm to find maximum matching
+    used_gt_indices = set()
+    used_p_indices = set()
+    matches = 0
+    
+    # Find best match for each predicted item
+    for p_idx, p_item in enumerate(p_list):
+        best_match_idx = None
+        
+        # Find first unused matching item
+        for gt_idx, gt_item in enumerate(gt_list):
+            if gt_idx not in used_gt_indices and match_func(p_item, gt_item):
+                best_match_idx = gt_idx
+                break
+        
+        # If match found, mark as used
+        if best_match_idx is not None:
+            used_gt_indices.add(best_match_idx)
+            used_p_indices.add(p_idx)
+            matches += 1
+    
+    # Calculate precision, recall, f1
+    total_predicted = len(p_list)
+    total_ground_truth = len(gt_list)
+    
+    precision = matches / total_predicted if total_predicted > 0 else 0.0
+    recall = matches / total_ground_truth if total_ground_truth > 0 else 0.0
+    
+    f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
+    
+    return {
+        'precision': precision,
+        'recall': recall,
+        'f1': f1,
+        'matches': matches,
+        'total_predicted': total_predicted,
+        'total_ground_truth': total_ground_truth
+    }

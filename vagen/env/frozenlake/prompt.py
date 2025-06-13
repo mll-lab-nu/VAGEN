@@ -43,20 +43,20 @@ FORMAT_CONFIGS = {
         "format": "<think><observation>...</observation><reasoning>...</reasoning></think>",
         "description": "You should first describe the observation, then your reasoning, and finally your answer.",
         "example": "<think><observation>The player is on the above the target</observation><reasoning>I should go down then left to reach the target</reasoning></think><answer>Down{action_sep}Left</answer>",
-        "additional_info": "For the content you provide within the `<observation>` tags, you must strictly describe the relative position of the `target` and any visible `hole` objects **relative to the player**. Your description/prediction must include **both** a vertical and a horizontal directional relationship for each object. Use ONLY the terms `above`, `below`, `left`, `right`, or `same` for describing these relationships.",
+        "additional_info": "Inside the <observation> tags, describe the position of the target (gift box) and each hole (blue) relative to the player. For each object, you must specify both its vertical (above, below, same) and horizontal (left, right, same) direction.",
     },
     
     "worldmodeling": {
         "format": "<think><reasoning>...</reasoning><prediction>...</prediction></think><answer>...</answer>",
         "description": "You should first give your reasoning, then predict the next state, and finally your answer.",
         "example": "<think><reasoning>I can see the target is on my down left, I should go down then left</reasoning><prediction>The player will reach the target</prediction></think><answer>Down{action_sep}Left</answer>",
-        "additional_info": "For the content you provide within the `<prediction>` tags, you must strictly describe the relative position of the `target` and any visible `hole` objects **relative to the player**. Your description/prediction must include **both** a vertical and a horizontal directional relationship for each object. Use ONLY the terms `above`, `below`, `left`, `right`, or `same` for describing these relationships.",
+        "additional_info": "Inside the <prediction> tags, describe the position of the target (gift box) and each hole (blue) relative to the player. For each object, you must specify both its vertical (above, below, same) and horizontal (left, right, same) direction.",
     },
     
     "grounding_worldmodeling": {
         "format": "<think><observation>...</observation><reasoning>...</reasoning><prediction>...</prediction></think><answer>...</answer>",
         "description": "You should first describe the observation, then your reasoning, then predict the next state, and finally your answer.",
-        "additional_info": "For the content you provide within the `<observation>` and `<prediction>` tags, you must strictly describe the relative position of the `target` (the gift box) and any visible `hole` (blue circles) objects **relative to the player**. Your description/prediction must include **both** a vertical and a horizontal directional relationship for each object. Use ONLY the terms `above`, `below`, `left`, `right`, or `same` for describing these relationships.",
+        "additional_info": "Inside the <observation> and <prediction> tags, describe the position of the target (gift box) and each hole (blue) relative to the player. For each object, you must specify both its vertical (above, below, same) and horizontal (left, right, same) direction.",
         "example": "<think><observation>The player is above and on the right side of target. There is a hole below and at the left of the player</observation><reasoning>I should go down then left to reach the target</reasoning><prediction>The player will at the same place as the target</prediction></think><answer>Down{action_sep}Left</answer>"
     },
     
