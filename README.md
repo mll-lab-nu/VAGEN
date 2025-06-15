@@ -168,8 +168,8 @@ Our experiments on visual Sokoban using a Qwen-VL 3B model show:
 <img width="800" alt="image" src="./public/3.png" />
 -->
 ## Experimental Results
-We benchmark closed- and open-sourced models on five environments. Reasoning on visual states, including both grounding and world modeling, can significantly improve
-the RL performance. 
+We benchmark closed- and open-sourced models on five environments. Reasoning on visual states, including both grounding and world modeling, can improve
+the performance. 
 <img width="1093" alt="image" src="https://github.com/user-attachments/assets/162820e8-a4f3-49b7-b8f8-c7963a5ac6f1" />
 
 Incorporating Visual Reasoning RL leads to improved performance
