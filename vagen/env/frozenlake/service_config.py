@@ -6,3 +6,5 @@ from typing import Dict, List, Tuple, Optional, Any, Union
 class FrozenLakeServiceConfig(BaseServiceConfig):
     device: Dict[str, Any] = field(default_factory=lambda: {"clip": 0})
     use_state_reward: bool = False
+    top_strings_m: int = 1000
+    top_strings_k: int = 5

@@ -6,9 +6,10 @@ from vagen.server.serial import serialize_observation
 from .env import FrozenLakeEnv
 from .env_config import FrozenLakeEnvConfig
 from ..base.base_service_config import BaseServiceConfig
-from vagen.env.utils.state_reward_text_utils import service_state_reward_wrapper_new as service_state_reward_wrapper
+from vagen.env.utils.state_reward_text_utils import service_state_reward_wrapper_v3 as service_state_reward_wrapper
 from .prompt import visual_reasoning_reward_prompt
-from vagen.env.utils.state_matching import calculate_visual_reasoning_reward_bipartite
+from vagen.env.utils.state_matching import calculate_visual_reasoning_reward_bipartite,calculate_f1_with_max_matching
+from vagen.env.utils.top_string_tracker import TopKStringTracker
 class FrozenLakeService(BaseService):
     """
     Service class for FrozenLake environments.
@@ -26,6 +27,10 @@ class FrozenLakeService(BaseService):
         self.environments = {}
         self.env_configs = {}
         self.config= config
+        if self.config.use_state_reward:
+            self.top_strings_tracker_grounding = TopKStringTracker(self.config.top_strings_m)
+            self.top_strings_tracker_worldmodeling = TopKStringTracker(self.config.top_strings_m)
+        
     def create_environments_batch(self, ids2configs: Dict[Any, Any]) -> None:
         """
         Create multiple FrozenLake environments in parallel.
@@ -299,17 +304,37 @@ class FrozenLakeService(BaseService):
     def gen_visual_reasoning_prompt(self, content,**kwargs) -> str:
         return visual_reasoning_reward_prompt.format(prediction=content)
     
-    def calculate_visual_reasoning_reward(self, response,state) -> float:
+    def calculate_visual_reasoning_reward(self, response,state,content,r_type,**kwargs) -> float:
         """
         Calculate the visual reasoning reward based on the response and state.
-        
+        e.g. [{"object_id": "target", "vertical_relation":above,"horizontal_relation":left}, 
+            {"object_id": "hole", "vertical_relation":above,"horizontal_relation":left}]
         Args:
-            response: The response from the LLM.
+            response: The output of the llm judge (structured state).
             state: The current state of the environment.
+            content: The input to the llm judge (natural lanagugae state).
         
         Returns:
             A float representing the calculated reward.
         """
-        object_weights={"target": 0.7,"hole": 0.3}
+        # object_weights={"target": 0.7,"hole": 0.3}
+        # return calculate_visual_reasoning_reward_bipartite(response, state,object_weights)
+        target_reward = calculate_f1_with_max_matching(
+            [item for item in state if item['object_id'] == 'target'],
+            [item for item in response if item['object_id'] == 'target'],
+            match_func=lambda x, y: x['vertical_relation'] == y['vertical_relation'] and x['horizontal_relation'] == y['horizontal_relation']
+        )
+        # check hole reward
+        hole_reward =calculate_f1_with_max_matching(
+            [item for item in state if item['object_id'] == 'hole'],
+            [item for item in response if item['object_id'] == 'hole'],
+            match_func=lambda x, y: x['vertical_relation'] == y['vertical_relation'] and x['horizontal_relation'] == y['horizontal_relation']
+        )
+        if r_type=="grounding":
+            top_k_strings = self.top_strings_tracker_grounding.get_top_k(self.config.top_strings_k)
+        if r_type=="worldmodeling":
+            top_k_strings = self.top_strings_tracker_worldmodeling.get_top_k(self.config.top_strings_k)
         
-        return calculate_visual_reasoning_reward_bipartite(response, state,object_weights)
+        if content in top_k_strings and target_reward<0.5:
+            return -0.1
+        return target_reward*0.7 + hole_reward*0.3

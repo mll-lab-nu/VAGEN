@@ -1,7 +1,7 @@
 from typing import Dict, List, Tuple, Optional, Any, Union
 from vagen.env.base.base_service import BaseService
 from vagen.env.base.base_service_config import BaseServiceConfig
-from vagen.env.utils.state_reward_text_utils import service_state_reward_wrapper_new as service_state_reward_wrapper
+from vagen.env.utils.state_reward_text_utils import service_state_reward_wrapper_v2 as service_state_reward_wrapper
 from vagen.server.serial import serialize_observation
 
 from .env import SokobanEnv
