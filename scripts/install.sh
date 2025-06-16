@@ -19,7 +19,7 @@ pip install 'flask'
 
 
 echo "Installing flash-attn with no build isolation..."
-pip install flash-attn --no-build-isolation
+pip install flash-attn==2.7.4.post1
 
 echo "Installing vagen package..."
 pip install -e .
