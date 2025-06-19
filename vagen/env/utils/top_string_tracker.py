@@ -128,8 +128,11 @@ class TopKStringTracker:
         # Keep top m
         top_m_strings = {string for _, string in all_items[:self.m]}
         
-        # Update count dictionary
-        self.count = {s: self.count[s] for s in top_m_strings}
+        # FIX: Preserve defaultdict behavior when rebuilding count dictionary
+        new_count = defaultdict(int)
+        for s in top_m_strings:
+            new_count[s] = self.count[s]
+        self.count = new_count
         
         # Rebuild heap
         self.heap = [(self.count[s], s) for s in top_m_strings]
@@ -145,15 +148,15 @@ class TopKStringTracker:
         return self.count.get(string, 0)
 
 
-# Usage example and test code
+# Enhanced test code with edge cases
 def test_topk_tracker():
-    """Test the functionality of TopKStringTracker"""
+    """Test the functionality of TopKStringTracker including edge cases"""
     print("=== TopK String Tracker Test ===")
     
     # Initialize, keep top 5 strings
     tracker = TopKStringTracker(m=5)
     
-    # First batch of strings
+    # Test 1: Basic functionality
     print("\n1. Adding first batch of strings:")
     batch1 = ["apple", "banana", "apple", "cherry"]
     tracker.add_strings(batch1)
@@ -161,39 +164,47 @@ def test_topk_tracker():
     print(f"Current top-3: {tracker.get_top_k(3)}")
     print(f"Current storage size: {tracker.size()}")
     
-    # Second batch of strings
+    # Test 2: More strings
     print("\n2. Adding second batch of strings:")
     batch2 = ["banana", "banana", "date", "elderberry"]
     tracker.add_strings(batch2)
     print(f"Added: {batch2}")
     print(f"Current top-3: {tracker.get_top_k(3)}")
-    print(f"String counts:")
-    for s in ["apple", "banana", "cherry", "date", "elderberry"]:
-        print(f"  {s}: {tracker.get_count(s)}")
     
-    # Third batch with more strings
-    print("\n3. Adding third batch of strings:")
-    batch3 = ["fig", "grape", "apple", "banana", "fig", "grape"]
-    tracker.add_strings(batch3)
-    print(f"Added: {batch3}")
-    print(f"Current top-4: {tracker.get_top_k(4)}")
-    print(f"Current storage size: {tracker.size()}")
-    
-    # Test adding strings from dictionary
-    print("\n4. Adding strings from dictionary:")
+    # Test 3: Dictionary addition
+    print("\n3. Adding strings from dictionary:")
     string_dict = {"apple": 2, "kiwi": 5, "mango": 3, "banana": 1}
     tracker.add_string_dict(string_dict)
     print(f"Added dict: {string_dict}")
     print(f"Current top-5: {tracker.get_top_k(5)}")
-    print(f"String counts after dict addition:")
-    for s in ["apple", "banana", "kiwi", "mango", "fig", "grape"]:
-        print(f"  {s}: {tracker.get_count(s)}")
     
-    # Trim to top 5
-    print("\n5. Trimming to top 5 strings:")
+    # Test 4: CRITICAL TEST - Trim and then add new strings (reproduces the bug)
+    print("\n4. Testing trim_to_m followed by new additions:")
+    print(f"Before trim - storage size: {tracker.size()}")
     tracker.trim_to_m()
-    print(f"Storage size after trimming: {tracker.size()}")
-    print(f"Top-5 after trimming: {tracker.get_top_k(5)}")
+    print(f"After trim - storage size: {tracker.size()}")
+    
+    # This should not cause KeyError anymore
+    print("Adding new string after trim...")
+    new_string = "The player is above and to the right of the goal, and there is a hole below and to the left of the player."
+    tracker.add_strings([new_string])
+    print("✓ Successfully added new string after trim!")
+    print(f"Count of new string: {tracker.get_count(new_string)}")
+    
+    # Test 5: Edge cases
+    print("\n5. Testing edge cases:")
+    
+    # Empty list
+    tracker.add_strings([])
+    print("✓ Empty list handled")
+    
+    # Zero/negative counts in dictionary
+    tracker.add_string_dict({"invalid1": 0, "invalid2": -1, "valid": 2})
+    print("✓ Invalid counts handled")
+    
+    # Requesting more top-k than available
+    all_strings = tracker.get_top_k(100)
+    print(f"✓ Requesting top-100 returned {len(all_strings)} strings")
     
     print("\n=== Test Complete ===")
 

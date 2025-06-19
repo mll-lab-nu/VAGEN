@@ -319,17 +319,19 @@ class FrozenLakeService(BaseService):
         """
         # object_weights={"target": 0.7,"hole": 0.3}
         # return calculate_visual_reasoning_reward_bipartite(response, state,object_weights)
-        target_reward = calculate_f1_with_max_matching(
+        target_result = calculate_f1_with_max_matching(
             [item for item in state if item['object_id'] == 'target'],
             [item for item in response if item['object_id'] == 'target'],
             match_func=lambda x, y: x['vertical_relation'] == y['vertical_relation'] and x['horizontal_relation'] == y['horizontal_relation']
         )
         # check hole reward
-        hole_reward =calculate_f1_with_max_matching(
+        hole_result =calculate_f1_with_max_matching(
             [item for item in state if item['object_id'] == 'hole'],
             [item for item in response if item['object_id'] == 'hole'],
             match_func=lambda x, y: x['vertical_relation'] == y['vertical_relation'] and x['horizontal_relation'] == y['horizontal_relation']
         )
+        target_reward = target_result['f1']
+        hole_reward = hole_result['f1']
         if r_type=="grounding":
             top_k_strings = self.top_strings_tracker_grounding.get_top_k(self.config.top_strings_k)
         if r_type=="worldmodeling":
