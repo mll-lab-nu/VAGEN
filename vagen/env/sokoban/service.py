@@ -100,14 +100,14 @@ class SokobanService(BaseService):
         # object_weights={"target": 0.7,"hole": 0.3}
         # return calculate_visual_reasoning_reward_bipartite(response, state,object_weights)
         target_result = calculate_f1_with_max_matching(
-            [item for item in state if item['object_id'] == 'target'],
-            [item for item in response if item['object_id'] == 'target'],
+            [item for item in state if item['object_id'] == 'target'] if state else [],
+            [item for item in response if item['object_id'] == 'target'] if response else [],
             match_func=lambda x, y: x['vertical_relation'] == y['vertical_relation'] and x['horizontal_relation'] == y['horizontal_relation']
         )
         # check hole reward
         box_result =calculate_f1_with_max_matching(
-            [item for item in state if item['object_id'] == 'box'],
-            [item for item in response if item['object_id'] == 'box'],
+            [item for item in state if item['object_id'] == 'box'] if state else [],
+            [item for item in response if item['object_id'] == 'box'] if response else [],
             match_func=lambda x, y: x['vertical_relation'] == y['vertical_relation'] and x['horizontal_relation'] == y['horizontal_relation']
         )
         target_reward = target_result['f1']
