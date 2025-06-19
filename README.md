@@ -1,29 +1,28 @@
 <h1 align="center">VAGEN: Training VLM agents with multi-turn reinforcement learning</h1>
-<!-- <p align="center" style="font-size: 18px;">
-  Reinforcing Visual State Reasoning for Multi-Turn VLM Agents<br>
-</p> -->
+<p align="center" style="font-size: 20px;">
+  <b>Reinforcing Visual State Reasoning for Multi-Turn VLM Agents</b>
+</p>
+<p align="center" style="font-size: 16px;">
+  Kangrui Wang*, Pingyue Zhang*, Zihan Wang*, Yaning Gao*, Linjie Li*, Qineng Wang, Hanyang Chen, Chi Wan, Yiping Lu, Zhengyuan Yang, Lijuan Wang, Ranjay Krishna, Jiajun Wu, Li Fei-Fei, Yejin Choi, Manling Li
+</p>
+<p align="center" style="font-size: 12px;"><i>(* equal contribution)</i></p>
+
 <p align="center">
+  <a href="https://arxiv.org/abs/YOUR_ARXIV_ID_HERE"><img src="https://img.shields.io/badge/📜_Paper-B31B1B?style=for-the-badge&logo=arXiv&logoColor=white" alt="Paper"></a>
   <a href="https://vagen.readthedocs.io/en/latest"><img src="https://img.shields.io/badge/📚_Documentation-4285F4?style=for-the-badge&logoColor=white" alt="Documentation"></a>
   <a href="https://mll-lab.notion.site/vagen"><img src="https://img.shields.io/badge/📝_Blog-FF5722?style=for-the-badge&logoColor=white" alt="Blog"></a>
   <a href="https://api.wandb.ai/links/ragen-V/nlb40e7l"><img src="https://img.shields.io/badge/📊_Experiment_Log-FB8C00?style=for-the-badge&logoColor=white" alt="Experiment Log"></a>
 </p>
 
+This repository contains the official implementation of our paper, **"Reinforcing Visual State Reasoning for Multi-Turn VLM Agents"**.
 
+We introduce **VAGEN**, a multi-turn reinforcement learning framework designed specifically for training vision-language model (VLM) agents. Built upon this framework, we propose **Visual Reasoning RL**, a novel reinforcement learning approach that significantly improves the multi-turn performance of VLMs by explicitly supervising their visual state reasoning process.
 
-<!--
-VAGEN is a multi-turn reinforcement learning framework designed specifically for training VLM Agents. VAGEN leverages the TRICO algorithm to efficiently train VLMs for visual agentic tasks.
--->
-<!-- We propose **VAGEN**, a scalable training framework that enables this method across diverse visual environments -->
-We propose **VAGEN**, a multi-turn reinforcement learning framework designed specifically for training vision-language models (VLMs) Agents.
-Based on VAGEN, we introduce **Visual Reasoning RL**, a reinforcement learning approach that improves multi-turn performance of VLMs by explicitly supervising visual state reasoning.
+![bi-level-gae](https://github.com/user-attachments/assets/fbf0ec24-6bb4-40ce-b545-818d83d04e05)
 
-
-<!--
-![vagen_new](https://github.com/user-attachments/assets/83c84052-89ba-4a77-9c13-85d882f52a3b)
--->
 ## News
 
-**[2025/05]** We introduce **Visual Reasoning RL** in our incoming paper.
+**[2025/05]** We are excited to release our paper, **"Reinforcing Visual State Reasoning for Multi-Turn VLM Agents"**, introducing the **Visual Reasoning RL** method!
 
 **[2025/04]** We've introduced a new modular design for environments and services in VAGEN:
 - Enhanced environment framework for easier creation of custom environments
@@ -31,20 +30,28 @@ Based on VAGEN, we introduce **Visual Reasoning RL**, a reinforcement learning a
 - Check out our new guides:
   - [Creating Environments](./docs/envs/create-env.md): New environment protocal.
   - [Creating Services](./docs/envs/create-service.md): We now support hosting environments in a separate process
- 
+
 **[2025/03]** We release VAGEN, a multi-turn reinforcement learning framework for training VLM Agents!
 
-## Framework
+## Why Visual Reasoning RL?
+Standard RL methods applied to VLMs struggle with multi-turn agentic tasks due to:
+1. **Visual State Ambiguity**: VLMs lack mechanisms to explicitly interpret and track evolving visual environments.
+2. **Precision Bottlenecks**: Existing representations fall short in tasks requiring fine-grained spatial or temporal understanding.
+
+Our approach, **Visual Reasoning RL**, addresses these challenges through:
+1. **Visual State Reasoning Prompts**: Injects structured prompts like grounding (current state description) and world modeling (future state prediction) to scaffold the model’s internal reasoning.
+2. **Reinforcement Learning with Reasoning Rewards**: Reinforces visual understanding with:
+   - **Turn-level reasoning rewards** for supervising accuracy.
+   - **Bi-Level GAE** for fine-grained credit assignment at both turn and token levels.
+
+## The VAGEN Framework
 
 We present the framework of **VAGEN** in the image below. The `rollout.py` module facilitates interactions between `ray_trainer.py` and various environments. Our framework operates with two forms of “language”: token sequences (used by the model) and structured information from the environments. `rollout.py` serves as a translator, parsing structured environment data into tokens for the model and converting model outputs back into structured actions or observations. It also records data of each step to form the entire trajectory.
 ![framework](https://github.com/user-attachments/assets/183cea78-2345-4b5e-82c5-a0679c5f112a)
 
+## Key Innovations of VAGEN
 
-
-<!--
-## Key Innovations
-
-VAGEN introduces the **Turn-aware Reason-Interaction Chain Optimization (TRICO)** algorithm which extends the traditional RICO approach with two key innovations:
+Two key innovations are introduced in VAGEN to support methods like Visual Reasoning RL:
 
 1. **Selective Token Masking** - Focuses optimization on action-critical tokens through:
    - Loss masking (`M^loss`): Identifies tokens to update during policy optimization
@@ -62,44 +69,6 @@ Traditional RL frameworks for LLM agents treat all tokens in a trajectory equall
 - **State Redundancy**: Visual tasks contain excessive low-level information in long-context inputs
 
 VAGEN addresses these challenges by focusing optimization on the most critical decision-making tokens and creating a more nuanced reward structure across interaction turns.
--->
-
-## Key Innovation of VAGEN
-
-Two key innovations are introduced in VAGEN:
-
-1. **Selective Token Masking** - Focuses optimization on action-critical tokens through:
-   - Loss masking (`M^loss`): Identifies tokens to update during policy optimization
-   - Advantage masking (`M^adv`): Determines tokens to include in advantage calculations
-
-2. **Cross-turn Credit Assignment** - Enables more effective credit attribution through:
-   - Bi-level advantage estimation with separate discount factors for cross-turn (`γ_turn`) and within-turn (`γ_token`) calculations
-   - Turn-level rewards applied at each interaction boundary
-
-## Why VAGEN Works Better for VLM Agents
-
-Traditional RL frameworks for LLM agents treat all tokens in a trajectory equally. This approach is suboptimal for VLM agents due to:
-
-- **Distribution Shift**: Most VLMs aren't pretrained to generate image tokens
-- **State Redundancy**: Visual tasks contain excessive low-level information in long-context inputs
-
-VAGEN addresses these challenges by focusing optimization on the most critical decision-making tokens and creating a more nuanced reward structure across interaction turns.
-
-
-## Why Visual Reasoning
-Standard RL methods applied to VLMs struggle with multi-turn agentic tasks due to:
-1. **Visual State Ambiguity**: VLMs lack mechanisms to explicitly interpret and track evolving visual environments
-2. **Precision Bottlenecks**: Existing representations fall short in tasks requiring fine-grained spatial or temporal understanding
-
-Our framework addresses through:
-1. **Visual State Reasoning Prompts** – Injects structured prompts like grounding (current state description) and world modeling (future state prediction) to scaffold the model’s internal reasoning
-2. **Visual Reasoning RL** – Reinforces visual understanding with:
-   - **Turn-level reasoning rewards** for supervising accuracy
-   - **Bi-Level GAE** for fine-grained credit assignment at both turn and token levels
-<!--
-<img width="1835" alt="image" src="https://github.com/user-attachments/assets/e5b70eeb-21de-4808-90c0-9ee7d990acd1" />
--->
-![bi-level-gae](https://github.com/user-attachments/assets/fbf0ec24-6bb4-40ce-b545-818d83d04e05)
 
 ## Installation
 
@@ -150,47 +119,12 @@ See our [Creating Environments](./docs/envs/create-env.md) guide. You may also w
 1. Refer to [VERL](https://verl.readthedocs.io/en/latest/index.html) for adding new MLLM.
 2. Refer to [QwenVLRolloutManager](vagen/rollout/qwen_rollout/rollout_manager.py) to understand how rollout works. In most cases, you can use QwenVLRolloutManager directly with only minor modifications to the model's special tokens
 
-<!--
 ## Experimental Results
-> To reproduce our experiment, please refer to document: [Reproduce Experiments](docs/reproduce-exp.md)
-
-
-Our experiments on visual Sokoban using a Qwen-VL 3B model show:
-- TRICO significantly outperforms RICO in visual agentic tasks
-- Both selective token masking and cross-turn credit assignment contribute to performance gains
-- AICO (Action-centric Interaction Chain Optimization), which uses only selective token masking, outperforms TRICO on simple tasks
-- TRICO demonstrates superior exploration capabilities on more complex problems
-
-<img width="800" alt="image" src="./public/1.png" />
-
-<img width="800" alt="image" src="./public/2.png" />
-
-<img width="800" alt="image" src="./public/3.png" />
--->
-## Experimental Results
-We benchmark closed- and open-sourced models on five environments. Reasoning on visual states, including both grounding and world modeling, can improve
-the performance. 
+We benchmark closed- and open-sourced models on five environments. Reasoning on visual states, including both grounding and world modeling, can improve the performance. 
 <img width="1093" alt="image" src="https://github.com/user-attachments/assets/162820e8-a4f3-49b7-b8f8-c7963a5ac6f1" />
 
-Incorporating Visual Reasoning RL leads to improved performance
+Incorporating **Visual Reasoning RL** leads to improved performance.
 <img width="1319" alt="image" src="https://github.com/user-attachments/assets/cba16487-c24b-4b25-9ecf-a668d4cd8ac6" />
-
-
-
-<!--
-## Cases
-We present several cases selected from validation steps during training models with AICO and TRICO, as shown below. You can view all the cases in our [Experiment Log](https://api.wandb.ai/links/ragen-V/nlb40e7l).
-
-### Cases from AICO Training
-<img width="1107" alt="image (4)" src="https://github.com/user-attachments/assets/995ec921-faf8-4832-a4c0-1c2ce559a55c" />
-
-![image (5)](https://github.com/user-attachments/assets/78bbc376-7e61-4a24-9911-eb28416eed37)
-
-### Cases from TRICO Training
-![image (6)](https://github.com/user-attachments/assets/60b251a2-e395-4079-a9aa-ceb4455b0a7a)
-
-![image (7)](https://github.com/user-attachments/assets/ddea7352-0a14-45a5-94a9-655a07c9fe3e)
--->
 
 ## Environments
 
@@ -203,7 +137,7 @@ We present several cases selected from validation steps during training models w
 
 
 # Project Roadmap
-- 🗓️ Mar 25, 2025: We release VAGEN, a multi-turn reinforcement learning framework for training VLM Agents!
+- 🗓️ May 25, 2025: We release our paper **"Reinforcing Visual State Reasoning for Multi-Turn VLM Agents"** and the VAGEN framework.
 - [ ] Merge to RAGEN for better package mangement
 - [ ] Expand evaluation framework to more diverse visual environments
 - [ ] Scaling to larger models and applying TRICO to text-only tasks
@@ -228,13 +162,13 @@ We thank [RAGEN](https://github.com/RAGEN-AI/RAGEN) for its innovative explorati
 
 ## Citation
 
-If you find our repo useful, we appreciate it if you could cite our work at:
+If you find our framework and paper useful, we appreciate it if you could cite our work:
 
 ```bibtex
-@misc{VAGEN,
+@misc{wang2025vagen,
   title={Reinforcing Visual State Reasoning for Multi-Turn VLM Agents},
   author={Kangrui Wang* and Pingyue Zhang* and Zihan Wang* and Yaning Gao* and Linjie Li* and Qineng Wang and Hanyang Chen and Chi Wan and Yiping Lu and Zhengyuan Yang and Lijuan Wang and Ranjay Krishna and Jiajun Wu and Li Fei-Fei and Yejin Choi and Manling Li},
-  url={https://github.com/RAGEN-AI/VAGEN},
   year={2025},
+  url={https://github.com/RAGEN-AI/VAGEN}
 }
 ```
