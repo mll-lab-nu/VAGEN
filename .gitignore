@@ -128,3 +128,6 @@ temp/
 benchmark_results/
 env_benchmark_results/
 results/
+
+# Settings
+MindCube_set_env.sh
