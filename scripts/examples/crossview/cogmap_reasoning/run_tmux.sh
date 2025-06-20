@@ -82,7 +82,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     data.max_trajectory_length=3600 \\
     data.image_key=images \\
     data.truncation=left \\
-    actor_rollout_ref.model.path=/home/ubuntu/Work/MindCube/MindCube-Qwen2.5VL-cogmap-and-reasoning \\
+    actor_rollout_ref.model.path=vagen/env/crossview/pretrained_models/MindCube-Qwen2.5VL-Aug-CGMap-FFR-OUT \\
     actor_rollout_ref.actor.optim.lr=1e-6 \\
     actor_rollout_ref.model.use_remove_padding=True \\
     actor_rollout_ref.actor.ppo_mini_batch_size=32 \\
@@ -107,7 +107,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     actor_rollout_ref.rollout.temperature=0.7 \\
     critic.optim.lr=1e-5 \\
     critic.model.use_remove_padding=True \\
-    critic.model.path=/home/ubuntu/Work/MindCube/MindCube-Qwen2.5VL-cogmap-and-reasoning \\
+    critic.model.path=vagen/pretrained_models/MindCube-Qwen2.5VL-Aug-CGMap-FFR-OUT \\
     critic.model.enable_gradient_checkpointing=True \\
     critic.ppo_micro_batch_size_per_gpu=1 \\
     critic.model.fsdp_config.param_offload=False \\
@@ -115,13 +115,13 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     algorithm.kl_ctrl.kl_coef=0.001 \\
     trainer.critic_warmup=0 \\
     trainer.logger=['console','wandb'] \\
-    trainer.project_name='vagen_crossview' \\
+    trainer.project_name='vagen_crossview_new' \\
     trainer.experiment_name=$EXPERIMENT_NAME \\
     trainer.n_gpus_per_node=4 \\
     trainer.nnodes=1 \\
-    trainer.save_freq=60 \\
+    trainer.save_freq=20 \\
     trainer.test_freq=20 \\
-    trainer.total_training_steps=220 \\
+    trainer.total_training_steps=200 \\
     trainer.remove_previous_ckpt_in_save=True \\
     rollout_manager.max_turns=1 \\
     rollout_manager.window_size=5 \\
