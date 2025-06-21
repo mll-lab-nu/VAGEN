@@ -131,3 +131,6 @@ results/
 
 # Settings
 MindCube_set_env.sh
+
+# pretrained models
+**/pretrained_models

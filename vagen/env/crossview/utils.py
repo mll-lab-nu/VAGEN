@@ -27,9 +27,11 @@ from vagen.env.crossview.MindCube_RL_Data import extraction_baseRL, extraction_c
 ANSWER_EXTRACTION_MAP={
     "baseRL": extraction_baseRL.extract_answer,
     "cogmap_and_reasoning": extraction_cogmap_and_reasoning.extract_answer,
+    "cogmap_and_reasoning_plain": extraction_cogmap_and_reasoning.extract_answer,
 }
 
 FORMAT_CHECK_MAP={
     "baseRL": extraction_baseRL.format_checking_pipeline,
     "cogmap_and_reasoning": extraction_cogmap_and_reasoning.format_checking_pipeline,
+    "cogmap_and_reasoning_plain": extraction_cogmap_and_reasoning.format_checking_pipeline,
 }

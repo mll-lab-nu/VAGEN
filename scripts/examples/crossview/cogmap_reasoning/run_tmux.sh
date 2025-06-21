@@ -82,7 +82,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     data.max_trajectory_length=3600 \\
     data.image_key=images \\
     data.truncation=left \\
-    actor_rollout_ref.model.path=vagen/env/crossview/pretrained_models/MindCube-Qwen2.5VL-Aug-CGMap-FFR-OUT \\
+    actor_rollout_ref.model.path=/home/ubuntu/VAGEN/vagen/env/crossview/pretrained_models/MindCube-Qwen2.5VL-Aug-CGMap-FFR-OUT \\
     actor_rollout_ref.actor.optim.lr=1e-6 \\
     actor_rollout_ref.model.use_remove_padding=True \\
     actor_rollout_ref.actor.ppo_mini_batch_size=32 \\
@@ -107,7 +107,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     actor_rollout_ref.rollout.temperature=0.7 \\
     critic.optim.lr=1e-5 \\
     critic.model.use_remove_padding=True \\
-    critic.model.path=vagen/pretrained_models/MindCube-Qwen2.5VL-Aug-CGMap-FFR-OUT \\
+    critic.model.path=/home/ubuntu/VAGEN/vagen/env/crossview/pretrained_models/MindCube-Qwen2.5VL-Aug-CGMap-FFR-OUT \\
     critic.model.enable_gradient_checkpointing=True \\
     critic.ppo_micro_batch_size_per_gpu=1 \\
     critic.model.fsdp_config.param_offload=False \\
