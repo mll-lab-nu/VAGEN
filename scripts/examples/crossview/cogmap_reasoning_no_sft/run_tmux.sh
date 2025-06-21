@@ -96,7 +96,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \\
     actor_rollout_ref.rollout.tensor_model_parallel_size=4 \\
     actor_rollout_ref.rollout.name=vllm \\
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.5 \\
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.3 \\
     actor_rollout_ref.rollout.enable_chunked_prefill=False \\
     actor_rollout_ref.rollout.enforce_eager=False \\
     actor_rollout_ref.rollout.free_cache_engine=False \\
@@ -115,13 +115,13 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     algorithm.kl_ctrl.kl_coef=0.001 \\
     trainer.critic_warmup=0 \\
     trainer.logger=['console','wandb'] \\
-    trainer.project_name='vagen_crossview' \\
+    trainer.project_name='vagen_crossview_new' \\
     trainer.experiment_name=$EXPERIMENT_NAME \\
     trainer.n_gpus_per_node=4 \\
     trainer.nnodes=1 \\
-    trainer.save_freq=60 \\
+    trainer.save_freq=20 \\
     trainer.test_freq=20 \\
-    trainer.total_training_steps=220 \\
+    trainer.total_training_steps=200 \\
     trainer.remove_previous_ckpt_in_save=True \\
     rollout_manager.max_turns=1 \\
     rollout_manager.window_size=5 \\
