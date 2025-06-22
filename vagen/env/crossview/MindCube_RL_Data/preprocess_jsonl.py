@@ -1,12 +1,15 @@
 import json
 
 files = [
-    'crossviewQA_tinybench_baseRL.jsonl',
-    'crossviewQA_tinybench_cogmap_and_reasoning.jsonl', 
-    'crossviewQA_train_baseRL.jsonl',
-    'crossviewQA_train_cogmap_and_reasoning.jsonl',
-    'crossviewQA_tinybench_cogmap_and_reasoning_plain.jsonl',
-    'crossviewQA_train_cogmap_and_reasoning_plain.jsonl', 
+    # 'crossviewQA_tinybench_baseRL.jsonl',
+    # 'crossviewQA_tinybench_cogmap_and_reasoning.jsonl', 
+    # 'crossviewQA_train_baseRL.jsonl',
+    # 'crossviewQA_train_cogmap_and_reasoning.jsonl',
+    # 'crossviewQA_tinybench_cogmap_and_reasoning_plain.jsonl',
+    # 'crossviewQA_train_cogmap_and_reasoning_plain.jsonl', 
+    'crossviewQA_tinybench_replace_cogmap_and_reasoning.jsonl',
+    'crossviewQA_tinybench_replace_cogmap_and_reasoning_plain.jsonl',
+    'crossviewQA_tinybench_replace_baseRL.jsonl'
 ]
 
 for file in files:

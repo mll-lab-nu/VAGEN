@@ -1,0 +1,17 @@
+env1:
+    env_name: crossview
+    env_config:
+        type: cogmap_and_reasoning_plain
+        split: train
+    train_size: 20000
+    test_size: 0
+
+env2:
+    env_name: crossview
+    env_config:
+        type: cogmap_and_reasoning_plain
+        split: test
+    train_size: 0
+    test_size: 1050 # 1050
+    
+
