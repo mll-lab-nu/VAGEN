@@ -6,7 +6,7 @@ from vagen.server.serial import serialize_observation
 from .env import FrozenLakeEnv
 from .env_config import FrozenLakeEnvConfig
 from ..base.base_service_config import BaseServiceConfig
-from vagen.env.utils.state_reward_text_utils import service_state_reward_wrapper_v3 as service_state_reward_wrapper
+from vagen.env.utils.state_reward_text_utils import service_state_reward_wrapper_v2 as service_state_reward_wrapper
 from .prompt import visual_reasoning_reward_prompt
 from vagen.env.utils.state_matching import calculate_visual_reasoning_reward_bipartite,calculate_f1_with_max_matching
 from vagen.env.utils.top_string_tracker import TopKStringTracker
@@ -317,26 +317,26 @@ class FrozenLakeService(BaseService):
         Returns:
             A float representing the calculated reward.
         """
-        # object_weights={"target": 0.7,"hole": 0.3}
-        # return calculate_visual_reasoning_reward_bipartite(response, state,object_weights)
-        target_result = calculate_f1_with_max_matching(
-            [item for item in state if item['object_id'] == 'target'] if state else [],
-            [item for item in response if item['object_id'] == 'target'] if response else [],
-            match_func=lambda x, y: x['vertical_relation'] == y['vertical_relation'] and x['horizontal_relation'] == y['horizontal_relation']
-        )
-        # check hole reward
-        hole_result =calculate_f1_with_max_matching(
-            [item for item in state if item['object_id'] == 'hole'] if state else [],
-            [item for item in response if item['object_id'] == 'hole'] if response else [],
-            match_func=lambda x, y: x['vertical_relation'] == y['vertical_relation'] and x['horizontal_relation'] == y['horizontal_relation']
-        )
-        target_reward = target_result['f1']
-        hole_reward = hole_result['f1']
-        if r_type=="grounding":
-            top_k_strings = self.top_strings_tracker_grounding.get_top_k(self.config.top_strings_k)
-        if r_type=="worldmodeling":
-            top_k_strings = self.top_strings_tracker_worldmodeling.get_top_k(self.config.top_strings_k)
+        object_weights={"target": 0.7,"hole": 0.3}
+        return calculate_visual_reasoning_reward_bipartite(response, state,object_weights)
+        # target_result = calculate_f1_with_max_matching(
+        #     [item for item in state if item['object_id'] == 'target'] if state else [],
+        #     [item for item in response if item['object_id'] == 'target'] if response else [],
+        #     match_func=lambda x, y: x['vertical_relation'] == y['vertical_relation'] and x['horizontal_relation'] == y['horizontal_relation']
+        # )
+        # # check hole reward
+        # hole_result =calculate_f1_with_max_matching(
+        #     [item for item in state if item['object_id'] == 'hole'] if state else [],
+        #     [item for item in response if item['object_id'] == 'hole'] if response else [],
+        #     match_func=lambda x, y: x['vertical_relation'] == y['vertical_relation'] and x['horizontal_relation'] == y['horizontal_relation']
+        # )
+        # target_reward = target_result['f1']
+        # hole_reward = hole_result['f1']
+        # if r_type=="grounding":
+        #     top_k_strings = self.top_strings_tracker_grounding.get_top_k(self.config.top_strings_k)
+        # if r_type=="worldmodeling":
+        #     top_k_strings = self.top_strings_tracker_worldmodeling.get_top_k(self.config.top_strings_k)
         
-        if content in top_k_strings and target_reward<0.5:
-            return -0.1
-        return target_reward*0.7 + hole_reward*0.3
+        # if content in top_k_strings and target_reward<0.5:
+        #     return -0.1
+        # return target_reward*0.7 + hole_reward*0.3
