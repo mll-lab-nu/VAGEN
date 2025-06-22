@@ -66,7 +66,7 @@ tmux send-keys -t "$TRAIN_SESSION" "set -x" C-m
 # First create the dataset
 tmux send-keys -t "$TRAIN_SESSION" "python -m vagen.env.create_dataset \\
     --force_gen \\
-    --yaml_path \"$SCRIPT_DIR/env_config.yaml\" \\
+    --yaml_path \"$SCRIPT_DIR/eval_env_config.yaml\" \\
     --train_path \"eval_data/$EXPERIMENT_NAME/train.parquet\" \\
     --test_path \"eval_data/$EXPERIMENT_NAME/test.parquet\"" C-m
 
@@ -82,7 +82,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     data.max_trajectory_length=3600 \\
     data.image_key=images \\
     data.truncation=left \\
-    actor_rollout_ref.model.path= \\
+    actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \\
     actor_rollout_ref.actor.optim.lr=1e-6 \\
     actor_rollout_ref.model.use_remove_padding=True \\
     actor_rollout_ref.actor.ppo_mini_batch_size=32 \\
@@ -94,7 +94,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     actor_rollout_ref.actor.fsdp_config.param_offload=True \\
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=True \\
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \\
-    actor_rollout_ref.rollout.tensor_model_parallel_size=1 \\
+    actor_rollout_ref.rollout.tensor_model_parallel_size=2 \\
     actor_rollout_ref.rollout.name=vllm \\
     actor_rollout_ref.rollout.gpu_memory_utilization=0.5 \\
     actor_rollout_ref.rollout.enable_chunked_prefill=False \\
@@ -107,7 +107,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     actor_rollout_ref.rollout.temperature=0.7 \\
     critic.optim.lr=1e-5 \\
     critic.model.use_remove_padding=True \\
-    critic.model.path= \\
+    critic.model.path=Qwen/Qwen2.5-VL-3B-Instruct \\
     critic.model.enable_gradient_checkpointing=True \\
     critic.ppo_micro_batch_size_per_gpu=1 \\
     critic.model.fsdp_config.param_offload=False \\
@@ -117,7 +117,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     trainer.logger=['console','wandb'] \\
     trainer.project_name='vagen_crossview_new' \\
     trainer.experiment_name=$EXPERIMENT_NAME \\
-    trainer.n_gpus_per_node=1 \\
+    trainer.n_gpus_per_node=2 \\
     trainer.nnodes=1 \\
     trainer.save_freq=20 \\
     trainer.test_freq=20 \\
@@ -132,7 +132,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     trainer.val_generations_to_log_to_wandb=1050 \\
     trainer.val_only=True \\
     rollout_manager.n_trajectory=8 \\
-    2>&1 | tee $EXPERIMENT_NAME.log" C-m
+    2>&1 | tee ${EXPERIMENT_NAME}_val.log" C-m
 
 echo "-----------------------------------------"
 echo "Configuration Summary:"

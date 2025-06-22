@@ -134,3 +134,6 @@ MindCube_set_env.sh
 
 # pretrained models
 **/pretrained_models
+
+# eval data
+**/eval_data
