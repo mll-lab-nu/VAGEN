@@ -129,7 +129,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     rollout_manager.use_loss_mask=True \\
     rollout_manager.use_gae_mask=True \\
     trainer.val_before_train=True \\
-    trainer.val_generations_to_log_to_wandb=1050 \\
+    trainer.val_generations_to_log_to_wandb=1053 \\
     trainer.val_only=True \\
     rollout_manager.n_trajectory=8 \\
     2>&1 | tee ${EXPERIMENT_NAME}_val.log" C-m

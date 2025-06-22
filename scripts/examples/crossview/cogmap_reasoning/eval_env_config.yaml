@@ -12,6 +12,6 @@ env2:
         type: cogmap_and_reasoning
         split: test
     train_size: 0
-    test_size: 1050 # 1050
+    test_size: 1053 # 1050
     
 
