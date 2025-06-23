@@ -304,7 +304,7 @@ class FrozenLakeService(BaseService):
     def gen_visual_reasoning_prompt(self, content,**kwargs) -> str:
         return visual_reasoning_reward_prompt.format(prediction=content)
     
-    def calculate_visual_reasoning_reward(self, response,state,content,r_type,**kwargs) -> float:
+    def calculate_visual_reasoning_reward(self, **kwargs) -> float:
         """
         Calculate the visual reasoning reward based on the response and state.
         e.g. [{"object_id": "target", "vertical_relation":above,"horizontal_relation":left}, 
@@ -318,7 +318,15 @@ class FrozenLakeService(BaseService):
             A float representing the calculated reward.
         """
         object_weights={"target": 0.7,"hole": 0.3}
+        response = kwargs.get('response', [])
+        state = kwargs.get('state', [])
         return calculate_visual_reasoning_reward_bipartite(response, state,object_weights)
+
+        # content = kwargs.get('content', '')
+        # r_type = kwargs.get('r_type', 'grounding')
+        # if r_type not in ["grounding", "worldmodeling"]:
+        #     raise ValueError("r_type must be either 'grounding' or 'worldmodeling'")
+        
         # target_result = calculate_f1_with_max_matching(
         #     [item for item in state if item['object_id'] == 'target'] if state else [],
         #     [item for item in response if item['object_id'] == 'target'] if response else [],
