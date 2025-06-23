@@ -153,7 +153,11 @@ def service_state_reward_wrapper_v2(step_batch_func):
             state=item["state"]
             env_config = self.env_configs[id]
             response= result["parsed_response"]
-            score=self.calculate_visual_reasoning_reward(response,state)
+            kwargs={
+                "response": response,
+                "state": state,
+            }
+            score=self.calculate_visual_reasoning_reward(**kwargs)
             if item["type"] == "grounding":
                 new_step_batch_results[id][3]["metrics"]["turn_metrics"]["grounding_reward"] = score * env_config.get("grounding_reward_weight", 0.5)
                 new_step_batch_results[id][1] += score * env_config.get("grounding_reward_weight", 0.5)
@@ -227,7 +231,15 @@ def service_state_reward_wrapper_v3(step_batch_func):
             prompt=item["prompt"]
             env_config = self.env_configs[id]
             response= result["parsed_response"]
-            score=self.calculate_visual_reasoning_reward(response=response,state=state,content=content,r_type=r_type,env_name=env_name,prompt=prompt)
+            kwargs={
+                "response": response,
+                "state": state,
+                "content": content,
+                "r_type": r_type,
+                "env_name": env_name,
+                "prompt": prompt
+            }
+            score=self.calculate_visual_reasoning_reward(**kwargs)
             if item["type"] == "grounding":
                 new_step_batch_results[id][3]["metrics"]["turn_metrics"]["grounding_reward"] = score * env_config.get("grounding_reward_weight", 0.5)
                 new_step_batch_results[id][1] += score * env_config.get("grounding_reward_weight", 0.5)
