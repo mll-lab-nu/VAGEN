@@ -10,3 +10,4 @@ class SVGServiceConfig(BaseServiceConfig):
     preload_models: bool = False
     # Configuration for different model devices
     device: Dict[str, Any] = field(default_factory=lambda: {"dino": 0, "dreamsim": 0})
+    use_state_reward: bool = False
