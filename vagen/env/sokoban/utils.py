@@ -739,3 +739,162 @@ def sokoban_state_to_sentences(state_dict):
             sentences.append(f"target{i} is {target_box_relation} box{j}")
     
     return sentences
+
+import numpy as np
+import json
+
+def get_relative_relation(player_pos: tuple[int, int], object_pos: tuple[int, int]) -> tuple[str, str]:
+    """
+    Calculates the vertical and horizontal relation of an object relative to the player.
+
+    Args:
+        player_pos: A tuple (row, col) for the player's position (y, x).
+        object_pos: A tuple (row, col) for the object's position (y, x).
+        Rows increase downwards, columns increase to the right.
+
+    Returns:
+        A tuple (vertical_relation, horizontal_relation) using "above", "below",
+        "same" for vertical and "left", "right", "same" for horizontal.
+    """
+    p_row, p_col = player_pos
+    o_row, o_col = object_pos
+
+    # Vertical relation (row comparison)
+    # Smaller row index means "above" (closer to the top of the grid)
+    if o_row < p_row:
+        vertical_relation = "above"
+    elif o_row > p_row:
+        vertical_relation = "below"
+    else:
+        vertical_relation = "same"
+
+    # Horizontal relation (column comparison)
+    # Smaller column index means "left" (closer to the left of the grid)
+    if o_col < p_col:
+        horizontal_relation = "left"
+    elif o_col > p_col:
+        horizontal_relation = "right"
+    else:
+        horizontal_relation = "same"
+
+    return (vertical_relation, horizontal_relation)
+
+
+def convert_sokoban_state_to_relative_list(state_dict: dict) -> list[dict]:
+    """
+    Converts a Sokoban state dictionary (from get_env_state) into a list of
+    dictionaries representing relative object positions to the player, matching
+    the LLM parser's expected JSON output format for Groundtruth.
+
+    Includes relations for Target, Boxes, and Walls found in the state_dict.
+    Uses generic "box" and "wall" IDs for multiple instances, similar to "hole".
+
+    Args:
+        state_dict: The dictionary returned by get_env_state containing
+                    player_position, box_positions, target_positions, wall_positions, etc.
+
+    Returns:
+        A list of dictionaries, each describing a target, box, or wall's
+        relative position to the player.
+    """
+    player_pos = state_dict.get("player_position")
+    if player_pos is None:
+        print("Warning: 'player_position' not found in state_dict. Cannot calculate relative positions.")
+        return [] # Cannot calculate relative positions without player
+
+    relative_positions_list = []
+
+    # Process Target positions
+    target_positions = state_dict.get("target_positions", [])
+    for target_pos in target_positions:
+        v_rel, h_rel = get_relative_relation(player_pos, target_pos)
+        relative_positions_list.append({
+            "object_id": "target",
+            "vertical_relation": v_rel,
+            "horizontal_relation": h_rel
+        })
+
+    # Process Box positions
+    box_positions = state_dict.get("box_positions", [])
+    for box_pos in box_positions:
+        # Use generic 'box' ID for all boxes
+        v_rel, h_rel = get_relative_relation(player_pos, box_pos)
+        relative_positions_list.append({
+            "object_id": "box",
+            "vertical_relation": v_rel,
+            "horizontal_relation": h_rel
+        })
+
+    # Process Wall positions
+
+    return relative_positions_list
+
+if __name__ == "__main__":
+    import json
+    # --- Example Usage (simulating output from your get_env_state) ---
+
+    # Scenario 1: Player at (2,2), Target at (0,0), Box at (2,3), Wall at (0,2)
+    simulated_state_dict_1 = {
+        "player_position": (2, 2),
+        "box_positions": [(2, 3)],
+        "target_positions": [(0, 0)],
+        "wall_positions": [(0, 2)],
+        "grid_size": (5, 5)
+    }
+
+    print("--- Scenario 1 ---")
+    groundtruth_relative_list_1 = convert_sokoban_state_to_relative_list(simulated_state_dict_1)
+    print(json.dumps(groundtruth_relative_list_1, indent=2))
+    # Expected Output:
+    # [
+    #   {
+    #     "object_id": "target",
+    #     "vertical_relation": "above",
+    #     "horizontal_relation": "left"
+    #   },
+    #   {
+    #     "object_id": "box",
+    #     "vertical_relation": "same",
+    #     "horizontal_relation": "right"
+    #   },
+    #   {
+    #     "object_id": "wall",
+    #     "vertical_relation": "above",
+    #     "horizontal_relation": "same"
+    #   }
+    # ]
+
+
+    # Scenario 2: Player at (1,1), Target at (1,1) (Goal state), Multiple Boxes
+    simulated_state_dict_2 = {
+        "player_position": (1, 1),
+        "box_positions": [(0, 0), (0, 2)],
+        "target_positions": [(1, 1)],
+        "wall_positions": [],
+        "grid_size": (3, 3)
+    }
+
+    print("\n--- Scenario 2 (Goal State) ---")
+    groundtruth_relative_list_2 = convert_sokoban_state_to_relative_list(simulated_state_dict_2)
+    print(json.dumps(groundtruth_relative_list_2, indent=2))
+    # Expected Output:
+    # [
+    #   {
+    #     "object_id": "target",
+    #     "vertical_relation": "same",
+    #     "horizontal_relation": "same"
+    #   },
+    #   {
+    #     "object_id": "box",
+    #     "vertical_relation": "above",
+    #     "horizontal_relation": "left"
+    #   },
+    #   {
+    #     "object_id": "box",
+    #     "vertical_relation": "above",
+    #     "horizontal_relation": "right"
+    #   }
+    # ]
+
+
+    
