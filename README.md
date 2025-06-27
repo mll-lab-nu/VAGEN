@@ -87,7 +87,7 @@ cd ../
 git clone https://github.com/RAGEN-AI/VAGEN.git
 cd VAGEN
 bash scripts/install.sh
-# This script installs dependencies for Frozenlake and Sokoban, for other environments, please refer to vagen/env/README.md and uncomment the registration in vagen/env/__init__.py
+# This script installs dependencies for Frozenlake and Sokoban, for other environments, please refer to vagen/env/README.md
 ```
 
 
@@ -96,19 +96,15 @@ bash scripts/install.sh
 # Login to wandb
 wandb login
 
-# Then, you can run different environments and algorithms:
+# You can run different environments and algorithms:
+bash scripts/exps/masked_grpo/frozenlake/grounding_worldmodeling/run_tmux.sh
+bash scripts/exps/masked_turn_ppo/sokoban/grounding_worldmodeling/run_tmux.sh
+bash scripts/exps/ppo/maniskill/grounding_worldmodeling_structrued/run_tmux.sh
+bash scripts/exps/finegrained/sokoban/grounding_worldmodeling/run_tmux.sh
 
-#Run a server process in a saperate tmux session if you want to train in env-as-service mode
-python vagen/server/server.py
-
-# Frozen Lake Environment
-bash scripts/examples/frozen_lake_aico/run.sh         # AICO without service
-bash scripts/examples/frozen_lake_trico/run.sh        # TRICO without service
-bash scripts/examples/frozen_lake_aico_service/run.sh # AICO with service
-
-# SVG Generation
-bash scripts/examples/svg_aico/run.sh                 # AICO without service
-bash scripts/examples/svg_trico/run.sh                # TRICO without service
+# Use Visual Reasoning Reward
+# Setup OPENAI_API_KEY in the Environment
+bash scripts/exps/state_reward_finegrained/sokoban/grounding_worldmodeling/run_tmux.sh
 ```
 ## How to Add New Environment and Services
 
@@ -134,13 +130,6 @@ Incorporating **Visual Reasoning RL** leads to improved performance.
 
 ## Cases
 <img width="1261" alt="image" src="https://github.com/user-attachments/assets/59fbce0c-4932-4f82-ab87-d407d84ebad4" />
-
-
-# Project Roadmap
-- 🗓️ May 25, 2025: We release our paper **"Reinforcing Visual State Reasoning for Multi-Turn VLM Agents"** and the VAGEN framework.
-- [ ] Merge to RAGEN for better package mangement
-- [ ] Expand evaluation framework to more diverse visual environments
-- [ ] Scaling to larger models and applying TRICO to text-only tasks
 
 
 ## Acknowledgement
