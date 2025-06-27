@@ -1,7 +1,0 @@
-env1:
-    env_name: alfworld
-    env_config:
-        render_mode: vision
-        alf_config_path: "scripts/examples/alfworld_aico/alf-config.yaml"
-    train_size: 3000
-    test_size: 8
