@@ -247,7 +247,7 @@ Incorporating **Visual Reasoning RL** leads to improved performance.
 [![preview](https://github.com/user-attachments/assets/d3e07add-5233-46d7-b955-23111ac0c0d7)](public/cases_full.png)
 -->
 
-<a href="public/cases_full.png" target="_blank">
+<a href="https://raw.githubusercontent.com/RAGEN-AI/VAGEN/refs/heads/main/public/cases_full.png" target="_blank">
   <img src="https://github.com/user-attachments/assets/d3e07add-5233-46d7-b955-23111ac0c0d7">
 </a>
 
