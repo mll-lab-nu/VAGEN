@@ -2,6 +2,7 @@
 <p align="center" style="font-size: 20px;">
   <b>Reinforcing Visual State Reasoning for Multi-Turn VLM Agents</b>
 </p>
+
 <p align="center" style="font-size: 16px;">
   Kangrui Wang*, Pingyue Zhang*, Zihan Wang*, Yaning Gao*, Linjie Li*, Qineng Wang, Hanyang Chen, Chi Wan, Yiping Lu, Zhengyuan Yang, Lijuan Wang, Ranjay Krishna, Jiajun Wu, Li Fei-Fei, Yejin Choi, Manling Li
 </p>
@@ -14,6 +15,31 @@
   <a href="https://wandb.ai/ragen-V/vagen-final/reports/VAGEN-Experimental-Results--VmlldzoxMzM2NzczNA"><img src="https://img.shields.io/badge/📊_Experiment_Log-FB8C00?style=for-the-badge&logoColor=white" alt="Experiment Log"></a>
   <a href="https://ragen-ai.github.io/vagen-project/"><img src="https://img.shields.io/badge/🌐_Website-00C851?style=for-the-badge&logoColor=white" alt="Website"></a>
 </p>
+
+<table>
+  <tr>
+    <td align="center"><b>FrozenLake</b><br>
+      <img src="https://github.com/user-attachments/assets/6d72800a-9b4d-45ec-b528-ac81efb93966" width="150"/><br>
+      <img src="https://github.com/user-attachments/assets/6f283f99-fa15-4e26-9f99-6649a7d72374" width="150"/>
+    </td>
+    <td align="center"><b>Navigation</b><br>
+      <img src="https://github.com/user-attachments/assets/b364e6c9-4c2c-46d0-afca-ee42f271c59c" width="150"/><br>
+      <img src="https://github.com/user-attachments/assets/65662eb0-9440-4555-9436-8b9272791ac4" width="150"/>
+    </td>
+    <td align="center"><b>Sokoban</b><br>
+      <img src="https://github.com/user-attachments/assets/145352b5-3a9e-4248-bb94-d3fa46e6c493" width="150"/><br>
+      <img src="https://github.com/user-attachments/assets/676de052-37d6-4c99-a7eb-200a58d11ed4" width="150"/>
+    </td>
+    <td align="center"><b>ManiSkill</b><br>
+      <img src="https://github.com/user-attachments/assets/c597f17d-5c62-4319-bdaa-b7fa8e4564e1" width="150"/><br>
+      <img src="https://github.com/user-attachments/assets/f61ea55c-ea79-4ead-9345-45be06d24e81" width="150"/>
+    </td>
+    <td align="center"><b>SVG</b><br>
+      <img src="https://github.com/user-attachments/assets/8646da5f-69be-4283-a078-969f9b8f3f3b" width="150"/><br>
+      <img src="https://github.com/user-attachments/assets/691b896a-ce30-4acc-ac49-af2d89452bdd" width="150"/>
+    </td>
+  </tr>
+</table>
 
 This repository contains the official implementation of our paper, **"Reinforcing Visual State Reasoning for Multi-Turn VLM Agents"**.
 
@@ -107,7 +133,7 @@ We present the workflow of **VAGEN** in the image below. The `rollout.py` module
 ![framework](https://github.com/user-attachments/assets/183cea78-2345-4b5e-82c5-a0679c5f112a)
 -->
 <div align="center">
-  <img src="https://github.com/user-attachments/assets/183cea78-2345-4b5e-82c5-a0679c5f112a" width="800"/>
+  <img src="https://github.com/user-attachments/assets/4cd3752c-e1ad-4cfd-8928-9ef9b0180e5d" width="800"/>
 </div>
 
 
