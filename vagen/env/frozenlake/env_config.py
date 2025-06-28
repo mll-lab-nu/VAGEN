@@ -12,10 +12,7 @@ class FrozenLakeEnvConfig(BaseEnvConfig):
     render_mode: str = "vision"  # "text" or "vision"
     max_actions_per_step: int = 3
     min_actions_to_succeed: int = 5
-    prompt_format: str = "free_think" 
-    # "free_think", "no_think", "grounding", "worldmodeling", "grounding_worldmodeling"
-    # "grounding_symbolic", "worldmodeling_symbolic", "grounding_worldmodeling_symbolic"
-    # "grounding_structured", "worldmodeling_structured", "grounding_worldmodeling_structured"
+    prompt_format: str = "grounding_worldmodeling"
     
     # configs for process reward for grounding and world modeling
     use_state_reward: bool = False

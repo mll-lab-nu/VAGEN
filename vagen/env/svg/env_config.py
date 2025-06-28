@@ -22,7 +22,7 @@ class SvgEnvConfig(BaseEnvConfig):
     format_reward: float = 0.5
     format_penalty: float = 0.0
     # Prompt configuration
-    prompt_format: str = "free_think" 
+    prompt_format: str = "grounding_worldmodeling" 
     # "free_think", "no_think", "grounding", "worldmodeling", "grounding_worldmodeling"
     use_state_reward: bool = False
     
