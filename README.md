@@ -69,11 +69,11 @@ Our approach, **Visual Reasoning RL**, addresses these challenges through:
 <table>
   <tr>
     <td align="center">
-      <img src="https://github.com/user-attachments/assets/406cdf7f-79c0-4732-8df1-009c893f3840" width="400"/><br/>
+      <img src="https://github.com/user-attachments/assets/406cdf7f-79c0-4732-8df1-009c893f3840" width="600"/><br/>
       <sub>Boost #1: Visual Reasoning</sub>
     </td>
     <td align="center">
-      <img src="https://github.com/user-attachments/assets/fbf0ec24-6bb4-40ce-b545-818d83d04e05" width="400"/><br/>
+      <img src="https://github.com/user-attachments/assets/fbf0ec24-6bb4-40ce-b545-818d83d04e05" width="600"/><br/>
       <sub>Boost #2: Turn-level</sub>
     </td>
   </tr>
