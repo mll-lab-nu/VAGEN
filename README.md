@@ -19,25 +19,30 @@
 <div style="width:100%; overflow-x:auto;">
   <table style="width:100%;">
     <tr>
-      <td align="center" style="width:20%;"><b>FrozenLake</b><br>
-        <img src="https://github.com/user-attachments/assets/6d72800a-9b4d-45ec-b528-ac81efb93966" style="width:80%;"/><br>
-        <img src="https://github.com/user-attachments/assets/6f283f99-fa15-4e26-9f99-6649a7d72374" style="width:80%;"/>
+      <td align="center" style="width:20%;"><br>
+        <img src="https://github.com/user-attachments/assets/6d72800a-9b4d-45ec-b528-ac81efb93966" style="width:72%;"/><br>
+        <img src="https://github.com/user-attachments/assets/6f283f99-fa15-4e26-9f99-6649a7d72374" style="width:72%;"/><br>
+        <b>FrozenLake</b>
       </td>
-      <td align="center" style="width:20%;"><b>Navigation</b><br>
-        <img src="https://github.com/user-attachments/assets/b364e6c9-4c2c-46d0-afca-ee42f271c59c" style="width:80%;"/><br>
-        <img src="https://github.com/user-attachments/assets/65662eb0-9440-4555-9436-8b9272791ac4" style="width:80%;"/>
+      <td align="center" style="width:20%;"><br>
+        <img src="https://github.com/user-attachments/assets/b364e6c9-4c2c-46d0-afca-ee42f271c59c" style="width:75%;"/><br>
+        <img src="https://github.com/user-attachments/assets/65662eb0-9440-4555-9436-8b9272791ac4" style="width:75%;"/><br>
+        <b>Navigation</b>
       </td>
-      <td align="center" style="width:20%;"><b>Sokoban</b><br>
+      <td align="center" style="width:20%;"><br>
         <img src="https://github.com/user-attachments/assets/145352b5-3a9e-4248-bb94-d3fa46e6c493" style="width:80%;"/><br>
-        <img src="https://github.com/user-attachments/assets/676de052-37d6-4c99-a7eb-200a58d11ed4" style="width:80%;"/>
+        <img src="https://github.com/user-attachments/assets/676de052-37d6-4c99-a7eb-200a58d11ed4" style="width:80%;"/><br>
+        <b>Sokoban</b>
       </td>
-      <td align="center" style="width:20%;"><b>ManiSkill</b><br>
+      <td align="center" style="width:20%;"><br>
         <img src="https://github.com/user-attachments/assets/c597f17d-5c62-4319-bdaa-b7fa8e4564e1" style="width:80%;"/><br>
-        <img src="https://github.com/user-attachments/assets/f61ea55c-ea79-4ead-9345-45be06d24e81" style="width:80%;"/>
+        <img src="https://github.com/user-attachments/assets/f61ea55c-ea79-4ead-9345-45be06d24e81" style="width:80%;"/><br>
+        <b>ManiSkill</b>
       </td>
-      <td align="center" style="width:20%;"><b>SVG</b><br>
-        <img src="https://github.com/user-attachments/assets/8646da5f-69be-4283-a078-969f9b8f3f3b" style="width:80%;"/><br>
-        <img src="https://github.com/user-attachments/assets/691b896a-ce30-4acc-ac49-af2d89452bdd" style="width:80%;"/>
+      <td align="center" style="width:20%;"><br>
+        <img src="https://github.com/user-attachments/assets/8646da5f-69be-4283-a078-969f9b8f3f3b" style="width:92%;"/><br>
+        <img src="https://github.com/user-attachments/assets/691b896a-ce30-4acc-ac49-af2d89452bdd" style="width:92%;"/><br>
+        <b>SVG</b>
       </td>
     </tr>
   </table>
