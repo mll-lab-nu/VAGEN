@@ -19,7 +19,11 @@ This repository contains the official implementation of our paper, **"Reinforcin
 
 We introduce **VAGEN**, a multi-turn reinforcement learning framework designed specifically for training vision-language model (VLM) agents. Built upon this framework, we propose **Visual Reasoning RL**, a novel reinforcement learning approach that significantly improves the multi-turn performance of VLMs by explicitly supervising their visual state reasoning process.
 
+<!--
 ![bi-level-gae](https://github.com/user-attachments/assets/fbf0ec24-6bb4-40ce-b545-818d83d04e05)
+-->
+![image](https://github.com/user-attachments/assets/834b32fa-9bfc-4e0f-a148-99cd6fc3141e)
+
 
 ## News
 
@@ -34,6 +38,7 @@ We introduce **VAGEN**, a multi-turn reinforcement learning framework designed s
 
 **[2025/03]** We release VAGEN, a multi-turn reinforcement learning framework for training VLM Agents!
 
+<!--
 ## Why Visual Reasoning RL?
 Standard RL methods applied to VLMs struggle with multi-turn agentic tasks due to:
 1. **Visual State Ambiguity**: VLMs lack mechanisms to explicitly interpret and track evolving visual environments.
@@ -44,11 +49,35 @@ Our approach, **Visual Reasoning RL**, addresses these challenges through:
 2. **Reinforcement Learning with Reasoning Rewards**: Reinforces visual understanding with:
    - **Turn-level reasoning rewards** for supervising accuracy.
    - **Bi-Level GAE** for fine-grained credit assignment at both turn and token levels.
+-->
 
-## The VAGEN Framework
+## Why Visual Reasoning RL?
+Standard RL methods applied to VLMs struggle with multi-turn agentic tasks due to:
+1. **Visual State Ambiguity**: VLMs lack mechanisms to explicitly interpret and track evolving visual environments.
+2. **Precision Bottlenecks**: Existing representations fall short in tasks requiring fine-grained spatial or temporal understanding.
 
-We present the framework of **VAGEN** in the image below. The `rollout.py` module facilitates interactions between `ray_trainer.py` and various environments. Our framework operates with two forms of “language”: token sequences (used by the model) and structured information from the environments. `rollout.py` serves as a translator, parsing structured environment data into tokens for the model and converting model outputs back into structured actions or observations. It also records data of each step to form the entire trajectory.
-![framework](https://github.com/user-attachments/assets/183cea78-2345-4b5e-82c5-a0679c5f112a)
+Our approach, **Visual Reasoning RL**, addresses these challenges through:
+
+### Boost #1: Visual Reasoning
+1. **Reasoning Prompts**: Injects structured prompts like grounding (current state description) and world modeling (future state prediction) to scaffold the model’s internal reasoning.
+2. **Reasoning Rewards**: We use LLM-as-Judge to reward the agent when its predicted or observed visual state matches the ground truth.
+
+### Boost #2: Turn-level
+1. **Turn-level reasoning rewards** for supervising accuracy.
+2. **Bi-Level GAE** for fine-grained credit assignment at both turn and token levels.
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="https://github.com/user-attachments/assets/406cdf7f-79c0-4732-8df1-009c893f3840" width="400"/><br/>
+      <sub>Boost #1: Visual Reasoning</sub>
+    </td>
+    <td align="center">
+      <img src="https://github.com/user-attachments/assets/fbf0ec24-6bb4-40ce-b545-818d83d04e05" width="400"/><br/>
+      <sub>Boost #2: Turn-level</sub>
+    </td>
+  </tr>
+</table>
 
 ## Key Innovations of VAGEN
 
@@ -70,6 +99,17 @@ Traditional RL frameworks for LLM agents treat all tokens in a trajectory equall
 - **State Redundancy**: Visual tasks contain excessive low-level information in long-context inputs
 
 VAGEN addresses these challenges by focusing optimization on the most critical decision-making tokens and creating a more nuanced reward structure across interaction turns.
+
+## The VAGEN Workflow
+
+We present the workflow of **VAGEN** in the image below. The `rollout.py` module facilitates interactions between `ray_trainer.py` and various environments. Our framework operates with two forms of “language”: token sequences (used by the model) and structured information from the environments. `rollout.py` serves as a translator, parsing structured environment data into tokens for the model and converting model outputs back into structured actions or observations. It also records data of each step to form the entire trajectory.
+<!--
+![framework](https://github.com/user-attachments/assets/183cea78-2345-4b5e-82c5-a0679c5f112a)
+-->
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/183cea78-2345-4b5e-82c5-a0679c5f112a" width="800"/>
+</div>
+
 
 ## Installation
 
@@ -118,10 +158,22 @@ See our [Creating Environments](./docs/envs/create-env.md) guide. You may also w
 
 ## Experimental Results
 We benchmark closed- and open-sourced models on five environments. Reasoning on visual states, including both grounding and world modeling, can improve the performance. 
+<!--
 <img width="1093" alt="image" src="https://github.com/user-attachments/assets/162820e8-a4f3-49b7-b8f8-c7963a5ac6f1" />
+-->
+<img width="1253" alt="image" src="https://github.com/user-attachments/assets/201d633b-910d-4384-88c9-e1dd0acaa88c" />
+
+
+
 
 Incorporating **Visual Reasoning RL** leads to improved performance.
+<!--
 <img width="1319" alt="image" src="https://github.com/user-attachments/assets/cba16487-c24b-4b25-9ecf-a668d4cd8ac6" />
+-->
+- VAGEN-Base uses the Grounding-WorldModeling reasoning strategy along with format and task-specific rewards.
+- VAGEN-Full builds on this and incorporates Visual Reasoning RL
+<img width="1253" alt="image" src="https://github.com/user-attachments/assets/066adeb0-ef7f-449b-8e01-21fb643eee2b" />
+
 
 ## Environments
 
@@ -130,7 +182,14 @@ Incorporating **Visual Reasoning RL** leads to improved performance.
 
 
 ## Cases
-<img width="1261" alt="image" src="https://github.com/user-attachments/assets/59fbce0c-4932-4f82-ab87-d407d84ebad4" />
+
+### Preview (click to show full cases)
+
+<!--
+<img width="923" alt="image" src="https://github.com/user-attachments/assets/dd412cc2-836b-4d23-81e0-a29d4eaf22b2" />
+<img width="923" alt="image" src="https://github.com/user-attachments/assets/d3e07add-5233-46d7-b955-23111ac0c0d7" />
+-->
+[![preview](https://github.com/user-attachments/assets/d3e07add-5233-46d7-b955-23111ac0c0d7)](https://github.com/user-attachments/assets/dd412cc2-836b-4d23-81e0-a29d4eaf22b2)
 
 
 ## Acknowledgement
