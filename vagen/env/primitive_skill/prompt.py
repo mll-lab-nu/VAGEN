@@ -110,7 +110,7 @@ FORMAT_CONFIGS = {
     },
     "grounding_worldmodeling": {
         "description": "You should first give your thought process with observation, reasoning, and prediction, and then your answer.",
-        "format": "<think><observation>...</observation><reasoning>...</reasoning><prediction>...</prediction></think>",
+        "format": "<think><observation>...</observation><reasoning>...</reasoning><prediction>...</prediction></think><answer>...</answer>",
         "example": "<think><observation>I see a red cube at (100,100,40) and a green cube at (200,200,60).</observation><reasoning>I need to pick the red cube and place it on top of the green cube</reasoning><prediction>After executing this action, the red cube will be at position (200,200,100), stacked on top of the green cube at (200,200,60)</prediction></think><answer>pick(100,100,40){action_sep}place(200,200,100)</answer>"
     },
     "grounding_structured": {
@@ -128,7 +128,7 @@ FORMAT_CONFIGS = {
     "grounding_worldmodeling_structured": {
         "description": "You should first give your thought process with observation, reasoning, and prediction, and then your answer.",
         "additional_info": "The observation and prediction should be in the format of {state_format}",
-        "format": "<think><observation>...</observation><reasoning>...</reasoning><prediction>...</prediction></think>",
+        "format": "<think><observation>...</observation><reasoning>...</reasoning><prediction>...</prediction></think><answer>...</answer>",
         "example": "<think><observation>{{'red_cube':(100,100,40),'green_cube':(200,200,60)}}</observation><reasoning>I need to pick the red cube and place it on top of the green cube</reasoning><prediction>{{'red_cube':(200,200,100),'green_cube':(200,200,60)}}</prediction></think><answer>pick(100,100,40){action_sep}place(200,200,100)</answer>"
     }
 }
