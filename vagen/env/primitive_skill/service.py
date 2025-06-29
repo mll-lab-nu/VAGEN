@@ -132,6 +132,7 @@ class PrimitiveSkillService(BaseService):
                     _load_partnet_mobility_dataset()
                     result_queue.put((-1, "info", f"Process {process_id} finished loading PartNet Mobility dataset"))
                 except Exception as e:
+                    logging.error(f"Process {process_id} failed to load dataset: {str(e)}, artnet Mobility dataset not found. Download it by running python -m mani_skill.utils.download_asset partnet_mobility_cabinet")
                     result_queue.put((-1, "error", f"Process {process_id} failed to load dataset: {str(e)}"))
                     return  # Exit the process if we can't load the essential dataset
         
