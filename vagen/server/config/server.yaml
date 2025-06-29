@@ -26,6 +26,7 @@ navigation:
   use_state_reward: ${use_state_reward}
 primitive_skill:
   max_workers: 48
+  max_process_workers: 8
   use_state_reward: ${use_state_reward}
 sokoban:
   max_workers: 48

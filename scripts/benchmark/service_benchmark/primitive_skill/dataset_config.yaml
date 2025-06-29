@@ -1,0 +1,7 @@
+primitive_skill:
+  env_name: primitive_skill
+  env_config:
+    prompt_format: free_think
+    render_mode: vision
+  train_size: 8
+  test_size: 4
