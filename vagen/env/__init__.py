@@ -62,4 +62,14 @@ try:
 except ImportError:
     pass
 
+try:
+    from .blackjack import BlackjackEnv, BlackjackEnvConfig, BlackjackService, BlackjackServiceConfig
+    REGISTERED_ENV["blackjack"] = {
+        "env_cls": BlackjackEnv,
+        "config_cls": BlackjackEnvConfig,
+        "service_cls": BlackjackService,
+        "service_config_cls": BlackjackServiceConfig
+    }
+except ImportError:
+    pass
 
