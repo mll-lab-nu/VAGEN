@@ -16,13 +16,10 @@ VAGEN is a multi-turn reinforcement learning framework designed for training Vis
 - [Create your Own Environment](envs/create-env.md): Build custom environments
 - [Create your Own Service](envs/create-service.md): Scale your training infrastructure
 
-### Experiments
-- [Reproduce Experiments](reproduce-exp.md): Reproduce our experiments
-
 
 #### Comparison of Algorithms
 
-| **Feature** | **PPO** | **RICO** | **TRICO (Ours)** |
+| **Feature** | **PPO & GRPO** | **VAGEN-Base** | **VAGEN-Full** |
 | --- | --- | --- | --- |
 | **Sequence Structure** | Single response | Multiple turn interaction | Multiple turn interaction |
 | **LM output** | No special structure | `<think>...</think><ans>...</ans>` | `<think>...</think><ans>...</ans><eoa>` |

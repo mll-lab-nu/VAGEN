@@ -198,14 +198,6 @@ env1:
         render_mode: text
     train_size: 10000   # Number of training environments 
     test_size: 512   # Number of testing environments
-
-env2:
-    env_name: svg   # Name of registered environment service
-    env_config:     # Specific configs for your enviornment
-        dino_weight: 3.0
-        dino_only: False
-    train_size: 10000   # Number of training environments 
-    test_size: 512   # Number of testing environments
 ```
 **env_name**: Specifies which registered environment service to use. Options include:
 
@@ -219,9 +211,3 @@ env2:
 **train_size**: Number of training environments to generate
 
 **test_size**: Number of testing environments to generate
-
-### Service Configuration File (service_config.yaml)
-
-```yaml
-# UNDER DEVELOPMENT
-```

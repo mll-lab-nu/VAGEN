@@ -1,178 +1,250 @@
 # How to Create New Environments
-> NOTICE: Once you've implemented your environment following this guide, VAGEN can be used directly, with the service layer being optional for training acceleration.
 
-This guide explains how to create new environments for VAGEN's architecture. Creating custom environments is the foundation for building specialized VLM agent training scenarios. 
-
-## Environment Structure Overview
-
-VAGEN uses an object-oriented approach for environment management:
-- 'BaseEnv': Abstract base class that defines the interface all environments must implement
-- 'BaseEnvConfig': Configuration class for environment parameters
-- 'Environment'-specific implementations (e.g., SvgEnv)
-
-This architecture enables standardized interaction patterns while allowing for customization across different domains and tasks.
+This guide explains how to create new environments for VAGEN using **Blackjack** as an example. Understanding the BaseEnv interface is key to building effective LLM training environments.
 
 ## Directory Structure
+
 ```
-vagen/
-├── env/
-|   ├── create_dataset.py         # Store train/test data configs, not real data
-│   ├── base/
-│   │   ├── base_env.py           # Abstract base class defining the 
-│   │   └── base_env_config.py    # Base configuration class for environments
-│   ├── [your_env]/               # Your environment implementation
-│       ├── env.py                # Your environment class
-│       ├── env_config.py         # Your environment configuration
-│       └── data/                 # Environment-specific resources (Optional)
-|   
-├── examples/
-|   ├── [your_env]/
-│       ├── env_config.yaml       # Your data&env config for create_dataset.py
-│       ├── run.sh                # Script for training
-```
-## Creating a New Environment Step by Step
-
-### Step 1: Create Environment Configuration
-
-Create a new class that inherits from BaseEnvConfig. This class will define all parameters specific to your environment in `create_dataset.py` by combining your unique requirements in `env_config.yaml` and default requirements in `env_config.py`:
-
-```python
-@dataclass
-class MyNewEnvConfig(BaseEnvConfig):
-    """Configuration for My New Environment"""
-    dataset_name: str = "path/to/dataset"
-    data_dir: str = "vagen/env/my_new_env/data"
-    seed: int = 42
-    # Add your environment-specific parameters here
-    
-    def config_id(self) -> str:
-        """Generate a unique identifier for this configuration"""
-        return f"MyNewEnvConfig(dataset={self.dataset_name},seed={self.seed})"
+vagen/env/blackjack/
+├── env.py                # BlackjackEnv - main environment wrapper
+├── env_config.py         # BlackjackEnvConfig - configuration class
+├── prompt.py             # Prompt templates and format configurations
+├── blackjack.py          # Core gym environment (standard gym interface)
+└── __init__.py           # Environment registration
 ```
 
-### Step 2: Implement Environment Class
+**File Responsibilities:**
+- `blackjack.py`（Optional）: Your core game logic （usually a standard gym environment） (`step`, `reset`)
+- `env_config.py`: Configuration parameters and settings for your environment
+- `env.py`: VAGEN wrapper that bridges LLM responses to your game logic
+- `prompt.py`: System prompts and LLM interaction format definitions
+- `__init__.py`: Registration info to make your environment discoverable by VAGEN
 
-Create a new class that inherits from BaseEnv. This class must implement all required methods:
-```python
-from vagen.env.base.base_env import BaseEnv
-from typing import Dict, Tuple
-import random
+## Understanding BaseEnv Interface
 
-class MyNewEnv(BaseEnv):
-    def __init__(self, config):
-        self.config = config
-        self.done = False
-        
-    def step(self, llm_raw_response) -> Tuple[Dict, float, bool, Dict]:
-        """Process an action from the LLM and return the next state"""
-        parsed_action = parse_llm_raw_response(llm_raw_response)
-        action_valid = parsed_action['is_valid']
-        action_effective = action_valid  # Simplification for example
-        
-        # Update environment state based on action
-        
-        obs = {
-            'obs_str': "Observation after action",
-            'multi_modal_data': {}  # Add any images or audio here
-        }
-        
-        reward = 0.0 if not action_valid else 0.5
-        self.done = False  # Update based on task completion
-        
-        info = {
-            "metrics": {
-                'success': False,
-                'action_is_effective': action_effective,
-                'action_is_valid': action_valid,
-            },
-            "llm_raw_response": llm_raw_response,
-            "llm_response": parsed_action,
-        }
-        
-        return obs, reward, self.done, info
-    
-    def reset(self, seed=None) -> Tuple[Dict, Dict]:
-        """Reset the environment to initial state"""
-        if seed is not None:
-            random.seed(seed)
-            
-        self.done = False
-        
-        obs = {
-            'obs_str': "Initial observation text",
-            'multi_modal_data': {}
-        }
-                
-        return obs, info #(Optional, could be empty)
-    
-    def system_prompt(self) -> str:
-        """Define the system prompt for the LLM"""
-        return "You are an agent in the MyNewEnv environment. Your goal is to [describe task]."
-    
-    def compute_reward(self) -> float:
-        """Calculate final episode reward"""
-        return 0.0  # Calculate based on task completion
-        
-    def close(self):
-        """Clean up any resources"""
-        pass
-```
-### Step 3: Make Sure Input/Output Format Details
+VAGEN environments inherit from `BaseEnv`, which defines the contract between your game logic and the LLM training system. Here's what each required method does:
 
-#### Environment Observations
-Step Observations must follow this structure:
+### Core Methods Overview
+
+**`step(llm_raw_response)`** - The heart of LLM interaction
+- Takes the raw text response from the LLM (e.g., `"<think>I should hit</think><answer>Hit</answer>"`)
+- Parses it to extract valid actions (e.g., `["Hit"]`)
+- Executes actions in your game
+- Returns the next observation, reward, completion status, and metrics
+
+**`reset(seed)`** - Initialize a new episode (these seeds are read from train/test parquet file)
+- Resets the game to starting state
+- Uses seed for reproducible episodes
+- Returns initial observation for the LLM
+
+**`system_prompt()`** - Define the LLM's role
+- Returns the system prompt that tells the LLM what game it's playing
+- Includes rules, available actions, and formatting instructions
+
+**`close()`** - Clean up resources
+- Called when the environment is no longer needed
+
+**`compute_reward()`** - Optional final reward
+- Usually returns 0.0 since step rewards are accumulated
+- Use only if you need extra reward at episode end
+
+## Key Data Structures
+
+### Observation Format
+Every observation must follow this structure:
 ```python
 {
-    'obs_str': "Text observation with <image> or <audio> placeholders",
+    'obs_str': "You see <image> showing your cards. The dealer shows <image>.",
     'multi_modal_data': {
-        '<image>': [image_data_1, image_data_2, ...],
-        '<audio>': [audio_data_1, audio_data_2, ...],
+        '<image>': [player_cards_image, dealer_card_image],
+        '<audio>': [shuffle_sound]  # optional
     }
 }
 ```
-**Notice**: number of `image_place_holder(<image>)` in `obs_str` must match with number of `image_data` in `multi_modal_data`
+The number of `<image>` placeholders in `obs_str` must match the length of the image list.
 
-#### Environment Info Dictionary
-The info dictionary provides additional context and metrics:
+### Info Dictionary
+Provides metrics and context for training:
 ```python
 {
     "metrics": {
-        'success': bool,  # Did the agent complete the task?
-        'action_is_effective': bool,  # Was the action meaningful?
-        'action_is_valid': bool,  # Was the action syntactically correct?
-        # Add additional custom metrics
+        'success': bool,              # Did LLM complete the task?
+        'action_is_effective': bool,  # Did action change game state meaningfully?
+        'action_is_valid': bool,      # Was action format correct?
     },
-    "llm_raw_response": str,  # Original response from LLM
-    "llm_response": dict,  # Parsed response with structured format
+    "llm_raw_response": str,  # Original LLM response
+    "llm_response": dict,     # Parsed action structure
 }
 ```
 
-### Step 4: Testing Your Environment
+## Implementation Components
 
-Create a basic script below your `env.py` to test your environment:
+Your environment needs three main files:
+
+### 1. Environment Configuration (`env_config.py`)
+Defines all parameters for your environment:
+
 ```python
-# Create environment
-config = MyNewEnvConfig()
-env = MyNewEnv(config)
+from vagen.env.base.base_env_config import BaseEnvConfig
+from dataclasses import dataclass
 
-# Reset environment
+@dataclass
+class BlackjackEnvConfig(BaseEnvConfig):
+    env_name: str = "blackjack"
+    render_mode: str = "vision"  # "text" or "vision"
+    natural: bool = False        # Game-specific parameter
+    max_actions_per_step: int = 1    # For Blackjack, we only allow one action per step, since it needs to interact with the dealer
+    prompt_format: str = "free_think"
+    
+    def config_id(self) -> str:
+        return f"BlackjackEnvConfig(mode={self.render_mode},format={self.prompt_format})"
+```
+
+### 2. Environment Implementation (`env.py`)
+The main environment class implementing BaseEnv:
+
+```python
+from vagen.env.base.base_env import BaseEnv
+from .blackjack import BlackjackEnv as GymBlackjackEnv  # Your gym environment
+from .env_config import BlackjackEnvConfig
+
+class BlackjackEnv(BaseEnv):
+    def __init__(self, config: BlackjackEnvConfig):
+        self.config = config
+        self.gym_env = GymBlackjackEnv()  # Your underlying game
+        # Initialize parsers and prompt functions...
+    
+    def step(self, llm_raw_response: str):
+        # 1. Parse LLM response to extract actions
+        parsed = self.parse_func(llm_raw_response)
+        actions = parsed['actions']
+        
+        # 2. Execute actions in your game
+        reward = 0
+        done = False
+        if actions and actions[0] in self.ACTION_LOOKUP:
+            action_int = self.ACTION_LOOKUP[actions[0]]
+            _, reward, done, _ = self.gym_env.step(action_int)
+        
+        # 3. Create metrics
+        metrics = {
+            "turn_metrics": {
+                "action_is_valid": len(actions) > 0,
+                "action_is_effective": reward != 0,
+            },
+            "traj_metrics": {
+                "success": done and reward > 0,
+            }
+        }
+        
+        # 4. Generate next observation
+        obs = self._render()
+        info = {"metrics": metrics, "llm_raw_response": llm_raw_response}
+        
+        return obs, reward, done, info
+    
+    def reset(self, seed=None):
+        self.gym_env.reset(seed=seed)
+        return self._render(init_obs=True), {}
+    
+    def system_prompt(self):
+        return "You are a Blackjack player. Actions: Hit, Stand. Goal: Beat dealer without busting."
+    
+    def _render(self, init_obs=False):
+        # Generate observation based on render_mode
+        if self.config.render_mode == 'vision':
+            image = self.gym_env.render()
+            return {
+                'obs_str': "Current game state: <image>",
+                'multi_modal_data': {'<image>': [image]}
+            }
+        else:
+            text_desc = f"Your hand: {self.gym_env.player_sum}, Dealer: {self.gym_env.dealer_card}"
+            return {'obs_str': text_desc}
+    
+    def close(self):
+        self.gym_env.close()
+```
+
+### 3. Prompt Templates (`prompt.py`)
+Defines how LLM interacts with your environment:
+
+```python
+def system_prompt(**kwargs):
+    return """You are a Blackjack player.
+Goal: Get closer to 21 than dealer without going over.
+Actions: "Hit" (take card), "Stand" (keep hand)"""
+
+def init_observation_template(observation="", **kwargs):
+    return f"[Initial Hand]: {observation}\nDecide: Hit or Stand?"
+
+# Format configurations for different reasoning types
+FORMAT_CONFIGS = {
+    "free_think": {
+        "format": "<think>...</think><answer>...</answer>",
+        "example": "<think>I have 16, dealer shows 10. Risky but need to improve.</think><answer>Hit</answer>"
+    },
+    "grounding": {
+        "format": "<think><observation>...</observation><reasoning>...</reasoning></think><answer>...</answer>",
+        "example": "<think><observation>Hand: 16, dealer: 10</observation><reasoning>Tough spot, hitting gives chance</reasoning></think><answer>Hit</answer>"
+    }
+}
+
+def format_prompt_generator(format_type):
+    def prompt_function(**kwargs):
+        config = FORMAT_CONFIGS[format_type]
+        return f"Respond in format: {config['format']}\ne.g. {config['example']}"
+    return prompt_function
+
+format_prompt = {fmt: format_prompt_generator(fmt) for fmt in FORMAT_CONFIGS}
+```
+
+## Environment Registration
+
+Register your environment in `__init__.py`:
+
+```python
+from .env import BlackjackEnv
+from .env_config import BlackjackEnvConfig
+
+BLACKJACK_ENV_INFO = {
+    "env_cls": BlackjackEnv,
+    "config_cls": BlackjackEnvConfig,
+    "description": "Classic Blackjack card game"
+}
+
+# Add to vagen/env/__init__.py:
+# REGISTERED_ENV["blackjack"] = BLACKJACK_ENV_INFO
+```
+
+## Testing Your Environment
+
+```python
+# Basic functionality test
+config = BlackjackEnvConfig(render_mode="text")
+env = BlackjackEnv(config)
+
+# Test reset
 obs, info = env.reset(seed=42)
-print("Initial observation:", obs['obs_str'])
+print("Initial obs:", obs['obs_str'])
 
-# Test step with mock LLM response
-mock_llm_response = "Action1, Action2, Action3"
-next_obs, reward, done, info = env.step(mock_llm_response)
+# Test step with LLM response
+response = "<think>Let me be conservative</think><answer>Stand</answer>"
+next_obs, reward, done, info = env.step(response)
 
-print("Next observation:", next_obs['obs_str'])
-print("Reward:", reward)
-print("Done:", done)
-print("Action valid:", info['metrics']['action_is_valid'])
-print("Action effective:", info['metrics']['action_is_effective'])
+print("Valid action:", info['metrics']['action_is_valid'])
+print("Effective action:", info['metrics']['action_is_effective'])
+print("Success:", info['metrics']['success'])
 
-# Clean up
 env.close()
 ```
 
-### Step 5: Integration with Service Layer (Optional)
+## Common Patterns
 
-For training acceleration and distributed processing, you can integrate your environment with the VAGEN service layer. This step is optional but recommended for large-scale training. See the "[Create your Own Service](create-service.md)" section for details.
+**Multi-modal environments**: Include images/audio in `multi_modal_data`
+**Text-only environments**: Set `multi_modal_data = None` in observations  
+**Multi-step episodes**: Track progress in `self.step_count` or similar
+**Complex action spaces**: Parse multiple actions from LLM response
+**Custom metrics**: Add domain-specific metrics to the metrics dictionary
+
+The key is understanding that `step()` bridges the gap between raw LLM text and your game logic, while maintaining consistent observation and metric formats for the training system.

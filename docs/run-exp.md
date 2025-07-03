@@ -30,24 +30,17 @@ wandb login
 
 ### Basic Approach
 ```
-# run one of the experiment scripts
-bash vagen/examples/frozen_lake_aico/run.sh  
-bash vagen/examples/frozen_lake_trico/run.sh  
-bash vagen/examples/sokoban_aico/run.sh 
-bash vagen/examples/sokoban_trico/run.sh  
-```
+# Login to wandb
+wandb login
 
-### Service Approach
-1. Start the server process in a tmux session 
-```
-python vagen/server/server.py
-```
+# You can run different environments and algorithms:
+bash scripts/examples/masked_grpo/frozenlake/grounding_worldmodeling/run_tmux.sh
+bash scripts/examples/finegrained/sokoban/grounding_worldmodeling/run_tmux.sh
+bash scripts/examples/masked_turn_ppo/frozenlake/grounding_worldmodeling/run_tmux.sh
 
-2. After the server is running, open new terminal to run the training processe:
-```
-bash vagen/examples/frozen_lake_aico_service/run.sh
-bash vagen/examples/svg_aico/run.sh
-bash vagen/examples/svg_trico/run.sh
+# Use Visual Reasoning Reward
+# Setup OPENAI_API_KEY in the Environment
+bash scripts/examples/state_reward_finegrained/sokoban/grounding_worldmodeling/run_tmux.sh
 ```
 
 ## Support Environment
@@ -55,7 +48,9 @@ bash vagen/examples/svg_trico/run.sh
 - Sokoban: A visual puzzle-solving environment with box pushing
 - SVG: An environment that generate svg code fot provided image. Supports reward model integration
 - Navigation: An environment of visual navigation task for embodied AI
+- Primitive-skill: An environment of primitive skill for embodied AI
+- Blackjack: A simple card game environment
 
 For information on creating new environment, please refer to our "[Create your Own Environment](envs/create-env.md)" guide.
 
-For information on creating service for new enviornment, please refer to our "[Create your Own Service](envs/create-service.md) guide"
+For information on creating service for training based on your new environment, please refer to our "[Create your Own Service](envs/create-service.md) guide"
