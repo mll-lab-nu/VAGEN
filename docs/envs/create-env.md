@@ -2,6 +2,9 @@
 
 This guide explains how to create new environments for VAGEN using **Blackjack** as an example. Understanding the BaseEnv interface is key to building effective LLM training environments.
 
+> For the specific rules of Blackjack, please refer to [Blackjack Rules](https://en.wikipedia.org/wiki/Blackjack).
+> For the gym-formated Blackjack details, please refer to [Blackjack-v0](https://gymnasium.farama.org/environments/toy_text/blackjack/).
+
 ## Directory Structure
 
 ```
