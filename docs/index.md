@@ -28,14 +28,14 @@ VAGEN is a multi-turn reinforcement learning framework designed for training Vis
 
 
 ## Citation
-
 If you find VAGEN useful, we appreciate it if you could cite our work at:
 
 ```bibtex
-@misc{VAGEN,
-  title={VAGEN: Training VLM Agents with Multi-Turn Reinforcement Learning},
-  author={Kangrui Wang* and Pingyue Zhang* and Zihan Wang* and Qineng Wang* and Linjie Li* and Zhengyuan Yang and Chi Wan and Yiping Lu and Manling Li},
+@misc{wang2025vagen,
+  title={Reinforcing Visual State Reasoning for Multi-Turn VLM Agents},
+  author={Kangrui Wang* and Pingyue Zhang* and Zihan Wang* and Yaning Gao* and Linjie Li* and Qineng Wang and Hanyang Chen and Chi Wan and Yiping Lu and Zhengyuan Yang and Lijuan Wang and Ranjay Krishna and Jiajun Wu and Li Fei-Fei and Yejin Choi and Manling Li},
   year={2025},
+  url={https://github.com/RAGEN-AI/VAGEN}
 }
 ```
 
