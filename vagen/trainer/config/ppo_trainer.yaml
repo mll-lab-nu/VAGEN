@@ -206,3 +206,5 @@ rollout_manager:
   use_service: False
   timeout: 1200
   max_workers: 8
+  high_level_gamma: ${algorithm.high_level_gamma}
+  use_turn_wise_update: False

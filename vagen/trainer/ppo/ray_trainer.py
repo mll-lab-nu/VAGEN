@@ -39,7 +39,7 @@ from verl.utils.checkpoint.checkpoint_manager import find_latest_ckpt_path
 from verl.utils.dataset.rl_dataset import RLHFDataset, collate_fn
 from torch.utils.data import RandomSampler, SequentialSampler
 from torchdata.stateful_dataloader import StatefulDataLoader
-
+from vagen.rollout.qwen_rollout.turn_wise_update_rollout_manager import TurnWiseUpdateRolloutManager
 from vagen.rollout.qwen_rollout.rollout_manager import QwenVLRolloutManager
 from vagen.rollout.qwen_rollout.rollout_manager_service import QwenVLRolloutManagerService
 WorkerType = Type[Worker]
@@ -761,13 +761,22 @@ class RayPPOTrainer(object):
     
         if self.test_rollout_manager==None:
             if self.config.rollout_manager.get("use_service",False):
-                self.test_rollout_manager =QwenVLRolloutManagerService(
-                    actor_rollout_wg=self.actor_rollout_wg,
-                    config=self.config.rollout_manager,
-                    tokenizer=self.tokenizer,
-                    processor=self.processor,
-                    split="val",
-                )
+                    
+                if self.config.rollout_manager.get("use_turn_wise_update",False):
+                    self.test_rollout_manager = TurnWiseUpdateRolloutManager(
+                        actor_rollout_wg=self.actor_rollout_wg,
+                        config=self.config.rollout_manager,
+                        tokenizer=self.tokenizer,
+                        processor=self.processor,
+                    )
+                else:
+                    self.test_rollout_manager =QwenVLRolloutManagerService(
+                        actor_rollout_wg=self.actor_rollout_wg,
+                        config=self.config.rollout_manager,
+                        tokenizer=self.tokenizer,
+                        processor=self.processor,
+                        split="val",
+                    )
             else:
                 self.test_rollout_manager =QwenVLRolloutManager(
                     actor_rollout_wg=self.actor_rollout_wg,
@@ -1077,13 +1086,22 @@ class RayPPOTrainer(object):
         self.global_steps += 1
 
         if self.config.rollout_manager.get("use_service",False):
-            rollout_manager = QwenVLRolloutManagerService(
-                actor_rollout_wg=self.actor_rollout_wg,
-                config=self.config.rollout_manager,
-                tokenizer=self.tokenizer,
-                processor=self.processor,
-                split="train",
-            )
+                
+            if self.config.rollout_manager.get("use_turn_wise_update",False):
+                rollout_manager = TurnWiseUpdateRolloutManager(
+                    actor_rollout_wg=self.actor_rollout_wg,
+                    config=self.config.rollout_manager,
+                    tokenizer=self.tokenizer,
+                    processor=self.processor,
+                )
+            else:
+                rollout_manager = QwenVLRolloutManagerService(
+                    actor_rollout_wg=self.actor_rollout_wg,
+                    config=self.config.rollout_manager,
+                    tokenizer=self.tokenizer,
+                    processor=self.processor,
+                    split="train",
+                )
         else:
             rollout_manager = QwenVLRolloutManager(
                 actor_rollout_wg=self.actor_rollout_wg,

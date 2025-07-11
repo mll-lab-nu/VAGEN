@@ -27,7 +27,7 @@ The bi-level GAE now becomes:
 2. critical calculate the GAE for each turn
 
 """
-class RolloutManager():
+class TurnWiseUpdateRolloutManager():
     def __init__(self,
                  actor_rollout_wg,
                  config,
@@ -451,15 +451,7 @@ class RolloutManager():
 
         """
 
-        # Let's use bellman equation to compute the reward for each turn
-        high_level_gamma = self.config.get("high_level_gamma", 0.9)
-        rewards = []
-        for i in range(len(recording)-1,0,-1):
-            if i == len(recording) - 1:
-                rewards.append(recording[i]['reward'])
-            else:
-                rewards.append(recording[i]['reward'] + high_level_gamma * recording[i+1]['reward'])
-        rewards.reverse()
+
 
         # handle prompt, prompt=pad_token since we now have everything in response and compute a loss mask for them
         prompt_with_chat_template=self.tokenizer.pad_token 
@@ -468,7 +460,7 @@ class RolloutManager():
         response_rst=self._single_recording_to_prompt(recording, step, window_size, is_final=True, prep_for_loss_mask=True)
         response_with_chat_template=response_rst['prompt']
         image_data=response_rst['image_data']
-        rewards=rewards[step-1:step]
+        rewards=response_rst['rewards']
        
         has_images = len(image_data) > 0
         row_dict = {}
@@ -530,6 +522,7 @@ class RolloutManager():
             position_ids_response = position_ids_prompt[-1:] + delta_position_id
         
         
+        
         row_dict['loss_mask'] = loss_mask
         row_dict['gae_mask'] = loss_mask
         row_dict["end_of_response_position_mask"] = end_of_response_position_mask # 
@@ -541,8 +534,6 @@ class RolloutManager():
         row_dict['position_ids'] = position_ids
         index = row_dict.get("extra_info", {}).get("index", 0)
         row_dict["index"] = index
-        row_dict["reward"]= sum(rewards)
-        
         return row_dict
 
     @torch.no_grad()
@@ -646,15 +637,28 @@ class RolloutManager():
             batch (DataProto): batch of final trajectory of all environments
         """
         batch_list = []
+        gamma = self.config.get("high_level_gamma", 0.9)
         reward_rst=self.env_client.compute_reward_batch(list(self.envs.keys()))
-        for env_id in self.envs.keys():
-            for step in range(1,self.env_states[env_id]['step']+1):
+        for env_id, recording in self.recorder.items():
+            # Compute discounted returns once per trajectory (excluding the initial prompt record at idx 0)
+            disc_returns: List[float] = []
+            G = reward_rst[env_id]
+            for i in range(len(recording) - 1, 0, -1):  # skip index 0 (no action/reward)
+                G = recording[i]["reward"] + gamma * G
+                disc_returns.append(G)
+            disc_returns.reverse()  # align with step indices 1..T
+            if not disc_returns:
+                print(f"DEBUG: disc_returns is empty for env {env_id}, recording length: {len(recording)}")
+            for idx, G_t in enumerate(disc_returns, start=1):
                 row_dict = self._generate_input_for_uptate(
-                    recording=self.recorder[env_id],
-                    step=self.env_states[env_id]['step'],
+                    recording=recording,
+                    step=idx,
                     window_size=self.config.get("window_size", 0),
                 )
-                row_dict['reward_model'] = {"style": "given", "ground_truth": {"reward": row_dict['reward']}}
+                row_dict["reward_model"] = {
+                    "style": "given",
+                    "ground_truth": {"reward": G_t},
+                }
                 batch_list.append(row_dict)
         batch_dict = collate_fn(batch_list)
         batch = DataProto.from_single_dict(batch_dict)
