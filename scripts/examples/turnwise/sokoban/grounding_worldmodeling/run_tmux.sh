@@ -1,12 +1,7 @@
 #!/bin/bash
-# -----------------------------------------------
-# Turn-wise fine-grained PPO training with VAGEN
-# -----------------------------------------------
-# 参考 finegrained 与 masked_turn_ppo 示例，支持一次性按 turn 反馈奖励。
+set -e  # Exit immediately if a command exits with a non-zero status
 
-set -e  # Exit on error
-
-# ----- 参数输入（可交互可默认） -----
+# Interactive input for port and CUDA devices
 read -p "Enter port number (default: 5000): " PORT_INPUT
 PORT=${PORT_INPUT:-5000}
 
@@ -14,20 +9,25 @@ read -p "Enter CUDA devices (default: 0,1,2,3): " CUDA_DEVICES
 CUDA_DEVICES=${CUDA_DEVICES:-0,1,2,3}
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-# extract trailing 3-level path and convert slashes to dashes as exp name
+
+# Extract experiment name from the path
+# This will take the last 3 parts of the path: format/sokoban/free_think
 EXPERIMENT_NAME=$(echo $SCRIPT_DIR | rev | cut -d'/' -f1-3 | rev | tr '/' '-')
 echo "Experiment name: $EXPERIMENT_NAME"
 
-# 自动生成不冲突的 tmux 会话名
+# Find available session names
 find_available_session() {
   local base_name=$1
   local count=0
+  
   while tmux has-session -t "${base_name}${count}" 2>/dev/null; do
     count=$((count+1))
   done
+  
   echo "${base_name}${count}"
 }
 
+# Create session names
 SERVER_SESSION=$(find_available_session "server")
 TRAIN_SESSION=$(find_available_session "train")
 
@@ -35,40 +35,39 @@ echo "Creating tmux sessions: $SERVER_SESSION and $TRAIN_SESSION"
 echo "Using port: $PORT"
 echo "Using CUDA devices: $CUDA_DEVICES"
 
+# Create directories if they don't exist
 mkdir -p "data/$EXPERIMENT_NAME"
 
-# ----------- Server 会话 -------------
+# Create server session
 tmux new-session -d -s "$SERVER_SESSION"
-tmux send-keys -t "$SERVER_SESSION" "conda activate vagen" C-m
+# Configure server session with conda and environment variables
+tmux send-keys -t "$SERVER_SESSION" "source activate vagen" C-m
 tmux send-keys -t "$SERVER_SESSION" "export CUDA_VISIBLE_DEVICES=$CUDA_DEVICES" C-m
 tmux send-keys -t "$SERVER_SESSION" "export VLLM_ATTENTION_BACKEND=XFORMERS" C-m
 tmux send-keys -t "$SERVER_SESSION" "export PYTHONHASHSEED=0" C-m
-# fine-grained 任务不依赖环境端 state reward，所以 use_state_reward=False
-# Turn-wise 训练仍然按 step 与系统交互
+# Start the server
+tmux send-keys -t "$SERVER_SESSION" "python -m vagen.server.server server.port=$PORT use_state_reward=True" C-m
 
-tmux send-keys -t "$SERVER_SESSION" "python -m vagen.server.server server.port=$PORT use_state_reward=False" C-m
-
+# Wait for server to start
 echo "Waiting for server to start on port $PORT..."
-sleep 10
+sleep 10  # Adjust as needed
 
 # ----------- Training 会话 -------------
 tmux new-session -d -s "$TRAIN_SESSION"
 tmux send-keys -t "$TRAIN_SESSION" "cd $SCRIPT_DIR" C-m
-tmux send-keys -t "$TRAIN_SESSION" "conda activate vagen" C-m
+tmux send-keys -t "$TRAIN_SESSION" "source activate vagen" C-m
 tmux send-keys -t "$TRAIN_SESSION" "export CUDA_VISIBLE_DEVICES=$CUDA_DEVICES" C-m
 tmux send-keys -t "$TRAIN_SESSION" "export VLLM_ATTENTION_BACKEND=XFORMERS" C-m
 tmux send-keys -t "$TRAIN_SESSION" "export PYTHONHASHSEED=0" C-m
 tmux send-keys -t "$TRAIN_SESSION" "set -x" C-m
 
-# 1. 生成数据集
-
+# First create the dataset
 tmux send-keys -t "$TRAIN_SESSION" "python -m vagen.env.create_dataset \\
     --yaml_path \"$SCRIPT_DIR/env_config.yaml\" \\
     --train_path \"data/$EXPERIMENT_NAME/train.parquet\" \\
     --test_path \"data/$EXPERIMENT_NAME/test.parquet\"" C-m
 
-# 2. 启动训练（turn-wise 版本）
-
+# Then start the training
 tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     algorithm.adv_estimator=masked_gae \\
     algorithm.high_level_gamma=0.9 \\
@@ -110,7 +109,6 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     critic.ppo_micro_batch_size_per_gpu=1 \\
     critic.model.fsdp_config.param_offload=False \\
     critic.model.fsdp_config.optimizer_offload=False \\
-    critic.use_reward_mask=True \\
     algorithm.kl_ctrl.kl_coef=0.001 \\
     trainer.critic_warmup=0 \\
     trainer.logger=['console','wandb'] \\
@@ -133,7 +131,6 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     rollout_manager.timeout=300 \\
     rollout_manager.base_url=\"http://localhost:$PORT\" \\
     rollout_manager.use_turn_wise_update=True \\
-
     2>&1 | tee $EXPERIMENT_NAME.log" C-m
 
 # ----------- 完成信息 -------------
@@ -146,4 +143,4 @@ echo "Training Session: $TRAIN_SESSION"
 echo "-----------------------------------------"
 echo "To attach to server session: tmux attach-session -t $SERVER_SESSION"
 echo "To attach to training session: tmux attach-session -t $TRAIN_SESSION"
-echo "NOTE: The sessions will remain active. To detach from a session use Ctrl+B then D" 
+echo "NOTE: The sessions will remain active. To detach from a session use Ctrl+B followed by D"
