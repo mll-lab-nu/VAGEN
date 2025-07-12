@@ -42,6 +42,7 @@ from torchdata.stateful_dataloader import StatefulDataLoader
 from vagen.rollout.qwen_rollout.turn_wise_update_rollout_manager import TurnWiseUpdateRolloutManager
 from vagen.rollout.qwen_rollout.rollout_manager import QwenVLRolloutManager
 from vagen.rollout.qwen_rollout.rollout_manager_service import QwenVLRolloutManagerService
+from vagen.trainer.ppo.utils import seed_everything
 WorkerType = Type[Worker]
 
 
@@ -1068,6 +1069,14 @@ class RayPPOTrainer(object):
                           default_backend=self.config.trainer.logger,
                           config=OmegaConf.to_container(self.config, resolve=True))
 
+        # ------------------------------------------------------------------
+        # Global seeding – ensure deterministic behaviour for PyTorch / NumPy
+        # and make Python hash-based ops reproducible.  This needs to be done
+        # **before** any worker processes / datasets are created.
+        # ------------------------------------------------------------------
+        seed_val = self.config.data.get('seed', 42)
+        seed_everything(seed_val)
+
         self.global_steps = 0
 
         # load checkpoint before doing anything
@@ -1146,7 +1155,13 @@ class RayPPOTrainer(object):
                         train_metrics=self.log_rst_to_metrics_dict(rst=rst,mode='train')
                         metrics.update(train_metrics)
                     print(f"[DEBUG] step {self.global_steps} rollout ends")
-                    batch = batch.union(final_gen_batch_output)
+                    
+                    # If the rollout output already contains deterministic UID,
+                    # use it directly to avoid key conflicts when unioning.
+                    if 'uid' in final_gen_batch_output.non_tensor_batch:
+                        batch = final_gen_batch_output
+                    else:
+                        batch = batch.union(final_gen_batch_output)
 
                     # balance the number of valid tokens on each dp rank.
                     # Note that this breaks the order of data inside the batch.

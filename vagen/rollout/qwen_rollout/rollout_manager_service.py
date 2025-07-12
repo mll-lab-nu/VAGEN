@@ -415,7 +415,7 @@ class QwenVLRolloutManagerService():
 
 
     @torch.no_grad()
-    def _generate_input_for_uptate(
+    def _generate_input_for_update(
             self, 
             recording: List[Dict], 
             step: int, 
@@ -638,7 +638,7 @@ class QwenVLRolloutManagerService():
         batch_list = []
         reward_rst=self.env_client.compute_reward_batch(list(self.envs.keys()))
         for env_id in self.envs.keys():
-            row_dict = self._generate_input_for_uptate(
+            row_dict = self._generate_input_for_update(
                 recording=self.recorder[env_id],
                 step=self.env_states[env_id]['step'],
                 window_size=None,

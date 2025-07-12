@@ -5,6 +5,7 @@ from collections import defaultdict
 import torch
 import numpy as np
 from transformers import PreTrainedTokenizer, ProcessorMixin
+from vagen.rollout.utils import tensor_to_uuid
 from dataclasses import dataclass, field
 import PIL
 import re
@@ -418,15 +419,13 @@ class TurnWiseUpdateRolloutManager():
         row_dict['attention_mask'] = torch.tensor([0], dtype=torch.long)
         row_dict['position_ids'] = torch.tensor([0], dtype=torch.long)
 
-        # add index for each prompt
-        index = row_dict.get("extra_info", {}).get("index", 0)
-        row_dict["index"] = index
+      
 
         return row_dict
 
 
     @torch.no_grad()
-    def _generate_input_for_uptate(
+    def _generate_input_for_update(
             self, 
             recording: List[Dict], 
             step: int, 
@@ -524,7 +523,7 @@ class TurnWiseUpdateRolloutManager():
         
         
         row_dict['loss_mask'] = loss_mask
-        row_dict['gae_mask'] = loss_mask
+        row_dict['gae_mask'] = loss_mask 
         row_dict["end_of_response_position_mask"] = end_of_response_position_mask # 
         position_ids = torch.cat([position_ids_prompt, position_ids_response], dim=-1)
         row_dict['prompts'] = input_ids_prompt
@@ -532,8 +531,13 @@ class TurnWiseUpdateRolloutManager():
         row_dict['input_ids'] = input_ids
         row_dict['attention_mask'] = attention_mask
         row_dict['position_ids'] = position_ids
-        index = row_dict.get("extra_info", {}).get("index", 0)
-        row_dict["index"] = index
+        pad_id = self.tokenizer.pad_token_id   # e.g. 151643
+        valid_prompt=torch.where(
+            torch.logical_not(loss_mask.bool()),                 # condition
+            input_ids,                        # keep original token
+            torch.full_like(input_ids, pad_id)  # else → pad_token_id
+        )
+        row_dict["uid"] = tensor_to_uuid(valid_prompt, pad_token_id=self.tokenizer.pad_token_id)
         return row_dict
 
     @torch.no_grad()
@@ -639,6 +643,9 @@ class TurnWiseUpdateRolloutManager():
         batch_list = []
         gamma = self.config.get("high_level_gamma", 0.9)
         reward_rst=self.env_client.compute_reward_batch(list(self.envs.keys()))
+        # Map each unique valid_prompt to a deterministic UUID so that identical
+        # prompts share the same identifier across the whole trajectory.
+        uid_assignment={} #counter
         for env_id, recording in self.recorder.items():
             # Compute discounted returns once per trajectory (excluding the initial prompt record at idx 0)
             disc_returns: List[float] = []
@@ -650,7 +657,7 @@ class TurnWiseUpdateRolloutManager():
             if not disc_returns:
                 print(f"DEBUG: disc_returns is empty for env {env_id}, recording length: {len(recording)}")
             for idx, G_t in enumerate(disc_returns, start=1):
-                row_dict = self._generate_input_for_uptate(
+                row_dict = self._generate_input_for_update(
                     recording=recording,
                     step=idx,
                     window_size=self.config.get("window_size", 0),
@@ -659,7 +666,13 @@ class TurnWiseUpdateRolloutManager():
                     "style": "given",
                     "ground_truth": {"reward": G_t},
                 }
+               
+                # Generate deterministic UUID based on the content of valid_prompt
+                uid_assignment[row_dict["uid"]] = uid_assignment.get(row_dict["uid"], 0) + 1
+                
+
                 batch_list.append(row_dict)
+        print("min uid_assignment", min(uid_assignment.values()),"max uid_assignment", max(uid_assignment.values()),"avg uid_assignment", sum(uid_assignment.values())/len(uid_assignment))
         batch_dict = collate_fn(batch_list)
         batch = DataProto.from_single_dict(batch_dict)
         return batch
