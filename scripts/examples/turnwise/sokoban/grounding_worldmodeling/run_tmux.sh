@@ -75,14 +75,14 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     data.val_files=data/$EXPERIMENT_NAME/test.parquet \\
     data.train_batch_size=64 \\
     data.max_prompt_length=1024 \\
-    data.max_response_length=200 \\
+    data.max_response_length=512 \\
     data.max_trajectory_length=2400 \\
     data.image_key=images \\
-    data.truncation=left \\
+    data.truncation=error \\
     actor_rollout_ref.model.path=Qwen/Qwen2.5-VL-3B-Instruct \\
     actor_rollout_ref.actor.optim.lr=1e-6 \\
     actor_rollout_ref.model.use_remove_padding=True \\
-    actor_rollout_ref.actor.ppo_mini_batch_size=32 \\
+    actor_rollout_ref.actor.ppo_mini_batch_size=128 \\
     actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=1 \\
     actor_rollout_ref.actor.use_kl_loss=False \\
     actor_rollout_ref.actor.kl_loss_coef=0.001 \\
@@ -93,6 +93,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \\
     actor_rollout_ref.rollout.tensor_model_parallel_size=2 \\
     actor_rollout_ref.rollout.name=vllm \\
+    actor_rollout_ref.actor.grad_norm_threshold=10000 \\
     actor_rollout_ref.rollout.gpu_memory_utilization=0.1 \\
     actor_rollout_ref.rollout.enable_chunked_prefill=False \\
     actor_rollout_ref.rollout.enforce_eager=False \\
@@ -114,7 +115,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     trainer.logger=['console','wandb'] \\
     trainer.project_name='vagen_turnwise' \\
     trainer.experiment_name=$EXPERIMENT_NAME \\
-    trainer.n_gpus_per_node=4 \\
+    trainer.n_gpus_per_node=8 \\
     trainer.nnodes=1 \\
     trainer.save_freq=150 \\
     trainer.test_freq=20 \\

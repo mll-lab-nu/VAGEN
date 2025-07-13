@@ -452,7 +452,7 @@ class TurnWiseUpdateRolloutManager():
         """
 
 
-        print()
+
         # handle prompt, prompt=pad_token since we now have everything in response and compute a loss mask for them
         prompt_with_chat_template=self.tokenizer.pad_token 
         
@@ -533,22 +533,21 @@ class TurnWiseUpdateRolloutManager():
         row_dict['attention_mask'] = attention_mask
         row_dict['position_ids'] = position_ids
         pad_id = self.tokenizer.pad_token_id   # e.g. 151643
-        # Keep original tokens where loss_mask==0 (prompt part), pad elsewhere
-        valid_prompt = torch.where(
-            torch.logical_not(loss_mask.bool()),     # True for prompt tokens
-            input_ids,
-            torch.full_like(input_ids, pad_id)
+        valid_prompt=torch.where(
+            torch.logical_not(loss_mask.bool()),                 # condition
+            input_ids,                        # keep original token
+            torch.full_like(input_ids, pad_id)  # else → pad_token_id
         )
         # Debug: decode prompt and response
-        try:
-            prompt_ids = valid_prompt[valid_prompt != pad_id].tolist()
-            response_ids = input_ids[loss_mask.bool()].tolist()
-            prompt_str = self.tokenizer.decode(prompt_ids, skip_special_tokens=False)
-            response_str = self.tokenizer.decode(response_ids, skip_special_tokens=False)
-            # print("[DEBUG update] prompt:", prompt_str)
-            # print("[DEBUG update] response:", response_str)
-        except Exception as _:
-            pass
+        # try:
+        #     prompt_ids = valid_prompt[valid_prompt != pad_id].tolist()
+        #     response_ids = input_ids[loss_mask.bool()].tolist()
+        #     prompt_str = self.tokenizer.decode(prompt_ids, skip_special_tokens=False)
+        #     response_str = self.tokenizer.decode(response_ids, skip_special_tokens=False)
+        #     print("[DEBUG update] prompt:", prompt_str)
+        #     print("[DEBUG update] response:", response_str)
+        # except Exception as _:
+        #     pass
         row_dict["uid"] = tensor_to_uuid(valid_prompt, pad_token_id=self.tokenizer.pad_token_id)
         return row_dict
 
@@ -669,7 +668,7 @@ class TurnWiseUpdateRolloutManager():
             if not disc_returns:
                 print(f"DEBUG: disc_returns is empty for env {env_id}, recording length: {len(recording)}")
             for idx, G_t in enumerate(disc_returns, start=1):
-                print("DEBUG: turn", idx, "G_t", G_t)
+                #print("DEBUG: step", idx, "G_t", G_t)
                 row_dict = self._generate_input_for_update(
                     recording=recording,
                     step=idx,
@@ -691,7 +690,7 @@ class TurnWiseUpdateRolloutManager():
                 
 
                 batch_list.append(row_dict)
-        print("DEBUG: min uid_assignment", min(uid_assignment.values()),"max uid_assignment", max(uid_assignment.values()),"avg uid_assignment", sum(uid_assignment.values())/len(uid_assignment))
+        print("min uid_assignment", min(uid_assignment.values()),"max uid_assignment", max(uid_assignment.values()),"avg uid_assignment", sum(uid_assignment.values())/len(uid_assignment))
         batch_dict = collate_fn(batch_list)
         batch = DataProto.from_single_dict(batch_dict)
         return batch
