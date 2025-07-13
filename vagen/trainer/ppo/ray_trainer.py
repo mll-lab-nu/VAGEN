@@ -18,6 +18,7 @@ This trainer supports model-agonistic model initialization with huggingface
 
 import os
 import uuid
+import math
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
@@ -1162,6 +1163,17 @@ class RayPPOTrainer(object):
                         batch = final_gen_batch_output
                     else:
                         batch = batch.union(final_gen_batch_output)
+
+                    # Ensure batch size is divisible by both world_size and critic mini-batch.
+                    world_size = self.actor_rollout_wg.world_size
+                    ppo_mini_batch_size = self.config.actor_rollout_ref.actor.ppo_mini_batch_size 
+                    lcm_divisor = math.lcm(world_size, ppo_mini_batch_size)
+
+                    remainder = len(batch) % lcm_divisor
+                    if remainder != 0:
+                        keep_num = len(batch) - remainder
+                        rand_idx = torch.randperm(len(batch))[:keep_num]
+                        batch.reorder(rand_idx)
 
                     # balance the number of valid tokens on each dp rank.
                     # Note that this breaks the order of data inside the batch.

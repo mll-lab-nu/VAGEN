@@ -338,7 +338,7 @@ class TurnWiseUpdateRolloutManager():
         """
         
         assert step >= 0
-        start_step = max(0, step - window_size) if window_size is not None else 0
+        start_step = max(0, step - window_size-1) if window_size is not None else 0
         end_step = step
         assert len(recording) >= end_step + 1, 'History length is not enough'
         history = recording[start_step: end_step + 1]
@@ -347,7 +347,8 @@ class TurnWiseUpdateRolloutManager():
         
         env_id = history[0]['env_id']
         chat.append({"role": "system", "content": self.system_prompts[env_id]})
-
+        if is_final and start_step==end_step:
+            raise ValueError("is_final is True but start_step==end_step: step={step}, window_size={window_size}")
         image_data=[]
         for i, record in enumerate(history):
             if i>0:
@@ -451,7 +452,7 @@ class TurnWiseUpdateRolloutManager():
         """
 
 
-
+        print()
         # handle prompt, prompt=pad_token since we now have everything in response and compute a loss mask for them
         prompt_with_chat_template=self.tokenizer.pad_token 
         
@@ -532,11 +533,22 @@ class TurnWiseUpdateRolloutManager():
         row_dict['attention_mask'] = attention_mask
         row_dict['position_ids'] = position_ids
         pad_id = self.tokenizer.pad_token_id   # e.g. 151643
-        valid_prompt=torch.where(
-            torch.logical_not(loss_mask.bool()),                 # condition
-            input_ids,                        # keep original token
-            torch.full_like(input_ids, pad_id)  # else → pad_token_id
+        # Keep original tokens where loss_mask==0 (prompt part), pad elsewhere
+        valid_prompt = torch.where(
+            torch.logical_not(loss_mask.bool()),     # True for prompt tokens
+            input_ids,
+            torch.full_like(input_ids, pad_id)
         )
+        # Debug: decode prompt and response
+        try:
+            prompt_ids = valid_prompt[valid_prompt != pad_id].tolist()
+            response_ids = input_ids[loss_mask.bool()].tolist()
+            prompt_str = self.tokenizer.decode(prompt_ids, skip_special_tokens=False)
+            response_str = self.tokenizer.decode(response_ids, skip_special_tokens=False)
+            # print("[DEBUG update] prompt:", prompt_str)
+            # print("[DEBUG update] response:", response_str)
+        except Exception as _:
+            pass
         row_dict["uid"] = tensor_to_uuid(valid_prompt, pad_token_id=self.tokenizer.pad_token_id)
         return row_dict
 
@@ -657,22 +669,29 @@ class TurnWiseUpdateRolloutManager():
             if not disc_returns:
                 print(f"DEBUG: disc_returns is empty for env {env_id}, recording length: {len(recording)}")
             for idx, G_t in enumerate(disc_returns, start=1):
+                print("DEBUG: turn", idx, "G_t", G_t)
                 row_dict = self._generate_input_for_update(
                     recording=recording,
                     step=idx,
                     window_size=self.config.get("window_size", 0),
                 )
-                row_dict["reward_model"] = {
-                    "style": "given",
-                    "ground_truth": {"reward": G_t},
-                }
+                # row_dict["reward_model"] = {
+                #     "style": "given",
+                #     "ground_truth": {"reward": G_t},
+                # }
+                reward_tensor = torch.zeros_like(row_dict['responses'], dtype=torch.float32)
+                prompt_length = row_dict['prompts'].shape[-1]
                
-                # Generate deterministic UUID based on the content of valid_prompt
+                valid_response_length = row_dict['attention_mask'][prompt_length:].sum()
+                reward_tensor[valid_response_length - 1] = G_t
+                row_dict["rm_scores"] = reward_tensor
+                # Generate deterministic UID based on the content of valid_prompt
+                # Currently uid works for llm but not vlm because we use prompt tokens for uid where images are represented by the same <image> token
                 uid_assignment[row_dict["uid"]] = uid_assignment.get(row_dict["uid"], 0) + 1
                 
 
                 batch_list.append(row_dict)
-        print("min uid_assignment", min(uid_assignment.values()),"max uid_assignment", max(uid_assignment.values()),"avg uid_assignment", sum(uid_assignment.values())/len(uid_assignment))
+        print("DEBUG: min uid_assignment", min(uid_assignment.values()),"max uid_assignment", max(uid_assignment.values()),"avg uid_assignment", sum(uid_assignment.values())/len(uid_assignment))
         batch_dict = collate_fn(batch_list)
         batch = DataProto.from_single_dict(batch_dict)
         return batch
