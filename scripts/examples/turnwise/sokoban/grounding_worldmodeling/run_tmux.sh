@@ -66,7 +66,8 @@ tmux send-keys -t "$TRAIN_SESSION" "python -m vagen.env.create_dataset \\
     --yaml_path \"$SCRIPT_DIR/env_config.yaml\" \\
     --train_path \"data/$EXPERIMENT_NAME/train.parquet\" \\
     --test_path \"data/$EXPERIMENT_NAME/test.parquet\"" C-m
-
+# add a uid to the experiment name  
+WANDB_EXPERIMENT_NAME=${EXPERIMENT_NAME}_$(date +%Y%m%d_%H%M%S)
 # Then start the training
 tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     algorithm.adv_estimator=masked_gae \\
@@ -114,7 +115,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     trainer.critic_warmup=0 \\
     trainer.logger=['console','wandb'] \\
     trainer.project_name='vagen_turnwise' \\
-    trainer.experiment_name=$EXPERIMENT_NAME \\
+    trainer.experiment_name=$WANDB_EXPERIMENT_NAME \\
     trainer.n_gpus_per_node=8 \\
     trainer.nnodes=1 \\
     trainer.save_freq=150 \\
