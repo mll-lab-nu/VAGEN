@@ -137,7 +137,7 @@ def compute_turn_wise_update_bi_level_gae_advantage_return(
         token_level_rewards: torch.Tensor,
         values: torch.Tensor, 
         loss_mask: torch.Tensor,
-        data_proto: DataProto,  # DataProto object containing env_id, turn_id, and reward
+        data_proto,  # DataProto object containing env_id, turn_id, and reward
         gamma: float,
         lam: float,
         high_level_gamma: float,
@@ -160,8 +160,8 @@ def compute_turn_wise_update_bi_level_gae_advantage_return(
             shape: (bs, response_length). 1 for LLM response tokens, 0 for padding.
         data_proto: `(DataProto)`
             DataProto object containing:
-            - env_id: trajectory identifier
-            - turn_id: step within trajectory
+            - env_id: trajectory identifier (can be any hashable type: str, int, tuple, etc.)
+            - turn_id: step within trajectory (must be numeric)
             - reward: turn-level reward (scalar per turn)
         gamma: `(float)`
             Discount factor for token-level rewards.
@@ -185,17 +185,17 @@ def compute_turn_wise_update_bi_level_gae_advantage_return(
         returns = torch.zeros_like(values)
         
         # Extract data from DataProto
-        env_ids = data_proto.non_tensor_batch['env_id']  # shape: (bs,)
-        turn_ids = data_proto.non_tensor_batch['turn_id']  # shape: (bs,)
-        turn_rewards = data_proto.non_tensor_batch['reward']  # shape: (bs,) - turn-level rewards
+        env_ids = data_proto.non_tensor_batch['env_id']  # numpy array with dtype=object
+        turn_ids = data_proto.non_tensor_batch['turn_id']  # numpy array with dtype=object
+        turn_rewards = data_proto.non_tensor_batch['reward']  # numpy array with dtype=object
         
         # Step 1: Identify unique turns (handle duplicates from padding)
         unique_turns = {}
         duplicate_turns = []
         
         for b in range(batch_size):
-            env_id = env_ids[b].item()
-            turn_id = turn_ids[b].item()
+            env_id = env_ids[b]  # Keep as is - can be any hashable type
+            turn_id = int(turn_ids[b])  # Turn ID must be numeric
             turn_key = (env_id, turn_id)
             
             if turn_key not in unique_turns:
@@ -233,7 +233,7 @@ def compute_turn_wise_update_bi_level_gae_advantage_return(
                 # Use the last valid position for turn-level value
                 # Since values[i] is before generating token[i], we use the last position
                 last_valid_pos = valid_positions[-1].item()
-                turn_reward = turn_rewards[batch_idx].item()
+                turn_reward = float(turn_rewards[batch_idx])
                 turn_value = values[batch_idx, last_valid_pos].item()
                 
                 # Get next turn's value (first token of next turn)
@@ -312,8 +312,8 @@ def compute_turn_wise_update_bi_level_gae_advantage_return(
         
         # Step 5: Handle duplicate turns by copying computed values
         for dup_idx in duplicate_turns:
-            env_id = env_ids[dup_idx].item()
-            turn_id = turn_ids[dup_idx].item()
+            env_id = env_ids[dup_idx]  # Keep as is - can be any hashable type
+            turn_id = int(turn_ids[dup_idx])  # Turn ID must be numeric
             orig_idx = unique_turns[(env_id, turn_id)]
             
             advantages[dup_idx] = advantages[orig_idx]
