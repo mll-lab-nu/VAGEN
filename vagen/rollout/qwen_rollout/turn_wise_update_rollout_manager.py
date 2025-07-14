@@ -669,7 +669,9 @@ class TurnWiseUpdateRolloutManager():
             disc_returns.reverse()  # align with step indices 1..T
             if not disc_returns:
                 print(f"DEBUG: disc_returns is empty for env {env_id}, recording length: {len(recording)}")
-            for idx, r_t in enumerate(disc_returns, start=1):
+            for idx, r_t in enumerate(disc_returns):
+                if idx==0:
+                    continue
                 row_dict = self._generate_input_for_update(
                     recording=recording,
                     step=idx,
