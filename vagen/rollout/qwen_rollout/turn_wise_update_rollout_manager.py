@@ -660,30 +660,30 @@ class TurnWiseUpdateRolloutManager():
         for env_id, recording in self.recorder.items():
             # Compute discounted returns once per trajectory (excluding the initial prompt record at idx 0)
             disc_returns: List[float] = []
-            G = reward_rst[env_id]
-            for i in range(len(recording) - 1, 0, -1):  # skip index 0 (no action/reward)
+            recording[-1]['reward'] +=reward_rst[env_id]
+            G = recording[-1]['reward']
+            disc_returns.append(G)
+            for i in range(len(recording) - 2, -1, -1):  # skip index 0 (no action/reward)
                 G = recording[i]["reward"] + gamma * G
                 disc_returns.append(G)
             disc_returns.reverse()  # align with step indices 1..T
             if not disc_returns:
                 print(f"DEBUG: disc_returns is empty for env {env_id}, recording length: {len(recording)}")
-            for idx, G_t in enumerate(disc_returns, start=1):
-                #print("DEBUG: step", idx, "G_t", G_t)
+            for idx, r_t in enumerate(disc_returns, start=1):
                 row_dict = self._generate_input_for_update(
                     recording=recording,
                     step=idx,
                     window_size=self.config.get("window_size", 0),
                 )
-                # row_dict["reward_model"] = {
-                #     "style": "given",
-                #     "ground_truth": {"reward": G_t},
-                # }
                 reward_tensor = torch.zeros_like(row_dict['responses'], dtype=torch.float32)
                 prompt_length = row_dict['prompts'].shape[-1]
                
                 valid_response_length = row_dict['attention_mask'][prompt_length:].sum()
-                reward_tensor[valid_response_length - 1] = G_t
+                reward_tensor[valid_response_length - 1] = r_t
                 row_dict["rm_scores"] = reward_tensor
+                row_dict["turn_id"] = idx
+                row_dict["env_id"] = env_id
+                row_dict["reward"] = r_t
                 # Generate deterministic UID based on the content of valid_prompt
                 # Currently uid works for llm but not vlm because we use prompt tokens for uid where images are represented by the same <image> token
                 uid_assignment[row_dict["uid"]] = uid_assignment.get(row_dict["uid"], 0) + 1
