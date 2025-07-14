@@ -652,7 +652,10 @@ class TurnWiseUpdateRolloutManager():
             batch (DataProto): batch of final trajectory of all environments
         """
         batch_list = []
-        gamma = self.config.get("high_level_gamma", 0.9)
+        if not self.config.get("use_turn_wise_update_bi_level_gae", False):
+            gamma=0.0
+        else:
+            gamma = self.config.get("high_level_gamma", 0.9)
         reward_rst=self.env_client.compute_reward_batch(list(self.envs.keys()))
         # Map each unique valid_prompt to a deterministic UUID so that identical
         # prompts share the same identifier across the whole trajectory.
@@ -681,7 +684,8 @@ class TurnWiseUpdateRolloutManager():
                 prompt_length = row_dict['prompts'].shape[-1]
                
                 valid_response_length = row_dict['attention_mask'][prompt_length:].sum()
-                reward_tensor[valid_response_length - 1] = r_t
+                if not self.config.get("use_turn_wise_update_bi_level_gae", False):
+                    reward_tensor[valid_response_length - 1] = r_t
                 row_dict["rm_scores"] = reward_tensor
                 row_dict["turn_id"] = idx
                 row_dict["env_id"] = env_id

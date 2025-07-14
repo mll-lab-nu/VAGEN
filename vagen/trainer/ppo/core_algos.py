@@ -21,7 +21,7 @@ implement PPO
 import numpy as np
 import torch
 from collections import defaultdict
-
+from verl import DataProto
 import verl.utils.torch_functional as verl_F
 
 
@@ -134,12 +134,14 @@ def compute_gae_advantage_return_with_loss_mask(token_level_rewards: torch.Tenso
     return advantages, returns
 
 def compute_turn_wise_update_bi_level_gae_advantage_return(
+        token_level_rewards: torch.Tensor,
         values: torch.Tensor, 
         loss_mask: torch.Tensor,
-        data_proto,  # DataProto object containing env_id, turn_id, and reward
+        data_proto: DataProto,  # DataProto object containing env_id, turn_id, and reward
         gamma: float,
         lam: float,
-        high_level_gamma: float
+        high_level_gamma: float,
+        token_reward_type: str = "return"  # "return" or "advantage"
     ):
     """Turn-based GAE calculation that computes two levels of advantage and return.
     
@@ -147,8 +149,13 @@ def compute_turn_wise_update_bi_level_gae_advantage_return(
     one turn from a trajectory, with turn-level rewards directly stored in the batch.
     
     Args:
+        token_level_rewards: `(torch.Tensor)`
+            shape: (bs, response_length). Per-token rewards (e.g., KL penalties).
+            If not using KL penalty, this should be all zeros.
         values: `(torch.Tensor)`
             shape: (bs, response_length). Value estimates for each token.
+            IMPORTANT: values[i] is the value estimate BEFORE generating token[i],
+            i.e., it's the output when the model sees token[i-1].
         loss_mask: `(torch.Tensor)`
             shape: (bs, response_length). 1 for LLM response tokens, 0 for padding.
         data_proto: `(DataProto)`
@@ -162,6 +169,9 @@ def compute_turn_wise_update_bi_level_gae_advantage_return(
             Discount factor for turn-level rewards.
         lam: `(float)`
             Lambda value for GAE computation.
+        token_reward_type: `(str)`
+            "return": use turn return as the last token's reward
+            "advantage": use turn advantage as the last token's reward
     
     Returns:
         advantages: `(torch.Tensor)`
@@ -175,9 +185,9 @@ def compute_turn_wise_update_bi_level_gae_advantage_return(
         returns = torch.zeros_like(values)
         
         # Extract data from DataProto
-        env_ids = data_proto.batch['env_id']  # shape: (bs,)
-        turn_ids = data_proto.batch['turn_id']  # shape: (bs,)
-        turn_rewards = data_proto.batch['reward']  # shape: (bs,) - turn-level rewards
+        env_ids = data_proto.non_tensor_batch['env_id']  # shape: (bs,)
+        turn_ids = data_proto.non_tensor_batch['turn_id']  # shape: (bs,)
+        turn_rewards = data_proto.non_tensor_batch['reward']  # shape: (bs,) - turn-level rewards
         
         # Step 1: Identify unique turns (handle duplicates from padding)
         unique_turns = {}
@@ -221,17 +231,19 @@ def compute_turn_wise_update_bi_level_gae_advantage_return(
                     continue
                 
                 # Use the last valid position for turn-level value
+                # Since values[i] is before generating token[i], we use the last position
                 last_valid_pos = valid_positions[-1].item()
                 turn_reward = turn_rewards[batch_idx].item()
                 turn_value = values[batch_idx, last_valid_pos].item()
                 
-                # Get next turn's value
+                # Get next turn's value (first token of next turn)
                 if i < len(turns) - 1:
                     next_turn_id, next_batch_idx = turns[i + 1]
                     next_valid_positions = loss_mask[next_batch_idx].nonzero(as_tuple=True)[0]
                     if len(next_valid_positions) > 0:
-                        next_last_valid_pos = next_valid_positions[-1].item()
-                        next_value = values[next_batch_idx, next_last_valid_pos].item()
+                        # Use the first valid position of next turn
+                        next_first_valid_pos = next_valid_positions[0].item()
+                        next_value = values[next_batch_idx, next_first_valid_pos].item()
                     else:
                         next_value = 0.0
                 else:
@@ -254,10 +266,23 @@ def compute_turn_wise_update_bi_level_gae_advantage_return(
             if len(valid_positions) == 0:
                 continue
             
-            # Set the turn return at the last valid position
+            # Determine what to use as the last token's reward
+            if token_reward_type == "advantage":
+                last_token_reward = turn_advantage
+            elif token_reward_type == "return":
+                last_token_reward = turn_return
+            else:
+                raise ValueError(f"token_reward_type must be 'advantage' or 'return', got {token_reward_type}")
+            
+            # Set the advantage and return at the last valid position
             last_valid_pos = valid_positions[-1].item()
             advantages[batch_idx, last_valid_pos] = turn_advantage
             returns[batch_idx, last_valid_pos] = turn_return
+            
+            # Create updated rewards for token-level computation
+            updated_token_rewards = token_level_rewards[batch_idx].clone()
+            # Add the chosen reward type to the last token
+            updated_token_rewards[last_valid_pos] += last_token_reward
             
             # Backward pass through tokens to compute token-level advantages
             lastgaelam = 0.0
@@ -270,20 +295,16 @@ def compute_turn_wise_update_bi_level_gae_advantage_return(
                     continue
                 
                 # Get next value
+                # Since values[i] is before generating token[i], when computing advantage for token[i],
+                # we use values[i+1] as the next value
                 if i < len(valid_positions) - 1:
                     next_pos = valid_positions[i + 1].item()
                     nextvalue = values[batch_idx, next_pos].item()
                 else:
                     nextvalue = 0.0
                 
-                # Calculate token-level advantage
-                # For non-last tokens, reward is 0, only the last token gets the turn reward
-                if i == len(valid_positions) - 1:
-                    token_reward = turn_return  # Use turn return as reward for last token
-                else:
-                    token_reward = 0.0
-                
-                delta = token_reward + gamma * nextvalue - values[batch_idx, curr_pos].item()
+                # Calculate token-level advantage using the updated rewards (includes KL penalty)
+                delta = updated_token_rewards[curr_pos].item() + gamma * nextvalue - values[batch_idx, curr_pos].item()
                 lastgaelam = delta + gamma * lam * lastgaelam
                 
                 advantages[batch_idx, curr_pos] = lastgaelam

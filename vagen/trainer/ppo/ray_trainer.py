@@ -138,7 +138,7 @@ def apply_kl_penalty(data: DataProto, kl_ctrl: core_algos.AdaptiveKLController, 
     return data, metrics
 
 
-def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_repeat=1,high_level_gamma=1.0):
+def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_repeat=1,high_level_gamma=1.0,**kwargs):
     # prepare response group
     # TODO: add other ways to estimate advantages
     if adv_estimator == AdvantageEstimator.GAE:
@@ -244,19 +244,21 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
     elif adv_estimator == AdvantageEstimator.TURN_WISE_UPDATE_BI_LEVEL_GAE:
+        token_level_rewards=data.batch['token_level_rewards']
         values = data.batch['values']
         responses = data.batch['responses']
         response_length = responses.size(-1)
         attention_mask = data.batch['attention_mask']
         response_mask = attention_mask[:, -response_length:]
         loss_mask = data.batch['loss_mask'][:, -response_length:]
-        advantages, returns = core_algos.compute_turn_wise_update_bi_level_gae_advantage_return(token_level_rewards=data.batch['token_level_rewards'],
+        advantages, returns = core_algos.compute_turn_wise_update_bi_level_gae_advantage_return(token_level_rewards=token_level_rewards,
                                                                                                 values=values,
                                                                                                 loss_mask=loss_mask,
                                                                                                 gamma=gamma,
                                                                                                 data_proto=data,
                                                                                                 lam=lam,
                                                                                                 high_level_gamma=high_level_gamma,
+                                                                                                token_reward_type=kwargs.get("token_reward_type", "return"),
                                                                                                 )
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
@@ -505,7 +507,7 @@ class RayPPOTrainer(object):
             self.kl_ctrl = core_algos.FixedKLController(kl_coef=0.)
 
         if self.config.algorithm.adv_estimator in [AdvantageEstimator.GAE, AdvantageEstimator.BI_LEVEL_GAE,
-                                                   AdvantageEstimator.MASKED_GAE,AdvantageEstimator.TURN_WISE_GAE]:
+                                                   AdvantageEstimator.MASKED_GAE,AdvantageEstimator.TURN_WISE_GAE,AdvantageEstimator.TURN_WISE_UPDATE_BI_LEVEL_GAE]:
             self.use_critic = True
         elif self.config.algorithm.adv_estimator in [
                 AdvantageEstimator.GRPO, AdvantageEstimator.REINFORCE_PLUS_PLUS, AdvantageEstimator.REMAX,
@@ -1082,7 +1084,30 @@ class RayPPOTrainer(object):
         """
         from verl.utils.tracking import Tracking
         from omegaconf import OmegaConf
-
+        if self.config.algorithm.adv_estimator==AdvantageEstimator.TURN_WISE_UPDATE_BI_LEVEL_GAE:
+            assert self.config.rollout_manager.get("use_turn_wise_update_bi_level_gae",False), "use_turn_wise_update_bi_level_gae must be True when adv_estimator is turn_wise_update_bi_level_gae"
+            assert self.config.rollout_manager.get("use_turn_wise_update",False), "use_turn_wise_update must be True when adv_estimator is turn_wise_update_bi_level_gae"
+            assert self.config.rollout_manager.get("use_loss_mask",False), "use_loss_mask must be True when adv_estimator is turn_wise_update_bi_level_gae"
+            assert self.config.rollout_manager.get("use_gae_mask",False), "use_gae_mask must be True when adv_estimator is turn_wise_update_bi_level_gae"
+            assert not self.config.rollout_manager.get("use_multi_turn_reward",False), "use_multi_turn_reward must be False when adv_estimator is masked_gae"
+        elif self.config.algorithm.adv_estimator==AdvantageEstimator.MASKED_GAE:
+            assert self.config.rollout_manager.get("use_loss_mask",False), "use_loss_mask must be True when adv_estimator is masked_gae"
+            assert self.config.rollout_manager.get("use_gae_mask",False), "use_gae_mask must be True when adv_estimator is masked_gae"
+            assert not self.config.rollout_manager.get("use_multi_turn_reward",False), "use_multi_turn_reward must be False when adv_estimator is masked_gae"
+        elif self.config.algorithm.adv_estimator==AdvantageEstimator.BI_LEVEL_GAE:
+            assert self.config.rollout_manager.get("use_loss_mask",False), "use_loss_mask must be True when adv_estimator is bi_level_gae"
+            assert self.config.rollout_manager.get("use_gae_mask",False), "use_gae_mask must be True when adv_estimator is bi_level_gae"
+            assert self.config.rollout_manager.get("use_multi_turn_reward",False), "use_multi_turn_reward must be True when adv_estimator is bi_level_gae"
+        
+        if self.config.rollout_manager.get("use_turn_wise_update",False):
+            assert self.config.algorithm.adv_estimator in [AdvantageEstimator.TURN_WISE_UPDATE_BI_LEVEL_GAE,AdvantageEstimator.MASKED_GAE],f"adv_estimator must be turn_wise_update_bi_level_gae or masked_gae when use_turn_wise_update is True"
+            assert self.config.rollout_manager.get("use_loss_mask",False), "use_loss_mask must be True when use_turn_wise_update is True"
+            assert self.config.rollout_manager.get("use_gae_mask",False), "use_gae_mask must be True when use_turn_wise_update is True"
+            
+       
+            
+       
+            
         logger = Tracking(project_name=self.config.trainer.project_name,
                           experiment_name=self.config.trainer.experiment_name,
                           default_backend=self.config.trainer.logger,
@@ -1112,7 +1137,7 @@ class RayPPOTrainer(object):
 
         # we start from step 1
         self.global_steps += 1
-
+        
         if self.config.rollout_manager.get("use_service",False):
                 
             if self.config.rollout_manager.get("use_turn_wise_update",False):
@@ -1254,7 +1279,8 @@ class RayPPOTrainer(object):
                                                   gamma=self.config.algorithm.gamma,
                                                   lam=self.config.algorithm.lam,
                                                   num_repeat=self.config.actor_rollout_ref.rollout.n,
-                                                  high_level_gamma=self.config.algorithm.high_level_gamma,)
+                                                  high_level_gamma=self.config.algorithm.high_level_gamma,
+                                                  token_reward_type=self.config.algorithm.token_reward_type)
 
                     # update critic
                     if self.use_critic:
