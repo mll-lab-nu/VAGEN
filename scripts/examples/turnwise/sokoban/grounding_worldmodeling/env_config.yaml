@@ -4,5 +4,6 @@ env1:
         render_mode: vision
         prompt_format: grounding_worldmodeling
         use_state_reward: False
+        turn_wise_update: True
     train_size: 10000  
     test_size: 128

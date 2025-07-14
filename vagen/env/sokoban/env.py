@@ -159,9 +159,10 @@ class SokobanEnv(BaseEnv):
             img_str = "\n".join("".join(lookup(cell) for cell in row) for row in room_state)
         
         if init_obs:
-            obs_str = init_observation_template(img_str=img_str) + "\n" + format_prompt
+            obs_str = init_observation_template(img_str=img_str,turn_wise_update=self.config.get("turn_wise_update", False),) + "\n" + format_prompt
         else:
             obs_str = action_template(
+                turn_wise_update=self.config.get("turn_wise_update", False),
                 valid_action=self.valid_actions,
                 img_str=img_str,
             ) + "\n" + format_prompt

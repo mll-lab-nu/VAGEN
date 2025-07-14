@@ -11,6 +11,10 @@ Actions you can take: Left, Down, Right, Up."""
 
 def init_observation_template(**kwargs):
     observation = kwargs.get("img_str", "The player is near a box")
+    if kwargs.get("turn_wise_update", False):
+        return f"""Current observation is:
+{observation}
+Decide your next action(s)."""
     return f"""[Initial Observation]:
 {observation}
 Decide your next action(s)."""
@@ -18,6 +22,10 @@ Decide your next action(s)."""
 def action_template(**kwargs):
     valid_action = kwargs.get("valid_action", "Down")
     observation = kwargs.get("img_str", "The player pushed the box closer to the target")
+    if kwargs.get("turn_wise_update", False):
+        return f"""Current observation is:
+{observation}
+Decide your next action(s)."""
     return f"""After your answer, the extracted valid action is {valid_action}.
 After that, the observation is:
 {observation}

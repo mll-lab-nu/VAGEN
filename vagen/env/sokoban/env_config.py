@@ -10,7 +10,8 @@ class SokobanEnvConfig(BaseEnvConfig):
     render_mode: str = "vision" # "vision" or "text"
     min_actions_to_succeed: int = 5
     max_actions_per_step: int = 3
-    prompt_format: str = "grounding_worldmodeling" 
+    prompt_format: str = "grounding_worldmodeling"
+    turn_wise_update: bool = False
     # "free_think", "no_think", "grounding", "worldmodeling", "grounding_worldmodeling"
     # "grounding_symbolic", "worldmodeling_symbolic", "grounding_worldmodeling_symbolic"
     # "grounding_structured", "worldmodeling_structured", "grounding_worldmodeling_structured"
