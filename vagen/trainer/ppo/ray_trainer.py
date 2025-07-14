@@ -73,6 +73,7 @@ class AdvantageEstimator(str, Enum):
     REMAX = 'remax'
     RLOO = 'rloo'
     MULTI_TURN_GRPO = 'multi_turn_grpo'
+    TURN_WISE_UPDATE_BI_LEVEL_GAE = 'turn_wise_update_bi_level_gae'
 
 
 @dataclass
@@ -240,6 +241,23 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
             advantages, returns = core_algos.compute_grpo_outcome_advantage(token_level_rewards=token_level_rewards,
                                                                             eos_mask=response_mask,
                                                                             index=index)
+        data.batch['advantages'] = advantages
+        data.batch['returns'] = returns
+    elif adv_estimator == AdvantageEstimator.TURN_WISE_UPDATE_BI_LEVEL_GAE:
+        values = data.batch['values']
+        responses = data.batch['responses']
+        response_length = responses.size(-1)
+        attention_mask = data.batch['attention_mask']
+        response_mask = attention_mask[:, -response_length:]
+        loss_mask = data.batch['loss_mask'][:, -response_length:]
+        advantages, returns = core_algos.compute_turn_wise_update_bi_level_gae_advantage_return(token_level_rewards=data.batch['token_level_rewards'],
+                                                                                                values=values,
+                                                                                                loss_mask=loss_mask,
+                                                                                                gamma=gamma,
+                                                                                                data_proto=data,
+                                                                                                lam=lam,
+                                                                                                high_level_gamma=high_level_gamma,
+                                                                                                )
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
     # elif adv_estimator == AdvantageEstimator.REINFORCE_PLUS_PLUS:
@@ -1169,11 +1187,12 @@ class RayPPOTrainer(object):
                     ppo_mini_batch_size = self.config.actor_rollout_ref.actor.ppo_mini_batch_size 
                     lcm_divisor = math.lcm(world_size, ppo_mini_batch_size)
 
-                    remainder = len(batch) % lcm_divisor
-                    if remainder != 0:
-                        keep_num = len(batch) - remainder
-                        rand_idx = torch.randperm(len(batch))[:keep_num]
-                        batch.reorder(rand_idx)
+                    # remainder = len(batch) % lcm_divisor
+                    # if remainder != 0:
+                    #     keep_num = len(batch) - remainder
+                    #     rand_idx = torch.randperm(len(batch))[:keep_num]
+                    #     batch.reorder(rand_idx)
+                    batch,pad_size=pad_dataproto_to_divisor(batch,lcm_divisor)
 
                     # balance the number of valid tokens on each dp rank.
                     # Note that this breaks the order of data inside the batch.
