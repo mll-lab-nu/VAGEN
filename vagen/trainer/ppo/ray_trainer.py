@@ -67,12 +67,12 @@ class AdvantageEstimator(str, Enum):
     GAE = 'gae'
     MASKED_GAE = 'masked_gae'
     BI_LEVEL_GAE = 'bi_level_gae'
-    TURN_WISE_GAE = 'turn_wise_gae'
+    HIGH_LEVEL_GAE = 'high_level_gae'
     GRPO = 'grpo'
-    REINFORCE_PLUS_PLUS = 'reinforce_plus_plus'
-    REMAX = 'remax'
-    RLOO = 'rloo'
     MULTI_TURN_GRPO = 'multi_turn_grpo'
+    TURN_WISE_UPDATE_GAE = 'turn_wise_update_gae'
+    TURN_WISE_UPDATE_GIGPO = 'turn_wise_update_gigpo'
+    TURN_WISE_UPDATE_HIGH_LEVEL_GAE = 'turn_wise_update_high_level_gae'
     TURN_WISE_UPDATE_BI_LEVEL_GAE = 'turn_wise_update_bi_level_gae'
 
 
@@ -160,7 +160,6 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         responses = data.batch['responses']
         response_length = responses.size(-1)
         attention_mask = data.batch['attention_mask']
-        response_mask = attention_mask[:, -response_length:]
         token_level_rewards = data.batch['token_level_rewards']
         gae_mask = data.batch['gae_mask'][:, -response_length:]
         advantages, returns =core_algos.compute_gae_advantage_return_with_loss_mask(token_level_rewards=token_level_rewards,
@@ -176,9 +175,6 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         response_length = responses.size(-1)
         attention_mask = data.batch['attention_mask']
         response_mask = attention_mask[:, -response_length:]
-        #assert "multi_turn_token_level_rewards" in data.batch.keys()
-        # assert "loss_mask" in data.batch.keys()
-        # loss_mask = data.batch['loss_mask'][:, -response_length:]
         if "loss_mask" in data.batch.keys():
             loss_mask = data.batch['loss_mask'][:, -response_length:]
         else:
@@ -193,20 +189,20 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
-    elif adv_estimator == AdvantageEstimator.TURN_WISE_GAE:
+    elif adv_estimator == AdvantageEstimator.HIGH_LEVEL_GAE:
         values = data.batch['values']
         responses = data.batch['responses']
         response_length = responses.size(-1)
         attention_mask = data.batch['attention_mask']
         response_mask = attention_mask[:, -response_length:]
-        #assert "multi_turn_token_level_rewards" in data.batch.keys()
-        # assert "loss_mask" in data.batch.keys()
-        # loss_mask = data.batch['loss_mask'][:, -response_length:]
+        
+        assert "loss_mask" in data.batch.keys()
+        
         if "loss_mask" in data.batch.keys():
             loss_mask = data.batch['loss_mask'][:, -response_length:]
         else:
             loss_mask=data.batch['attention_mask'][:, -response_length:]
-        advantages, returns = core_algos.compute_turn_wise_gae_advantage_return(token_level_rewards=data.batch['token_level_rewards'],
+        advantages, returns = core_algos.compute_high_level_gae_advantage_return(token_level_rewards=data.batch['token_level_rewards'],
                                                                         values=values,
                                                                         loss_mask=loss_mask,
                                                                         reward_mask=data.batch['end_of_response_position_mask'][:, -response_length:],
@@ -228,12 +224,6 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         
         if "loss_mask" in data.batch.keys():
             loss_mask = data.batch['loss_mask'][:, -response_length:]
-            
-            # valid_token_level_rewards_positions = token_level_rewards[0].nonzero(as_tuple=True)[0]
-            # valid_loss_positions = loss_mask[0].nonzero(as_tuple=True)[0]
-            # print(f"[DEBUG]valid_token_level_rewards_positions={valid_token_level_rewards_positions}")
-            # print(f"[DEBUG]valid_loss_positions={valid_loss_positions}")
-            # seems here only need to replace eos_mask with loss_mask
             advantages, returns = core_algos.compute_grpo_outcome_advantage(token_level_rewards=token_level_rewards,
                                                                         eos_mask=loss_mask,
                                                                         index=index)
@@ -243,64 +233,95 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
                                                                             index=index)
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
+    elif adv_estimator == AdvantageEstimator.TURN_WISE_UPDATE_GAE:
+        token_level_rewards=data.batch['token_level_rewards']
+        values = data.batch['values']
+        responses = data.batch['responses']
+        response_length = responses.size(-1)
+        loss_mask = data.batch['loss_mask'][:, -response_length:]
+        env_ids = data.non_tensor_batch['env_id']  # numpy array with dtype=object
+        turn_ids = data.non_tensor_batch['turn_id']  # numpy array with dtype=object
+        turn_rewards = data.non_tensor_batch['reward']  # numpy array with dtype=object
+        advantages, returns = core_algos.compute_turn_wise_update_gae_advantage_return(token_level_rewards=token_level_rewards,
+                                                                                                values=values,
+                                                                                                loss_mask=loss_mask,
+                                                                                                gamma=gamma,
+                                                                                                lam=lam,
+                                                                                                env_ids=env_ids,
+                                                                                                turn_ids=turn_ids,
+                                                                                                turn_rewards=turn_rewards,
+                                                                                                )
+        data.batch['advantages'] = advantages
+        data.batch['returns'] = returns
+    elif adv_estimator == AdvantageEstimator.TURN_WISE_UPDATE_HIGH_LEVEL_GAE:
+        token_level_rewards=data.batch['token_level_rewards']
+        values = data.batch['values']
+        responses = data.batch['responses']
+        response_length = responses.size(-1)
+        loss_mask = data.batch['loss_mask'][:, -response_length:]
+        env_ids = data.non_tensor_batch['env_id']  # numpy array with dtype=object
+        turn_ids = data.non_tensor_batch['turn_id']  # numpy array with dtype=object
+        turn_rewards = data.non_tensor_batch['reward']  # numpy array with dtype=object
+        reward_mask=data.batch['end_of_response_position_mask'][:, -response_length:]
+        
+        # Assertion 1: Each row in reward_mask should have exactly one 1, others are 0, so sum equals batch_size
+        assert reward_mask.sum() == reward_mask.size(0), f"reward_mask should have exactly one 1 per row, but sum={reward_mask.sum()}, batch_size={reward_mask.size(0)}"
+        
+        # Assertion 2: The position of the last 1 in loss_mask should match the position of 1 in reward_mask
+        loss_mask_last_one_pos = (loss_mask == 1).float().argmax(dim=-1)  # Position of last 1 in each row
+        reward_mask_one_pos = (reward_mask == 1).float().argmax(dim=-1)   # Position of 1 in reward_mask
+        assert torch.all(loss_mask_last_one_pos == reward_mask_one_pos), f"Position of last 1 in loss_mask does not match position of 1 in reward_mask"
+        
+        
+        advantages, returns = core_algos.compute_turn_wise_update_high_level_gae_advantage_return(token_level_rewards=token_level_rewards,
+                                                                                                values=values,
+                                                                                                loss_mask=loss_mask,
+                                                                                                reward_mask=reward_mask,
+                                                                                                high_level_gamma=high_level_gamma,
+                                                                                                lam=lam,
+                                                                                                env_ids=env_ids,
+                                                                                                turn_ids=turn_ids,
+                                                                                                turn_rewards=turn_rewards,
+                                                                                                )
+        data.batch['advantages'] = advantages
+        data.batch['returns'] = returns
     elif adv_estimator == AdvantageEstimator.TURN_WISE_UPDATE_BI_LEVEL_GAE:
         token_level_rewards=data.batch['token_level_rewards']
         values = data.batch['values']
         responses = data.batch['responses']
         response_length = responses.size(-1)
-        attention_mask = data.batch['attention_mask']
-        response_mask = attention_mask[:, -response_length:]
         loss_mask = data.batch['loss_mask'][:, -response_length:]
+        env_ids = data.non_tensor_batch['env_id']  # numpy array with dtype=object
+        turn_ids = data.non_tensor_batch['turn_id']  # numpy array with dtype=object
+        turn_rewards = data.non_tensor_batch['reward']  # numpy array with dtype=object
         advantages, returns = core_algos.compute_turn_wise_update_bi_level_gae_advantage_return(token_level_rewards=token_level_rewards,
                                                                                                 values=values,
                                                                                                 loss_mask=loss_mask,
-                                                                                                gamma=gamma,
-                                                                                                data_proto=data,
-                                                                                                lam=lam,
                                                                                                 high_level_gamma=high_level_gamma,
-                                                                                                token_reward_type=kwargs.get("token_reward_type", "return"),
+                                                                                                gamma=gamma,
+                                                                                                lam=lam,
+                                                                                                env_ids=env_ids,
+                                                                                                turn_ids=turn_ids,
+                                                                                                turn_rewards=turn_rewards,
+                                                                                                token_reward_type=kwargs.get("token_reward_type", "advantage"),
+                                                                                                )
+        data.batch['advantages'] = advantages
+        data.batch['advantages'] = advantages
+        data.batch['returns'] = returns
+    elif adv_estimator == AdvantageEstimator.TURN_WISE_UPDATE_GIGPO:
+        token_level_rewards=data.batch['token_level_rewards']
+        values = data.batch['values']
+        responses = data.batch['responses']
+        response_length = responses.size(-1)
+        loss_mask = data.batch['loss_mask'][:, -response_length:]
+        uids = data.non_tensor_batch['uid']
+        advantages, returns = core_algos.compute_turn_wise_update_gigpo_advantage_return(token_level_rewards=token_level_rewards,
+                                                                                                values=values,
+                                                                                                loss_mask=loss_mask,
+                                                                                                uids=uids,
                                                                                                 )
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
-    # elif adv_estimator == AdvantageEstimator.REINFORCE_PLUS_PLUS:
-    #     token_level_rewards = data.batch['token_level_rewards']
-    #     responses = data.batch['responses']
-    #     response_length = responses.size(-1)
-    #     attention_mask = data.batch['attention_mask']
-    #     response_mask = attention_mask[:, -response_length:]
-    #     advantages, returns = core_algos.compute_reinforce_plus_plus_outcome_advantage(
-    #         token_level_rewards=token_level_rewards, eos_mask=response_mask, gamma=gamma)
-    #     data.batch['advantages'] = advantages
-    #     data.batch['returns'] = returns
-    # elif adv_estimator == AdvantageEstimator.REMAX:
-    #     token_level_rewards = data.batch['token_level_rewards']
-    #     index = data.non_tensor_batch['uid']
-    #     responses = data.batch['responses']
-    #     response_length = responses.size(-1)
-    #     attention_mask = data.batch['attention_mask']
-    #     response_mask = attention_mask[:, -response_length:]
-
-    #     reward_baselines = data.batch['reward_baselines']
-
-    #     advantages, returns = core_algos.compute_remax_outcome_advantage(token_level_rewards=token_level_rewards,
-    #                                                                      reward_baselines=reward_baselines,
-    #                                                                      eos_mask=response_mask)
-
-    #     data.batch['advantages'] = advantages
-    #     data.batch['returns'] = returns
-    # elif adv_estimator == AdvantageEstimator.RLOO:
-    #     token_level_rewards = data.batch['token_level_rewards']
-    #     index = data.non_tensor_batch['uid']
-    #     responses = data.batch['responses']
-    #     response_length = responses.size(-1)
-    #     attention_mask = data.batch['attention_mask']
-    #     response_mask = attention_mask[:, -response_length:]
-    #     advantages, returns = core_algos.compute_rloo_outcome_advantage(token_level_rewards=token_level_rewards,
-    #                                                                     eos_mask=response_mask,
-    #                                                                     index=index)
-    #     data.batch['advantages'] = advantages
-    #     data.batch['returns'] = returns
-    
     else:
         raise NotImplementedError
     return data
@@ -507,11 +528,12 @@ class RayPPOTrainer(object):
             self.kl_ctrl = core_algos.FixedKLController(kl_coef=0.)
 
         if self.config.algorithm.adv_estimator in [AdvantageEstimator.GAE, AdvantageEstimator.BI_LEVEL_GAE,
-                                                   AdvantageEstimator.MASKED_GAE,AdvantageEstimator.TURN_WISE_GAE,AdvantageEstimator.TURN_WISE_UPDATE_BI_LEVEL_GAE]:
+                                                   AdvantageEstimator.MASKED_GAE,AdvantageEstimator.HIGH_LEVEL_GAE,AdvantageEstimator.TURN_WISE_UPDATE_GAE,
+                                                   AdvantageEstimator.TURN_WISE_UPDATE_BI_LEVEL_GAE,AdvantageEstimator.TURN_WISE_UPDATE_BI_LEVEL_GAE]:
             self.use_critic = True
         elif self.config.algorithm.adv_estimator in [
                 AdvantageEstimator.GRPO, AdvantageEstimator.REINFORCE_PLUS_PLUS, AdvantageEstimator.REMAX,
-                AdvantageEstimator.RLOO, AdvantageEstimator.MULTI_TURN_GRPO
+                AdvantageEstimator.RLOO, AdvantageEstimator.MULTI_TURN_GRPO, AdvantageEstimator.TURN_WISE_UPDATE_GRPO,
         ]:
             self.use_critic = False
         else:
@@ -587,9 +609,9 @@ class RayPPOTrainer(object):
             if config.critic.ppo_micro_batch_size is not None:
                 assert config.critic.ppo_mini_batch_size % config.critic.ppo_micro_batch_size == 0
                 assert config.critic.ppo_micro_batch_size * sp_size >= n_gpus
-            if config.algorithm.adv_estimator == AdvantageEstimator.TURN_WISE_GAE:
+            if config.algorithm.adv_estimator in [AdvantageEstimator.HIGH_LEVEL_GAE, AdvantageEstimator.TURN_WISE_UPDATE_HIGH_LEVEL_GAE]:
                 assert config.critic.get('use_reward_mask', False), \
-                    "TURN_WISE_GAE needs reward mask"
+                    "HIGH_LEVEL_GAE needs reward mask"
 
         # Check if use_remove_padding is enabled when using sequence parallelism for fsdp
         if config.actor_rollout_ref.actor.strategy == 'fsdp':
@@ -1084,26 +1106,7 @@ class RayPPOTrainer(object):
         """
         from verl.utils.tracking import Tracking
         from omegaconf import OmegaConf
-        if self.config.algorithm.adv_estimator==AdvantageEstimator.TURN_WISE_UPDATE_BI_LEVEL_GAE:
-            assert self.config.rollout_manager.get("use_turn_wise_update_bi_level_gae",False), "use_turn_wise_update_bi_level_gae must be True when adv_estimator is turn_wise_update_bi_level_gae"
-            assert self.config.rollout_manager.get("use_turn_wise_update",False), "use_turn_wise_update must be True when adv_estimator is turn_wise_update_bi_level_gae"
-            assert self.config.rollout_manager.get("use_loss_mask",False), "use_loss_mask must be True when adv_estimator is turn_wise_update_bi_level_gae"
-            assert self.config.rollout_manager.get("use_gae_mask",False), "use_gae_mask must be True when adv_estimator is turn_wise_update_bi_level_gae"
-            assert not self.config.rollout_manager.get("use_multi_turn_reward",False), "use_multi_turn_reward must be False when adv_estimator is masked_gae"
-        elif self.config.algorithm.adv_estimator==AdvantageEstimator.MASKED_GAE:
-            assert self.config.rollout_manager.get("use_loss_mask",False), "use_loss_mask must be True when adv_estimator is masked_gae"
-            assert self.config.rollout_manager.get("use_gae_mask",False), "use_gae_mask must be True when adv_estimator is masked_gae"
-            assert not self.config.rollout_manager.get("use_multi_turn_reward",False), "use_multi_turn_reward must be False when adv_estimator is masked_gae"
-        elif self.config.algorithm.adv_estimator==AdvantageEstimator.BI_LEVEL_GAE:
-            assert self.config.rollout_manager.get("use_loss_mask",False), "use_loss_mask must be True when adv_estimator is bi_level_gae"
-            assert self.config.rollout_manager.get("use_gae_mask",False), "use_gae_mask must be True when adv_estimator is bi_level_gae"
-            assert self.config.rollout_manager.get("use_multi_turn_reward",False), "use_multi_turn_reward must be True when adv_estimator is bi_level_gae"
         
-        if self.config.rollout_manager.get("use_turn_wise_update",False):
-            assert self.config.algorithm.adv_estimator in [AdvantageEstimator.TURN_WISE_UPDATE_BI_LEVEL_GAE,AdvantageEstimator.MASKED_GAE],f"adv_estimator must be turn_wise_update_bi_level_gae or masked_gae when use_turn_wise_update is True"
-            assert self.config.rollout_manager.get("use_loss_mask",False), "use_loss_mask must be True when use_turn_wise_update is True"
-            assert self.config.rollout_manager.get("use_gae_mask",False), "use_gae_mask must be True when use_turn_wise_update is True"
-            
        
             
        

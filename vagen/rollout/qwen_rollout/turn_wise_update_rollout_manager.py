@@ -500,6 +500,9 @@ class TurnWiseUpdateRolloutManager():
         
         loss_mask = torch.cat([loss_mask_prompt, loss_mask_response], dim=-1)
         end_of_response_position_mask = torch.cat([end_of_response_position_mask_prompt, end_of_response_position_mask_response], dim=-1)
+        #assert end_of_response_position_mask.sum() == 1, f"In single turn update, there should be one and only one end of response position, got {end_of_response_position_mask.sum()}"
+        if end_of_response_position_mask.sum() != 1:
+            print(f"[DEBUG] end_of_response_position_mask.sum(): {end_of_response_position_mask.sum()}, there should be one and only one end of response position, got {end_of_response_position_mask.sum()}")
         input_ids = torch.cat([input_ids_prompt, input_ids_response], dim=-1)
         attention_mask = torch.cat([attention_mask_prompt, attention_mask_response], dim=-1)
 
@@ -533,22 +536,30 @@ class TurnWiseUpdateRolloutManager():
         row_dict['attention_mask'] = attention_mask
         row_dict['position_ids'] = position_ids
         pad_id = self.tokenizer.pad_token_id   # e.g. 151643
-        valid_prompt=torch.where(
-            torch.logical_not(loss_mask.bool()),                 # condition
-            input_ids,                        # keep original token
-            torch.full_like(input_ids, pad_id)  # else → pad_token_id
-        )
-        # Debug: decode prompt and response
-        # try:
-        #     prompt_ids = valid_prompt[valid_prompt != pad_id].tolist()
-        #     response_ids = input_ids[loss_mask.bool()].tolist()
-        #     prompt_str = self.tokenizer.decode(prompt_ids, skip_special_tokens=False)
-        #     response_str = self.tokenizer.decode(response_ids, skip_special_tokens=False)
-        #     print("[DEBUG update] prompt:", prompt_str)
-        #     print("[DEBUG update] response:", response_str)
-        # except Exception as _:
-        #     pass
-        row_dict["uid"] = tensor_to_uuid(valid_prompt, pad_token_id=self.tokenizer.pad_token_id)
+        
+        # we use the last observation as uid for group based optimization
+        if "uid" in recording[step-1]["info"].keys():
+            row_dict["uid"] = recording[step-1]["info"]["uid"]
+            
+        else:
+            
+            valid_prompt=torch.where(
+                torch.logical_not(loss_mask.bool()),                 # condition
+                input_ids,                        # keep original token
+                torch.full_like(input_ids, pad_id)  # else → pad_token_id
+            )
+            # Debug: decode prompt and response
+            # try:
+            #     prompt_ids = valid_prompt[valid_prompt != pad_id].tolist()
+            #     response_ids = input_ids[loss_mask.bool()].tolist()
+            #     prompt_str = self.tokenizer.decode(prompt_ids, skip_special_tokens=False)
+            #     response_str = self.tokenizer.decode(response_ids, skip_special_tokens=False)
+            #     print("[DEBUG update] prompt:", prompt_str)
+            #     print("[DEBUG update] response:", response_str)
+            # except Exception as _:
+            #     pass
+            row_dict["uid"] = tensor_to_uuid(valid_prompt, pad_token_id=self.tokenizer.pad_token_id)
+            print(f"[DEBUG] No uid found for env, you can only use grpo for text-only prompt in this case!!!")
         return row_dict
 
     @torch.no_grad()
@@ -652,27 +663,10 @@ class TurnWiseUpdateRolloutManager():
             batch (DataProto): batch of final trajectory of all environments
         """
         batch_list = []
-        if not self.config.get("use_turn_wise_update_bi_level_gae", False):
-            gamma=0.0
-        else:
-            gamma = self.config.get("high_level_gamma", 0.9)
         reward_rst=self.env_client.compute_reward_batch(list(self.envs.keys()))
-        # Map each unique valid_prompt to a deterministic UUID so that identical
-        # prompts share the same identifier across the whole trajectory.
         uid_assignment={} #counter
         for env_id, recording in self.recorder.items():
-            # Compute discounted returns once per trajectory (excluding the initial prompt record at idx 0)
-            disc_returns: List[float] = []
-            recording[-1]['reward'] +=reward_rst[env_id]
-            G = recording[-1]['reward']
-            disc_returns.append(G)
-            for i in range(len(recording) - 2, -1, -1):  # skip index 0 (no action/reward)
-                G = recording[i]["reward"] + gamma * G
-                disc_returns.append(G)
-            disc_returns.reverse()  # align with step indices 1..T
-            if not disc_returns:
-                print(f"DEBUG: disc_returns is empty for env {env_id}, recording length: {len(recording)}")
-            for idx, r_t in enumerate(disc_returns):
+            for idx in range(len(recording)):
                 if idx==0:
                     continue
                 row_dict = self._generate_input_for_update(
@@ -684,12 +678,12 @@ class TurnWiseUpdateRolloutManager():
                 prompt_length = row_dict['prompts'].shape[-1]
                
                 valid_response_length = row_dict['attention_mask'][prompt_length:].sum()
-                if not self.config.get("use_turn_wise_update_bi_level_gae", False):
-                    reward_tensor[valid_response_length - 1] = r_t
                 row_dict["rm_scores"] = reward_tensor
                 row_dict["turn_id"] = idx
                 row_dict["env_id"] = env_id
-                row_dict["reward"] = r_t
+                row_dict["reward"] = recording[idx]['reward']
+                if idx==len(recording)-1:
+                    row_dict["reward"] += reward_rst[env_id]
                 # Generate deterministic UID based on the content of valid_prompt
                 # Currently uid works for llm but not vlm because we use prompt tokens for uid where images are represented by the same <image> token
                 uid_assignment[row_dict["uid"]] = uid_assignment.get(row_dict["uid"], 0) + 1
