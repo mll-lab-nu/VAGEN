@@ -481,7 +481,8 @@ class TurnUpdateRolloutManager():
             # except Exception as _:
             #     pass
             row_dict["uid"] = tensor_to_uuid(valid_prompt, pad_token_id=self.tokenizer.pad_token_id)
-            print(f"[DEBUG] No uid found for env, you can only use grpo for text-only prompt in this case!!!")
+            if self.config.algorithm == "gigrpo":
+                print(f"[DEBUG] No uid found for env, you can only use gigrpo for text-only env in this case!!!")
         return row_dict
 
     @torch.no_grad()
