@@ -134,24 +134,17 @@ def compute_gae_advantage_return_with_loss_mask(token_level_rewards: torch.Tenso
         
     return advantages, returns
 
-def get_sos_positions(loss_mask, batch_idx):
-    mask = loss_mask[batch_idx]
-    if mask.dtype == torch.bool:
-        mask = mask.int()
-    padded_mask = torch.cat([torch.zeros(1, dtype=mask.dtype, device=mask.device), mask])
-    diff = padded_mask[1:] - padded_mask[:-1]
-    sos_positions = (diff == 1).nonzero(as_tuple=True)[0]
-    
-    return sos_positions
+
 
 def compute_bi_level_gae_advantage_return(
         token_level_rewards: torch.Tensor,
         values: torch.Tensor, 
-        reward_mask: torch.Tensor,
+        eos_mask: torch.Tensor,
+        sos_mask: torch.Tensor,
         loss_mask: torch.Tensor,
-        gamma: float,
         lam: float,
-        high_level_gamma: float
+        high_level_gamma: float,
+        gamma: float,
     ):
     """Modified GAE calculation that compute two level of advantage and return:
     high level: per-turn wise
@@ -160,8 +153,10 @@ def compute_bi_level_gae_advantage_return(
     Args:
         token_level_rewards: `(torch.Tensor)` (multi-turn reward, per turn reward is given at eos token for each response token sequence)
             shape: (bs, response_length)
-        reward_mask: `(torch.Tensor)`
-            shape: (bs, response_length). 1 for reward position (end of each llm response)
+        eos_mask: `(torch.Tensor)`
+            shape: (bs, response_length). 1 for eos token, 0 for other tokens
+        sos_mask: `(torch.Tensor)`
+            shape: (bs, response_length). 1 for sos token, 0 for other tokens
         values: `(torch.Tensor)`
             shape: (bs, response_length)
         loss_mask: `(torch.Tensor)`
@@ -186,20 +181,15 @@ def compute_bi_level_gae_advantage_return(
         returns_token = torch.zeros_like(token_level_rewards)
         updated_reward = token_level_rewards.clone()
         
-        prev = torch.cat(
-            [torch.zeros_like(loss_mask[:, :1]),   
-            loss_mask[:, :-1]],                   
-            dim=1
-        ) # padd 0 to left
-
-        start_mask = (loss_mask == 1) & (prev == 0)    
-        if start_mask.sum() != reward_mask.sum():
-            print(f"[DEBUG] start_mask.sum(): {start_mask.sum()}, reward_mask.sum(): {reward_mask.sum()} should be equal")
-        
         for b in range(batch_size):
-            sos_positions = start_mask.nonzero(as_tuple=True)[0]
-            eos_positions=reward_mask[b].nonzero(as_tuple=True)[0]
-            
+            sos_positions = sos_mask[b].nonzero(as_tuple=True)[0]
+            eos_positions = eos_mask[b].nonzero(as_tuple=True)[0]
+
+            # Debug: Check if sos_positions and eos_positions have the same length
+            if len(sos_positions) != len(eos_positions):
+                print(f"[DEBUG] Batch {b}: sos_positions length ({len(sos_positions)}) != eos_positions length ({len(eos_positions)})")
+                print(f"[DEBUG] sos_positions: {sos_positions}")
+                print(f"[DEBUG] eos_positions: {eos_positions}")
             # We use sos positions to calculate turn-level advantage
             # We assign the turn-level advantage to the last valid token of each turn
             
@@ -255,8 +245,8 @@ def compute_bi_level_gae_advantage_return(
 def compute_high_level_gae_advantage_return(
         token_level_rewards: torch.Tensor,
         values: torch.Tensor,
-        reward_mask: torch.Tensor,
-        loss_mask: torch.Tensor,
+        eos_mask: torch.Tensor,
+        sos_mask: torch.Tensor,
         lam: float,
         high_level_gamma: float
     ):
@@ -295,14 +285,6 @@ def compute_high_level_gae_advantage_return(
         returns = torch.zeros_like(token_level_rewards)
         updated_reward = token_level_rewards.clone()
         
-        prev = torch.cat(
-            [torch.zeros_like(loss_mask[:, :1]),   
-            loss_mask[:, :-1]],                   
-            dim=1
-        ) # padd 0 to left
-
-        eos_mask = reward_mask 
-        sos_mask = (loss_mask == 1) & (prev == 0)    
         if sos_mask.sum() != reward_mask.sum():
             print(f"[DEBUG] start_mask.sum(): {sos_mask.sum()}, reward_mask.sum(): {eos_mask.sum()} should be equal")
         

@@ -175,17 +175,23 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         response_length = responses.size(-1)
         attention_mask = data.batch['attention_mask']
         response_mask = attention_mask[:, -response_length:]
-        if "loss_mask" in data.batch.keys():
-            loss_mask = data.batch['loss_mask'][:, -response_length:]
-        else:
-            loss_mask=data.batch['attention_mask'][:, -response_length:]
+        assert "loss_mask" in data.batch.keys(), "loss_mask is required for bi_level_gae"
+        loss_mask = data.batch['loss_mask']
+        prev = torch.cat(
+            [torch.zeros_like(loss_mask[:, :1]),   
+            loss_mask[:, :-1]],                   
+            dim=1
+        ) # pad 0 to left
+        sos_mask = (loss_mask == 1) & (prev == 0)  # 1 where loss_mask transitions from 0 to 1
+        
         advantages, returns = core_algos.compute_bi_level_gae_advantage_return(token_level_rewards=data.batch['token_level_rewards'],
                                                                         values=values,
-                                                                        loss_mask=loss_mask,
-                                                                        gamma=gamma,
+                                                                        eos_mask=data.batch['end_of_response_position_mask'][:, -response_length:],
+                                                                        sos_mask=sos_mask[:, -response_length:],
+                                                                        loss_mask=loss_mask[:, -response_length:],
                                                                         lam=lam,
                                                                         high_level_gamma=high_level_gamma,
-                                                                        reward_mask=data.batch['end_of_response_position_mask'][:, -response_length:])
+                                                                        gamma=gamma,)
         
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
@@ -195,21 +201,24 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         response_length = responses.size(-1)
         attention_mask = data.batch['attention_mask']
         response_mask = attention_mask[:, -response_length:]
-        
-        assert "loss_mask" in data.batch.keys()
-        
-        if "loss_mask" in data.batch.keys():
-            loss_mask = data.batch['loss_mask'][:, -response_length:]
-        else:
-            loss_mask=data.batch['attention_mask'][:, -response_length:]
+          
+        assert "loss_mask" in data.batch.keys(), "loss_mask is required for high_level_gae"
+        loss_mask = data.batch['loss_mask']
+        prev = torch.cat(
+            [torch.zeros_like(loss_mask[:, :1]),   
+            loss_mask[:, :-1]],                   
+            dim=1
+        ) # padd 0 to left
+        sos_mask = (loss_mask == 1) & (prev == 0)  
         advantages, returns = core_algos.compute_high_level_gae_advantage_return(token_level_rewards=data.batch['token_level_rewards'],
                                                                         values=values,
-                                                                        loss_mask=loss_mask,
-                                                                        reward_mask=data.batch['end_of_response_position_mask'][:, -response_length:],
+                                                                        loss_mask=loss_mask[:, -response_length:],
+                                                                        eos_mask=data.batch['end_of_response_position_mask'][:, -response_length:],
+                                                                        sos_mask=sos_mask[:, -response_length:],
                                                                         lam=lam,
                                                                         high_level_gamma=high_level_gamma,
                                                                         )
-        
+        data.batch['critic_loss_mask']=sos_mask
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
     elif adv_estimator == AdvantageEstimator.GRPO:
