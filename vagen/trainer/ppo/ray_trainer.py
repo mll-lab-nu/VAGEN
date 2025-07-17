@@ -70,7 +70,7 @@ class AdvantageEstimator(str, Enum):
     BI_LEVEL_GAE = 'bi_level_gae'
     HIGH_LEVEL_GAE = 'high_level_gae'
     GRPO = 'grpo'
-    MULTI_TURN_GRPO = 'multi_turn_grpo'
+    GIRPO = 'girpo'
     TURN_UPDATE_GAE = 'turn_update_gae'
     TURN_UPDATE_GIGPO = 'turn_update_gigpo'
     TURN_UPDATE_HIGH_LEVEL_GAE = 'turn_update_high_level_gae'
@@ -536,11 +536,11 @@ class RayPPOTrainer(object):
 
         if self.config.algorithm.adv_estimator in [AdvantageEstimator.GAE, AdvantageEstimator.BI_LEVEL_GAE,
                                                    AdvantageEstimator.MASKED_GAE,AdvantageEstimator.HIGH_LEVEL_GAE,AdvantageEstimator.TURN_UPDATE_GAE,
-                                                   AdvantageEstimator.TURN_UPDATE_BI_LEVEL_GAE,AdvantageEstimator.TURN_UPDATE_BI_LEVEL_GAE]:
+                                                   AdvantageEstimator.TURN_UPDATE_HIGH_LEVEL_GAE,AdvantageEstimator.TURN_UPDATE_BI_LEVEL_GAE]:
             self.use_critic = True
         elif self.config.algorithm.adv_estimator in [
-                AdvantageEstimator.GRPO, AdvantageEstimator.REINFORCE_PLUS_PLUS, AdvantageEstimator.REMAX,
-                AdvantageEstimator.RLOO, AdvantageEstimator.MULTI_TURN_GRPO, AdvantageEstimator.TURN_UPDATE_GRPO,
+                AdvantageEstimator.GRPO, AdvantageEstimator.GIRPO,
+                
         ]:
             self.use_critic = False
         else:
@@ -616,9 +616,7 @@ class RayPPOTrainer(object):
             if config.critic.ppo_micro_batch_size is not None:
                 assert config.critic.ppo_mini_batch_size % config.critic.ppo_micro_batch_size == 0
                 assert config.critic.ppo_micro_batch_size * sp_size >= n_gpus
-            if config.algorithm.adv_estimator in [AdvantageEstimator.HIGH_LEVEL_GAE, AdvantageEstimator.TURN_UPDATE_HIGH_LEVEL_GAE]:
-                assert config.critic.get('use_reward_mask', False), \
-                    "HIGH_LEVEL_GAE needs reward mask"
+           
 
         # Check if use_remove_padding is enabled when using sequence parallelism for fsdp
         if config.actor_rollout_ref.actor.strategy == 'fsdp':
