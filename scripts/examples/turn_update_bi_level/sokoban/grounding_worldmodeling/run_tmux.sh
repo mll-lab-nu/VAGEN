@@ -118,7 +118,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     trainer.save_freq=150 \\
     trainer.test_freq=20 \\
     trainer.total_training_steps=300 \\
-    algorithm.adv_estimator=turn_wise_update_bi_level_gae \\
+    algorithm.adv_estimator=turn_update_bi_level_gae \\
     algorithm.high_level_gamma=0.9 \\
     algorithm.kl_ctrl.kl_coef=0.001 \\
     algorithm.token_reward_type=return \\
@@ -133,8 +133,8 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     rollout_manager.use_service=True \\
     rollout_manager.timeout=300 \\
     rollout_manager.base_url=\"http://localhost:$PORT\" \\
-    rollout_manager.use_turn_wise_update=True \\
-    rollout_manager.use_turn_wise_update_bi_level_gae=True \\
+    rollout_manager.use_turn_update=True \\
+    rollout_manager.use_turn_update_bi_level_gae=True \\
     2>&1 | tee $EXPERIMENT_NAME.log" C-m
 
 # ----------- 完成信息 -------------

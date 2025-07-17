@@ -411,7 +411,7 @@ def compute_grpo_outcome_advantage(token_level_rewards: torch.Tensor,
 
     return scores, scores
 
-def compute_turn_wise_update_gae_advantage_return(
+def compute_turn_update_gae_advantage_return(
         token_level_rewards: torch.Tensor,
         values: torch.Tensor,
         loss_mask: torch.Tensor,
@@ -562,7 +562,7 @@ def compute_turn_wise_update_gae_advantage_return(
     
     return advantages, returns
 
-def compute_turn_wise_update_high_level_gae_advantage_return(
+def compute_turn_update_high_level_gae_advantage_return(
         token_level_rewards: torch.Tensor,
         values: torch.Tensor,
         loss_mask: torch.Tensor,
@@ -714,7 +714,7 @@ def compute_turn_wise_update_high_level_gae_advantage_return(
     
     return advantages, returns
 
-def compute_turn_wise_update_bi_level_gae_advantage_return(
+def compute_turn_update_bi_level_gae_advantage_return(
         token_level_rewards: torch.Tensor,
         values: torch.Tensor,
         loss_mask: torch.Tensor,

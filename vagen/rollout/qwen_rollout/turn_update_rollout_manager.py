@@ -28,7 +28,7 @@ The bi-level GAE now becomes:
 2. critical calculate the GAE for each turn
 
 """
-class TurnWiseUpdateRolloutManager():
+class TurnUpdateRolloutManager():
     def __init__(self,
                  actor_rollout_wg,
                  config,

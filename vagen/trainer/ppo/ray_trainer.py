@@ -39,7 +39,7 @@ from verl.utils.checkpoint.checkpoint_manager import find_latest_ckpt_path
 from verl.utils.dataset.rl_dataset import RLHFDataset, collate_fn
 from torch.utils.data import RandomSampler, SequentialSampler
 from torchdata.stateful_dataloader import StatefulDataLoader
-from vagen.rollout.qwen_rollout.turn_wise_update_rollout_manager import TurnWiseUpdateRolloutManager
+from vagen.rollout.qwen_rollout.turn_update_rollout_manager import TurnWiseUpdateRolloutManager
 from vagen.rollout.qwen_rollout.rollout_manager import QwenVLRolloutManager
 from vagen.rollout.qwen_rollout.rollout_manager_service import QwenVLRolloutManagerService
 from vagen.trainer.ppo.utils import seed_everything
@@ -70,10 +70,10 @@ class AdvantageEstimator(str, Enum):
     HIGH_LEVEL_GAE = 'high_level_gae'
     GRPO = 'grpo'
     MULTI_TURN_GRPO = 'multi_turn_grpo'
-    TURN_WISE_UPDATE_GAE = 'turn_wise_update_gae'
-    TURN_WISE_UPDATE_GIGPO = 'turn_wise_update_gigpo'
-    TURN_WISE_UPDATE_HIGH_LEVEL_GAE = 'turn_wise_update_high_level_gae'
-    TURN_WISE_UPDATE_BI_LEVEL_GAE = 'turn_wise_update_bi_level_gae'
+    TURN_UPDATE_GAE = 'turn_update_gae'
+    TURN_UPDATE_GIGPO = 'turn_update_gigpo'
+    TURN_UPDATE_HIGH_LEVEL_GAE = 'turn_update_high_level_gae'
+    TURN_UPDATE_BI_LEVEL_GAE = 'turn_update_bi_level_gae'
 
 
 @dataclass
@@ -242,7 +242,7 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
                                                                             index=index)
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
-    elif adv_estimator == AdvantageEstimator.TURN_WISE_UPDATE_GAE:
+    elif adv_estimator == AdvantageEstimator.TURN_UPDATE_GAE:
         token_level_rewards=data.batch['token_level_rewards']
         values = data.batch['values']
         responses = data.batch['responses']
@@ -251,7 +251,7 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         env_ids = data.non_tensor_batch['env_id']  # numpy array with dtype=object
         turn_ids = data.non_tensor_batch['turn_id']  # numpy array with dtype=object
         turn_rewards = data.non_tensor_batch['reward']  # numpy array with dtype=object
-        advantages, returns = core_algos.compute_turn_wise_update_gae_advantage_return(token_level_rewards=token_level_rewards,
+        advantages, returns = core_algos.compute_turn_update_gae_advantage_return(token_level_rewards=token_level_rewards,
                                                                                                 values=values,
                                                                                                 loss_mask=loss_mask,
                                                                                                 gamma=gamma,
@@ -262,7 +262,7 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
                                                                                                 )
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
-    elif adv_estimator == AdvantageEstimator.TURN_WISE_UPDATE_HIGH_LEVEL_GAE:
+    elif adv_estimator == AdvantageEstimator.TURN_UPDATE_HIGH_LEVEL_GAE:
         token_level_rewards=data.batch['token_level_rewards']
         values = data.batch['values']
         responses = data.batch['responses']
@@ -282,7 +282,7 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         assert torch.all(loss_mask_last_one_pos == reward_mask_one_pos), f"Position of last 1 in loss_mask does not match position of 1 in reward_mask"
         
         
-        advantages, returns = core_algos.compute_turn_wise_update_high_level_gae_advantage_return(token_level_rewards=token_level_rewards,
+        advantages, returns = core_algos.compute_turn_update_high_level_gae_advantage_return(token_level_rewards=token_level_rewards,
                                                                                                 values=values,
                                                                                                 loss_mask=loss_mask,
                                                                                                 reward_mask=reward_mask,
@@ -294,7 +294,7 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
                                                                                                 )
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
-    elif adv_estimator == AdvantageEstimator.TURN_WISE_UPDATE_BI_LEVEL_GAE:
+    elif adv_estimator == AdvantageEstimator.TURN_UPDATE_BI_LEVEL_GAE:
         token_level_rewards=data.batch['token_level_rewards']
         values = data.batch['values']
         responses = data.batch['responses']
@@ -303,7 +303,7 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         env_ids = data.non_tensor_batch['env_id']  # numpy array with dtype=object
         turn_ids = data.non_tensor_batch['turn_id']  # numpy array with dtype=object
         turn_rewards = data.non_tensor_batch['reward']  # numpy array with dtype=object
-        advantages, returns = core_algos.compute_turn_wise_update_bi_level_gae_advantage_return(token_level_rewards=token_level_rewards,
+        advantages, returns = core_algos.compute_turn_update_bi_level_gae_advantage_return(token_level_rewards=token_level_rewards,
                                                                                                 values=values,
                                                                                                 loss_mask=loss_mask,
                                                                                                 high_level_gamma=high_level_gamma,
@@ -317,14 +317,14 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         data.batch['advantages'] = advantages
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
-    elif adv_estimator == AdvantageEstimator.TURN_WISE_UPDATE_GIGPO:
+    elif adv_estimator == AdvantageEstimator.TURN_UPDATE_GIGPO:
         token_level_rewards=data.batch['token_level_rewards']
         values = data.batch['values']
         responses = data.batch['responses']
         response_length = responses.size(-1)
         loss_mask = data.batch['loss_mask'][:, -response_length:]
         uids = data.non_tensor_batch['uid']
-        advantages, returns = core_algos.compute_turn_wise_update_gigpo_advantage_return(token_level_rewards=token_level_rewards,
+        advantages, returns = core_algos.compute_turn_update_gigpo_advantage_return(token_level_rewards=token_level_rewards,
                                                                                                 values=values,
                                                                                                 loss_mask=loss_mask,
                                                                                                 uids=uids,
@@ -537,12 +537,12 @@ class RayPPOTrainer(object):
             self.kl_ctrl = core_algos.FixedKLController(kl_coef=0.)
 
         if self.config.algorithm.adv_estimator in [AdvantageEstimator.GAE, AdvantageEstimator.BI_LEVEL_GAE,
-                                                   AdvantageEstimator.MASKED_GAE,AdvantageEstimator.HIGH_LEVEL_GAE,AdvantageEstimator.TURN_WISE_UPDATE_GAE,
-                                                   AdvantageEstimator.TURN_WISE_UPDATE_BI_LEVEL_GAE,AdvantageEstimator.TURN_WISE_UPDATE_BI_LEVEL_GAE]:
+                                                   AdvantageEstimator.MASKED_GAE,AdvantageEstimator.HIGH_LEVEL_GAE,AdvantageEstimator.TURN_UPDATE_GAE,
+                                                   AdvantageEstimator.TURN_UPDATE_BI_LEVEL_GAE,AdvantageEstimator.TURN_UPDATE_BI_LEVEL_GAE]:
             self.use_critic = True
         elif self.config.algorithm.adv_estimator in [
                 AdvantageEstimator.GRPO, AdvantageEstimator.REINFORCE_PLUS_PLUS, AdvantageEstimator.REMAX,
-                AdvantageEstimator.RLOO, AdvantageEstimator.MULTI_TURN_GRPO, AdvantageEstimator.TURN_WISE_UPDATE_GRPO,
+                AdvantageEstimator.RLOO, AdvantageEstimator.MULTI_TURN_GRPO, AdvantageEstimator.TURN_UPDATE_GRPO,
         ]:
             self.use_critic = False
         else:
@@ -618,7 +618,7 @@ class RayPPOTrainer(object):
             if config.critic.ppo_micro_batch_size is not None:
                 assert config.critic.ppo_mini_batch_size % config.critic.ppo_micro_batch_size == 0
                 assert config.critic.ppo_micro_batch_size * sp_size >= n_gpus
-            if config.algorithm.adv_estimator in [AdvantageEstimator.HIGH_LEVEL_GAE, AdvantageEstimator.TURN_WISE_UPDATE_HIGH_LEVEL_GAE]:
+            if config.algorithm.adv_estimator in [AdvantageEstimator.HIGH_LEVEL_GAE, AdvantageEstimator.TURN_UPDATE_HIGH_LEVEL_GAE]:
                 assert config.critic.get('use_reward_mask', False), \
                     "HIGH_LEVEL_GAE needs reward mask"
 
@@ -815,7 +815,7 @@ class RayPPOTrainer(object):
         if self.test_rollout_manager==None:
             if self.config.rollout_manager.get("use_service",False):
                     
-                if self.config.rollout_manager.get("use_turn_wise_update",False):
+                if self.config.rollout_manager.get("use_turn_update",False):
                     self.test_rollout_manager = TurnWiseUpdateRolloutManager(
                         actor_rollout_wg=self.actor_rollout_wg,
                         config=self.config.rollout_manager,
@@ -1152,7 +1152,7 @@ class RayPPOTrainer(object):
         
         if self.config.rollout_manager.get("use_service",False):
                 
-            if self.config.rollout_manager.get("use_turn_wise_update",False):
+            if self.config.rollout_manager.get("use_turn_update",False):
                 rollout_manager = TurnWiseUpdateRolloutManager(
                     actor_rollout_wg=self.actor_rollout_wg,
                     config=self.config.rollout_manager,
