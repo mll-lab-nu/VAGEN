@@ -16,7 +16,7 @@ from verl.utils.dataset.rl_dataset import process_image, collate_fn
 import vagen.env
 from vagen.env import REGISTERED_ENV
 from vagen.server.client import BatchEnvClient
-from vagen.rollout.qwen_rollout.utils import compute_loss_mask
+from vagen.rollout.utils.mask_utils import compute_loss_mask
 class QwenVLRolloutManagerService():
     def __init__(self,
                  actor_rollout_wg,

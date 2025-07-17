@@ -15,7 +15,7 @@ import verl.utils.torch_functional as verl_F
 from verl.utils.dataset.rl_dataset import process_image, collate_fn
 import vagen.env
 from vagen.env import REGISTERED_ENV
-
+from vagen.rollout.utils.mask_utils import compute_loss_mask
     
 class QwenVLRolloutManager():
     def __init__(self,
@@ -93,90 +93,12 @@ class QwenVLRolloutManager():
     
     @torch.no_grad()
     def _compute_loss_mask(self, input_ids, attention_mask):
-        """
-        Compute loss mask for the input ids and attention mask
-        We only do loss for the tokens in input_ids that are wrapped by special tokens (by defualt they're <|box_start|> and <|box_end|>)
-        
-        
-        Args:
-            input_ids: (batch_size, seq_len)
-            attention_mask: (batch_size, seq_len)
-    
-        Returns:
-            input_ids: (batch_size, seq_len)
-            attention_mask: (batch_size, seq_len)
-            loss_mask: (batch_size, seq_len) # e.g. 0000|1111|0000|11111|000|1111
-            end_of_response_position_mask: (batch_size, seq_len) # e.g. 0000|0001|0000|00001|000|0001 given the end of sequence mask, mark the position of the last token in the response
-        
-        - There will be different stratgy to handel special tokens in the input_ids
-        - 1. remove them, in this case we need to fill the hole by adding pad in the right and shift the sequence left
-        - 2. keep them, attention mask will be 0 for them
-        - 3. Replace them with pad token
-    
-        Let's use the 3rd strategy for now
-        Compute loss mask for the input ids and attention mask by:
-        1. Removing special tokens
-        2. Adding padding on the right
-        3. Shifting the sequence left
-        """
-        
         # Get token IDs for special tokens and pad token
         sptk_b = self.tokenizer.convert_tokens_to_ids(self.config.special_token_for_loss_mask[0])
         sptk_e = self.tokenizer.convert_tokens_to_ids(self.config.special_token_for_loss_mask[1])
         pad_token_id = self.tokenizer.pad_token_id
 
-        batch_size = input_ids.shape[0]
-        seq_len = input_ids.shape[1]
-        
-        # Initialize output tensors with same shape as inputs
-        new_input_ids = input_ids.clone()
-        new_attention_mask = attention_mask.clone()
-        loss_mask = torch.zeros_like(new_attention_mask)
-        new_loss_mask = torch.zeros_like(new_attention_mask)
-        end_of_response_position_mask = torch.zeros_like(new_attention_mask)
-        new_end_of_response_position_mask = torch.zeros_like(new_attention_mask)
-        # Process each example in the batch
-        for b in range(batch_size):
-            # Count right padding tokens using attention mask
-            right_pad_tokens = (new_input_ids[b] == pad_token_id).sum().item()
-            
-            # Assert that initial padding tokens have attention mask of 0
-            if not torch.all(attention_mask[b, -right_pad_tokens:] == 0):
-                print("[DEBUG]: right padding tokens must have attention mask of 0")
-            
-            # Find special token indices
-            sptk_b_indices = (input_ids[b] == sptk_b).nonzero().flatten()
-            sptk_e_indices = (input_ids[b] == sptk_e).nonzero().flatten()
-            
-            # Create a mask for tokens that should compute loss
-            hole_pos=[] # initialize holes position list with last padding token position
-            for start_pos, end_pos in zip(sptk_b_indices, sptk_e_indices):
-                loss_mask[b][start_pos+1:end_pos] = 1
-                end_of_response_position_mask[b][end_pos-1] = 1
-                hole_pos.append(start_pos.item())
-                hole_pos.append(end_pos.item())
-            hole_pos.append(seq_len-right_pad_tokens)
-            # assert new_input_ids[b][seq_len-right_pad_tokens]==pad_token_id
-            if not torch.all(new_input_ids[b][seq_len-right_pad_tokens:] == pad_token_id):
-                print("[DEBUG]: right padding tokens must be pad token")
-            
-            # shift right to fill the wholes
-            holes_to_fill=1
-            for i in range(0,len(hole_pos)-1):
-                start_pos = hole_pos[i]
-                end_pos = hole_pos[i+1]
-                new_loss_mask[b,start_pos+1-holes_to_fill:end_pos-holes_to_fill]=loss_mask[b,start_pos+1:end_pos]
-                new_end_of_response_position_mask[b,start_pos+1-holes_to_fill:end_pos-holes_to_fill]=end_of_response_position_mask[b,start_pos+1:end_pos]
-                new_input_ids[b,start_pos+1-holes_to_fill:end_pos-holes_to_fill]=input_ids[b,start_pos+1:end_pos]
-                new_attention_mask[b,start_pos+1-holes_to_fill:end_pos-holes_to_fill]=attention_mask[b,start_pos+1:end_pos]
-                holes_to_fill+=1
-
-            valid_tokens = seq_len-right_pad_tokens-len(hole_pos)+1 # the number of non-special tokens and non-padding tokens
-            new_loss_mask[b][valid_tokens:]=0
-            new_input_ids[b][valid_tokens:]=pad_token_id
-            new_attention_mask[b][valid_tokens:]=0
-        
-        return new_input_ids, new_attention_mask, new_loss_mask, new_end_of_response_position_mask
+        return compute_loss_mask(input_ids, attention_mask, sptk_b, sptk_e, pad_token_id)
     
     @torch.no_grad()
     def reset(self, env_configs):

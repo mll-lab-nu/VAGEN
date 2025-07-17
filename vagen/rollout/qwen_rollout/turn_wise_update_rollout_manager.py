@@ -5,7 +5,6 @@ from collections import defaultdict
 import torch
 import numpy as np
 from transformers import PreTrainedTokenizer, ProcessorMixin
-from vagen.rollout.utils import tensor_to_uuid
 from dataclasses import dataclass, field
 import PIL
 import re
@@ -17,7 +16,8 @@ from verl.utils.dataset.rl_dataset import process_image, collate_fn
 import vagen.env
 from vagen.env import REGISTERED_ENV
 from vagen.server.client import BatchEnvClient
-
+from vagen.rollout.utils.mask_utils import compute_loss_mask
+from vagen.rollout.utils.uid_utils import tensor_to_uuid
 """
 
 This would be a rollout manager supporting dividing trajectory into turns for optimization, the behavior now looks like:
