@@ -281,10 +281,9 @@ def compute_high_level_gae_advantage_return(
     """
     with torch.no_grad():
         batch_size, gen_len = token_level_rewards.shape
-        advantages_turn = torch.zeros_like(token_level_rewards)
-        advantages_token = torch.zeros_like(token_level_rewards)
-        returns = torch.zeros_like(token_level_rewards)
-        updated_reward = token_level_rewards.clone()
+        token_advantages = torch.zeros_like(token_level_rewards)
+        token_returns = torch.zeros_like(token_level_rewards)
+        
         
         
         for b in range(batch_size):
@@ -311,18 +310,17 @@ def compute_high_level_gae_advantage_return(
                     nextvalue = 0.0
                 
                 
-                reward_for_current_turn = updated_reward[b, cur_eos_pos] # reward is assigned to the last valid token of each turn
-                delta = reward_for_current_turn + high_level_gamma * nextvalue - values[b, cur_sos_pos] # value before current tokens are taken
                 
+                delta = token_level_rewards[b, cur_eos_pos] + high_level_gamma * nextvalue - values[b, cur_sos_pos] # value before current tokens are taken
                 lastgaelam = delta + high_level_gamma * lam * lastgaelam
-                returns[b, cur_sos_pos] = lastgaelam + values[b, cur_sos_pos]
-                updated_reward[b, cur_eos_pos] = advantages_turn + values[b, cur_sos_pos]
-                advantages_token[b, cur_sos_pos:cur_eos_pos+1] = lastgaelam # Tokes shares the turn advantage
+                token_returns[b, cur_sos_pos] = lastgaelam + values[b, cur_sos_pos]
+              
+                token_advantages[b, cur_sos_pos:cur_eos_pos+1] = lastgaelam # Tokes shares the turn advantage
                 
         
-        advantages_token = verl_F.masked_whiten(advantages_token, loss_mask)
+        token_advantages = verl_F.masked_whiten(token_advantages, loss_mask)
     
-    return advantages_token, returns
+    return token_advantages, token_returns
                     
         
         
