@@ -286,8 +286,6 @@ def compute_high_level_gae_advantage_return(
         returns = torch.zeros_like(token_level_rewards)
         updated_reward = token_level_rewards.clone()
         
-        if sos_mask.sum() != reward_mask.sum():
-            print(f"[DEBUG] start_mask.sum(): {sos_mask.sum()}, reward_mask.sum(): {eos_mask.sum()} should be equal")
         
         for b in range(batch_size):
             sos_positions = sos_mask[b].nonzero(as_tuple=True)[0]
