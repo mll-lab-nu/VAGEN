@@ -42,7 +42,7 @@ mkdir -p "data/$EXPERIMENT_NAME"
 # Create server session
 tmux new-session -d -s "$SERVER_SESSION"
 # Configure server session with conda and environment variables
-tmux send-keys -t "$SERVER_SESSION" "conda activate vagen" C-m
+tmux send-keys -t "$SERVER_SESSION" "source activate vagen" C-m
 tmux send-keys -t "$SERVER_SESSION" "export CUDA_VISIBLE_DEVICES=$CUDA_DEVICES" C-m
 tmux send-keys -t "$SERVER_SESSION" "export VLLM_ATTENTION_BACKEND=XFORMERS" C-m
 tmux send-keys -t "$SERVER_SESSION" "export PYTHONHASHSEED=0" C-m
@@ -57,7 +57,7 @@ sleep 10  # Adjust as needed
 tmux new-session -d -s "$TRAIN_SESSION"
 # Configure training session with conda and environment variables
 tmux send-keys -t "$TRAIN_SESSION" "cd $SCRIPT_DIR" C-m
-tmux send-keys -t "$TRAIN_SESSION" "conda activate vagen" C-m
+tmux send-keys -t "$TRAIN_SESSION" "source activate vagen" C-m
 tmux send-keys -t "$TRAIN_SESSION" "export CUDA_VISIBLE_DEVICES=$CUDA_DEVICES" C-m
 tmux send-keys -t "$TRAIN_SESSION" "export VLLM_ATTENTION_BACKEND=XFORMERS" C-m
 tmux send-keys -t "$TRAIN_SESSION" "export PYTHONHASHSEED=0" C-m
@@ -71,7 +71,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python -m vagen.env.create_dataset \\
 
 # Then start the training
 tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
-    algorithm.adv_estimator=turn_wise_gae \\
+    algorithm.adv_estimator=high_level_gae \\
     algorithm.high_level_gamma=1.0 \\
     data.train_files=data/$EXPERIMENT_NAME/train.parquet \\
     data.val_files=data/$EXPERIMENT_NAME/test.parquet \\

@@ -247,6 +247,7 @@ def compute_high_level_gae_advantage_return(
         values: torch.Tensor,
         eos_mask: torch.Tensor,
         sos_mask: torch.Tensor,
+        loss_mask: torch.Tensor,
         lam: float,
         high_level_gamma: float
     ):
