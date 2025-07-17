@@ -39,7 +39,7 @@ from verl.utils.checkpoint.checkpoint_manager import find_latest_ckpt_path
 from verl.utils.dataset.rl_dataset import RLHFDataset, collate_fn
 from torch.utils.data import RandomSampler, SequentialSampler
 from torchdata.stateful_dataloader import StatefulDataLoader
-from vagen.rollout.qwen_rollout.turn_update_rollout_manager import TurnWiseUpdateRolloutManager
+from vagen.rollout.qwen_rollout.turn_update_rollout_manager import TurnUpdateRolloutManager
 from vagen.rollout.qwen_rollout.rollout_manager import QwenVLRolloutManager
 from vagen.rollout.qwen_rollout.rollout_manager_service import QwenVLRolloutManagerService
 from vagen.trainer.ppo.utils import seed_everything
@@ -816,7 +816,7 @@ class RayPPOTrainer(object):
             if self.config.rollout_manager.get("use_service",False):
                     
                 if self.config.rollout_manager.get("use_turn_update",False):
-                    self.test_rollout_manager = TurnWiseUpdateRolloutManager(
+                    self.test_rollout_manager = TurnUpdateRolloutManager(
                         actor_rollout_wg=self.actor_rollout_wg,
                         config=self.config.rollout_manager,
                         tokenizer=self.tokenizer,
@@ -1153,7 +1153,7 @@ class RayPPOTrainer(object):
         if self.config.rollout_manager.get("use_service",False):
                 
             if self.config.rollout_manager.get("use_turn_update",False):
-                rollout_manager = TurnWiseUpdateRolloutManager(
+                rollout_manager = TurnUpdateRolloutManager(
                     actor_rollout_wg=self.actor_rollout_wg,
                     config=self.config.rollout_manager,
                     tokenizer=self.tokenizer,

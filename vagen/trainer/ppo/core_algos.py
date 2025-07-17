@@ -494,55 +494,20 @@ def compute_turn_update_gae_advantage_return(
         
         # Step 4: Process each trajectory
         for env_id, turns in trajectories.items():
-            # Build a map for quick lookup of next turn
-            turn_id_to_next = {}
-            for i in range(len(turns) - 1):
-                curr_turn_id, curr_batch_idx = turns[i]
-                next_turn_id, next_batch_idx = turns[i + 1]
-                turn_id_to_next[curr_turn_id] = (next_turn_id, next_batch_idx)
             
-            # Process turns backward, maintaining lastgaelam across turns
+            
             lastgaelam = 0.0
-            
+            next_value = 0.0
             for i in range(len(turns) - 1, -1, -1):
                 turn_id, batch_idx = turns[i]
                 
-                # Get valid positions for this turn
                 valid_positions = loss_mask[batch_idx].nonzero(as_tuple=True)[0]
-                if len(valid_positions) == 0:
-                    print(f"[DEBUG] No valid positions for turn {turn_id} in batch {batch_idx}")
-                    continue
-                
-                # Check if there's a next turn to connect to
-                if turn_id in turn_id_to_next:
-                    next_turn_id, next_batch_idx = turn_id_to_next[turn_id]
-                    next_valid_positions = loss_mask[next_batch_idx].nonzero(as_tuple=True)[0]
-                    if len(next_valid_positions) > 0:
-                        # Connect to the first valid position of next turn
-                        next_first_pos = next_valid_positions[0].item()
-                        next_value_for_continuation = values[next_batch_idx, next_first_pos].item()
-                    else:
-                        next_value_for_continuation = 0.0
-                else:
-                    # This is the last turn in trajectory
-                    next_value_for_continuation = 0.0
-                    lastgaelam = 0.0  # Reset for the last turn
                 
                 # Backward pass through valid tokens within this turn
                 for j in range(len(valid_positions) - 1, -1, -1):
                     curr_pos = valid_positions[j].item()
-                    
-                    # Get next value
-                    if j < len(valid_positions) - 1:
-                        # Next token within the same turn
-                        next_pos = valid_positions[j + 1].item()
-                        nextvalue = values[batch_idx, next_pos].item()
-                    else:
-                        # Last token of this turn - connect to next turn if exists
-                        nextvalue = next_value_for_continuation
-                    
                     # Calculate advantage using the updated rewards
-                    delta = updated_rewards[batch_idx, curr_pos].item() + gamma * nextvalue - values[batch_idx, curr_pos].item()
+                    delta = updated_rewards[batch_idx, curr_pos].item() + gamma * next_value - values[batch_idx, curr_pos].item()
                     lastgaelam = delta + gamma * lam * lastgaelam
                     
                     advantages[batch_idx, curr_pos] = lastgaelam
