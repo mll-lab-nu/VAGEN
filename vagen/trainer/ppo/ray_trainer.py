@@ -44,6 +44,7 @@ from vagen.rollout.qwen_rollout.rollout_manager import QwenVLRolloutManager
 from vagen.rollout.qwen_rollout.rollout_manager_service import QwenVLRolloutManagerService
 from vagen.trainer.ppo.utils import seed_everything
 from vagen.trainer.ppo import core_algos
+from vagen.trainer.ppo import core_algos_turn_update
 WorkerType = Type[Worker]
 
 
@@ -251,7 +252,7 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         env_ids = data.non_tensor_batch['env_id']  # numpy array with dtype=object
         turn_ids = data.non_tensor_batch['turn_id']  # numpy array with dtype=object
         turn_rewards = data.non_tensor_batch['reward']  # numpy array with dtype=object
-        advantages, returns = core_algos.compute_turn_update_gae_advantage_return(token_level_rewards=token_level_rewards,
+        advantages, returns = core_algos_turn_update.compute_turn_update_gae_advantage_return(token_level_rewards=token_level_rewards,
                                                                                                 values=values,
                                                                                                 loss_mask=loss_mask,
                                                                                                 gamma=gamma,
@@ -267,25 +268,21 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         values = data.batch['values']
         responses = data.batch['responses']
         response_length = responses.size(-1)
-        loss_mask = data.batch['loss_mask'][:, -response_length:]
+        loss_mask = data.batch['loss_mask']
+        prev = torch.cat(
+            [torch.zeros_like(loss_mask[:, :1]),   
+            loss_mask[:, :-1]],                   
+            dim=1
+        ) # padd 0 to left
+        sos_mask = (loss_mask == 1) & (prev == 0)  
         env_ids = data.non_tensor_batch['env_id']  # numpy array with dtype=object
         turn_ids = data.non_tensor_batch['turn_id']  # numpy array with dtype=object
         turn_rewards = data.non_tensor_batch['reward']  # numpy array with dtype=object
-        reward_mask=data.batch['end_of_response_position_mask'][:, -response_length:]
-        
-        # Assertion 1: Each row in reward_mask should have exactly one 1, others are 0, so sum equals batch_size
-        assert reward_mask.sum() == reward_mask.size(0), f"reward_mask should have exactly one 1 per row, but sum={reward_mask.sum()}, batch_size={reward_mask.size(0)}"
-        
-        # Assertion 2: The position of the last 1 in loss_mask should match the position of 1 in reward_mask
-        loss_mask_last_one_pos = (loss_mask == 1).float().argmax(dim=-1)  # Position of last 1 in each row
-        reward_mask_one_pos = (reward_mask == 1).float().argmax(dim=-1)   # Position of 1 in reward_mask
-        assert torch.all(loss_mask_last_one_pos == reward_mask_one_pos), f"Position of last 1 in loss_mask does not match position of 1 in reward_mask"
         
         
-        advantages, returns = core_algos.compute_turn_update_high_level_gae_advantage_return(token_level_rewards=token_level_rewards,
+        advantages, returns = core_algos_turn_update.compute_turn_update_high_level_gae_advantage_return(token_level_rewards=token_level_rewards,
                                                                                                 values=values,
-                                                                                                loss_mask=loss_mask,
-                                                                                                reward_mask=reward_mask,
+                                                                                                loss_mask=loss_mask[:, -response_length:],
                                                                                                 high_level_gamma=high_level_gamma,
                                                                                                 lam=lam,
                                                                                                 env_ids=env_ids,
@@ -294,6 +291,7 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
                                                                                                 )
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
+        data.batch['critic_loss_mask']=sos_mask
     elif adv_estimator == AdvantageEstimator.TURN_UPDATE_BI_LEVEL_GAE:
         token_level_rewards=data.batch['token_level_rewards']
         values = data.batch['values']
@@ -303,7 +301,7 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         env_ids = data.non_tensor_batch['env_id']  # numpy array with dtype=object
         turn_ids = data.non_tensor_batch['turn_id']  # numpy array with dtype=object
         turn_rewards = data.non_tensor_batch['reward']  # numpy array with dtype=object
-        advantages, returns = core_algos.compute_turn_update_bi_level_gae_advantage_return(token_level_rewards=token_level_rewards,
+        advantages, returns = core_algos_turn_update.compute_turn_update_bi_level_gae_advantage_return(token_level_rewards=token_level_rewards,
                                                                                                 values=values,
                                                                                                 loss_mask=loss_mask,
                                                                                                 high_level_gamma=high_level_gamma,
@@ -324,7 +322,7 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         response_length = responses.size(-1)
         loss_mask = data.batch['loss_mask'][:, -response_length:]
         uids = data.non_tensor_batch['uid']
-        advantages, returns = core_algos.compute_turn_update_gigpo_advantage_return(token_level_rewards=token_level_rewards,
+        advantages, returns = core_algos_turn_update.compute_turn_update_gigpo_advantage_return(token_level_rewards=token_level_rewards,
                                                                                                 values=values,
                                                                                                 loss_mask=loss_mask,
                                                                                                 uids=uids,

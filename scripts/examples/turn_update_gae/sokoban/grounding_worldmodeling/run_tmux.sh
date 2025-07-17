@@ -52,7 +52,7 @@ tmux send-keys -t "$SERVER_SESSION" "python -m vagen.server.server server.port=$
 echo "Waiting for server to start on port $PORT..."
 sleep 10  # Adjust as needed
 
-# ----------- Training 会话 -------------
+
 tmux new-session -d -s "$TRAIN_SESSION"
 tmux send-keys -t "$TRAIN_SESSION" "cd $SCRIPT_DIR" C-m
 tmux send-keys -t "$TRAIN_SESSION" "source activate vagen" C-m
@@ -135,7 +135,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     rollout_manager.use_turn_update=True \\
     2>&1 | tee $EXPERIMENT_NAME.log" C-m
 
-# ----------- 完成信息 -------------
+
 echo "-----------------------------------------"
 echo "Configuration Summary:"
 echo "Port: $PORT"
