@@ -323,9 +323,13 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         loss_mask = data.batch['loss_mask'][:, -response_length:]
         uids = data.non_tensor_batch['uid']
         advantages, returns = core_algos_turn_update.compute_turn_update_gigpo_advantage_return(token_level_rewards=token_level_rewards,
-                                                                                                values=values,
                                                                                                 loss_mask=loss_mask,
-                                                                                                uids=uids,
+                                                                                                high_level_gamma=high_level_gamma,
+                                                                                                env_ids=env_ids,
+                                                                                                turn_ids=turn_ids,
+                                                                                                turn_rewards=turn_rewards,
+                                                                                                turn_uids=turn_uids,
+                                                                                                token_reward_type=kwargs.get("token_reward_type", "advantage"),
                                                                                                 )
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns

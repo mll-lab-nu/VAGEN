@@ -66,7 +66,7 @@ def get_kl_controller(config):
 
     return kl_ctrl
 
-
+@torch.no_grad()
 def compute_gae_advantage_return_with_loss_mask(token_level_rewards: torch.Tensor, values: torch.Tensor, 
                                  loss_mask: torch.Tensor, gamma: float, lam: float):
     """Modified GAE calculation that handle multi-turn with loss mask
@@ -90,52 +90,52 @@ def compute_gae_advantage_return_with_loss_mask(token_level_rewards: torch.Tenso
         Returns: `(torch.Tensor)`
             shape: (bs, response_length)
     """
-    with torch.no_grad():
-        batch_size, gen_len = token_level_rewards.shape
-        advantages = torch.zeros_like(token_level_rewards)
-        returns = torch.zeros_like(token_level_rewards)
+    
+    batch_size, gen_len = token_level_rewards.shape
+    advantages = torch.zeros_like(token_level_rewards)
+    returns = torch.zeros_like(token_level_rewards)
+    
+    for b in range(batch_size):
+        lastgaelam = 0.0
         
-        for b in range(batch_size):
-            lastgaelam = 0.0
-            
-            # Find the valid token positions (where loss_mask is 1)
-            valid_positions = loss_mask[b].nonzero(as_tuple=True)[0]
-            
-            if len(valid_positions) == 0:
-                print(f"[DEBUG] No valid positions for batch {b}")
-                continue
-                
-            for i in range(len(valid_positions) - 1, -1, -1):
-                curr_pos = valid_positions[i]
-                
-                # Get the next value
-                if i < len(valid_positions) - 1:
-                    # Next valid position
-                    next_pos = valid_positions[i + 1]
-                    nextvalue = values[b, next_pos]
-                    
-                else:
-                    # Last valid position
-                    nextvalue = 0.0
-                
-                # Calculate delta using the next valid token
-                delta = token_level_rewards[b, curr_pos] + gamma * nextvalue - values[b, curr_pos]
-                
-                # Update advantage estimate
-                lastgaelam = delta + gamma * lam * lastgaelam
-                advantages[b, curr_pos] = lastgaelam
-            
-            # Calculate returns for valid positions
-            for i, pos in enumerate(valid_positions):
-                returns[b, pos] = advantages[b, pos] + values[b, pos]
+        # Find the valid token positions (where loss_mask is 1)
+        valid_positions = loss_mask[b].nonzero(as_tuple=True)[0]
         
+        if len(valid_positions) == 0:
+            print(f"[DEBUG] No valid positions for batch {b}")
+            continue
+            
+        for i in range(len(valid_positions) - 1, -1, -1):
+            curr_pos = valid_positions[i]
+            
+            # Get the next value
+            if i < len(valid_positions) - 1:
+                # Next valid position
+                next_pos = valid_positions[i + 1]
+                nextvalue = values[b, next_pos]
+                
+            else:
+                # Last valid position
+                nextvalue = 0.0
+            
+            # Calculate delta using the next valid token
+            delta = token_level_rewards[b, curr_pos] + gamma * nextvalue - values[b, curr_pos]
+            
+            # Update advantage estimate
+            lastgaelam = delta + gamma * lam * lastgaelam
+            advantages[b, curr_pos] = lastgaelam
+        
+        # Calculate returns for valid positions
+        for i, pos in enumerate(valid_positions):
+            returns[b, pos] = advantages[b, pos] + values[b, pos]
+    
 
-        advantages = verl_F.masked_whiten(advantages, loss_mask)
+    advantages = verl_F.masked_whiten(advantages, loss_mask)
         
     return advantages, returns
 
 
-
+@torch.no_grad()
 def compute_bi_level_gae_advantage_return(
         token_level_rewards: torch.Tensor,
         values: torch.Tensor, 
@@ -174,74 +174,74 @@ def compute_bi_level_gae_advantage_return(
         Returns: `(torch.Tensor)`
             shape: (bs, response_length)
     """
-    with torch.no_grad():
-        batch_size, gen_len = token_level_rewards.shape
-        advantages_turn = torch.zeros_like(token_level_rewards)
-        advantages_token = torch.zeros_like(token_level_rewards)
-        returns_token = torch.zeros_like(token_level_rewards)
-        updated_reward = token_level_rewards.clone()
-        
-        for b in range(batch_size):
-            sos_positions = sos_mask[b].nonzero(as_tuple=True)[0]
-            eos_positions = eos_mask[b].nonzero(as_tuple=True)[0]
+    
+    batch_size, gen_len = token_level_rewards.shape
+    advantages_turn = torch.zeros_like(token_level_rewards)
+    advantages_token = torch.zeros_like(token_level_rewards)
+    returns_token = torch.zeros_like(token_level_rewards)
+    updated_reward = token_level_rewards.clone()
+    
+    for b in range(batch_size):
+        sos_positions = sos_mask[b].nonzero(as_tuple=True)[0]
+        eos_positions = eos_mask[b].nonzero(as_tuple=True)[0]
 
-            # Debug: Check if sos_positions and eos_positions have the same length
-            if len(sos_positions) != len(eos_positions):
-                print(f"[DEBUG] Batch {b}: sos_positions length ({len(sos_positions)}) != eos_positions length ({len(eos_positions)})")
-                print(f"[DEBUG] sos_positions: {sos_positions}")
-                print(f"[DEBUG] eos_positions: {eos_positions}")
-            # We use sos positions to calculate turn-level advantage
-            # We assign the turn-level advantage to the last valid token of each turn
-            
-            lastgaelam = 0.0
-            for i in range(len(sos_positions) - 1, -1, -1):
-                cur_sos_pos = sos_positions[i]
-                cur_eos_pos = eos_positions[i]
-                
-                # Get the next value
-                if i < len(sos_positions) - 1:
-                    # Next valid position
-                    
-                    next_sos_pos = sos_positions[i + 1]
-                    nextvalue = values[b, next_sos_pos]
-                    
-                else:
-                    # Last valid position
-                    nextvalue = 0.0
-                
-                
-                reward_for_current_turn = updated_reward[b, cur_eos_pos] # reward is assigned to the last valid token of each turn
-                delta = reward_for_current_turn + high_level_gamma * nextvalue - values[b, cur_sos_pos] # value before current tokens are taken
-                
-                lastgaelam = delta + high_level_gamma * lam * lastgaelam
-                advantages_turn[b, cur_eos_pos] = lastgaelam
-
-                updated_reward[b, cur_eos_pos] = advantages_turn[b, cur_eos_pos] + values[b, cur_sos_pos]  
-                
-            
-            # Then, calculate low level advantage and return for each token using gamma
-            lastgaelam = 0.0
-            valid_positions = loss_mask[b].nonzero(as_tuple=True)[0]
-            for i in range(len(valid_positions) - 1, -1, -1):
-                curr_pos = valid_positions[i]
-                if curr_pos not in eos_positions:
-                    # Next valid position
-                    next_pos = valid_positions[i + 1]
-                    nextvalue = values[b, next_pos]
-                else:
-                    # Last valid position
-                    nextvalue = 0.0
-                    lastgaelam = 0.0
-                delta = updated_reward[b, curr_pos] + gamma * nextvalue - values[b, curr_pos]
-                lastgaelam = delta + gamma * lam * lastgaelam
-                advantages_token[b, curr_pos] = lastgaelam
-                returns_token[b, curr_pos] = lastgaelam + values[b, curr_pos]
+        # Debug: Check if sos_positions and eos_positions have the same length
+        if len(sos_positions) != len(eos_positions):
+            print(f"[DEBUG] Batch {b}: sos_positions length ({len(sos_positions)}) != eos_positions length ({len(eos_positions)})")
+            print(f"[DEBUG] sos_positions: {sos_positions}")
+            print(f"[DEBUG] eos_positions: {eos_positions}")
+        # We use sos positions to calculate turn-level advantage
+        # We assign the turn-level advantage to the last valid token of each turn
         
-        advantages_token = verl_F.masked_whiten(advantages_token, loss_mask)
+        lastgaelam = 0.0
+        for i in range(len(sos_positions) - 1, -1, -1):
+            cur_sos_pos = sos_positions[i]
+            cur_eos_pos = eos_positions[i]
+            
+            # Get the next value
+            if i < len(sos_positions) - 1:
+                # Next valid position
+                
+                next_sos_pos = sos_positions[i + 1]
+                nextvalue = values[b, next_sos_pos]
+                
+            else:
+                # Last valid position
+                nextvalue = 0.0
+            
+            
+            reward_for_current_turn = updated_reward[b, cur_eos_pos] # reward is assigned to the last valid token of each turn
+            delta = reward_for_current_turn + high_level_gamma * nextvalue - values[b, cur_sos_pos] # value before current tokens are taken
+            
+            lastgaelam = delta + high_level_gamma * lam * lastgaelam
+            advantages_turn[b, cur_eos_pos] = lastgaelam
+
+            updated_reward[b, cur_eos_pos] = advantages_turn[b, cur_eos_pos] + values[b, cur_sos_pos]  
+            
+        
+        # Then, calculate low level advantage and return for each token using gamma
+        lastgaelam = 0.0
+        valid_positions = loss_mask[b].nonzero(as_tuple=True)[0]
+        for i in range(len(valid_positions) - 1, -1, -1):
+            curr_pos = valid_positions[i]
+            if curr_pos not in eos_positions:
+                # Next valid position
+                next_pos = valid_positions[i + 1]
+                nextvalue = values[b, next_pos]
+            else:
+                # Last valid position
+                nextvalue = 0.0
+                lastgaelam = 0.0
+            delta = updated_reward[b, curr_pos] + gamma * nextvalue - values[b, curr_pos]
+            lastgaelam = delta + gamma * lam * lastgaelam
+            advantages_token[b, curr_pos] = lastgaelam
+            returns_token[b, curr_pos] = lastgaelam + values[b, curr_pos]
+    
+    advantages_token = verl_F.masked_whiten(advantages_token, loss_mask)
     
     return advantages_token, returns_token
 
-
+@torch.no_grad()
 def compute_high_level_gae_advantage_return(
         token_level_rewards: torch.Tensor,
         values: torch.Tensor,
@@ -279,52 +279,52 @@ def compute_high_level_gae_advantage_return(
         - reward_mask identifies the end of each turn (where rewards are assigned)
         - The function processes each batch item separately to handle variable turn lengths
     """
-    with torch.no_grad():
-        batch_size, gen_len = token_level_rewards.shape
-        token_advantages = torch.zeros_like(token_level_rewards)
-        token_returns = torch.zeros_like(token_level_rewards)
+    
+    batch_size, gen_len = token_level_rewards.shape
+    token_advantages = torch.zeros_like(token_level_rewards)
+    token_returns = torch.zeros_like(token_level_rewards)
+    
+    
+    
+    for b in range(batch_size):
+        sos_positions = sos_mask[b].nonzero(as_tuple=True)[0]
+        eos_positions=eos_mask[b].nonzero(as_tuple=True)[0]
         
+        # We use sos positions to calculate turn-level advantage
+        # We assign the turn-level advantage to the last valid token of each turn
         
-        
-        for b in range(batch_size):
-            sos_positions = sos_mask[b].nonzero(as_tuple=True)[0]
-            eos_positions=eos_mask[b].nonzero(as_tuple=True)[0]
+        lastgaelam = 0.0
+        for i in range(len(sos_positions) - 1, -1, -1):
+            cur_sos_pos = sos_positions[i]
+            cur_eos_pos = eos_positions[i]
             
-            # We use sos positions to calculate turn-level advantage
-            # We assign the turn-level advantage to the last valid token of each turn
+            # Get the next value
+            if i < len(sos_positions) - 1:
+                # Next valid position
+                
+                next_sos_pos = sos_positions[i + 1]
+                nextvalue = values[b, next_sos_pos]
+                
+            else:
+                # Last valid position
+                nextvalue = 0.0
             
-            lastgaelam = 0.0
-            for i in range(len(sos_positions) - 1, -1, -1):
-                cur_sos_pos = sos_positions[i]
-                cur_eos_pos = eos_positions[i]
-                
-                # Get the next value
-                if i < len(sos_positions) - 1:
-                    # Next valid position
-                    
-                    next_sos_pos = sos_positions[i + 1]
-                    nextvalue = values[b, next_sos_pos]
-                    
-                else:
-                    # Last valid position
-                    nextvalue = 0.0
-                
-                
-                
-                delta = token_level_rewards[b, cur_eos_pos] + high_level_gamma * nextvalue - values[b, cur_sos_pos] # value before current tokens are taken
-                lastgaelam = delta + high_level_gamma * lam * lastgaelam
-                token_returns[b, cur_sos_pos] = lastgaelam + values[b, cur_sos_pos]
-              
-                token_advantages[b, cur_sos_pos:cur_eos_pos+1] = lastgaelam # Tokes shares the turn advantage
-                
-        
-        token_advantages = verl_F.masked_whiten(token_advantages, loss_mask)
+            
+            
+            delta = token_level_rewards[b, cur_eos_pos] + high_level_gamma * nextvalue - values[b, cur_sos_pos] # value before current tokens are taken
+            lastgaelam = delta + high_level_gamma * lam * lastgaelam
+            token_returns[b, cur_sos_pos] = lastgaelam + values[b, cur_sos_pos]
+            
+            token_advantages[b, cur_sos_pos:cur_eos_pos+1] = lastgaelam # Tokes shares the turn advantage
+            
+    
+    token_advantages = verl_F.masked_whiten(token_advantages, loss_mask)
     
     return token_advantages, token_returns
                     
         
         
-
+@torch.no_grad()
 def compute_gae_advantage_return(token_level_rewards: torch.Tensor, values: torch.Tensor, eos_mask: torch.Tensor,
                                  gamma: torch.Tensor, lam: torch.Tensor):
     """Adapted from https://github.com/huggingface/trl/blob/main/trl/trainer/ppo_trainer.py
@@ -348,24 +348,25 @@ def compute_gae_advantage_return(token_level_rewards: torch.Tensor, values: torc
             shape: (bs, response_length)
 
     """
-    with torch.no_grad():
-        lastgaelam = 0
-        advantages_reversed = []
-        gen_len = token_level_rewards.shape[-1]
+    
+    lastgaelam = 0
+    advantages_reversed = []
+    gen_len = token_level_rewards.shape[-1]
 
-        for t in reversed(range(gen_len)):
-            nextvalues = values[:, t + 1] if t < gen_len - 1 else 0.0 
-            delta = token_level_rewards[:, t] + gamma * nextvalues - values[:, t] # TD error
-            lastgaelam = delta + gamma * lam * lastgaelam # gae
-            advantages_reversed.append(lastgaelam) # store the gae
-        advantages = torch.stack(advantages_reversed[::-1], dim=1)
+    for t in reversed(range(gen_len)):
+        nextvalues = values[:, t + 1] if t < gen_len - 1 else 0.0 
+        delta = token_level_rewards[:, t] + gamma * nextvalues - values[:, t] # TD error
+        lastgaelam = delta + gamma * lam * lastgaelam # gae
+        advantages_reversed.append(lastgaelam) # store the gae
+    advantages = torch.stack(advantages_reversed[::-1], dim=1)
 
-        returns = advantages + values
-        advantages = verl_F.masked_whiten(advantages, eos_mask)
+    returns = advantages + values
+    advantages = verl_F.masked_whiten(advantages, eos_mask)
     return advantages, returns
 
 
 # NOTE(sgm): this implementation only consider outcome supervision, where the reward is a scalar.
+@torch.no_grad()
 def compute_grpo_outcome_advantage(token_level_rewards: torch.Tensor,
                                    eos_mask: torch.Tensor,
                                    index: torch.Tensor,
@@ -392,22 +393,21 @@ def compute_grpo_outcome_advantage(token_level_rewards: torch.Tensor,
     id2mean = {}
     id2std = {}
 
-    with torch.no_grad():
-        bsz = scores.shape[0]
-        for i in range(bsz):
-            id2score[index[i]].append(scores[i])
-        for idx in id2score:
-            if len(id2score[idx]) == 1:
-                id2mean[idx] = torch.tensor(0.0)
-                id2std[idx] = torch.tensor(1.0)
-            elif len(id2score[idx]) > 1:
-                id2mean[idx] = torch.mean(torch.tensor(id2score[idx]))
-                id2std[idx] = torch.std(torch.tensor([id2score[idx]]))
-            else:
-                raise ValueError(f"no score in prompt index: {idx}")
-        for i in range(bsz):
-            scores[i] = (scores[i] - id2mean[index[i]]) / (id2std[index[i]] + epsilon)
-        scores = scores.unsqueeze(-1).tile([1, response_length]) * eos_mask
+    bsz = scores.shape[0]
+    for i in range(bsz):
+        id2score[index[i]].append(scores[i])
+    for idx in id2score:
+        if len(id2score[idx]) == 1:
+            id2mean[idx] = torch.tensor(0.0)
+            id2std[idx] = torch.tensor(1.0)
+        elif len(id2score[idx]) > 1:
+            id2mean[idx] = torch.mean(torch.tensor(id2score[idx]))
+            id2std[idx] = torch.std(torch.tensor([id2score[idx]]))
+        else:
+            raise ValueError(f"no score in prompt index: {idx}")
+    for i in range(bsz):
+        scores[i] = (scores[i] - id2mean[index[i]]) / (id2std[index[i]] + epsilon)
+    scores = scores.unsqueeze(-1).tile([1, response_length]) * eos_mask
 
     return scores, scores
 
