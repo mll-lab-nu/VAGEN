@@ -113,7 +113,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     trainer.logger=['console','wandb'] \\
     trainer.project_name='vagen_turnwise' \\
     trainer.experiment_name=$WANDB_EXPERIMENT_NAME \\
-    trainer.n_gpus_per_node=4 \\
+    trainer.n_gpus_per_node=8 \\
     trainer.nnodes=1 \\
     trainer.save_freq=150 \\
     trainer.test_freq=20 \\
