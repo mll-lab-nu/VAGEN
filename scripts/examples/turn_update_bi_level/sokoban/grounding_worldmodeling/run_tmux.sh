@@ -134,7 +134,6 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     rollout_manager.timeout=300 \\
     rollout_manager.base_url=\"http://localhost:$PORT\" \\
     rollout_manager.use_turn_update=True \\
-    rollout_manager.use_turn_update_bi_level_gae=True \\
     2>&1 | tee $EXPERIMENT_NAME.log" C-m
 
 
