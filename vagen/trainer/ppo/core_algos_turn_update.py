@@ -415,7 +415,8 @@ def compute_turn_update_gigpo_advantage_return_with_discount(
         else:
             group_returns = [ret for _, ret in group]
             mean_return = np.mean(group_returns)
-            std_return = np.std(group_returns)
+            #std_return = np.std(group_returns)
+            std_return = 1.0
             
             if std_return > 1e-8:
                 for batch_idx, ret in group:
