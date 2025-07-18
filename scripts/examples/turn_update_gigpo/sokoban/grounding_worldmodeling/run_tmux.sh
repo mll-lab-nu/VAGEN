@@ -74,7 +74,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     algorithm.high_level_gamma=0.9 \\
     data.train_files=data/$EXPERIMENT_NAME/train.parquet \\
     data.val_files=data/$EXPERIMENT_NAME/test.parquet \\
-    data.train_batch_size=64 \\
+    data.train_batch_size=16 \\
     data.max_prompt_length=1024 \\
     data.max_response_length=512 \\
     data.max_trajectory_length=2400 \\
@@ -128,7 +128,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     rollout_manager.use_gae_mask=True \\
     trainer.val_before_train=True \\
     trainer.val_generations_to_log_to_wandb=8 \\
-    rollout_manager.n_trajectory=2 \\
+    rollout_manager.n_trajectory=8 \\
     rollout_manager.use_service=True \\
     rollout_manager.timeout=300 \\
     rollout_manager.base_url=\"http://localhost:$PORT\" \\

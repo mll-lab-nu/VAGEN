@@ -341,14 +341,12 @@ def compute_turn_update_bi_level_gae_advantage_return(
 @torch.no_grad()
 def compute_turn_update_gigpo_advantage_return_with_discount(
         token_level_rewards: torch.Tensor,
-        values: torch.Tensor,
         loss_mask: torch.Tensor,
         env_ids: np.ndarray,
         turn_ids: np.ndarray,
         turn_rewards: np.ndarray,
         turn_uids: np.ndarray,
         high_level_gamma: float,
-        token_reward_type: str = "advantage"
     ):
     """Extended GIGPO that incorporates discounting across turns within trajectories.
     

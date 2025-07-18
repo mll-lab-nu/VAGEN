@@ -317,19 +317,20 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         data.batch['returns'] = returns
     elif adv_estimator == AdvantageEstimator.TURN_UPDATE_GIGPO:
         token_level_rewards=data.batch['token_level_rewards']
-        values = data.batch['values']
         responses = data.batch['responses']
         response_length = responses.size(-1)
         loss_mask = data.batch['loss_mask'][:, -response_length:]
         uids = data.non_tensor_batch['uid']
+        env_ids = data.non_tensor_batch['env_id']
+        turn_ids = data.non_tensor_batch['turn_id']
+        turn_rewards = data.non_tensor_batch['reward']
         advantages, returns = core_algos_turn_update.compute_turn_update_gigpo_advantage_return_with_discount(token_level_rewards=token_level_rewards,
                                                                                                 loss_mask=loss_mask,
                                                                                                 high_level_gamma=high_level_gamma,
                                                                                                 env_ids=env_ids,
                                                                                                 turn_ids=turn_ids,
                                                                                                 turn_rewards=turn_rewards,
-                                                                                                turn_uids=turn_uids,
-                                                                                                token_reward_type=kwargs.get("token_reward_type", "advantage"),
+                                                                                                turn_uids=uids,
                                                                                                 )
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
@@ -543,7 +544,7 @@ class RayPPOTrainer(object):
                                                    AdvantageEstimator.TURN_UPDATE_HIGH_LEVEL_GAE,AdvantageEstimator.TURN_UPDATE_BI_LEVEL_GAE]:
             self.use_critic = True
         elif self.config.algorithm.adv_estimator in [
-                AdvantageEstimator.GRPO, AdvantageEstimator.GIRPO,
+                AdvantageEstimator.GRPO, AdvantageEstimator.TURN_UPDATE_GIGPO,
                 
         ]:
             self.use_critic = False
