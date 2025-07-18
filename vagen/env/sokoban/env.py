@@ -16,6 +16,8 @@ from .prompt import (
 from .env_config import SokobanEnvConfig
 from vagen.env.utils.state_reward_text_utils import env_state_reward_wrapper
 from .utils import sokoban_state_to_sentences, convert_sokoban_state_to_relative_list
+import hashlib
+import numpy as np
 class SokobanEnv(BaseEnv):
     GRID_LOOKUP = {
         0: " # \t",  # wall
@@ -71,7 +73,7 @@ class SokobanEnv(BaseEnv):
             self.env.player_position = np.argwhere(self.env.room_state == 5)[0]
             self.env.num_env_steps = self.env.reward_last = self.env.boxes_on_target = 0
         self.total_reward = 0
-        return self._render(init_obs=True), {}
+        return self._render(init_obs=True), {"uid":self._get_env_state_uid()}
     
     @env_state_reward_wrapper
     def step(self, action_str: str):
@@ -121,7 +123,7 @@ class SokobanEnv(BaseEnv):
         info["metrics"] = metrics
         metrics['turn_metrics']['action_is_effective'] = not np.array_equal(prev_player_position, self.env.player_position)
         self.total_reward += self.reward
-
+        info["uid"] = self._get_env_state_uid()
         return self._render(init_obs=False), self.reward, done, info
     
     def system_prompt(self):
@@ -180,6 +182,31 @@ class SokobanEnv(BaseEnv):
     def _success(self):
         return self.env.boxes_on_target == self.env.num_boxes
     
+    def _get_env_state_uid(self):
+        """
+        Generate a unique identifier for the current environment state using numpy arrays.
+        
+        Uses the raw room_state and room_fixed arrays directly for maximum efficiency.
+        # use for gigpo
+        Returns:
+            str: A unique identifier (SHA-256 hash) for the current state
+        """
+        # Get the raw numpy arrays
+        room_state = self.env.room_state
+        room_fixed = self.env.room_fixed
+        
+        # Convert to bytes for hashing
+        state_bytes = room_state.tobytes()
+        fixed_bytes = room_fixed.tobytes()
+        
+        # Combine both arrays' bytes
+        combined_bytes = state_bytes + fixed_bytes
+        
+        # Generate SHA-256 hash
+        state_hash = hashlib.sha256(combined_bytes).hexdigest()
+        
+        return state_hash
+
     def get_env_state(self):
         """
         Get the basic positional state of the Sokoban environment.
@@ -224,7 +251,7 @@ if __name__ == "__main__":
     env = SokobanEnv(config)
     print(env.system_prompt())
     obs, info = env.reset()
-    print(obs["obs_str"])
+    print(obs["obs_str"],info["uid"])
     i=0
     import os
     if config.render_mode == 'vision':
@@ -236,7 +263,7 @@ if __name__ == "__main__":
         action = input("Enter action (Left, Down, Right, Up): ")
         action = f"<think>Let me try this direction.</think><answer>{action}</answer>"
         obs, reward, done, info = env.step(action)
-        print(obs["obs_str"])
+        print(obs["obs_str"],info["uid"])
         if config.render_mode == 'vision':
             # save the image
             img = obs["multi_modal_data"][config.image_placeholder][0]

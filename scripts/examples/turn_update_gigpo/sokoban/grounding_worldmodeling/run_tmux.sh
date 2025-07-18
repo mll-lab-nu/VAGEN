@@ -70,6 +70,8 @@ tmux send-keys -t "$TRAIN_SESSION" "python -m vagen.env.create_dataset \\
 WANDB_EXPERIMENT_NAME=${EXPERIMENT_NAME}_$(date +%Y%m%d_%H%M%S)
 # Then start the training
 tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
+    algorithm.adv_estimator=turn_update_gigpo \\
+    algorithm.high_level_gamma=0.9 \\
     data.train_files=data/$EXPERIMENT_NAME/train.parquet \\
     data.val_files=data/$EXPERIMENT_NAME/test.parquet \\
     data.train_batch_size=64 \\
@@ -109,6 +111,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     critic.ppo_micro_batch_size_per_gpu=1 \\
     critic.model.fsdp_config.param_offload=False \\
     critic.model.fsdp_config.optimizer_offload=False \\
+    algorithm.kl_ctrl.kl_coef=0.001 \\
     trainer.critic_warmup=0 \\
     trainer.logger=['console','wandb'] \\
     trainer.project_name='vagen_turnwise' \\
@@ -118,10 +121,6 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     trainer.save_freq=150 \\
     trainer.test_freq=20 \\
     trainer.total_training_steps=300 \\
-    algorithm.adv_estimator=turn_update_bi_level_gae \\
-    algorithm.high_level_gamma=0.9 \\
-    algorithm.kl_ctrl.kl_coef=0.001 \\
-    algorithm.token_reward_type=return \\
     rollout_manager.max_turns=3 \\
     rollout_manager.window_size=0 \\
     rollout_manager.use_multi_turn_reward=False \\
