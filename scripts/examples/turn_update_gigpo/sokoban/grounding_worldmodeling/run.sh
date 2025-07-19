@@ -64,11 +64,16 @@ for i in {1..10}; do
 done
 
 echo "Creating dataset..."
-# Create the dataset
+# Create the dataset (使用绝对路径)
 python -m vagen.env.create_dataset \
     --yaml_path "$SCRIPT_DIR/env_config.yaml" \
-    --train_path "data/$EXPERIMENT_NAME/train.parquet" \
-    --test_path "data/$EXPERIMENT_NAME/test.parquet"
+    --train_path "$SCRIPT_DIR/data/$EXPERIMENT_NAME/train.parquet" \
+    --test_path "$SCRIPT_DIR/data/$EXPERIMENT_NAME/test.parquet"
+
+echo "Checking if dataset was created..."
+ls -la "$SCRIPT_DIR/data/$EXPERIMENT_NAME/"
+echo "Current directory: $(pwd)"
+echo "Script directory: $SCRIPT_DIR"
 
 echo "Starting training..."
 # Start the training (output directly to console)
@@ -78,8 +83,8 @@ set -x  # Enable command echoing
 python3 -m vagen.trainer.main_ppo \
     algorithm.adv_estimator=turn_update_gigpo \
     algorithm.high_level_gamma=0.9 \
-    data.train_files=data/$EXPERIMENT_NAME/train.parquet \
-    data.val_files=data/$EXPERIMENT_NAME/test.parquet \
+    data.train_files="$SCRIPT_DIR/data/$EXPERIMENT_NAME/train.parquet" \
+    data.val_files="$SCRIPT_DIR/data/$EXPERIMENT_NAME/test.parquet" \
     data.train_batch_size=64 \
     data.max_prompt_length=1024 \
     data.max_response_length=512 \
