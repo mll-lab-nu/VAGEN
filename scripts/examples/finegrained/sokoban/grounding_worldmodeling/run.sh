@@ -3,7 +3,7 @@ set -e  # Exit immediately if a command exits with a non-zero status
 
 # Configuration - Set these values manually
 PORT=5000
-CUDA_DEVICES="0,1,2,3"
+CUDA_DEVICES="0,1,2,3,4,5,6,7"
 
 # Get the directory of the script
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
