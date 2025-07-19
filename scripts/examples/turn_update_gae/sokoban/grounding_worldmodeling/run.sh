@@ -67,8 +67,9 @@ echo "Creating dataset..."
 # Create the dataset
 python -m vagen.env.create_dataset \
     --yaml_path "$SCRIPT_DIR/env_config.yaml" \
-    --train_path "data/$EXPERIMENT_NAME/train.parquet" \
-    --test_path "data/$EXPERIMENT_NAME/test.parquet"
+    --train_path "$SCRIPT_DIR/data/$EXPERIMENT_NAME/train.parquet" \
+    --test_path "$SCRIPT_DIR/data/$EXPERIMENT_NAME/test.parquet" \
+    2>&1 | tee "$SCRIPT_DIR/server.log"
 
 echo "Starting training..."
 # Start the training (output directly to console)
@@ -81,8 +82,8 @@ WANDB_EXPERIMENT_NAME=${EXPERIMENT_NAME}_$(date +%Y%m%d_%H%M%S)
 python3 -m vagen.trainer.main_ppo \
     algorithm.adv_estimator=turn_update_gae \
     algorithm.high_level_gamma=0.9 \
-    data.train_files=data/$EXPERIMENT_NAME/train.parquet \
-    data.val_files=data/$EXPERIMENT_NAME/test.parquet \
+    data.train_files="$SCRIPT_DIR/data/$EXPERIMENT_NAME/train.parquet" \
+    data.val_files="$SCRIPT_DIR/data/$EXPERIMENT_NAME/test.parquet" \
     data.train_batch_size=64 \
     data.max_prompt_length=1024 \
     data.max_response_length=512 \

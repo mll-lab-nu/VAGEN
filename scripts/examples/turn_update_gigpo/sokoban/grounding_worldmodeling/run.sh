@@ -64,11 +64,12 @@ for i in {1..10}; do
 done
 
 echo "Creating dataset..."
-# Create the dataset (使用绝对路径)
+
 python -m vagen.env.create_dataset \
     --yaml_path "$SCRIPT_DIR/env_config.yaml" \
     --train_path "$SCRIPT_DIR/data/$EXPERIMENT_NAME/train.parquet" \
-    --test_path "$SCRIPT_DIR/data/$EXPERIMENT_NAME/test.parquet"
+    --test_path "$SCRIPT_DIR/data/$EXPERIMENT_NAME/test.parquet" \
+    2>&1 | tee "$SCRIPT_DIR/server.log"
 
 echo "Checking if dataset was created..."
 ls -la "$SCRIPT_DIR/data/$EXPERIMENT_NAME/"
