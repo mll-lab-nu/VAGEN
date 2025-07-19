@@ -77,7 +77,7 @@ cd "$SCRIPT_DIR"
 set -x  # Enable command echoing
 
 python3 -m vagen.trainer.main_ppo \
-    algorithm.adv_estimator=turn_update_high_level \
+    algorithm.adv_estimator=turn_update_high_level_gae \
     algorithm.high_level_gamma=0.9 \
     data.train_files="$SCRIPT_DIR/data/$EXPERIMENT_NAME/train.parquet" \
     data.val_files="$SCRIPT_DIR/data/$EXPERIMENT_NAME/test.parquet" \
