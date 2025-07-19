@@ -23,11 +23,11 @@ export VLLM_ATTENTION_BACKEND=XFORMERS
 export PYTHONHASHSEED=0
 
 # Activate conda environment
-conda activate vagen
+source activate vagen
 
 echo "Starting server in background..."
 # Start server in background and save PID
-python -m vagen.server.server server.port=$PORT use_state_reward=True &
+python -m vagen.server.server server.port=$PORT &
 SERVER_PID=$!
 echo "Server started with PID: $SERVER_PID"
 
@@ -76,11 +76,11 @@ cd "$SCRIPT_DIR"
 set -x  # Enable command echoing
 
 python3 -m vagen.trainer.main_ppo \
-    algorithm.adv_estimator=bi_level_gae \
-    algorithm.high_level_gamma=0.95 \
+    algorithm.adv_estimator=high_level_gae \
+    algorithm.high_level_gamma=1.0 \
     data.train_files=data/$EXPERIMENT_NAME/train.parquet \
     data.val_files=data/$EXPERIMENT_NAME/test.parquet \
-    data.train_batch_size=128 \
+    data.train_batch_size=64 \
     data.max_prompt_length=1024 \
     data.max_response_length=200 \
     data.max_trajectory_length=2400 \
@@ -116,12 +116,13 @@ python3 -m vagen.trainer.main_ppo \
     critic.ppo_micro_batch_size_per_gpu=1 \
     critic.model.fsdp_config.param_offload=False \
     critic.model.fsdp_config.optimizer_offload=False \
+    critic.use_reward_mask=True \
     algorithm.kl_ctrl.kl_coef=0.001 \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
     trainer.project_name='vagen_new' \
     trainer.experiment_name=$EXPERIMENT_NAME \
-    trainer.n_gpus_per_node=4 \
+    trainer.n_gpus_per_node=8 \
     trainer.nnodes=1 \
     trainer.save_freq=150 \
     trainer.test_freq=20 \
@@ -133,9 +134,9 @@ python3 -m vagen.trainer.main_ppo \
     rollout_manager.use_gae_mask=True \
     trainer.val_before_train=True \
     trainer.val_generations_to_log_to_wandb=8 \
-    rollout_manager.n_trajectory=1 \
+    rollout_manager.n_trajectory=2 \
     rollout_manager.use_service=True \
     rollout_manager.timeout=300 \
     rollout_manager.base_url="http://localhost:$PORT"
 
-echo "Training completed!"
+echo "Training completed!" 

@@ -23,11 +23,11 @@ export VLLM_ATTENTION_BACKEND=XFORMERS
 export PYTHONHASHSEED=0
 
 # Activate conda environment
-conda activate vagen
+source activate vagen
 
 echo "Starting server in background..."
 # Start server in background and save PID
-python -m vagen.server.server server.port=$PORT use_state_reward=True &
+python -m vagen.server.server server.port=$PORT use_state_reward=False &
 SERVER_PID=$!
 echo "Server started with PID: $SERVER_PID"
 
@@ -76,7 +76,7 @@ cd "$SCRIPT_DIR"
 set -x  # Enable command echoing
 
 python3 -m vagen.trainer.main_ppo \
-    algorithm.adv_estimator=bi_level_gae \
+    algorithm.adv_estimator=masked_gae \
     algorithm.high_level_gamma=0.95 \
     data.train_files=data/$EXPERIMENT_NAME/train.parquet \
     data.val_files=data/$EXPERIMENT_NAME/test.parquet \
@@ -121,14 +121,14 @@ python3 -m vagen.trainer.main_ppo \
     trainer.logger=['console','wandb'] \
     trainer.project_name='vagen_new' \
     trainer.experiment_name=$EXPERIMENT_NAME \
-    trainer.n_gpus_per_node=4 \
+    trainer.n_gpus_per_node=8 \
     trainer.nnodes=1 \
     trainer.save_freq=150 \
     trainer.test_freq=20 \
     trainer.total_training_steps=300 \
     rollout_manager.max_turns=3 \
     rollout_manager.window_size=5 \
-    rollout_manager.use_multi_turn_reward=True \
+    rollout_manager.use_multi_turn_reward=False \
     rollout_manager.use_loss_mask=True \
     rollout_manager.use_gae_mask=True \
     trainer.val_before_train=True \
@@ -138,4 +138,4 @@ python3 -m vagen.trainer.main_ppo \
     rollout_manager.timeout=300 \
     rollout_manager.base_url="http://localhost:$PORT"
 
-echo "Training completed!"
+echo "Training completed!" 

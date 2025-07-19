@@ -3,7 +3,7 @@ set -e  # Exit immediately if a command exits with a non-zero status
 
 # Configuration - Set these values manually
 PORT=5000
-CUDA_DEVICES="0,1,2,3,4,5,6,7"
+CUDA_DEVICES="0,1,2,3"
 
 # Get the directory of the script
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -23,11 +23,11 @@ export VLLM_ATTENTION_BACKEND=XFORMERS
 export PYTHONHASHSEED=0
 
 # Activate conda environment
-conda activate vagen
+source activate vagen
 
 echo "Starting server in background..."
 # Start server in background and save PID
-python -m vagen.server.server server.port=$PORT use_state_reward=True &
+python -m vagen.server.server server.port=$PORT use_state_reward=False &
 SERVER_PID=$!
 echo "Server started with PID: $SERVER_PID"
 
@@ -121,7 +121,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.logger=['console','wandb'] \
     trainer.project_name='vagen_new' \
     trainer.experiment_name=$EXPERIMENT_NAME \
-    trainer.n_gpus_per_node=4 \
+    trainer.n_gpus_per_node=8 \
     trainer.nnodes=1 \
     trainer.save_freq=150 \
     trainer.test_freq=20 \
