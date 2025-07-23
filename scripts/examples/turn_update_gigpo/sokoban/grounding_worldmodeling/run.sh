@@ -86,7 +86,7 @@ python3 -m vagen.trainer.main_ppo \
     algorithm.high_level_gamma=0.9 \
     data.train_files="$SCRIPT_DIR/data/$EXPERIMENT_NAME/train.parquet" \
     data.val_files="$SCRIPT_DIR/data/$EXPERIMENT_NAME/test.parquet" \
-    data.train_batch_size=64 \
+    data.train_batch_size=16 \
     data.max_prompt_length=1024 \
     data.max_response_length=512 \
     data.max_trajectory_length=2400 \
@@ -97,7 +97,7 @@ python3 -m vagen.trainer.main_ppo \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.actor.ppo_mini_batch_size=64 \
     actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=1 \
-    actor_rollout_ref.actor.use_kl_loss=True \
+    actor_rollout_ref.actor.use_kl_loss=False \
     actor_rollout_ref.actor.kl_loss_coef=0.001 \
     actor_rollout_ref.actor.kl_loss_type=mse \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
@@ -131,7 +131,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.nnodes=1 \
     trainer.save_freq=150 \
     trainer.test_freq=20 \
-    trainer.total_training_steps=300 \
+    trainer.total_training_steps=600 \
     rollout_manager.max_turns=3 \
     rollout_manager.window_size=0 \
     rollout_manager.use_multi_turn_reward=False \
@@ -139,7 +139,7 @@ python3 -m vagen.trainer.main_ppo \
     rollout_manager.use_gae_mask=True \
     trainer.val_before_train=True \
     trainer.val_generations_to_log_to_wandb=8 \
-    rollout_manager.n_trajectory=2 \
+    rollout_manager.n_trajectory=16 \
     rollout_manager.use_service=True \
     rollout_manager.timeout=300 \
     rollout_manager.base_url="http://localhost:$PORT" \
