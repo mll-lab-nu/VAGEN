@@ -61,12 +61,12 @@ def grpo_state_traj_advantage(
     
     # Assign to tokens
     advantages = assign_advantages_to_tokens(combined_advantages, loss_mask)
-    
+    returns = advantages.clone()
     # Handle duplicates
-    apply_duplicate_values(duplicate_turns, unique_turns, env_ids, turn_ids, advantages)
+    apply_duplicate_values(duplicate_turns, unique_turns, env_ids, turn_ids, advantages, returns)
     
     # Final whitening
     advantages = verl_F.masked_whiten(advantages, loss_mask)
-    returns = advantages.clone()
+    
     
     return advantages, returns

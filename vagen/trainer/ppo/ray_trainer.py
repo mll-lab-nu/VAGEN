@@ -551,7 +551,7 @@ class RayPPOTrainer(object):
                                                    AdvantageEstimator.TURN_UPDATE_HIGH_LEVEL_GAE,AdvantageEstimator.TURN_UPDATE_BI_LEVEL_GAE]:
             self.use_critic = True
         elif self.config.algorithm.adv_estimator in [
-                AdvantageEstimator.GRPO, AdvantageEstimator.TURN_UPDATE_GIGPO,
+                AdvantageEstimator.GRPO, AdvantageEstimator.TURN_UPDATE_GRPO,
                 
         ]:
             self.use_critic = False
@@ -856,20 +856,20 @@ class RayPPOTrainer(object):
             if 'multi_modal_inputs' in batch.non_tensor_batch.keys():
                 batch.pop(
                     batch_keys=['input_ids', 'attention_mask', 'position_ids'],
-                    non_tensor_batch_keys=['raw_prompt_ids', 'multi_modal_data', 'multi_modal_inputs'],
+                    non_tensor_batch_keys=['raw_prompt_ids', 'multi_modal_data', 'multi_modal_inputs',],
                 )
             else:
                 batch.pop(
                     batch_keys=['input_ids', 'attention_mask', 'position_ids'],
-                    non_tensor_batch_keys=['raw_prompt_ids'],
+                    non_tensor_batch_keys=['raw_prompt_ids',],
                 )
-
-            env_configs = [
-                    batch.non_tensor_batch['extra_info'][i]
-                    for i in range(len(batch))
-                ]
+            batch.non_tensor_batch['uid'] = np.array([str(uuid.uuid4()) for _ in range(len(batch.batch))],dtype=object)
+            # env_configs = [
+            #         batch.non_tensor_batch['extra_info'][i]
+            #         for i in range(len(batch))
+            #     ]
             
-            self.test_rollout_manager.reset(env_configs)
+            self.test_rollout_manager.reset(batch)
             self.test_rollout_manager.rollout_loop()
             micro_validation_rst = self.test_rollout_manager.recording_to_log() # data source == inputs in our current setting, outputs=whole trjecotry
             validation_rst.extend(micro_validation_rst)
@@ -1098,7 +1098,17 @@ class RayPPOTrainer(object):
             #     batch.non_tensor_batch['extra_info'][j]
             #     for j in range(start_idx, end_idx)
             # ]
-            mini_batch=batch[start_idx:end_idx]
+            indices = torch.arange(start_idx, end_idx)
+            mini_batch_tensor = batch.batch[indices] if batch.batch is not None else None
+            mini_batch_non_tensor = {
+                key: val[start_idx:end_idx] 
+                for key, val in batch.non_tensor_batch.items()
+            }
+            mini_batch = DataProto(
+                batch=mini_batch_tensor,
+                non_tensor_batch=mini_batch_non_tensor,
+                meta_info=batch.meta_info
+            )
             # Reset and process this mini-batch
             rollout_manager.reset(mini_batch)
             rollout_manager.rollout_loop()
@@ -1199,7 +1209,7 @@ class RayPPOTrainer(object):
                 else:
                     batch.pop(
                         batch_keys=['input_ids', 'attention_mask', 'position_ids'],
-                        non_tensor_batch_keys=['raw_prompt_ids'],
+                        non_tensor_batch_keys=['raw_prompt_ids',],
                     )
 
                 

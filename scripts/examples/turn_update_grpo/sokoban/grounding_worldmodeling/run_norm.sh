@@ -83,9 +83,9 @@ set -x  # Enable command echoing
 
 python3 -m vagen.trainer.main_ppo \
     algorithm.adv_estimator=turn_update_grpo \
-    algorithm.turn_advantage_weight= 1.0 \
-    algorithm.traj_advantage_weight= 1.0 \
-    algorithm.use_std_normalization= False \
+    algorithm.turn_advantage_weight=1.0 \
+    algorithm.traj_advantage_weight=1.0 \
+    algorithm.use_std_normalization=True \
     algorithm.high_level_gamma=0.9 \
     data.train_files="$SCRIPT_DIR/data/$EXPERIMENT_NAME/train.parquet" \
     data.val_files="$SCRIPT_DIR/data/$EXPERIMENT_NAME/test.parquet" \
@@ -129,7 +129,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
     trainer.project_name='vagen_turnwise' \
-    trainer.experiment_name=$EXPERIMENT_NAME \
+    trainer.experiment_name="${EXPERIMENT_NAME}_traj" \
     trainer.n_gpus_per_node=8 \
     trainer.nnodes=1 \
     trainer.save_freq=150 \

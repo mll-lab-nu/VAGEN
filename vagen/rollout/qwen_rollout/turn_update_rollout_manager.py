@@ -465,8 +465,8 @@ class TurnUpdateRolloutManager():
         pad_id = self.tokenizer.pad_token_id   # e.g. 151643
         
         # we use the last observation as uid for group based optimization
-        if "uid" in recording[step-1]["info"].keys():
-            row_dict["uid"] = recording[step-1]["info"]["uid"]
+        if "state_id" in recording[step-1]["info"].keys():
+            row_dict["state_id"] = recording[step-1]["info"]["state_id"]
             
         else:
             
@@ -487,7 +487,7 @@ class TurnUpdateRolloutManager():
             #     pass
             row_dict["state_id"] = tensor_to_uuid(valid_prompt, pad_token_id=self.tokenizer.pad_token_id)
             if self.config.algorithm == "gigrpo":
-                print(f"[DEBUG] No uid found for env, you can only use gigrpo for text-only env in this case!!!")
+                print(f"[DEBUG] No state_id found for env, you can only use gigrpo for text-only env in this case!!!")
         return row_dict
 
     @torch.no_grad()
@@ -592,7 +592,7 @@ class TurnUpdateRolloutManager():
         """
         batch_list = []
         reward_rst=self.env_client.compute_reward_batch(list(self.envs.keys()))
-        uid_assignment={} #counter
+        state_id_assignment={} #counter
         for env_id, recording in self.recorder.items():
             for idx in range(len(recording)):
                 if idx==0:
@@ -615,11 +615,13 @@ class TurnUpdateRolloutManager():
                     row_dict["reward"] += reward_rst[env_id]
                 # Generate deterministic UID based on the content of valid_prompt
                 # Currently uid works for llm but not vlm because we use prompt tokens for uid where images are represented by the same <image> token
-                uid_assignment[row_dict["state_id"]] = uid_assignment.get(row_dict["state_id"], 0) + 1
+                state_id_assignment[row_dict["state_id"]] = state_id_assignment.get(row_dict["state_id"], 0) + 1
                 
 
                 batch_list.append(row_dict)
-        print("min uid_assignment", min(uid_assignment.values()),"max uid_assignment", max(uid_assignment.values()),"avg uid_assignment", sum(uid_assignment.values())/len(uid_assignment))
+        print("min state_id_assignment", min(state_id_assignment.values()),"max state_id_assignment", 
+              max(state_id_assignment.values()),"avg state_id_assignment", sum(state_id_assignment.values())/len(state_id_assignment) 
+              if len(state_id_assignment) > 0 else 0)
         batch_dict = collate_fn(batch_list)
         batch = DataProto.from_single_dict(batch_dict)
         return batch

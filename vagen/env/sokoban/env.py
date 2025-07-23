@@ -73,7 +73,7 @@ class SokobanEnv(BaseEnv):
             self.env.player_position = np.argwhere(self.env.room_state == 5)[0]
             self.env.num_env_steps = self.env.reward_last = self.env.boxes_on_target = 0
         self.total_reward = 0
-        return self._render(init_obs=True), {"uid":self._get_env_state_uid()}
+        return self._render(init_obs=True), {"state_id":self._get_env_state_id()}
     
     @env_state_reward_wrapper
     def step(self, action_str: str):
@@ -123,7 +123,7 @@ class SokobanEnv(BaseEnv):
         info["metrics"] = metrics
         metrics['turn_metrics']['action_is_effective'] = not np.array_equal(prev_player_position, self.env.player_position)
         self.total_reward += self.reward
-        info["uid"] = self._get_env_state_uid()
+        info["state_id"] = self._get_env_state_id()
         return self._render(init_obs=False), self.reward, done, info
     
     def system_prompt(self):
@@ -182,7 +182,7 @@ class SokobanEnv(BaseEnv):
     def _success(self):
         return self.env.boxes_on_target == self.env.num_boxes
     
-    def _get_env_state_uid(self):
+    def _get_env_state_id(self):
         """
         Generate a unique identifier for the current environment state using numpy arrays.
         
@@ -251,7 +251,7 @@ if __name__ == "__main__":
     env = SokobanEnv(config)
     print(env.system_prompt())
     obs, info = env.reset()
-    print(obs["obs_str"],info["uid"])
+    print(obs["obs_str"],info["state_id"])
     i=0
     import os
     if config.render_mode == 'vision':
@@ -263,7 +263,7 @@ if __name__ == "__main__":
         action = input("Enter action (Left, Down, Right, Up): ")
         action = f"<think>Let me try this direction.</think><answer>{action}</answer>"
         obs, reward, done, info = env.step(action)
-        print(obs["obs_str"],info["uid"])
+        print(obs["obs_str"],info["state_id"])
         if config.render_mode == 'vision':
             # save the image
             img = obs["multi_modal_data"][config.image_placeholder][0]

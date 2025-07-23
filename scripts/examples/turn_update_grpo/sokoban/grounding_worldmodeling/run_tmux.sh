@@ -71,9 +71,9 @@ WANDB_EXPERIMENT_NAME=${EXPERIMENT_NAME}_$(date +%Y%m%d_%H%M%S)
 # Then start the training
 tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     algorithm.adv_estimator=turn_update_grpo \\
-    algorithm.turn_advantage_weight= 1.0 \\
-    algorithm.traj_advantage_weight= 1.0 \\
-    algorithm.use_std_normalization= False \\
+    algorithm.turn_advantage_weight=1.0 \\
+    algorithm.traj_advantage_weight=1.0 \\
+    algorithm.use_std_normalization=False \\
     algorithm.high_level_gamma=0.9 \\
     data.train_files=data/$EXPERIMENT_NAME/train.parquet \\
     data.val_files=data/$EXPERIMENT_NAME/test.parquet \\
