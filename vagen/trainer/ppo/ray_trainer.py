@@ -44,7 +44,8 @@ from vagen.rollout.qwen_rollout.rollout_manager import QwenVLRolloutManager
 from vagen.rollout.qwen_rollout.rollout_manager_service import QwenVLRolloutManagerService
 from vagen.trainer.ppo.utils import seed_everything
 from vagen.trainer.ppo import core_algos
-from vagen.trainer.ppo import core_algos_turn_update
+from vagen.trainer.ppo import turn_update_ppo
+from vagen.trainer.ppo import turn_update_grpo
 WorkerType = Type[Worker]
 
 
@@ -72,7 +73,7 @@ class AdvantageEstimator(str, Enum):
     GRPO = 'grpo'
     GIRPO = 'girpo'
     TURN_UPDATE_GAE = 'turn_update_gae'
-    TURN_UPDATE_GIGPO = 'turn_update_gigpo'
+    TURN_UPDATE_GRPO = 'turn_update_grpo'
     TURN_UPDATE_HIGH_LEVEL_GAE = 'turn_update_high_level_gae'
     TURN_UPDATE_BI_LEVEL_GAE = 'turn_update_bi_level_gae'
 
@@ -252,7 +253,7 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         env_ids = data.non_tensor_batch['env_id']  # numpy array with dtype=object
         turn_ids = data.non_tensor_batch['turn_id']  # numpy array with dtype=object
         turn_rewards = data.non_tensor_batch['reward']  # numpy array with dtype=object
-        advantages, returns = core_algos_turn_update.compute_turn_update_gae_advantage_return(token_level_rewards=token_level_rewards,
+        advantages, returns = turn_update_ppo.compute_turn_update_gae_advantage_return(token_level_rewards=token_level_rewards,
                                                                                                 values=values,
                                                                                                 loss_mask=loss_mask,
                                                                                                 gamma=gamma,
@@ -280,7 +281,7 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         turn_rewards = data.non_tensor_batch['reward']  # numpy array with dtype=object
         
         
-        advantages, returns = core_algos_turn_update.compute_turn_update_high_level_gae_advantage_return(token_level_rewards=token_level_rewards,
+        advantages, returns = turn_update_ppo.compute_turn_update_high_level_gae_advantage_return(token_level_rewards=token_level_rewards,
                                                                                                 values=values,
                                                                                                 loss_mask=loss_mask[:, -response_length:],
                                                                                                 high_level_gamma=high_level_gamma,
@@ -301,7 +302,7 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         env_ids = data.non_tensor_batch['env_id']  # numpy array with dtype=object
         turn_ids = data.non_tensor_batch['turn_id']  # numpy array with dtype=object
         turn_rewards = data.non_tensor_batch['reward']  # numpy array with dtype=object
-        advantages, returns = core_algos_turn_update.compute_turn_update_bi_level_gae_advantage_return(token_level_rewards=token_level_rewards,
+        advantages, returns = turn_update_ppo.compute_turn_update_bi_level_gae_advantage_return(token_level_rewards=token_level_rewards,
                                                                                                 values=values,
                                                                                                 loss_mask=loss_mask,
                                                                                                 high_level_gamma=high_level_gamma,
@@ -315,7 +316,7 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         data.batch['advantages'] = advantages
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
-    elif adv_estimator == AdvantageEstimator.TURN_UPDATE_GIGPO:
+    elif adv_estimator == AdvantageEstimator.TURN_UPDATE_GRPO:
         token_level_rewards=data.batch['token_level_rewards']
         responses = data.batch['responses']
         response_length = responses.size(-1)
@@ -324,14 +325,20 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         env_ids = data.non_tensor_batch['env_id']
         turn_ids = data.non_tensor_batch['turn_id']
         turn_rewards = data.non_tensor_batch['reward']
-        advantages, returns = core_algos_turn_update.compute_turn_update_gigpo_advantage_return_with_discount(token_level_rewards=token_level_rewards,
-                                                                                                loss_mask=loss_mask,
-                                                                                                high_level_gamma=high_level_gamma,
-                                                                                                env_ids=env_ids,
-                                                                                                turn_ids=turn_ids,
-                                                                                                turn_rewards=turn_rewards,
-                                                                                                turn_uids=uids,
-                                                                                                )
+        state_ids = data.non_tensor_batch['state_id']
+        advantages, returns = turn_update_grpo.grpo_state_traj_advantage(
+            token_level_rewards=token_level_rewards,
+            loss_mask=loss_mask,
+            env_ids=env_ids,
+            turn_ids=turn_ids,
+            turn_rewards=turn_rewards,
+            state_ids=state_ids,
+            uids=uids,
+            high_level_gamma=high_level_gamma,
+            turn_advantage_weight=kwargs.get("turn_advantage_weight", 1.0),
+            traj_advantage_weight=kwargs.get("traj_advantage_weight", 1.0),
+            use_std_normalization=kwargs.get("use_std_normalization", False),
+        )
         data.batch['advantages'] = advantages
         data.batch['returns'] = returns
     else:
@@ -1087,13 +1094,13 @@ class RayPPOTrainer(object):
             print(f"Processing mini-batch {i+1}/{num_mini_batches}, size: {actual_mini_batch_size}")
             
             # Extract env_configs for this mini-batch
-            mini_batch_env_configs = [
-                batch.non_tensor_batch['extra_info'][j]
-                for j in range(start_idx, end_idx)
-            ]
-            
+            # mini_batch_env_configs = [
+            #     batch.non_tensor_batch['extra_info'][j]
+            #     for j in range(start_idx, end_idx)
+            # ]
+            mini_batch=batch[start_idx:end_idx]
             # Reset and process this mini-batch
-            rollout_manager.reset(mini_batch_env_configs)
+            rollout_manager.reset(mini_batch)
             rollout_manager.rollout_loop()
             mini_batch_output = rollout_manager.generate_batch_for_update()
             mini_batch_rst = rollout_manager.recording_to_log()
@@ -1293,7 +1300,10 @@ class RayPPOTrainer(object):
                                                   lam=self.config.algorithm.lam,
                                                   num_repeat=self.config.actor_rollout_ref.rollout.n,
                                                   high_level_gamma=self.config.algorithm.high_level_gamma,
-                                                  token_reward_type=self.config.algorithm.token_reward_type)
+                                                  token_reward_type=self.config.algorithm.token_reward_type,
+                                                  turn_advantage_weight=self.config.algorithm.turn_advantage_weight,
+                                                  traj_advantage_weight=self.config.algorithm.traj_advantage_weight,
+                                                  use_std_normalization=self.config.algorithm.use_std_normalization)
 
                     # update critic
                     if self.use_critic:

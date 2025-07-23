@@ -105,7 +105,7 @@ class QwenVLRolloutManagerService():
         return compute_loss_mask(input_ids, attention_mask, sptk_b, sptk_e, pad_token_id)
     
     @torch.no_grad()
-    def reset(self, env_configs):
+    def reset(self, mini_batch:DataProto):
         """
         Reset environments based on provided configurations, reusing environments when possible.
         - For env with same config and env_name, reuse the same environment (reset)
@@ -120,7 +120,10 @@ class QwenVLRolloutManagerService():
         """
         # Step 1: Sort environments into buckets by env_name and config
         # Try to reuse environemnts with the same config and env_name
-        
+        env_configs = [
+                mini_batch.non_tensor_batch['extra_info'][i]
+                for i in range(len(mini_batch))
+            ]
         env_buckets = defaultdict(set)
         
         if self.envs is None:

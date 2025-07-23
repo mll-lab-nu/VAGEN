@@ -116,7 +116,7 @@ class TurnUpdateRolloutManager():
         return compute_loss_mask(input_ids, attention_mask, sptk_b, sptk_e, pad_token_id)
     
     @torch.no_grad()
-    def reset(self, env_configs):
+    def reset(self, mini_batch:DataProto):
         """
         Reset environments based on provided configurations, reusing environments when possible.
         - For env with same config and env_name, reuse the same environment (reset)
@@ -130,21 +130,26 @@ class TurnUpdateRolloutManager():
             Initial observations and info from all environments
         """
         # Step 1: Sort environments into buckets by env_name and config
-        # Try to reuse environemnts with the same config and env_name
-        
+        # Try to reuse environments with the same config and env_name
+        env_configs = [
+                mini_batch.non_tensor_batch['extra_info'][i]
+                for i in range(len(mini_batch))
+            ]
+        uids=mini_batch.non_tensor_batch['uid']
         env_buckets = defaultdict(set)
         
         if self.envs is None:
             self.envs = {} # This is now id:config_instance
-            
+        
         for env_id, env_config_instance in self.envs.items():
             env_config_id = env_config_instance.config_id()
             bucket_key = env_config_id
             env_buckets[bucket_key].add(env_id)
         
-        # Step1. collect envs which need to be reset and new env configs
+        # Step 1. Collect envs which need to be reset and new env configs
         ids2seeds_reset = {}
         configs_to_create=[]
+        env_id2uid = {}  # Mapping from env_id to uid
         for i, cfg in enumerate(env_configs):
             # Create bucket key
             config_instance= REGISTERED_ENV[cfg["env_name"]]["config_cls"](**cfg["env_config"])
@@ -155,9 +160,10 @@ class TurnUpdateRolloutManager():
             if bucket_key in env_buckets and env_buckets[bucket_key]:
                 old_env_id = env_buckets[bucket_key].pop()
                 ids2seeds_reset[old_env_id] = cfg["seed"]
+                env_id2uid[old_env_id] = uids[i]  # Map reused env_id to uid
             else:
-                # don't initialize the environment here, close unused environments first
-                configs_to_create.append(cfg)
+                # Do not initialize the environment here, close unused environments first
+                configs_to_create.append((cfg, uids[i]))  # Store config and uid for new envs
         
         # Step 2: Collect ids which need to be closed
         ids_to_close=[]
@@ -168,12 +174,11 @@ class TurnUpdateRolloutManager():
                 self.envs.pop(env_id)
 
         # Step 3: Close unused environments
-        #print(f"[DEBUG] ids_to_close: {ids_to_close}")
         self.env_client.close_batch(ids_to_close)
         # Step 4: Create new environments
         ids2configs_create = {}
         id=0
-        for cfg in configs_to_create:
+        for cfg, uid in configs_to_create:  # For new envs, assign uid
             id+=1
             while self.split+str(id) in self.envs:
                 id+=1
@@ -181,12 +186,10 @@ class TurnUpdateRolloutManager():
             ids2configs_create[id_str] = cfg
             ids2seeds_reset[id_str] = cfg["seed"]
             self.envs[id_str] = REGISTERED_ENV[cfg["env_name"]]["config_cls"](**cfg["env_config"])
-        #print(f"[DEBUG] ids2configs_create: {ids2configs_create}")
+            env_id2uid[id_str] = uid  # Map new env_id to uid
         self.env_client.create_environments_batch(ids2configs_create)
         # Step 5: Reset environments
-        #print(f"[DEBUG] ids2seeds_reset: {ids2seeds_reset}")
         reset_results=self.env_client.reset_batch(ids2seeds_reset)
-        
         
         if self.recorder is not None:
             del self.recorder
@@ -194,6 +197,8 @@ class TurnUpdateRolloutManager():
         initial_obs = {}
         initial_info = {}
         
+        # Save env_id to uid mapping
+        self.env_id2uid = env_id2uid
         
         for env_id, rst in reset_results.items():
             obs, info = rst
@@ -214,8 +219,8 @@ class TurnUpdateRolloutManager():
     @torch.no_grad()
     def record(self, env_id, obs, reward, done, info):
         """
-        Record each step's obs, info, done, reward,
-        Please include "llm_raw_response" in info # it will be decoded by rollout manager and pass to env, then should pass back
+        Record each step's obs, info, done, reward.
+        Please include "llm_raw_response" in info. It will be decoded by rollout manager and passed to env, then should be passed back.
         """
         # Create a record entry for this step
         assert obs is not None, "obs cannot be None"
@@ -480,7 +485,7 @@ class TurnUpdateRolloutManager():
             #     print("[DEBUG update] response:", response_str)
             # except Exception as _:
             #     pass
-            row_dict["uid"] = tensor_to_uuid(valid_prompt, pad_token_id=self.tokenizer.pad_token_id)
+            row_dict["state_id"] = tensor_to_uuid(valid_prompt, pad_token_id=self.tokenizer.pad_token_id)
             if self.config.algorithm == "gigrpo":
                 print(f"[DEBUG] No uid found for env, you can only use gigrpo for text-only env in this case!!!")
         return row_dict
@@ -605,11 +610,12 @@ class TurnUpdateRolloutManager():
                 row_dict["turn_id"] = idx
                 row_dict["env_id"] = env_id
                 row_dict["reward"] = recording[idx]['reward']
+                row_dict["uid"] = self.env_id2uid[env_id]
                 if idx==len(recording)-1:
                     row_dict["reward"] += reward_rst[env_id]
                 # Generate deterministic UID based on the content of valid_prompt
                 # Currently uid works for llm but not vlm because we use prompt tokens for uid where images are represented by the same <image> token
-                uid_assignment[row_dict["uid"]] = uid_assignment.get(row_dict["uid"], 0) + 1
+                uid_assignment[row_dict["state_id"]] = uid_assignment.get(row_dict["state_id"], 0) + 1
                 
 
                 batch_list.append(row_dict)
