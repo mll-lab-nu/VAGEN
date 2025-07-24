@@ -129,7 +129,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
     trainer.project_name='vagen_turnwise' \
-    trainer.experiment_name="${EXPERIMENT_NAME}_traj" \
+    trainer.experiment_name="${EXPERIMENT_NAME}_state_traj_norm" \
     trainer.n_gpus_per_node=8 \
     trainer.nnodes=1 \
     trainer.save_freq=150 \
