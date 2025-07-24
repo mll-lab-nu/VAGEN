@@ -130,7 +130,7 @@ class SokobanEnv(BaseEnv):
         format_prompt=self.format_prompt_func(
             max_actions_per_step=self.config.max_actions_per_step,
             action_sep=self.config.action_sep,
-            add_example=True  # Always true for system prompt
+            add_example=True if not self.config.turn_wise_update else False  # Always true for system prompt
         )
         return system_prompt() + "\n" + format_prompt
     
