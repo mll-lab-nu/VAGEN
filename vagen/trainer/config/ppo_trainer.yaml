@@ -132,6 +132,7 @@ critic:
   grad_clip: 1.0
   cliprange_value: 0.5
   use_reward_mask: False
+  grad_norm_threshold: 1e10
 
 reward_model:
   enable: False
