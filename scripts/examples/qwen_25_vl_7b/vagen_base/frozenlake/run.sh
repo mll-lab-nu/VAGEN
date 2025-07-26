@@ -65,7 +65,7 @@ set -x
 
 # Start the training (output directly to console)
 python3 -m vagen.trainer.main_ppo \
-    algorithm.adv_estimator=bi_level_gae \
+    algorithm.adv_estimator=masked_gae \
     algorithm.high_level_gamma=1.0 \
     data.train_files=data/$EXPERIMENT_NAME/train.parquet \
     data.val_files=data/$EXPERIMENT_NAME/test.parquet \
@@ -117,7 +117,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.total_training_steps=300 \
     rollout_manager.max_turns=3 \
     rollout_manager.window_size=5 \
-    rollout_manager.use_multi_turn_reward=True \
+    rollout_manager.use_multi_turn_reward=False \
     rollout_manager.use_loss_mask=True \
     rollout_manager.use_gae_mask=True \
     trainer.val_before_train=True \
