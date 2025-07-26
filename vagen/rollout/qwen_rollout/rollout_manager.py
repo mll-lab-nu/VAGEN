@@ -15,6 +15,7 @@ import verl.utils.torch_functional as verl_F
 from verl.utils.dataset.rl_dataset import process_image, collate_fn
 import vagen.env
 from vagen.env import REGISTERED_ENV
+from vagen.rollout.multimodal_utils import get_multimodal_handler, detect_model_type
 from vagen.rollout.utils.mask_utils import compute_loss_mask
     
 class QwenVLRolloutManager():
@@ -32,6 +33,14 @@ class QwenVLRolloutManager():
         self.envs = None # dict env_id:EnvInterface
         self.env_states = None # dict
         self.batch_idx_to_env_id = None # dict
+        
+        # Detect model type and get appropriate handler
+        if processor is not None:
+            self.model_type = detect_model_type(processor)
+            self.multimodal_handler = get_multimodal_handler(self.model_type)
+        else:
+            self.model_type = None
+            self.multimodal_handler = None
 
     @torch.no_grad()
     def _handle_special_tokens(self, llm_raw_response: str, prep_for_loss_mask: bool) -> str:
@@ -57,39 +66,21 @@ class QwenVLRolloutManager():
             image_data: List[PIL.Image.Image],
             do_embedding: bool = True,
         ) -> str:
-        """Handle multi-modal data in the prompt template
-
-        - For do_embedding=False(vllm), replace <image> with <|vision_start|><|image_pad|><|vision_end|> -> raw_prompt
-        - For do_embedding=True, replace <image> with <|vision_start|>{image_token}<|vision_end|> -> prompt_template
-            - where {image_token} is the length of image embedding
+        """Handle multi-modal data in the prompt template using model-specific handlers.
+        
+        - For do_embedding=False(vllm), replace <image> with model-specific tokens -> raw_prompt
+        - For do_embedding=True, replace <image> with model-specific embedded tokens -> prompt_template
         """
-        assert len(image_data) == prompt_template.count('<image>'), 'Number of images does not match number of <image> in the prompt template'
-        raw_prompt = prompt_template.replace('<image>', '<|vision_start|><|image_pad|><|vision_end|>')
-        row_dict['multi_modal_data'] = {'image': image_data}
-        image_grid_thw = None
-        if do_embedding:
-            image_inputs = self.processor.image_processor(image_data, return_tensors='pt')
-            image_grid_thw = image_inputs['image_grid_thw']
-            row_dict['multi_modal_inputs'] = {key: val for key, val in image_inputs.items()}
-            # print(f"[DEBUG] number of image_data in rollout: {len(image_data)}")
-        if image_grid_thw is not None:
-            merge_length = self.processor.image_processor.merge_size**2
-            index = 0
-            while '<image>' in prompt_template:
-                prompt_template = prompt_template.replace(
-                    '<image>',
-                    '<|vision_start|>' + '<|placeholder|>' * (image_grid_thw[index].prod() // merge_length) +
-                    '<|vision_end|>',
-                    1,
-                )
-                index += 1
-
-            prompt_template = prompt_template.replace('<|placeholder|>',
-                                                        self.processor.image_token)
-            # print(f"[DEBUG] number of image_data in final trajectory: {len(image_data)}")
-            # number_of_image_tokens=prompt_template.count(self.processor.image_token)
-            # print(f"[DEBUG] number_of_image_tokens: {number_of_image_tokens}")
-        return prompt_template, row_dict, image_grid_thw, raw_prompt
+        if self.multimodal_handler is None:
+            raise ValueError("No multimodal handler available. Processor might be None.")
+        
+        return self.multimodal_handler(
+            prompt_template=prompt_template,
+            row_dict=row_dict, 
+            image_data=image_data,
+            processor=self.processor,
+            do_embedding=do_embedding
+        )
     
     @torch.no_grad()
     def _compute_loss_mask(self, input_ids, attention_mask):
@@ -410,7 +401,8 @@ class QwenVLRolloutManager():
         
         position_ids_prompt = compute_position_id_with_mask(attention_mask_prompt)
         # if self.image_key in row_dict:
-        if has_images:
+        if has_images and image_grid_thw is not None:
+            # Qwen model with image_grid_thw
             from verl.models.transformers.qwen2_vl import get_rope_index
             position_ids_response = get_rope_index(
                 self.processor,
@@ -420,6 +412,7 @@ class QwenVLRolloutManager():
             )  # (3, seq_len)
             position_ids_prompt=position_ids_prompt.view(1, -1).expand(3, -1)
         else:
+            # InternVL model or no images - use simple position computation
             response_length = input_ids_response.shape[0]
             delta_position_id = torch.arange(1, response_length + 1, device=position_ids_prompt.device)
             position_ids_response = position_ids_prompt[-1:] + delta_position_id
