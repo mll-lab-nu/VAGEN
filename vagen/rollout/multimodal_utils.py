@@ -76,7 +76,7 @@ def handle_internvl_multimodal_data(
     processor,
     do_embedding: bool = True,
 ) -> Tuple[str, Dict, Optional[torch.Tensor], str]:
-    """Handle multi-modal data for InternVL models.
+    """Handle multi-modal data for InternVL models for huggingface version.
     
     Args:
         prompt_template: Template string with <image> placeholders
