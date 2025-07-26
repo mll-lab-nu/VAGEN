@@ -69,6 +69,7 @@ class AdvantageEstimator(str, Enum):
     GAE = 'gae'
     MASKED_GAE = 'masked_gae'
     BI_LEVEL_GAE = 'bi_level_gae'
+    BI_LEVEL_GAE_NEW = 'bi_level_gae_new'
     HIGH_LEVEL_GAE = 'high_level_gae'
     GRPO = 'grpo'
     GIRPO = 'girpo'
@@ -187,6 +188,32 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         sos_mask = (loss_mask == 1) & (prev == 0)  # 1 where loss_mask transitions from 0 to 1
         
         advantages, returns = core_algos.compute_bi_level_gae_advantage_return(token_level_rewards=data.batch['token_level_rewards'],
+                                                                        values=values,
+                                                                        eos_mask=data.batch['end_of_response_position_mask'][:, -response_length:],
+                                                                        sos_mask=sos_mask[:, -response_length:],
+                                                                        loss_mask=loss_mask[:, -response_length:],
+                                                                        lam=lam,
+                                                                        high_level_gamma=high_level_gamma,
+                                                                        gamma=gamma,)
+        
+        data.batch['advantages'] = advantages
+        data.batch['returns'] = returns
+    elif adv_estimator == AdvantageEstimator.BI_LEVEL_GAE_NEW:
+        values = data.batch['values']
+        responses = data.batch['responses']
+        response_length = responses.size(-1)
+        attention_mask = data.batch['attention_mask']
+        response_mask = attention_mask[:, -response_length:]
+        assert "loss_mask" in data.batch.keys(), "loss_mask is required for bi_level_gae_new"
+        loss_mask = data.batch['loss_mask']
+        prev = torch.cat(
+            [torch.zeros_like(loss_mask[:, :1]),   
+            loss_mask[:, :-1]],                   
+            dim=1
+        ) # pad 0 to left
+        sos_mask = (loss_mask == 1) & (prev == 0)  # 1 where loss_mask transitions from 0 to 1
+        
+        advantages, returns = core_algos.compute_bi_level_gae_advantage_return_new(token_level_rewards=data.batch['token_level_rewards'],
                                                                         values=values,
                                                                         eos_mask=data.batch['end_of_response_position_mask'][:, -response_length:],
                                                                         sos_mask=sos_mask[:, -response_length:],
@@ -546,7 +573,7 @@ class RayPPOTrainer(object):
         else:
             self.kl_ctrl = core_algos.FixedKLController(kl_coef=0.)
 
-        if self.config.algorithm.adv_estimator in [AdvantageEstimator.GAE, AdvantageEstimator.BI_LEVEL_GAE,
+        if self.config.algorithm.adv_estimator in [AdvantageEstimator.GAE, AdvantageEstimator.BI_LEVEL_GAE,AdvantageEstimator.BI_LEVEL_GAE_NEW,
                                                    AdvantageEstimator.MASKED_GAE,AdvantageEstimator.HIGH_LEVEL_GAE,AdvantageEstimator.TURN_UPDATE_GAE,
                                                    AdvantageEstimator.TURN_UPDATE_HIGH_LEVEL_GAE,AdvantageEstimator.TURN_UPDATE_BI_LEVEL_GAE]:
             self.use_critic = True
