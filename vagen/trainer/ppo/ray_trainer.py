@@ -1175,8 +1175,8 @@ class RayPPOTrainer(object):
         # and make Python hash-based ops reproducible.  This needs to be done
         # **before** any worker processes / datasets are created.
         # ------------------------------------------------------------------
-        seed_val = self.config.data.get('seed', 42)
-        seed_everything(seed_val)
+        seed = self.config.data.get('seed', 1)
+        seed_everything(seed)
 
         self.global_steps = 0
 

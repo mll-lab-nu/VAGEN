@@ -14,6 +14,7 @@ data:
   filter_overlong_prompts: False # for large-scale dataset, filtering overlong prompts could be timeconsuming. You should disable this and set `truncation='left'
   truncation: error
   image_key: images
+  seed: 1
 
 actor_rollout_ref:
   hybrid_engine: True
@@ -31,7 +32,7 @@ actor_rollout_ref:
     use_dynamic_bsz: False
     ppo_max_token_len_per_gpu: 16384 # n * ${data.max_prompt_length} + ${data.max_response_length}
     grad_clip: 1.0
-    grad_norm_threshold: 1e10
+    grad_norm_threshold: 1e3
     clip_ratio: 0.2
     entropy_coeff: 0.001
     use_kl_loss: False # True for GRPO
@@ -132,7 +133,7 @@ critic:
   grad_clip: 1.0
   cliprange_value: 0.5
   use_reward_mask: False
-  grad_norm_threshold: 1e10
+  grad_norm_threshold: 1e3
 
 reward_model:
   enable: False
