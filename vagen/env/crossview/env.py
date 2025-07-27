@@ -18,9 +18,12 @@ class CrossViewEnv(BaseEnv):
         self.image_dir = os.path.join(self.script_dir,config.image_path)
         self.type=config.type
         self.split = config.split
-        train_data_path=f"crossviewQA_train_{self.type}.jsonl"
-        test_data_path=f"crossviewQA_tinybench_{self.type}.jsonl"
-        self.data_path=os.path.join(self.script_dir,"MindCube_RL_Data",train_data_path if self.split=="train" else test_data_path)
+        # train_data_path=f"crossviewQA_train_{self.type}.jsonl"
+        # test_data_path=f"crossviewQA_tinybench_{self.type}.jsonl"
+        # self.data_path=os.path.join(self.script_dir,"MindCube_RL_Data",train_data_path if self.split=="train" else test_data_path)
+        train_data_path=f"MindCube_train.jsonl"
+        test_data_path=f"MindCube_tinybench.jsonl"
+        self.data_path=os.path.join(self.image_dir, "raw", train_data_path if self.split=="train" else test_data_path)
         with open(self.data_path, "r") as f:
             self.dataset = [json.loads(line) for line in f]
         self.current_data = None
@@ -69,7 +72,8 @@ class CrossViewEnv(BaseEnv):
            
         
         # Create observation string with image placeholders
-        obs_str = self.current_data["question_str"]
+        # obs_str = self.current_data["question_str"]
+        obs_str = self.current_data["question"]
         
         return {
             'obs_str': obs_str,
