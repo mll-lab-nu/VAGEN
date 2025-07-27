@@ -39,7 +39,8 @@ class QwenVLRolloutManagerService():
         self.env_client = BatchEnvClient(base_url=self.config.base_url,timeout=self.config.timeout,max_workers=self.config.max_workers)
         
         # Detect model type and get appropriate handler
-        self.multimodal_handler = get_multimodal_handler(detect_model_type(processor))
+        self.model_type = detect_model_type(processor)
+        self.multimodal_handler = get_multimodal_handler(self.model_type)
 
 
     @torch.no_grad()
