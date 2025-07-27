@@ -83,7 +83,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     data.truncation=left \\
     actor_rollout_ref.model.path=OpenGVLab/InternVL3-1B \\
     actor_rollout_ref.actor.optim.lr=1e-6 \\
-    actor_rollout_ref.model.use_remove_padding=True \\
+    actor_rollout_ref.model.use_remove_padding=False \\
     actor_rollout_ref.actor.ppo_mini_batch_size=32 \\
     actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=1 \\
     actor_rollout_ref.actor.use_kl_loss=False \\
