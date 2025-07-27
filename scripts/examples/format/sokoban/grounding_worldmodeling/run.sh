@@ -1,86 +1,29 @@
-#!/bin/bash
-set -e  # Exit immediately if a command exits with a non-zero status
+set -x
 
-# Configuration - Set these values manually
-PORT=5000
-CUDA_DEVICES="0,1,2,3,4,5,6,7"
 
-# Get the directory of the script
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-
-# Extract experiment name from the path
-EXPERIMENT_NAME=$(echo $SCRIPT_DIR | rev | cut -d'/' -f1-3 | rev | tr '/' '-')
-echo "Experiment name: $EXPERIMENT_NAME"
-echo "Using port: $PORT"
-echo "Using CUDA devices: $CUDA_DEVICES"
-
-# Create directories if they don't exist
-mkdir -p "data/$EXPERIMENT_NAME"
-
-# Set environment variables
-export CUDA_VISIBLE_DEVICES=$CUDA_DEVICES
 export VLLM_ATTENTION_BACKEND=XFORMERS
 export PYTHONHASHSEED=0
 
-# Activate conda environment
-source activate vagen
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-echo "Starting server in background..."
-# Start server in background and save PID
-python -m vagen.server.server server.port=$PORT use_state_reward=False &
-SERVER_PID=$!
-echo "Server started with PID: $SERVER_PID"
+# Extract experiment name from the path
+# This will take the last 3 parts of the path: format/sokoban/free_think
+EXPERIMENT_NAME=$(echo $SCRIPT_DIR | rev | cut -d'/' -f1-3 | rev | tr '/' '-')
 
-# Create a cleanup function to kill server on script exit
-cleanup() {
-    echo "Cleaning up..."
-    if kill -0 $SERVER_PID 2>/dev/null; then
-        echo "Stopping server (PID: $SERVER_PID)..."
-        kill $SERVER_PID
-        wait $SERVER_PID 2>/dev/null || true
-    fi
-}
-
-# Set trap to cleanup on script exit
-trap cleanup EXIT INT TERM
-
-# Wait for server to start
-echo "Waiting for server to start on port $PORT..."
-sleep 15
-
-# Test if server is responsive
-echo "Testing server connection..."
-for i in {1..10}; do
-    if curl -s "http://localhost:$PORT/health" > /dev/null 2>&1; then
-        echo "Server is ready!"
-        break
-    elif [ $i -eq 10 ]; then
-        echo "Server failed to start properly"
-        exit 1
-    else
-        echo "Waiting for server... (attempt $i/10)"
-        sleep 2
-    fi
-done
-
-echo "Creating dataset..."
-# Create the dataset
+echo "Experiment name: $EXPERIMENT_NAME"
+# run python -m vagen.server.server in a tmux session first
 python -m vagen.env.create_dataset \
     --yaml_path "$SCRIPT_DIR/env_config.yaml" \
-    --train_path "$SCRIPT_DIR/data/$EXPERIMENT_NAME/train.parquet" \
-    --test_path "$SCRIPT_DIR/data/$EXPERIMENT_NAME/test.parquet" \
-    2>&1 | tee "$SCRIPT_DIR/server.log"
+    --train_path "data/$EXPERIMENT_NAME/train.parquet" \
+    --test_path "data/$EXPERIMENT_NAME/test.parquet" \
 
-echo "Starting training..."
-# Start the training (output directly to console)
-cd "$SCRIPT_DIR"
-set -x  # Enable command echoing
+# max_trajectory_length = max_prompt_length + max_response_length
 
 python3 -m vagen.trainer.main_ppo \
-    algorithm.adv_estimator=bi_level_gae \
+    algorithm.adv_estimator=masked_gae \
     algorithm.high_level_gamma=0.95 \
-    data.train_files="$SCRIPT_DIR/data/$EXPERIMENT_NAME/train.parquet" \
-    data.val_files="$SCRIPT_DIR/data/$EXPERIMENT_NAME/test.parquet" \
+    data.train_files=data/$EXPERIMENT_NAME/train.parquet \
+    data.val_files=data/$EXPERIMENT_NAME/test.parquet \
     data.train_batch_size=128 \
     data.max_prompt_length=1024 \
     data.max_response_length=200 \
@@ -122,21 +65,17 @@ python3 -m vagen.trainer.main_ppo \
     trainer.logger=['console','wandb'] \
     trainer.project_name='vagen_new' \
     trainer.experiment_name=$EXPERIMENT_NAME \
-    trainer.n_gpus_per_node=8 \
+    trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \
-    trainer.save_freq=150 \
+    trainer.save_freq=250 \
     trainer.test_freq=20 \
     trainer.total_training_steps=300 \
     rollout_manager.max_turns=3 \
     rollout_manager.window_size=5 \
-    rollout_manager.use_multi_turn_reward=True \
+    rollout_manager.use_multi_turn_reward=False \
     rollout_manager.use_loss_mask=True \
     rollout_manager.use_gae_mask=True \
     trainer.val_before_train=True \
     trainer.val_generations_to_log_to_wandb=8 \
     rollout_manager.n_trajectory=1 \
-    rollout_manager.use_service=True \
-    rollout_manager.timeout=300 \
-    rollout_manager.base_url="http://localhost:$PORT"
-
-echo "Training completed!"
+    2>&1 | tee $EXPERIMENT_NAME.log

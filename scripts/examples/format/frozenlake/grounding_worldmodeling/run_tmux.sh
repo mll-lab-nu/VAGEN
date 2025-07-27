@@ -42,12 +42,12 @@ mkdir -p "data/$EXPERIMENT_NAME"
 # Create server session
 tmux new-session -d -s "$SERVER_SESSION"
 # Configure server session with conda and environment variables
-tmux send-keys -t "$SERVER_SESSION" "source activate vagen" C-m
+tmux send-keys -t "$SERVER_SESSION" "conda activate vagen" C-m
 tmux send-keys -t "$SERVER_SESSION" "export CUDA_VISIBLE_DEVICES=$CUDA_DEVICES" C-m
 tmux send-keys -t "$SERVER_SESSION" "export VLLM_ATTENTION_BACKEND=XFORMERS" C-m
 tmux send-keys -t "$SERVER_SESSION" "export PYTHONHASHSEED=0" C-m
 # Start the server
-tmux send-keys -t "$SERVER_SESSION" "python -m vagen.server.server server.port=$PORT use_state_reward=False" C-m
+tmux send-keys -t "$SERVER_SESSION" "python -m vagen.server.server server.port=$PORT" C-m
 
 # Wait for server to start
 echo "Waiting for server to start on port $PORT..."
@@ -57,7 +57,7 @@ sleep 10  # Adjust as needed
 tmux new-session -d -s "$TRAIN_SESSION"
 # Configure training session with conda and environment variables
 tmux send-keys -t "$TRAIN_SESSION" "cd $SCRIPT_DIR" C-m
-tmux send-keys -t "$TRAIN_SESSION" "source activate vagen" C-m
+tmux send-keys -t "$TRAIN_SESSION" "conda activate vagen" C-m
 tmux send-keys -t "$TRAIN_SESSION" "export CUDA_VISIBLE_DEVICES=$CUDA_DEVICES" C-m
 tmux send-keys -t "$TRAIN_SESSION" "export VLLM_ATTENTION_BACKEND=XFORMERS" C-m
 tmux send-keys -t "$TRAIN_SESSION" "export PYTHONHASHSEED=0" C-m
@@ -75,7 +75,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     algorithm.high_level_gamma=0.95 \\
     data.train_files=data/$EXPERIMENT_NAME/train.parquet \\
     data.val_files=data/$EXPERIMENT_NAME/test.parquet \\
-    data.train_batch_size=128 \\
+    data.train_batch_size=64 \\
     data.max_prompt_length=1024 \\
     data.max_response_length=200 \\
     data.max_trajectory_length=2400 \\
@@ -128,10 +128,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     rollout_manager.use_gae_mask=True \\
     trainer.val_before_train=True \\
     trainer.val_generations_to_log_to_wandb=8 \\
-    rollout_manager.n_trajectory=1 \\
-    rollout_manager.use_service=True \\
-    rollout_manager.timeout=300 \\
-    rollout_manager.base_url=\"http://localhost:$PORT\" \\
+    rollout_manager.n_trajectory=2 \\
     2>&1 | tee $EXPERIMENT_NAME.log" C-m
 
 echo "-----------------------------------------"

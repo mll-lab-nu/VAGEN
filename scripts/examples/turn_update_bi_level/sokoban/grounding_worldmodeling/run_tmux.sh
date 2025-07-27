@@ -114,7 +114,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     trainer.experiment_name=$WANDB_EXPERIMENT_NAME \\
     trainer.n_gpus_per_node=8 \\
     trainer.nnodes=1 \\
-    trainer.save_freq=150 \\
+    trainer.save_freq=250 \\
     trainer.test_freq=20 \\
     trainer.total_training_steps=300 \\
     algorithm.adv_estimator=turn_update_bi_level_gae \\

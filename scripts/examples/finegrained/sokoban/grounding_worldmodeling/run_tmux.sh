@@ -42,7 +42,7 @@ mkdir -p "data/$EXPERIMENT_NAME"
 # Create server session
 tmux new-session -d -s "$SERVER_SESSION"
 # Configure server session with conda and environment variables
-tmux send-keys -t "$SERVER_SESSION" "source activate vagen" C-m
+tmux send-keys -t "$SERVER_SESSION" "conda activate vagen" C-m
 tmux send-keys -t "$SERVER_SESSION" "export CUDA_VISIBLE_DEVICES=$CUDA_DEVICES" C-m
 tmux send-keys -t "$SERVER_SESSION" "export VLLM_ATTENTION_BACKEND=XFORMERS" C-m
 tmux send-keys -t "$SERVER_SESSION" "export PYTHONHASHSEED=0" C-m
@@ -57,7 +57,7 @@ sleep 10  # Adjust as needed
 tmux new-session -d -s "$TRAIN_SESSION"
 # Configure training session with conda and environment variables
 tmux send-keys -t "$TRAIN_SESSION" "cd $SCRIPT_DIR" C-m
-tmux send-keys -t "$TRAIN_SESSION" "source activate vagen" C-m
+tmux send-keys -t "$TRAIN_SESSION" "conda activate vagen" C-m
 tmux send-keys -t "$TRAIN_SESSION" "export CUDA_VISIBLE_DEVICES=$CUDA_DEVICES" C-m
 tmux send-keys -t "$TRAIN_SESSION" "export VLLM_ATTENTION_BACKEND=XFORMERS" C-m
 tmux send-keys -t "$TRAIN_SESSION" "export PYTHONHASHSEED=0" C-m
@@ -118,7 +118,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     trainer.experiment_name=$EXPERIMENT_NAME \\
     trainer.n_gpus_per_node=4 \\
     trainer.nnodes=1 \\
-    trainer.save_freq=150 \\
+    trainer.save_freq=250 \\
     trainer.test_freq=20 \\
     trainer.total_training_steps=300 \\
     rollout_manager.max_turns=3 \\

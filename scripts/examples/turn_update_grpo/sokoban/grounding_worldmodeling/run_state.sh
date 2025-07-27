@@ -132,7 +132,7 @@ python3 -m vagen.trainer.main_ppo \
     trainer.experiment_name="${EXPERIMENT_NAME}_state" \
     trainer.n_gpus_per_node=8 \
     trainer.nnodes=1 \
-    trainer.save_freq=150 \
+    trainer.save_freq=250 \
     trainer.test_freq=20 \
     trainer.total_training_steps=600 \
     rollout_manager.max_turns=3 \
