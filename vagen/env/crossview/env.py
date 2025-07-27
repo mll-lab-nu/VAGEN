@@ -78,6 +78,20 @@ class CrossViewEnv(BaseEnv):
             }
         }
     
+    def _reward_calculation(self, format_checking_result: bool, success: bool):
+        if self.config.reward_type == 'format-only':
+            return 1.0 if format_checking_result else 0.0
+        elif self.config.reward_type == 'answer-only':
+            return 5.0 if success else 0.0
+        elif self.config.reward_type == 'format-and-answer':
+            r = 0.0
+            if format_checking_result:
+                r+=1.0
+            if success:
+                r+=5.0
+            return r
+        
+    
     def step(self, llm_raw_response) -> Tuple[Dict, float, bool, Dict]:
         """Process the LLM's response and compute reward"""
 
@@ -88,11 +102,7 @@ class CrossViewEnv(BaseEnv):
         if parsed_answer is None:
             format_checking_result = False
         success = format_checking_result and parsed_answer.lower()==gt_answer.lower()
-        reward=0.0
-        if format_checking_result:
-            reward+=1.0
-        if success:
-            reward+=5.0
+        reward = self._reward_calculation(format_checking_result, success)
         info = {
             "metrics":{ 
                 "turn_metrics": {

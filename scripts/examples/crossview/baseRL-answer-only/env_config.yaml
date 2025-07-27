@@ -1,0 +1,19 @@
+env1:
+    env_name: crossview
+    env_config:
+        split: train
+        type: baseRL
+        reward_type: format-only
+    train_size: 20000
+    test_size: 0
+
+env2:
+    env_name: crossview
+    env_config:
+        split: test
+        type: baseRL
+        reward_type: format-only
+    train_size: 0
+    test_size: 210 # 1050
+    
+
