@@ -92,17 +92,20 @@ def handle_internvl_multimodal_data(
         'Number of images does not match number of <image> in the prompt template'
     
     # For InternVL, raw_prompt uses the standard image tokens
-    raw_prompt = prompt_template.replace('<image>', 
-        f'{processor.tokenizer.start_image_token}{processor.tokenizer.context_image_token}{processor.tokenizer.end_image_token}')
-    row_dict['multi_modal_data'] = {'image': image_data}
+    # raw_prompt = prompt_template.replace('<image>', 
+    #     f'{processor.tokenizer.start_image_token}{processor.tokenizer.context_image_token}{processor.tokenizer.end_image_token}')
+    # raw_prompt = prompt_template.replace('<image>', '<|vision_start|><|image_pad|><|vision_end|>')
+    raw_prompt = prompt_template
+    row_dict['multi_modal_data'] = {'image': image_data} # vllm can automatically handle the data with <image>
     
     if do_embedding:
-        proxy_text = [f"<IMG_CONTEXT>"] * len(image_data)
+        proxy_text = [f'<IMG_CONTEXT><SPLIT>' * len(image_data)]
         model_inputs = processor(text=proxy_text, images=image_data, return_tensors='pt')
-        input_ids = model_inputs['input_ids'] # |img| * D
-        for i in range(len(image_data)):
-            decoded_tokens = processor.tokenizer.decode(input_ids[i], skip_special_tokens=False)
-            prompt_template = prompt_template.replace('<image>', decoded_tokens, 1)
+        input_ids = model_inputs['input_ids'] # 1 * D
+        decoded_text = processor.tokenizer.decode(input_ids[0], skip_special_tokens=False)
+        image_tokens = decoded_text.split('<SPLIT>')
+        for image_token in image_tokens:
+            prompt_template = prompt_template.replace('<image>', image_token, 1)
         row_dict['multi_modal_inputs'] = {'pixel_values': model_inputs['pixel_values']}
     
     # InternVL doesn't use image_grid_thw, so return None

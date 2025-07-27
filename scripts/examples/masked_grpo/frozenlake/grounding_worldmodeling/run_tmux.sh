@@ -94,9 +94,9 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     actor_rollout_ref.actor.fsdp_config.param_offload=True \\
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=True \\
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \\
-    actor_rollout_ref.rollout.tensor_model_parallel_size=1 \\
+    actor_rollout_ref.rollout.tensor_model_parallel_size=2 \\
     actor_rollout_ref.rollout.name=vllm \\
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.1 \\
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.5 \\
     actor_rollout_ref.rollout.enable_chunked_prefill=False \\
     actor_rollout_ref.rollout.enforce_eager=False \\
     actor_rollout_ref.rollout.free_cache_engine=False \\
@@ -106,7 +106,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     actor_rollout_ref.rollout.top_p=0.95 \\
     actor_rollout_ref.rollout.temperature=0.7 \\
     critic.optim.lr=1e-5 \\
-    critic.model.use_remove_padding=True \\
+    critic.model.use_remove_padding=False \\
     critic.model.path=OpenGVLab/InternVL3-1B \\
     +critic.model.trust_remote_code=True \\
     critic.model.enable_gradient_checkpointing=True \\
@@ -118,7 +118,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     trainer.logger=['console','wandb'] \\
     trainer.project_name='vagen_new' \\
     trainer.experiment_name=$EXPERIMENT_NAME \\
-    trainer.n_gpus_per_node=1 \\
+    trainer.n_gpus_per_node=2 \\
     trainer.nnodes=1 \\
     trainer.save_freq=250 \\
     trainer.test_freq=20 \\
