@@ -363,8 +363,9 @@ setup_vagen() {
   git clone https://huggingface.co/datasets/MLL-Lab/MindCube
   cd MindCube
   git lfs pull
-  mkdir -p extracted_images
-  unzip data.zip -d extracted_images
+  unzip data.zip "data/other_all_image/*" -d extracted_images
+  mv extracted_images/data/other_all_image extracted_images/other_all_image
+  rm -r extracted_images/data
   # TODO
   cd ..
 
