@@ -131,7 +131,7 @@ python3 -m vagen.trainer.main_ppo \
     rollout_manager.timeout=300 \
     rollout_manager.base_url="http://localhost:$PORT" \
     actor_rollout_ref.actor.grad_norm_threshold=1000 \
-    critic.grad_norm_threshold=1000 \
+    critic.grad_norm_threshold=1e6 \
     2>&1 | tee $EXPERIMENT_NAME.log
 
 echo "Training completed!"
