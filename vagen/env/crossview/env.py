@@ -82,8 +82,16 @@ class CrossViewEnv(BaseEnv):
         if self.config.reward_type == 'format-only':
             return 1.0 if format_checking_result else 0.0
         elif self.config.reward_type == 'answer-only':
-            return 5.0 if success else 0.0
-        elif self.config.reward_type == 'format-and-answer':
+            return 1.0 if success else 0.0
+        elif self.config.reward_type == 'format-answer-same':
+            r = 0.0
+            if format_checking_result:
+                r+=1.0
+            if success:
+                r+=1.0
+            return r
+
+        elif self.config.reward_type == 'base':
             r = 0.0
             if format_checking_result:
                 r+=1.0

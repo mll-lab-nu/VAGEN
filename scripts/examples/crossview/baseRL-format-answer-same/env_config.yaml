@@ -3,7 +3,7 @@ env1:
     env_config:
         split: train
         type: baseRL
-        reward_type: answer-only
+        reward_type: format-answer-same
     train_size: 20000
     test_size: 0
 
@@ -12,7 +12,7 @@ env2:
     env_config:
         split: test
         type: baseRL
-        reward_type: answer-only
+        reward_type: format-answer-same
     train_size: 0
     test_size: 210 # 1050
     
