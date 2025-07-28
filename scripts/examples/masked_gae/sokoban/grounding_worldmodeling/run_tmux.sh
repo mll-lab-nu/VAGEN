@@ -42,7 +42,7 @@ mkdir -p "data/$EXPERIMENT_NAME"
 # Create server session
 tmux new-session -d -s "$SERVER_SESSION"
 # Configure server session with conda and environment variables
-tmux send-keys -t "$SERVER_SESSION" "source activate vagen" C-m
+tmux send-keys -t "$SERVER_SESSION" "source activate vagen_internvl" C-m
 tmux send-keys -t "$SERVER_SESSION" "export CUDA_VISIBLE_DEVICES=$CUDA_DEVICES" C-m
 tmux send-keys -t "$SERVER_SESSION" "export VLLM_ATTENTION_BACKEND=XFORMERS" C-m
 tmux send-keys -t "$SERVER_SESSION" "export PYTHONHASHSEED=0" C-m
@@ -57,7 +57,7 @@ sleep 10  # Adjust as needed
 tmux new-session -d -s "$TRAIN_SESSION"
 # Configure training session with conda and environment variables
 tmux send-keys -t "$TRAIN_SESSION" "cd $SCRIPT_DIR" C-m
-tmux send-keys -t "$TRAIN_SESSION" "source activate vagen" C-m
+tmux send-keys -t "$TRAIN_SESSION" "source activate vagen_internvl" C-m
 tmux send-keys -t "$TRAIN_SESSION" "export CUDA_VISIBLE_DEVICES=$CUDA_DEVICES" C-m
 tmux send-keys -t "$TRAIN_SESSION" "export VLLM_ATTENTION_BACKEND=XFORMERS" C-m
 tmux send-keys -t "$TRAIN_SESSION" "export PYTHONHASHSEED=0" C-m
@@ -79,6 +79,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     data.max_prompt_length=1024 \\
     data.max_response_length=200 \\
     data.max_trajectory_length=2400 \\
+    +data.trust_remote_code=True \\
     data.image_key=images \\
     data.truncation=left \\
     actor_rollout_ref.model.path=OpenGVLab/InternVL3-1B \\
@@ -96,7 +97,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \\
     actor_rollout_ref.rollout.tensor_model_parallel_size=2 \\
     actor_rollout_ref.rollout.name=vllm \\
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.5 \\
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.7 \\
     actor_rollout_ref.rollout.enable_chunked_prefill=False \\
     actor_rollout_ref.rollout.enforce_eager=False \\
     actor_rollout_ref.rollout.free_cache_engine=False \\
@@ -118,7 +119,7 @@ tmux send-keys -t "$TRAIN_SESSION" "python3 -m vagen.trainer.main_ppo \\
     trainer.logger=['console','wandb'] \\
     trainer.project_name='vagen_new' \\
     trainer.experiment_name=$EXPERIMENT_NAME \\
-    trainer.n_gpus_per_node=2 \\
+    trainer.n_gpus_per_node=8 \\
     trainer.nnodes=1 \\
     trainer.save_freq=250 \\
     trainer.test_freq=20 \\
