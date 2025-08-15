@@ -38,13 +38,18 @@ class ALFWorldEnv(BaseEnv):
         self.config = config
         
         # Setup environment
-        self.env = environment.AlfredTWEnv(
-            self.config.get("data_path", None),
-            self.config.get("force_compute_cache", False),
-            self.config.get("objs", False),
-            self.config.get("rewards_heuristic", False),
-            self.config.get("eval_mode", False)
-        )
+        import yaml
+        with open(self.config.alf_config_path) as reader:
+            alf_config = yaml.safe_load(reader)
+        
+        if self.config.render_mode == "vision":
+            alf_config['env']['type'] = 'AlfredThorEnv'
+            env = alfworld.agents.environment.AlfredThorEnv(alf_config)
+        else:
+            alf_config['env']['type'] = 'AlfredTWEnv'
+            env = alfworld.agents.environment.AlfredTWEnv(alf_config)
+        
+        self.env = env.init_env(batch_size=1)
         
         # Initialize state variables
         self.total_reward = 0
