@@ -198,13 +198,13 @@ bash scripts/install.sh
 wandb login
 
 # You can run different environments and algorithms:
-bash scripts/examples/masked_grpo/frozenlake/grounding_worldmodeling/run_tmux.sh
-bash scripts/examples/finegrained/sokoban/grounding_worldmodeling/run_tmux.sh
-bash scripts/examples/masked_turn_ppo/frozenlake/grounding_worldmodeling/run_tmux.sh
+bash scripts/examples/masked_grpo/frozenlake/run_tmux.sh
+bash scripts/examples/masked_turn_ppo/frozenlake/run_tmux.sh
+bash scripts/examples/vagen_base/sokoban/run_tmux.sh
 
 # Use Visual Reasoning Reward
 # Setup OPENAI_API_KEY in the Environment
-bash scripts/examples/state_reward_finegrained/sokoban/grounding_worldmodeling/run_tmux.sh
+bash scripts/examples/vagen_full/sokoban/run_tmux.sh
 ```
 ## How to Add New Environment and Services
 
