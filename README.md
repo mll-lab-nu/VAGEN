@@ -1,12 +1,12 @@
-<h1 align="center">VAGEN: Training VLM agents with multi-turn reinforcement learning</h1>
+<h1 align="center">VAGEN: Reinforcing World Model Reasoning for Multi-Turn VLM Agents</h1>
 <!-- <p align="center" style="font-size: 30px;">
-  <b>Reinforcing World Model Reasoning for Multi-Turn VLM Agents</b>
+  <b>Training VLM agents with multi-turn reinforcement learning</b>
 </p>
 <p align="center" style="font-size: 10px;">
   <b>NeurIPS 2025</b>
 </p> -->
-<h3 align="center"><b>Reinforcing World Model Reasoning for Multi-Turn VLM Agents</b></h3>
-<h6 align="center"><b>NeurIPS 2025</b></h6>
+<h3 align="center"><b>Training VLM agents with multi-turn reinforcement learning</b></h3>
+<h4 align="center"><b>🔥 NeurIPS 2025 🔥</b></h4>
 
 <p align="center" style="font-size: 16px;">
   Kangrui Wang*, Pingyue Zhang*, Zihan Wang*, Yaning Gao*, Linjie Li*, Qineng Wang, Hanyang Chen, Chi Wan, Yiping Lu, Zhengyuan Yang, Lijuan Wang, Ranjay Krishna, Jiajun Wu, Li Fei-Fei, Yejin Choi, Manling Li
