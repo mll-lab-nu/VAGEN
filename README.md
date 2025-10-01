@@ -271,9 +271,9 @@ If you find our framework and paper useful, we appreciate it if you could cite o
 
 ```bibtex
 @misc{wang2025vagen,
-  title={Reinforcing Visual State Reasoning for Multi-Turn VLM Agents},
+  title={VAGEN:Reinforcing World Model Reasoning for Multi-Turn VLM Agents},
   author={Kangrui Wang* and Pingyue Zhang* and Zihan Wang* and Yaning Gao* and Linjie Li* and Qineng Wang and Hanyang Chen and Chi Wan and Yiping Lu and Zhengyuan Yang and Lijuan Wang and Ranjay Krishna and Jiajun Wu and Li Fei-Fei and Yejin Choi and Manling Li},
   year={2025},
-  url={https://github.com/RAGEN-AI/VAGEN}
+  url={https://vagen-ai.github.io/}
 }
 ```
