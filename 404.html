@@ -1,0 +1,12 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Redirecting…</title>
+<script>
+  var p = location.pathname.replace(/^\/vagen/i, '');
+  var target = 'https://vagen-ai.github.io' + p + location.search + location.hash;
+  location.replace(target);
+</script></head>
+<body>Moved to <a id="link"></a>
+<script>
+  var p = location.pathname.replace(/^\/vagen/i, '');
+  var target = 'https://vagen-ai.github.io' + p + location.search + location.hash;
+  var a = document.getElementById('link'); a.href = target; a.textContent = target;
+</script></body></html>
