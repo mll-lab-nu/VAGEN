@@ -14,7 +14,7 @@
 <p align="center" style="font-size: 12px;"><i>(* equal contribution)</i></p>
 
 <p align="center">
-  <a href="https://arxiv.org/abs/YOUR_ARXIV_ID_HERE"><img src="https://img.shields.io/badge/📜_Paper-B31B1B?style=for-the-badge&logo=arXiv&logoColor=white" alt="Paper"></a>
+  <a href="https://arxiv.org/abs/2510.16907"><img src="https://img.shields.io/badge/📜_Paper-B31B1B?style=for-the-badge&logo=arXiv&logoColor=white" alt="Paper"></a>
   <a href="https://vagen.readthedocs.io/en/latest"><img src="https://img.shields.io/badge/📚_Documentation-4285F4?style=for-the-badge&logoColor=white" alt="Documentation"></a>
   <a href="https://mll-lab.notion.site/vagen"><img src="https://img.shields.io/badge/📝_Blog-FF5722?style=for-the-badge&logoColor=white" alt="Blog"></a>
   <a href="https://wandb.ai/ragen-V/vagen-final/reports/VAGEN-Experimental-Results--VmlldzoxMzM2NzczNA?accessToken=c9539vj7s3yxh8qu4rykmgi1kz47935mu9pvkind70m2tt6bdin6tx263ec7yqei"><img src="https://img.shields.io/badge/📊_Experiment_Log-FB8C00?style=for-the-badge&logoColor=white" alt="Experiment Log"></a>
@@ -111,13 +111,12 @@ Standard RL methods applied to VLMs struggle with multi-turn agentic tasks due t
 
 Our approach, **Visual Reasoning RL**, addresses these challenges through:
 
-### Boost #1: Visual Reasoning
-1. **Reasoning Prompts**: Injects structured prompts like grounding (current state description) and world modeling (future state prediction) to scaffold the model’s internal reasoning.
+### Boost #1: World Modeling
+1. **Reasoning Prompts**: Injects structured world modeling prompts (future state prediction) to scaffold the model’s internal reasoning.
 2. **Reasoning Rewards**: We use LLM-as-Judge to reward the agent when its predicted or observed visual state matches the ground truth.
 
-### Boost #2: Turn-level
-1. **Turn-level reasoning rewards** for supervising accuracy.
-2. **Bi-Level GAE** for fine-grained credit assignment at both turn and token levels.
+### Boost #2: Bi-Level GAE
+To address the limitation of only providing trajectory-level feedback, we propose **Bi-Level GAE**, which delivers fine-grained turn-level reward signals. This approach assigns rewards at the end of each action and introduces two discount factors: one for tokens within a turn, and one for transitions across turns.
 
 <table>
   <tr>
@@ -211,7 +210,8 @@ See our [Creating Environments](./docs/envs/create-env.md) guide. You may also w
 ## Experimental Results
 We benchmark closed- and open-sourced models on five environments. We find explicitly visual states reasoning is crucial for VLM agents.
 <!-- <img width="1253" alt="image" src="https://github.com/user-attachments/assets/201d633b-910d-4384-88c9-e1dd0acaa88c" /> -->
-<img width="2142" height="1202" alt="image" src="https://github.com/user-attachments/assets/42cdffaa-0111-4700-b375-a524b721ccb7" />
+<img width="1728" height="942" alt="image" src="https://github.com/user-attachments/assets/3b6b0e0f-37dc-440b-b5e3-2ed77d71dd46" />
+
 
 <img width="2252" height="648" alt="image" src="https://github.com/user-attachments/assets/19a922d9-1a4f-4615-96f8-2feda258ada9" />
 
