@@ -112,8 +112,20 @@ Standard RL methods applied to VLMs struggle with multi-turn agentic tasks due t
 Our approach, **Visual Reasoning RL**, addresses these challenges through:
 
 ### Boost #1: World Modeling
+
 1. **Reasoning Prompts**: Injects structured world modeling prompts (future state prediction) to scaffold the model’s internal reasoning.
+
+   - **WorldModeling: Explicit future state prediction**  
+     ```text
+     <think>...<prediction>...</prediction></think><answer>...</answer>
+     ```
+
+   - **WorldModeling: Combined current and future state reasoning**  
+     ```text
+     <think><observation>...</observation>...<prediction>...</prediction></think><answer>...</answer>
+     ```
 2. **Reasoning Rewards**: We use LLM-as-Judge to reward the agent when its predicted or observed visual state matches the ground truth.
+
 
 ### Boost #2: Bi-Level GAE
 To address the limitation of only providing trajectory-level feedback, we propose **Bi-Level GAE**, which delivers fine-grained turn-level reward signals. This approach assigns rewards at the end of each action and introduces two discount factors: one for tokens within a turn, and one for transitions across turns.
