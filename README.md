@@ -115,11 +115,6 @@ Our approach, **Visual Reasoning RL**, addresses these challenges through:
 
 1. **Reasoning Prompts**: Injects structured world modeling prompts (future state prediction) to scaffold the model’s internal reasoning.
 
-   - **WorldModeling: Explicit future state prediction**  
-     ```text
-     <think>...<prediction>...</prediction></think><answer>...</answer>
-     ```
-
    - **WorldModeling: Combined current and future state reasoning**  
      ```text
      <think><observation>...</observation>...<prediction>...</prediction></think><answer>...</answer>
