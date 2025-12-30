@@ -3,7 +3,7 @@
 set -x
 
 PROJECT_NAME="verl_vagen"
-EXPERIMENT_NAME="ppo_qwen25vl3b"
+EXPERIMENT_NAME="ppo_qwen25vl3b_no_concat"
 
 BASEDIR=$(pwd)
 SCRIPTDIR=$(dirname "$0")
@@ -23,7 +23,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     data.train_files=${DATASET_TRAIN} \
     data.val_files=${DATASET_VAL} \
     data.train_batch_size=128 \
-    algorithm.adv_estimator=gae \
+    algorithm.adv_estimator=no_concat_gae \
     algorithm.kl_ctrl.kl_coef=0.0 \
     actor_rollout_ref.model.path=${REF_MODEL_PATH} \
     actor_rollout_ref.model.use_remove_padding=True \
@@ -55,7 +55,6 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     actor_rollout_ref.rollout.multi_turn.enable=True \
     actor_rollout_ref.rollout.agent.agent_loop_config_path=$agent_loop_config_path \
     actor_rollout_ref.rollout.disable_log_stats=False \
-    +actor_rollout_ref.rollout.concat_multi_turn=False \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
     trainer.val_before_train=True \
@@ -69,7 +68,8 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     trainer.validation_data_dir=${EXPERIMENT_DIR}/validation \
     trainer.rollout_data_dir=${EXPERIMENT_DIR}/rollout_data \
     trainer.log_val_generations=32 \
-    +trainer.log_val_rollout_skip_special_tokens=False \
+    +trainer.skip_special_tokens_in_validation=False \
+    +trainer.concat_multi_turn=False \
     data.max_prompt_length=1000 \
     data.max_response_length=4000 \
     critic.optim.lr=1e-5 \

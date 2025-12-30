@@ -41,8 +41,8 @@ class AgentData:
         sys_images: Optional[List[Image.Image]] = None,
         cur_msg: Optional[Dict[str, Any]] = None,
         cur_images: Optional[List[Image.Image]] = None,
-        group_index: int = 0,
-        traj_index: int = 0,
+        group_idx: int = 0,
+        traj_idx: int = 0,
     ):
         self.sys_msg: Optional[Dict[str, Any]] = sys_msg
         self.sys_images: Optional[List[Image.Image]] = sys_images
@@ -55,8 +55,8 @@ class AgentData:
         self.env = env
         self.response_limit = response_limit
         self.env_name = env_name
-        self.group_index = group_index
-        self.traj_index = traj_index
+        self.group_idx = group_idx
+        self.traj_idx = traj_idx
         # Token buffers
         self.turn_prompt_ids: Optional[List[int]] = None
         self.turn_response_ids: Optional[List[int]] = None
@@ -138,8 +138,8 @@ class GymAgentLoop(AgentLoopBase):
             env=env,
             response_limit=per_turn_response_limit,
             env_name=kwargs["env_name"],
-            group_index=kwargs["group_index"],
-            traj_index=kwargs["traj_index"],
+            group_idx=kwargs["group_idx"],
+            traj_idx=kwargs["traj_idx"],
         )
 
         # State machine: always GENERATE -> INTERACT, and decide termination inside INTERACT
@@ -157,7 +157,7 @@ class GymAgentLoop(AgentLoopBase):
 
         # Close env after loop
         await env.close()
-        return AgentData.outputs
+        return agent_data.outputs
 
     async def _handle_pending_state(self, agent_data: AgentData, sampling_params: Dict[str, Any]) -> AgentState:
         """Encode initial (system + first user) messages into prompt_ids."""
@@ -173,12 +173,12 @@ class GymAgentLoop(AgentLoopBase):
                 ),
             )
             model_inputs = self.processor(text=[raw_prompt], images=image_data, return_tensors="pt")
-            agent_data.prompt_ids = model_inputs.pop("input_ids").squeeze(0).tolist()
+            agent_data.turn_prompt_ids = model_inputs.pop("input_ids").squeeze(0).tolist()
         else:
             if image_data:
                 raise ValueError("Environment returned images but `processor` is None.")
             try:
-                agent_data.prompt_ids = await self.loop.run_in_executor(
+                agent_data.turn_prompt_ids = await self.loop.run_in_executor(
                     None,
                     lambda: self.tokenizer.apply_chat_template(
                         [agent_data.sys_msg, agent_data.cur_msg],
@@ -191,7 +191,7 @@ class GymAgentLoop(AgentLoopBase):
                 logger.warning(f"TypeError Warning in apply_chat_template in AgentLoop: {e}, switching to flattened text-only content.")
                 # Fallback for text-only tokenizer
                 flat_messages = [_flatten_text_only_content([agent_data.sys_msg, agent_data.cur_msg])]
-                agent_data.prompt_ids = await self.loop.run_in_executor(
+                agent_data.turn_prompt_ids = await self.loop.run_in_executor(
                     None,
                     lambda: self.tokenizer.apply_chat_template(
                         flat_messages,
@@ -201,8 +201,8 @@ class GymAgentLoop(AgentLoopBase):
                     ),
                 )
         
-        if len(agent_data.prompt_ids)>self.prompt_length:
-            logger.warning(f"In env:{agent_data.env_name}, initial prompt length {len(agent_data.prompt_ids)} exceeds prompt_length {self.prompt_length}")
+        if len(agent_data.turn_prompt_ids)>self.prompt_length:
+            logger.warning(f"In env:{agent_data.env_name}, initial prompt length {len(agent_data.turn_prompt_ids)} exceeds prompt_length {self.prompt_length}")
         return AgentState.GENERATING
 
     
@@ -214,20 +214,20 @@ class GymAgentLoop(AgentLoopBase):
         max_new_tokens=sampling_params_for_turn.get("max_new_tokens", None) or agent_data.response_limit
         max_new_tokens = min(max_new_tokens, agent_data.response_limit)
         sampling_params_for_turn["max_new_tokens"] = max_new_tokens
-            
+        image_data = agent_data.sys_images + agent_data.cur_images
 
         with simple_timer("generate_sequences", agent_data.metrics):
             output = await self.server_manager.generate(
-                request_id=agent_data.request_id,
-                prompt_ids=agent_data.turn_prompt_ids,
-                sampling_params=sampling_params_for_turn,
-                image_data=agent_data.image_data,
+                request_id = agent_data.request_id,
+                prompt_ids = agent_data.turn_prompt_ids,
+                sampling_params = sampling_params_for_turn,
+                image_data = image_data,
             )
 
 
         agent_data.turn_response_ids = output.token_ids
-        agent_data.turn_prompt_ids += agent_data.response_ids
-        agent_data.turn_response_mask = [1] * len(agent_data.response_ids)
+        agent_data.turn_prompt_ids += agent_data.turn_response_ids
+        agent_data.turn_response_mask = [1] * len(agent_data.turn_response_ids)
         if output.log_probs:
             agent_data.turn_response_logprobs = output.log_probs
 
@@ -264,14 +264,14 @@ class GymAgentLoop(AgentLoopBase):
         
         
         
-        if done or agent_data.traj_success:
+        if done:
             last_turn = True
 
         if self.env_max_turns is not None and agent_data.env_turns >= int(self.env_max_turns):
             last_turn = True
 
         
-        if len(agent_data.response_mask) >= self.response_length:
+        if len(agent_data.turn_response_mask) >= self.response_length:
             last_turn = True
 
         turn_images=agent_data.sys_images+agent_data.cur_images
@@ -281,20 +281,20 @@ class GymAgentLoop(AgentLoopBase):
             response_mask=agent_data.turn_response_mask[: self.response_length],
             multi_modal_data={"image":  turn_images} if turn_images else {},
             response_logprobs=(
-                agent_data.turn_response_logprobs[: self.response_length] if agent_data.response_logprobs else None
+                agent_data.turn_response_logprobs[: self.response_length] if agent_data.turn_response_logprobs else None
             ),
             reward_score=float(reward),
             num_turns=1,
             metrics=agent_data.metrics,
             extra_fields={"reward_extra_info": {
                 "traj_success": traj_success,
+                },
                 "image": turn_images,
                 "last_turn": last_turn,
-                "group_index": agent_data.group_index,
-                "traj_index": agent_data.traj_index,
-                "turn_index": agent_data.env_turns,
-                "reward": float(reward),
-                },
+                "group_idx": agent_data.group_idx,
+                "traj_idx": agent_data.traj_idx,
+                "turn_idx": agent_data.env_turns,
+                          
             },
         )
         agent_data.outputs.append(output)
@@ -307,4 +307,4 @@ class GymAgentLoop(AgentLoopBase):
         if last_turn:
             return AgentState.TERMINATED
 
-        return AgentState.GENERATING
+        return AgentState.PENDING

@@ -59,6 +59,7 @@ from verl.utils.rollout_skip import RolloutSkip
 from verl.utils.seqlen_balancing import calculate_workload, get_seqlen_balanced_partitions, log_seqlen_unbalance
 from verl.utils.torch_functional import masked_mean
 from .utils.image_validation_logger import ValidationGenerationsLogger
+from .utils.concat_val_multi_turn import concat_val_multi_turn
 from . import custom_advantage
 
 @dataclass
@@ -179,6 +180,48 @@ def compute_response_mask(data: DataProto):
     attention_mask = data.batch["attention_mask"]
     return attention_mask[:, -response_length:]
 
+def compute_value_mask(data: DataProto):
+    """
+    Compute the mask for value-function loss.
+
+    This mask selects only the last valid token of each response.
+    It is used to ensure that value loss is computed only at the
+    final token of the response.
+
+    Args:
+        data (DataProto):
+            The data object containing batched inputs and outputs.
+            Expected fields:
+              - data.batch["responses"]: (bs, response_length)
+              - data.batch["attention_mask"]: (bs, seq_length)
+
+    Returns:
+        torch.Tensor:
+            Value mask of shape (bs, response_length),
+            where only the last valid response token is 1.
+    """
+ 
+    response_mask = data.batch["response_mask"]
+
+    # Create index tensor [0, 1, ..., L-1]
+    idx = torch.arange(response_mask.size(1), device=response_mask.device)
+
+    # Mask invalid positions with -inf, then take argmax
+    masked_idx = torch.where(
+        response_mask.bool(),
+        idx,
+        torch.full_like(idx, -1),
+    )
+
+    last_pos = masked_idx.max(dim=1).values  # (bs,)
+
+    value_mask = torch.zeros_like(response_mask)
+    valid = last_pos >= 0
+    value_mask[valid, last_pos[valid]] = 1.0
+
+    return value_mask
+
+    
 
 def compute_advantage(
     data: DataProto,
@@ -256,12 +299,12 @@ def compute_advantage(
             adv_kwargs["index"] = data.non_tensor_batch["uid"]
         if "reward_baselines" in data.batch:  # optional
             adv_kwargs["reward_baselines"] = data.batch["reward_baselines"]
-        if "group_indexs" in data.non_tensor_batch:  # optional
-            adv_kwargs["group_indexs"] = data.non_tensor_batch["group_indexs"]
-        if "turn_indexs" in data.non_tensor_batch:  # optional
-            adv_kwargs["turn_indexs"] = data.non_tensor_batch["turn_indexs"]
-        if "traj_indexs" in data.non_tensor_batch:  # optional
-            adv_kwargs["traj_indexs"] = data.non_tensor_batch["traj_indexs"]
+        if "group_idx" in data.non_tensor_batch:  # optional
+            adv_kwargs["group_idx"] = data.non_tensor_batch["group_idx"]
+        if "turn_idx" in data.non_tensor_batch:  # optional
+            adv_kwargs["turn_idx"] = data.non_tensor_batch["turn_idx"]
+        if "traj_idx" in data.non_tensor_batch:  # optional
+            adv_kwargs["traj_idx"] = data.non_tensor_batch["traj_idx"]
 
         # calculate advantage estimator
         advantages, returns = adv_estimator_fn(**adv_kwargs)
@@ -543,6 +586,24 @@ class RayPPOTrainer:
 
         return gen_batch
 
+    def _assign_group_and_traj_idx(self, gen_batch: DataProto, num_traj_per_sample: int) -> None:
+        """Assign group_idx and traj_idx for no-concat mode.
+
+        Args:
+            gen_batch: The generated batch after repeat operation
+            num_traj_per_sample: Number of trajectories per sample (repeat_times)
+        """
+        # Assign group_idx from uid
+        gen_batch.non_tensor_batch["group_idx"] = gen_batch.non_tensor_batch["uid"]
+
+        # Assign traj_idx based on repeat pattern
+        # Since repeat with interleave=True creates [A, A, A, B, B, B, C, C, C] pattern,
+        # traj_idx should be [0, 1, 2, 0, 1, 2, 0, 1, 2]
+        batch_size = len(gen_batch.non_tensor_batch["uid"])
+        traj_idx = np.tile(np.arange(num_traj_per_sample), batch_size // num_traj_per_sample)
+        gen_batch.non_tensor_batch["traj_idx"] = traj_idx
+
+
     def _post_process_no_concat_batch(self, batch: DataProto, gen_batch_output: DataProto) -> DataProto:
         """Re-align and union batch with gen_batch_output in no-concat mode.
 
@@ -648,6 +709,12 @@ class RayPPOTrainer:
             sample_gts.extend(ground_truths)
 
             test_gen_batch = self._get_gen_batch(test_batch)
+
+            if not self.concat_multi_turn:
+                # we need to create group_idx, traj_idx for each traj in no-concat mode
+                num_traj_per_sample = self.config.actor_rollout_ref.rollout.val_kwargs.n
+                self._assign_group_and_traj_idx(test_gen_batch, num_traj_per_sample)
+
             test_gen_batch.meta_info = {
                 "eos_token_id": self.tokenizer.eos_token_id,
                 "pad_token_id": self.tokenizer.pad_token_id,
@@ -664,14 +731,32 @@ class RayPPOTrainer:
                 if not self.async_rollout_mode
                 else self.config.actor_rollout_ref.rollout.agent.num_workers
             )
+
+            # In no-concat mode, save original uids before padding for filtering later
+            if not self.concat_multi_turn:
+                original_uids = set(test_gen_batch.non_tensor_batch["uid"])
+
             test_gen_batch_padded, pad_size = pad_dataproto_to_divisor(test_gen_batch, size_divisor)
             if not self.async_rollout_mode:
                 test_output_gen_batch_padded = self.actor_rollout_wg.generate_sequences(test_gen_batch_padded)
             else:
                 test_output_gen_batch_padded = self.async_rollout_manager.generate_sequences(test_gen_batch_padded)
-            
+
             # unpad
-            test_output_gen_batch = unpad_dataproto(test_output_gen_batch_padded, pad_size=pad_size)
+            if self.concat_multi_turn:
+                test_output_gen_batch = unpad_dataproto(test_output_gen_batch_padded, pad_size=pad_size)
+            else:
+                # In no-concat mode, filter by uid since each input generates variable number of outputs
+                # We need to keep only outputs whose uid is in the original (pre-padding) uid set
+                valid_indices = [
+                    i for i, uid in enumerate(test_output_gen_batch_padded.non_tensor_batch["group_idx"]) # uid in test_gen become group index in test_output_gen
+                    if uid in original_uids
+                ]
+                test_output_gen_batch = test_output_gen_batch_padded.select_idxs(valid_indices)
+                # Concatenate multi-turn trajectories into single entries
+                test_output_gen_batch = concat_val_multi_turn(test_output_gen_batch, test_gen_batch)
+                # after this, we can assume no-concat mode and concat_multi_turn can be handled equally
+
 
             print("validation generation end")
 
@@ -680,7 +765,7 @@ class RayPPOTrainer:
             pad_token_id = getattr(self.tokenizer, "pad_token_id", None)
             mask = output_ids != pad_token_id  if pad_token_id is not None else torch.ones_like(output_ids, dtype=torch.bool)
             output_texts = [
-                self.tokenizer.decode(output_ids[i][mask[i]].tolist(), skip_special_tokens=False)
+                self.tokenizer.decode(output_ids[i][mask[i]].tolist(), skip_special_tokens=self.config.trainer.get("skip_special_tokens_in_validation", True))
                 for i in range(output_ids.size(0))
             ]
             sample_outputs.extend(output_texts)
@@ -693,6 +778,9 @@ class RayPPOTrainer:
                 sample_images.extend([None] * len(output_texts))
 
             test_batch = test_batch.union(test_output_gen_batch)
+            if not self.concat_multi_turn:
+                # in no-concat mode, we need to re-align and union the test_batch with test_output_gen_batch
+                test_batch = self._post_process_no_concat_batch(test_batch, test_output_gen_batch)
             test_batch.meta_info["validate"] = True
             
             # Store prompt ids and only remove padding tokens for input texts
@@ -700,7 +788,7 @@ class RayPPOTrainer:
             pad_token_id = getattr(self.tokenizer, "pad_token_id", None)
             mask = input_ids != pad_token_id  if pad_token_id is not None else torch.ones_like(input_ids, dtype=torch.bool)
             input_texts = [
-                self.tokenizer.decode(input_ids[i][mask[i]].tolist(), skip_special_tokens=False)
+                self.tokenizer.decode(input_ids[i][mask[i]].tolist(), skip_special_tokens=self.config.trainer.get("skip_special_tokens_in_validation", True))
                 for i in range(input_ids.size(0))
             ]
             sample_inputs.extend(input_texts)
@@ -871,7 +959,7 @@ class RayPPOTrainer:
         self.concat_multi_turn = True # whether to concat history in async rollout --> if not, one traj has multiple prompt-response pairs
         if self.config.actor_rollout_ref.rollout.mode == "async":
             self.async_rollout_mode = True
-            if self.config.actor_rollout_ref.rollout.get("concat_multi_turn", True):
+            if self.config.trainer.get("concat_multi_turn", True):
                 from verl.experimental.agent_loop import AgentLoopManager
             else:
                 from .agent_loop.agent_loop_no_concat import AgentLoopManager
@@ -1137,6 +1225,10 @@ class RayPPOTrainer:
                 gen_batch_output = gen_batch.repeat(
                     repeat_times=self.config.actor_rollout_ref.rollout.n, interleave=True
                 )
+                if not self.concat_multi_turn:
+                    # we need to create group_idx, traj_idx for each traj in no-concat mode
+                    num_traj_per_sample = self.config.actor_rollout_ref.rollout.n
+                    self._assign_group_and_traj_idx(gen_batch_output, num_traj_per_sample)
 
                 is_last_step = self.global_steps >= self.total_training_steps
                 with marked_timer("step", timing_raw):
@@ -1191,6 +1283,9 @@ class RayPPOTrainer:
 
                     if "response_mask" not in batch.batch.keys():
                         batch.batch["response_mask"] = compute_response_mask(batch)
+                    
+                    if self.config.algorithm.adv_estimator=="no_concat_gae":
+                        batch.batch["value_mask"] = compute_value_mask(batch)
                     # Balance the number of valid tokens across DP ranks.
                     # NOTE: This usually changes the order of data in the `batch`,
                     # which won't affect the advantage calculation (since it's based on uid),
