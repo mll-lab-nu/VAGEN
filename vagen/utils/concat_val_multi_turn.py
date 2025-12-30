@@ -28,12 +28,12 @@ def concat_val_multi_turn(
 ) -> DataProto:
     """
     Concatenate multi-turn trajectories, then STRICTLY reorder to match test_gen_batch.uid,
-    where uid is equivalent to group_index.
+    where uid is equivalent to group_idx.
 
     STRICT CONSTRAINTS:
       - After turn->trajectory concatenation, number of trajectories MUST equal len(test_gen_batch).
-      - The multiset of test_gen_batch.uid MUST equal the multiset of concatenated group_index.
-      - Reorder consumes, for each uid, the next trajectory in ascending traj_index order.
+      - The multiset of test_gen_batch.uid MUST equal the multiset of concatenated group_idx.
+      - Reorder consumes, for each uid, the next trajectory in ascending traj_idx order.
       - No placeholder. Any mismatch => assert.
     """
     n = len(test_output_gen_batch)
@@ -46,12 +46,12 @@ def concat_val_multi_turn(
     )
 
     nt = test_output_gen_batch.non_tensor_batch
-    group_arr = nt["group_index"]
-    traj_arr = nt["traj_index"]
-    turn_arr = nt.get("turn_index", [0] * n)
+    group_arr = nt["group_idx"]
+    traj_arr = nt["traj_idx"]
+    turn_arr = nt.get("turn_idx", [0] * n)
 
     # ------------------------------------------------------------------
-    # 1) Group turns by (group_index, traj_index)
+    # 1) Group turns by (group_idx, traj_idx)
     # ------------------------------------------------------------------
     trajectory_groups: Dict[Tuple[str, int], List[Tuple[int, int]]] = defaultdict(list)
     for i in range(n):
@@ -61,7 +61,7 @@ def concat_val_multi_turn(
         trajectory_groups[(g, t)].append((ti, i))
 
     for k in trajectory_groups:
-        trajectory_groups[k].sort(key=lambda x: x[0])  # by turn_index
+        trajectory_groups[k].sort(key=lambda x: x[0])  # by turn_idx
 
     concatenated: List[Tuple[Dict[str, torch.Tensor], Dict[str, Any]]] = []
 
@@ -129,8 +129,8 @@ def concat_val_multi_turn(
             "rm_scores": concat_rm_scores,
         }
         non_tensor_entry = {
-            "group_index": group_idx_str,
-            "traj_index": int(traj_idx),
+            "group_idx": group_idx_str,
+            "traj_idx": int(traj_idx),
             "images": merged_images,
             "reward_extra_info": {"traj_success": traj_success},
         }
@@ -140,17 +140,17 @@ def concat_val_multi_turn(
         return test_output_gen_batch[:0]
 
     # ------------------------------------------------------------------
-    # 2.5) STRICT alignment with test_gen_batch.uid (uid == group_index)
+    # 2.5) STRICT alignment with test_gen_batch.uid (uid == group_idx)
     # ------------------------------------------------------------------
     gen_uid = [str(x) for x in test_gen_batch.non_tensor_batch["uid"]]
     target_n = len(test_gen_batch)
 
-    # Build bucket: uid(group_index) -> list of trajectories sorted by traj_index asc
+    # Build bucket: uid(group_idx) -> list of trajectories sorted by traj_idx asc
     bucket: Dict[str, List[Tuple[Dict[str, torch.Tensor], Dict[str, Any]]]] = defaultdict(list)
     for be, nte in concatenated:
-        bucket[str(nte["group_index"])].append((be, nte))
+        bucket[str(nte["group_idx"])].append((be, nte))
     for uid in bucket:
-        bucket[uid].sort(key=lambda x: int(x[1]["traj_index"]))
+        bucket[uid].sort(key=lambda x: int(x[1]["traj_idx"]))
 
     # --- HARD CHECK 1: trajectory count must match ---
     num_traj = sum(len(v) for v in bucket.values())
@@ -161,19 +161,19 @@ def concat_val_multi_turn(
         "Hint: test_gen_batch.uid must be TRAJECTORY-level, not TURN-level."
     )
 
-    # --- HARD CHECK 2: uid multiset must match group_index multiset ---
+    # --- HARD CHECK 2: uid multiset must match group_idx multiset ---
     expected_uid_counter = Counter(bucket.keys())
     # Counter(bucket.keys()) is wrong if same uid has >1 traj; need counts:
     expected_uid_counter = Counter({uid: len(v) for uid, v in bucket.items()})
     actual_uid_counter = Counter(gen_uid)
     assert actual_uid_counter == expected_uid_counter, (
-        "concat_val_multi_turn: uid multiset mismatch (uid == group_index).\n"
+        "concat_val_multi_turn: uid multiset mismatch (uid == group_idx).\n"
         f"  expected(from concat)={dict(expected_uid_counter)}\n"
         f"  actual(test_gen_batch)={dict(actual_uid_counter)}\n"
         "Hint: test_gen_batch.uid must repeat per-trajectory under the same uid."
     )
 
-    # Reorder exactly following gen_uid; consume within uid by traj_index asc
+    # Reorder exactly following gen_uid; consume within uid by traj_idx asc
     reordered: List[Tuple[Dict[str, torch.Tensor], Dict[str, Any]]] = []
     for i, uid in enumerate(gen_uid):
         assert uid in bucket and len(bucket[uid]) > 0, (
@@ -214,8 +214,8 @@ def concat_val_multi_turn(
         stacked_batch[k] = torch.stack(vals, dim=0)
 
     stacked_non_tensor = {
-        "group_index": _as_1d_object_array([nte["group_index"] for _, nte in concatenated]),
-        "traj_index": _as_1d_object_array([nte["traj_index"] for _, nte in concatenated]),
+        "group_idx": _as_1d_object_array([nte["group_idx"] for _, nte in concatenated]),
+        "traj_idx": _as_1d_object_array([nte["traj_idx"] for _, nte in concatenated]),
         "images": _as_1d_object_array([nte["images"] for _, nte in concatenated]),
         "reward_extra_info": _as_1d_object_array([nte["reward_extra_info"] for _, nte in concatenated]),
     }
@@ -226,11 +226,11 @@ def concat_val_multi_turn(
         meta_info=getattr(test_output_gen_batch, "meta_info", {}),
     )
 
-    # final alignment check: out.group_index[i] == test_gen_batch.uid[i]
+    # final alignment check: out.group_idx[i] == test_gen_batch.uid[i]
     for i in range(len(out)):
-        assert str(out.non_tensor_batch["group_index"][i]) == gen_uid[i], (
+        assert str(out.non_tensor_batch["group_idx"][i]) == gen_uid[i], (
             f"concat_val_multi_turn: order mismatch at i={i}: "
-            f"out.group_index={out.non_tensor_batch['group_index'][i]} != test_gen_batch.uid={gen_uid[i]}"
+            f"out.group_idx={out.non_tensor_batch['group_idx'][i]} != test_gen_batch.uid={gen_uid[i]}"
         )
 
     return out
@@ -264,19 +264,19 @@ def _make_dataproto(
     responses: List[List[int]],
     response_mask: Optional[List[List[int]]] = None,
     rm_scores: Optional[List[List[float]]] = None,
-    group_index: Optional[List[Any]] = None,
-    traj_index: Optional[List[Any]] = None,
-    turn_index: Optional[List[Any]] = None,
+    group_idx: Optional[List[Any]] = None,
+    traj_idx: Optional[List[Any]] = None,
+    turn_idx: Optional[List[Any]] = None,
     traj_success: Optional[List[Any]] = None,
     images: Optional[List[Any]] = None,
 ) -> DataProto:
     B = len(prompts)
     assert len(responses) == B
 
-    if group_index is None:
-        group_index = ["0"] * B
-    if traj_index is None:
-        traj_index = [0] * B
+    if group_idx is None:
+        group_idx = ["0"] * B
+    if traj_idx is None:
+        traj_idx = [0] * B
 
     batch_prompts = _pad_1d_int(prompts, PAD_TOKEN_ID)
     batch_resps = _pad_1d_int(responses, PAD_TOKEN_ID)
@@ -297,11 +297,11 @@ def _make_dataproto(
     }
 
     nt: Dict[str, Any] = {
-        "group_index": _as_1d_object_array(list(group_index)),
-        "traj_index": _as_1d_object_array(list(traj_index)),
+        "group_idx": _as_1d_object_array(list(group_idx)),
+        "traj_idx": _as_1d_object_array(list(traj_idx)),
     }
-    if turn_index is not None:
-        nt["turn_index"] = _as_1d_object_array(list(turn_index))
+    if turn_idx is not None:
+        nt["turn_idx"] = _as_1d_object_array(list(turn_idx))
     if traj_success is not None:
         nt["traj_success"] = _as_1d_object_array(list(traj_success))
     if images is not None:
@@ -312,16 +312,16 @@ def _make_dataproto(
 
 def _make_test_gen_batch_uid_from_output(dp: DataProto) -> DataProto:
     """
-    Build a TRAJECTORY-level test_gen_batch with only uid, where uid == group_index.
-    We derive trajectories by unique (group_index, traj_index), sorted by (group, traj).
+    Build a TRAJECTORY-level test_gen_batch with only uid, where uid == group_idx.
+    We derive trajectories by unique (group_idx, traj_idx), sorted by (group, traj).
     This matches the strict requirement in concat_val_multi_turn.
     """
     nt = dp.non_tensor_batch
-    group_arr = nt["group_index"]
-    traj_arr = nt["traj_index"]
+    group_arr = nt["group_idx"]
+    traj_arr = nt["traj_idx"]
 
     keys = sorted({(str(group_arr[i]), int(traj_arr[i])) for i in range(len(dp))})
-    uid = [g for (g, _t) in keys]  # uid == group_index, per trajectory
+    uid = [g for (g, _t) in keys]  # uid == group_idx, per trajectory
 
     # test_gen_batch only needs non_tensor_batch["uid"], batch content unused in concat
     dummy_batch = TensorDict({}, batch_size=(len(uid),))
@@ -337,9 +337,9 @@ def test_single_turn_keeps_as_is_and_traj_success_max():
         responses=[[21, 22]],
         response_mask=[[1, 1]],
         rm_scores=[[0.3, 0.7]],
-        group_index=["g"],
-        traj_index=[5],
-        turn_index=[0],
+        group_idx=["g"],
+        traj_idx=[5],
+        turn_idx=[0],
         traj_success=[0.2],
         images=[["imgA"]],
     )
@@ -347,8 +347,8 @@ def test_single_turn_keeps_as_is_and_traj_success_max():
     out = concat_val_multi_turn(dp, tg)
 
     assert len(out) == len(tg) == 1
-    assert out.non_tensor_batch["group_index"][0] == "g"
-    assert int(out.non_tensor_batch["traj_index"][0]) == 5
+    assert out.non_tensor_batch["group_idx"][0] == "g"
+    assert int(out.non_tensor_batch["traj_idx"][0]) == 5
     assert out.batch["responses"][0].tolist() == [21, 22]
     assert out.batch["response_mask"][0].tolist() == [1, 1]
     assert torch.allclose(out.batch["rm_scores"][0], torch.tensor([0.3, 0.7]))
@@ -362,9 +362,9 @@ def test_two_turn_concat_inserts_next_prompt_as_is_and_mask_rm_zeros_for_prompt_
         responses=[[20], [30, 31]],
         response_mask=[[1], [1, 0]],
         rm_scores=[[0.2], [0.9, 0.1]],
-        group_index=["g", "g"],
-        traj_index=[1, 1],
-        turn_index=[0, 1],
+        group_idx=["g", "g"],
+        traj_idx=[1, 1],
+        turn_idx=[0, 1],
         traj_success=[0.0, 1.0],
         images=[["i0"], ["i1", "i2"]],
     )
@@ -382,15 +382,15 @@ def test_two_turn_concat_inserts_next_prompt_as_is_and_mask_rm_zeros_for_prompt_
     assert out.non_tensor_batch["reward_extra_info"][0] == {"traj_success": 1.0}
 
 
-def test_sort_by_turn_index_and_traj_success_max_across_turns():
+def test_sort_by_turn_idx_and_traj_success_max_across_turns():
     dp = _make_dataproto(
         prompts=[[111], [100, 0, 0]],
         responses=[[300], [200]],
         response_mask=[[1], [1]],
         rm_scores=[[3.0], [2.0]],
-        group_index=["g", "g"],
-        traj_index=[7, 7],
-        turn_index=[1, 0],
+        group_idx=["g", "g"],
+        traj_idx=[7, 7],
+        turn_idx=[1, 0],
         traj_success=[0.4, 0.9],
         images=[["b"], ["a"]],
     )
@@ -408,9 +408,9 @@ def test_multiple_trajectories_padding_in_output_stack():
         responses=[[10], [20, 21], [90]],
         response_mask=[[1], [1, 1], [1]],
         rm_scores=[[0.1], [0.2, 0.3], [9.0]],
-        group_index=["A", "A", "B"],
-        traj_index=[0, 0, 5],
-        turn_index=[0, 1, 0],
+        group_idx=["A", "A", "B"],
+        traj_idx=[0, 0, 5],
+        turn_idx=[0, 1, 0],
         traj_success=[0.0, 1.0, 1.0],
         images=[["a0"], ["a1"], []],
     )
@@ -422,7 +422,7 @@ def test_multiple_trajectories_padding_in_output_stack():
     assert out.batch["response_mask"].shape[1] == L
     assert out.batch["rm_scores"].shape[1] == L
 
-    assert tuple(out.non_tensor_batch["group_index"]) == ("A", "B")
+    assert tuple(out.non_tensor_batch["group_idx"]) == ("A", "B")
     assert out.non_tensor_batch["reward_extra_info"][0] == {"traj_success": 1.0}
     assert out.non_tensor_batch["reward_extra_info"][1] == {"traj_success": 1.0}
 
@@ -431,9 +431,9 @@ def test_missing_images_and_traj_success_is_none():
     dp = _make_dataproto(
         prompts=[[1], [2]],
         responses=[[10], [20]],
-        group_index=["g", "g"],
-        traj_index=[1, 1],
-        turn_index=[0, 1],
+        group_idx=["g", "g"],
+        traj_idx=[1, 1],
+        turn_idx=[0, 1],
     )
     tg = _make_test_gen_batch_uid_from_output(dp)  # ["g"]
     out = concat_val_multi_turn(dp, tg)
@@ -446,7 +446,7 @@ def test_missing_images_and_traj_success_is_none():
 if __name__ == "__main__":
     test_single_turn_keeps_as_is_and_traj_success_max()
     test_two_turn_concat_inserts_next_prompt_as_is_and_mask_rm_zeros_for_prompt_segment()
-    test_sort_by_turn_index_and_traj_success_max_across_turns()
+    test_sort_by_turn_idx_and_traj_success_max_across_turns()
     test_multiple_trajectories_padding_in_output_stack()
     test_missing_images_and_traj_success_is_none()
     print("All tests passed.")
