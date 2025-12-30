@@ -65,7 +65,7 @@ We frame multi-turn VLM agentic tasks as a Partially Observable Markov Decision 
 
 
 ## News
-**[2025/12]** Introducing [VAGEN-Lite](https://github.com/mll-lab-nu/VAGEN/tree/vagen-lite): a lightweight and clean reimplementation of VAGEN, built on the VERL agent-loop for easier customization and stable performance.
+**[2025/12]** Introducing [VAGEN-Lite](https://github.com/mll-lab-nu/VAGEN/tree/vagen-lite): a lightweight and clean reimplementation of VAGEN, built on the VERL agent-loop for easy customization and stable performance.
 
 **[2025/09]** VAGEN is accepted by Neurips 2025
 
