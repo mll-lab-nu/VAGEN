@@ -65,10 +65,9 @@ We frame multi-turn VLM agentic tasks as a Partially Observable Markov Decision 
 
 
 ## News
+**[2025/12]** Introducing [VAGEN-Lite](https://github.com/mll-lab-nu/VAGEN/tree/vagen-lite): a lightweight and clean reimplementation of VAGEN, built on the VERL agent-loop for easier customization and stable performance.
 
-**[2025/09]** Our paper is accepted by Neurips 2025 as poster!
-
-**[2025/05]** We are excited to release our paper, **"Reinforcing Visual State Reasoning for Multi-Turn VLM Agents"**, introducing the **Visual Reasoning RL** method!
+**[2025/09]** VAGEN is accepted by Neurips 2025
 
 **[2025/04]** We've introduced a new modular design for environments and services in VAGEN:
 - Enhanced environment framework for easier creation of custom environments
