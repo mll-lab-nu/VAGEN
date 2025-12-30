@@ -631,6 +631,7 @@ class RayPPOTrainer:
         """
         # Step 1: Verify uid exists in both batches
         assert "uid" in batch.non_tensor_batch, "batch must contain 'uid' in non_tensor_batch for alignment"
+        gen_batch_output.non_tensor_batch["uid"]=gen_batch_output.non_tensor_batch["group_idx"]
         assert "uid" in gen_batch_output.non_tensor_batch, (
             "gen_batch_output must contain 'uid' in non_tensor_batch for alignment"
         )
@@ -778,9 +779,6 @@ class RayPPOTrainer:
                 sample_images.extend([None] * len(output_texts))
 
             test_batch = test_batch.union(test_output_gen_batch)
-            if not self.concat_multi_turn:
-                # in no-concat mode, we need to re-align and union the test_batch with test_output_gen_batch
-                test_batch = self._post_process_no_concat_batch(test_batch, test_output_gen_batch)
             test_batch.meta_info["validate"] = True
             
             # Store prompt ids and only remove padding tokens for input texts
