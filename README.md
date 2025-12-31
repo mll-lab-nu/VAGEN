@@ -1,7 +1,7 @@
 
 # VAGEN-Lite
 
-**VAGEN-Lite** is a lightweight implementation of **VAGEN** built on top of the **VERL agent-loop framework**
+**VAGEN-Lite** is a lightweight implementation of **VAGEN** built on top of the **VERL agent-loop framework** built on the VERL agent-loop for easy customization, fast trainig, and stable performance.
 
 ## Installation
 
@@ -28,18 +28,14 @@ pip install "trl==0.26.2"
 
 VAGEN-Lite currently supports PPO / GRPO with two multi-turn training paradigms:
 
-### 1. Multi-turn Concatenated Training
-
-All turns in a trajectory are concatenated into a single training instance.
+**Multi-turn Concatenated Training**: All turns in a trajectory are concatenated into a single training instance.
 
 ```bash
 cd VAGEN
 bash examples/sokoban/train_ppo_qwen25vl3b.sh
 ```
 
-### 2. Multi-turn Non-Concatenated Training
-
-Each trajectory is split into multiple turn-level training instances.
+**Multi-turn Non-Concatenated Training**: Each trajectory is split into multiple turn-level training instances.
 
 ```bash
 cd VAGEN
