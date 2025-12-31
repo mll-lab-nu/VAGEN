@@ -25,6 +25,7 @@ def _as_1d_object_array(items: List[Any]) -> np.ndarray:
 def concat_val_multi_turn(
     test_output_gen_batch: DataProto,
     test_gen_batch: DataProto,
+    tokenizer,
 ) -> DataProto:
     """
     Turn -> trajectory concatenation and STRICT reorder by test_gen_batch.uid,
@@ -216,7 +217,7 @@ def concat_val_multi_turn(
         if kind in ("response_mask", "rm_scores"):
             padding = torch.zeros((pad,), dtype=t.dtype, device=t.device)
         else:
-            padding = torch.full((pad,), PAD_TOKEN_ID, dtype=t.dtype, device=t.device)
+            padding = torch.full((pad,), tokenizer.pad_token_id, dtype=t.dtype, device=t.device)
         return torch.cat([t, padding], dim=0)
 
     keys = ["prompts", "responses", "response_mask", "rm_scores"]

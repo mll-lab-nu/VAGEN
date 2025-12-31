@@ -759,7 +759,7 @@ class RayPPOTrainer:
                 ]
                 test_output_gen_batch = test_output_gen_batch_padded.select_idxs(valid_indices)
                 # Concatenate multi-turn trajectories into single entries
-                test_output_gen_batch = concat_val_multi_turn(test_output_gen_batch, test_gen_batch)
+                test_output_gen_batch = concat_val_multi_turn(test_output_gen_batch, test_gen_batch,self.tokenizer)
                 # after this, we can assume no-concat mode and concat_multi_turn can be handled equally
 
 
