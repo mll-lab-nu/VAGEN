@@ -115,8 +115,8 @@ def concat_val_multi_turn(
 
         # images: simply concatenate lists
         merged_images: List[Any] = []
-        if "images" in nt:
-            img_arr = nt["images"]
+        if "image_data" in nt:
+            img_arr = nt["image_data"]
             for _, i in turns:
                 v = img_arr[i]
                 if v is None:
@@ -144,7 +144,7 @@ def concat_val_multi_turn(
         non_tensor_entry: Dict[str, Any] = {
             "group_idx": group_idx_str,
             "traj_idx": int(traj_idx),
-            "images": merged_images,
+            "image_data": merged_images,
             "reward_extra_info": reward_extra_info,
         }
 
@@ -228,7 +228,7 @@ def concat_val_multi_turn(
         stacked_batch[k] = torch.stack(vals, dim=0)
 
     # Dynamic non-tensor keys copied from reward_extra_info
-    base_nt_keys = {"group_idx", "traj_idx", "images", "reward_extra_info"}
+    base_nt_keys = {"group_idx", "traj_idx", "image_data", "reward_extra_info"}
     extra_keys: List[str] = []
     seen = set()
     for _, nte in concatenated:
@@ -242,7 +242,7 @@ def concat_val_multi_turn(
     stacked_non_tensor: Dict[str, np.ndarray] = {
         "group_idx": _as_1d_object_array([nte["group_idx"] for _, nte in concatenated]),
         "traj_idx": _as_1d_object_array([nte["traj_idx"] for _, nte in concatenated]),
-        "images": _as_1d_object_array([nte["images"] for _, nte in concatenated]),
+        "image_data": _as_1d_object_array([nte["image_data"] for _, nte in concatenated]),
         "reward_extra_info": _as_1d_object_array([nte["reward_extra_info"] for _, nte in concatenated]),
     }
 
@@ -296,7 +296,7 @@ def _make_dataproto(
     group_idx: Optional[List[Any]] = None,
     traj_idx: Optional[List[Any]] = None,
     turn_idx: Optional[List[Any]] = None,
-    images: Optional[List[Any]] = None,
+    image_data: Optional[List[Any]] = None,
     reward_extra_info: Optional[List[Optional[Dict[str, Any]]]] = None,
 ) -> DataProto:
     """
@@ -335,8 +335,8 @@ def _make_dataproto(
     }
     if turn_idx is not None:
         nt["turn_idx"] = _as_1d_object_array(list(turn_idx))
-    if images is not None:
-        nt["images"] = _as_1d_object_array(list(images))
+    if image_data is not None:
+        nt["image_data"] = _as_1d_object_array(list(image_data))
     if reward_extra_info is not None:
         nt["reward_extra_info"] = _as_1d_object_array(list(reward_extra_info))
 
@@ -369,7 +369,7 @@ def test_two_turn_reward_extra_info_uses_last_turn_and_is_copied_to_top_level():
         group_idx=["g", "g"],
         traj_idx=[1, 1],
         turn_idx=[0, 1],
-        images=[["i0"], ["i1"]],
+        image_data=[["i0"], ["i1"]],
         reward_extra_info=[
             {"traj_success": 0.0, "foo": 1},
             {"traj_success": 1.0, "foo": 2, "bar": "x"},

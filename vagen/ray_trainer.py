@@ -294,6 +294,10 @@ def compute_advantage(
             "response_mask": data.batch["response_mask"],
             "values": data.batch.get("values", torch.zeros_like(data.batch["token_level_rewards"])),
             "config": config,
+            "gamma": gamma,
+            "lam": lam,
+            "num_repeat": num_repeat,
+            "norm_adv_by_std_in_grpo": norm_adv_by_std_in_grpo,
         }
         if "uid" in data.non_tensor_batch:  # optional
             adv_kwargs["index"] = data.non_tensor_batch["uid"]
@@ -772,8 +776,8 @@ class RayPPOTrainer:
             sample_outputs.extend(output_texts)
 
             # Extract images from non_tensor_batch (extra_fields are stored there)
-            if "image" in test_output_gen_batch.non_tensor_batch:
-                batch_images = test_output_gen_batch.non_tensor_batch["image"]
+            if "image_data" in test_output_gen_batch.non_tensor_batch:
+                batch_images = test_output_gen_batch.non_tensor_batch["image_data"]
                 sample_images.extend(batch_images.tolist() if hasattr(batch_images, 'tolist') else batch_images)
             else:
                 sample_images.extend([None] * len(output_texts))
@@ -1289,6 +1293,11 @@ class RayPPOTrainer:
                     # which won't affect the advantage calculation (since it's based on uid),
                     # but might affect the loss calculation (due to the change of mini-batching).
                     if self.config.trainer.balance_batch:
+                        if not self.concat_multi_turn: # pad to divisor of dp_size
+                            divisor_size = self.actor_rollout_wg.world_size
+                            batch_size = len(batch.batch["attention_mask"])
+                            batch, pad_size = pad_dataproto_to_divisor(batch, divisor_size)
+                            print(f"Pad {pad_size} samples to make batch size {batch_size} divisible by {divisor_size} dp_workers")
                         self._balance_batch(batch, metrics=metrics)
 
                     # compute global_valid tokens

@@ -226,8 +226,8 @@ class GymAgentLoop(AgentLoopBase):
 
 
         agent_data.turn_response_ids = output.token_ids
+        agent_data.turn_response_mask = [1] * len(output.token_ids)
         agent_data.turn_prompt_ids += agent_data.turn_response_ids
-        agent_data.turn_response_mask = [1] * len(agent_data.turn_response_ids)
         if output.log_probs:
             agent_data.turn_response_logprobs = output.log_probs
 
@@ -275,11 +275,16 @@ class GymAgentLoop(AgentLoopBase):
             last_turn = True
 
         turn_images=agent_data.sys_images+agent_data.cur_images
+        
+        resp_len = len(agent_data.turn_response_mask)
+        response_ids = agent_data.turn_prompt_ids[-resp_len:] if resp_len else []
+        prompt_ids = agent_data.turn_prompt_ids[: len(agent_data.turn_prompt_ids) - resp_len]
+        multi_modal_data = {"image": turn_images} if turn_images else {}
         output = AgentLoopOutput(
-            prompt_ids=agent_data.turn_prompt_ids[-self.prompt_length:],
-            response_ids=agent_data.turn_response_ids[: self.response_length],
+            prompt_ids=prompt_ids[-self.prompt_length:],
+            response_ids=response_ids[: self.response_length],
             response_mask=agent_data.turn_response_mask[: self.response_length],
-            multi_modal_data={"image":  turn_images} if turn_images else {},
+            multi_modal_data=multi_modal_data,
             response_logprobs=(
                 agent_data.turn_response_logprobs[: self.response_length] if agent_data.turn_response_logprobs else None
             ),
@@ -287,9 +292,8 @@ class GymAgentLoop(AgentLoopBase):
             num_turns=1,
             metrics=agent_data.metrics,
             extra_fields={"reward_extra_info": {
-                "traj_success": traj_success,
-                },
-                "image": turn_images,
+                "traj_success": float(traj_success)},
+                "image_data": turn_images,
                 "last_turn": last_turn,
                 "group_idx": agent_data.group_idx,
                 "traj_idx": agent_data.traj_idx,
