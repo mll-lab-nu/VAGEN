@@ -1,0 +1,10 @@
+envs:
+  - name: Sokoban
+    n_envs: 256
+    data_source: sokoban
+    seed: [10001,10256,1]
+    max_turns: 5
+    response_length_per_turn: 512
+    config:
+      render_mode: vision
+      min_solution_steps: [1,5]

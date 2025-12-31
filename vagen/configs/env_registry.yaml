@@ -1,0 +1,2 @@
+env_registry:
+  Sokoban: vagen.envs.sokoban.sokoban_env.Sokoban

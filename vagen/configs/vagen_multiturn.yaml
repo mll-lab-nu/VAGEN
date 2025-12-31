@@ -1,0 +1,39 @@
+hydra:
+  searchpath:
+    - file:../../verl/verl/trainer/config
+defaults:
+  - ppo_trainer
+  - env_registry
+  - _self_
+
+data:
+  max_prompt_length: 9000
+  max_response_length: 8000
+  train_batch_size: 256
+  return_raw_chat: True
+  return_multi_modal_inputs: True
+  custom_cls:
+    path: "vagen/gym_agent_dataset.py"
+    name: AgenticDataset
+
+actor_rollout_ref:
+  hybrid_engine: True
+  rollout:
+    name: sglang
+    multi_turn:
+      enable: True
+      
+
+trainer:
+  val_before_train: True
+
+algorithm:
+  reward_scaling: 10.0
+  reward_bias: -0.5
+  reward_clip: 20.0
+  gamma: 1.0
+  lam: 1.0
+  reward_norm: True
+  reward_mean_level: group
+  reward_std_level: group
+  
