@@ -3,7 +3,7 @@
 set -x
 
 PROJECT_NAME="verl_vagen"
-EXPERIMENT_NAME="ppo_qwen25vl3b_no_concat"
+EXPERIMENT_NAME="grpo_qwen25vl3b"
 
 BASEDIR=$(pwd)
 SCRIPTDIR=$(dirname "$0")
@@ -11,7 +11,7 @@ EXPERIMENT_DIR=${BASEDIR}/exps/${PROJECT_NAME}/${EXPERIMENT_NAME}
 SAVE_CHECKPOINT_DIR=${EXPERIMENT_DIR}/verl_checkpoints
 DATASET_TRAIN=${SCRIPTDIR}/train_sokoban_vision.yaml
 DATASET_VAL=${SCRIPTDIR}/val_sokoban_vision.yaml
-agent_loop_config_path=${BASEDIR}/vagen/configs/agent_no_concat.yaml
+agent_loop_config_path=${BASEDIR}/vagen/configs/agent.yaml
 REF_MODEL_PATH=Qwen/Qwen2.5-VL-3B-Instruct
 mkdir -p ${EXPERIMENT_DIR}
 
@@ -22,8 +22,8 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     --config-name='vagen_multiturn' \
     data.train_files=${DATASET_TRAIN} \
     data.val_files=${DATASET_VAL} \
-    data.train_batch_size=128 \
-    algorithm.adv_estimator=no_concat_gae_first \
+    data.train_batch_size=32 \
+    algorithm.adv_estimator=grpo \
     algorithm.kl_ctrl.kl_coef=0.0 \
     actor_rollout_ref.model.path=${REF_MODEL_PATH} \
     actor_rollout_ref.model.use_remove_padding=True \
@@ -41,7 +41,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.name=sglang \
     actor_rollout_ref.rollout.mode=async \
-    actor_rollout_ref.rollout.n=1 \
+    actor_rollout_ref.rollout.n=8 \
     actor_rollout_ref.rollout.max_num_batched_tokens=10000 \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
     actor_rollout_ref.rollout.enforce_eager=True \
@@ -69,9 +69,8 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     trainer.rollout_data_dir=${EXPERIMENT_DIR}/rollout_data \
     trainer.log_val_generations=32 \
     +trainer.skip_special_tokens_in_validation=False \
-    +trainer.concat_multi_turn=False \
     data.max_prompt_length=1000 \
-    data.max_response_length=800 \
+    data.max_response_length=4000 \
     critic.optim.lr=1e-5 \
     critic.model.use_remove_padding=True \
     critic.model.path=${REF_MODEL_PATH} \
