@@ -1417,8 +1417,8 @@ class RayPPOTrainer:
                             norm_adv_by_std_in_grpo=norm_adv_by_std_in_grpo,
                             config=self.config.algorithm,
                         )
-                        
-                    if self.config.algorithm.adv_estimator in ["no_concat_gae_last","no_concat_gae_first"]:
+
+                    if self.config.algorithm.adv_estimator in ["no_concat_gae_last", "no_concat_gae_first"]:
                         batch.batch["value_mask"] = compute_value_mask(batch)
 
                     # update critic
