@@ -33,7 +33,7 @@ class SokobanEnvConfig:
     max_actions_per_step: int = 3  # Max actions per step
     action_sep: str = ","     # Separator between actions
     image_placeholder: str = "<image>"  # Placeholder for vision mode
-    add_example_system_prompt: bool = True  # Whether to add example system prompt
+    use_example_in_sys_prompt: bool = True  # Whether to add example system prompt
 
     # Map generation constraints
     min_solution_steps: Optional[Tuple[int, int]] = None  # (min, max) range for solution steps
@@ -73,8 +73,7 @@ class Sokoban(GymImageEnv):
         :param env_config: a Dict with keys mapped to SokobanEnvConfig
         """
         super().__init__(env_config)
-        self.env_config = env_config
-        self.config = SokobanEnvConfig(**self.env_config)
+        self.config = SokobanEnvConfig(**env_config)
         # Create the underlying (blocking) gym env
         self.env = SokobanEnv(
             dim_room=self.config.dim_room,
@@ -192,7 +191,7 @@ class Sokoban(GymImageEnv):
         format_prompt_str = format_prompt(
             max_actions_per_step=self.config.max_actions_per_step,
             action_sep=self.config.action_sep,
-            add_example=True,
+            add_example=self.config.use_example_in_sys_prompt,
             prompt_format=self.config.prompt_format,
         )
         return system_prompt() + "\n" + format_prompt_str

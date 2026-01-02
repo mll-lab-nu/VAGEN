@@ -18,5 +18,5 @@ envs:
     config: # env-specific config
       render_mode: vision
       min_solution_steps: [1,5]
-      add_example_in_sys_prompt: false
+      use_example_in_sys_prompt: false
       
