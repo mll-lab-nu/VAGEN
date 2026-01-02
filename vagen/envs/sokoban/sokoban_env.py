@@ -3,7 +3,6 @@ from PIL import Image
 
 # from gym_sokoban.envs.sokoban_env import SokobanEnv
 from .patch_sokoban_env import PatchedSokobanEnv as SokobanEnv
-from .utils.env_config import SokobanEnvConfig
 from .utils.prompt import (
     action_template,
     format_prompt,
@@ -20,6 +19,29 @@ from dataclasses import dataclass
 from typing import Any, Dict, Tuple, List, Optional
 
 
+from dataclasses import dataclass
+from typing import Optional, Tuple
+
+
+@dataclass
+class SokobanEnvConfig:
+    """Configuration for Sokoban environment"""
+    dim_room: Tuple[int, int] = (6, 6)  # Room dimensions (height, width)
+    max_steps: int = 100      # Maximum steps per episode
+    num_boxes: int = 1        # Number of boxes in the room
+    render_mode: str = "text" # "text" or "vision"
+    max_actions_per_step: int = 3  # Max actions per step
+    action_sep: str = ","     # Separator between actions
+    image_placeholder: str = "<image>"  # Placeholder for vision mode
+    use_example_in_sys_prompt: bool = True  # Whether to add example system prompt
+
+    # Map generation constraints
+    min_solution_steps: Optional[Tuple[int, int]] = None  # (min, max) range for solution steps
+    reset_seed_max_tries: int = 10000  # Max tries to find a valid seed
+    min_solution_bfs_max_depth: int = 200  # Max BFS depth for solution
+    prompt_format: str = "wm"  # "free_think" or "wm"
+    format_reward: float = 0.1  # Reward for following the format correctly
+    
 class Sokoban(GymImageEnv):
     """
     Sokoban environment that implements the EnvImageBase async interface.
@@ -48,20 +70,10 @@ class Sokoban(GymImageEnv):
 
     def __init__(self, env_config: Dict[str, Any]):
         """
-        env_config:
-        dim_room: tuple = (6, 6)  # Room dimensions (height, width)
-        max_steps: int = 100      # Maximum steps per episode
-        num_boxes: int = 1        # Number of boxes in the room
-        render_mode: str = "text" # "text" or "vision"
-        max_actions_per_step: int = 3  # Max actions per step
-        action_sep: str = ","     # Separator between actions
-        image_placeholder: str = "<image>"  # Placeholder for vision mode
-        min_solution_steps: tuple = (5, 10)  # Min solution steps range
-        prompt_format: str = "free_think"  # "free_think" or "wm"
+        :param env_config: a Dict with keys mapped to SokobanEnvConfig
         """
         super().__init__(env_config)
-        self.env_config = env_config
-        self.config = SokobanEnvConfig(**self.env_config)
+        self.config = SokobanEnvConfig(**env_config)
         # Create the underlying (blocking) gym env
         self.env = SokobanEnv(
             dim_room=self.config.dim_room,
@@ -179,7 +191,7 @@ class Sokoban(GymImageEnv):
         format_prompt_str = format_prompt(
             max_actions_per_step=self.config.max_actions_per_step,
             action_sep=self.config.action_sep,
-            add_example=True,
+            add_example=self.config.use_example_in_sys_prompt,
             prompt_format=self.config.prompt_format,
         )
         return system_prompt() + "\n" + format_prompt_str

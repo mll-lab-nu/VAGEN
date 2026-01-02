@@ -180,46 +180,51 @@ def compute_response_mask(data: DataProto):
     attention_mask = data.batch["attention_mask"]
     return attention_mask[:, -response_length:]
 
-def compute_value_mask(data: DataProto):
+def _default_eps(
+    x: torch.Tensor,
+    small_eps: float = 1e-2,
+    large_eps: float = 1e-6,
+) -> float:
     """
-    Compute the mask for value-function loss.
-
-    This mask selects only the last valid token of each response.
-    It is used to ensure that value loss is computed only at the
-    final token of the response.
-
-    Args:
-        data (DataProto):
-            The data object containing batched inputs and outputs.
-            Expected fields:
-              - data.batch["responses"]: (bs, response_length)
-              - data.batch["attention_mask"]: (bs, seq_length)
-
-    Returns:
-        torch.Tensor:
-            Value mask of shape (bs, response_length),
-            where only the last valid response token is 1.
+    Choose a comparison tolerance (eps) based on tensor dtype.
     """
- 
-    response_mask = data.batch["response_mask"]
+    if x.dtype in (torch.float16, torch.bfloat16):
+        return small_eps
+    return large_eps
 
-    # Create index tensor [0, 1, ..., L-1]
-    idx = torch.arange(response_mask.size(1), device=response_mask.device)
 
-    # Mask invalid positions with -inf, then take argmax
-    masked_idx = torch.where(
-        response_mask.bool(),
-        idx,
-        torch.full_like(idx, -1),
-    )
+def compute_value_mask(
+    data: DataProto,
+    ignore_value: float = -100.0,
+    eps: float | None = None,
+) -> torch.Tensor:
+    """
+    Compute value-function loss mask from token-level returns.
 
-    last_pos = masked_idx.max(dim=1).values  # (bs,)
+    Value loss is only computed at positions where `returns` is valid.
+    Invalid / ignored positions are marked by a float sentinel
+    `ignore_value` (default: -100.0), similar in spirit to
+    CrossEntropy's `ignore_index`.
 
-    value_mask = torch.zeros_like(response_mask)
-    valid = last_pos >= 0
-    value_mask[valid, last_pos[valid]] = 1.0
+    If you do NOT want a certain token position to participate in
+    value-function training, simply write:
 
-    return value_mask
+        returns[..., pos] = ignore_value
+
+    This mask will then automatically exclude that position from
+    value loss computation.
+    """
+    returns = data.batch["returns"]
+
+    if eps is None:
+        eps = _default_eps(returns)
+
+    # Identify ignored positions via approximate comparison
+    is_ignored = (returns - ignore_value).abs() < eps
+
+    # Mask dtype is aligned with response_mask for numerical stability
+    return (~is_ignored).to(dtype=data.batch["response_mask"].dtype)
+
 
     
 
@@ -1286,8 +1291,6 @@ class RayPPOTrainer:
                     if "response_mask" not in batch.batch.keys():
                         batch.batch["response_mask"] = compute_response_mask(batch)
                     
-                    if self.config.algorithm.adv_estimator=="no_concat_gae":
-                        batch.batch["value_mask"] = compute_value_mask(batch)
                     # Balance the number of valid tokens across DP ranks.
                     # NOTE: This usually changes the order of data in the `batch`,
                     # which won't affect the advantage calculation (since it's based on uid),
@@ -1414,6 +1417,9 @@ class RayPPOTrainer:
                             norm_adv_by_std_in_grpo=norm_adv_by_std_in_grpo,
                             config=self.config.algorithm,
                         )
+
+                    if self.config.algorithm.adv_estimator in ["no_concat_gae_last", "no_concat_gae_first"]:
+                        batch.batch["value_mask"] = compute_value_mask(batch)
 
                     # update critic
                     if self.use_critic:
