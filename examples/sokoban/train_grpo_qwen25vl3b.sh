@@ -16,7 +16,6 @@ REF_MODEL_PATH=Qwen/Qwen2.5-VL-3B-Instruct
 mkdir -p ${EXPERIMENT_DIR}
 
 
-#export RENDER_WS_URL=xxx
 PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     --config-path=${BASEDIR}/vagen/configs \
     --config-name='vagen_multiturn' \
