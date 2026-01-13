@@ -71,6 +71,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     +trainer.concat_multi_turn=False \
     data.max_prompt_length=1000 \
     data.max_response_length=800 \
+    critic.enable=True \
     critic.optim.lr=1e-5 \
     critic.model.use_remove_padding=True \
     critic.model.path=${REF_MODEL_PATH} \
