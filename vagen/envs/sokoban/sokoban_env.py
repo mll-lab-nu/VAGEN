@@ -41,6 +41,7 @@ class SokobanEnvConfig:
     min_solution_bfs_max_depth: int = 200  # Max BFS depth for solution
     prompt_format: str = "wm"  # "free_think" or "wm"
     format_reward: float = 0.1  # Reward for following the format correctly
+    success_reward: float = 1.0
     
 class Sokoban(GymImageEnv):
     """
@@ -156,11 +157,12 @@ class Sokoban(GymImageEnv):
                 action_int = self.ACTION_LOOKUP[action]
                 # Offload the blocking gym step to a thread
                 _obs, step_reward, step_done, _ = await asyncio.to_thread(self.env.step, action_int)
-                reward += float(step_reward)
+                # reward += float(step_reward) # ignore sokoban reward
                 self.valid_actions.append(action)
                 # Early success check
                 if self._is_success():
                     done = True
+                    reward += self.config.success_reward
                     metrics["traj_metrics"]["success"] = True
                     break
             else:
@@ -283,7 +285,8 @@ if __name__ == "__main__":
             "max_actions_per_step": max_actions_per_step,
             "min_solution_steps": min_solution_steps,
             "reset_seed_max_tries": reset_seed_max_tries,
-            "min_solution_bfs_max_depth": min_solution_bfs_max_depth
+            "min_solution_bfs_max_depth": min_solution_bfs_max_depth,
+            "prompt_format": "free_think",
             
         }
         env = Sokoban(cfg)
