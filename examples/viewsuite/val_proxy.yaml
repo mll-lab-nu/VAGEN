@@ -8,7 +8,7 @@ envs:
     config:
       jsonl_path: ../data/viewsuite_5k/forward_dynamics_dev_filter.jsonl
       image_size: [512,512]
-      eval_mode: false
+      eval_mode: true
       format_reward: 1.0
       answer_reward: 0.0
 
@@ -21,6 +21,6 @@ envs:
     config:
       jsonl_path: ../data/viewsuite_5k/inverse_dynamics_dev_filter.jsonl
       image_size: [512,512]
-      eval_mode: false
+      eval_mode: true
       format_reward: 1.0
       answer_reward: 0.0
