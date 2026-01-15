@@ -61,6 +61,7 @@ from verl.utils.torch_functional import masked_mean
 from .utils.image_validation_logger import ValidationGenerationsLogger
 from .utils.concat_val_multi_turn import concat_val_multi_turn
 from . import custom_advantage
+from .custom_metric.metric import METRIC_REGISTRY
 
 @dataclass
 class ResourcePoolManager:
@@ -179,6 +180,28 @@ def compute_response_mask(data: DataProto):
     response_length = responses.size(1)
     attention_mask = data.batch["attention_mask"]
     return attention_mask[:, -response_length:]
+
+
+def compute_custom_metrics(data: DataProto, prefix: str = "custom_metrics") -> dict:
+    """Compute all custom metrics registered in METRIC_REGISTRY.
+
+    Args:
+        data (DataProto): The data containing batch information.
+        prefix (str): Prefix for metric names in the returned dictionary.
+
+    Returns:
+        dict: A dictionary containing all computed custom metrics with appropriate prefixes.
+    """
+    custom_metrics = {}
+
+    for metric_name, metric_fn in METRIC_REGISTRY.items():
+        try:
+            metric_value = metric_fn(data)
+            custom_metrics[f"{prefix}/{metric_name}"] = metric_value
+        except Exception as e:
+            print(f"Warning: Failed to compute custom metric '{metric_name}': {e}")
+
+    return custom_metrics
 
 def _default_eps(
     x: torch.Tensor,
@@ -683,6 +706,7 @@ class RayPPOTrainer:
     def _validate(self):
         data_source_lst = []
         reward_extra_infos_dict: dict[str, list] = defaultdict(list)
+        custom_metrics_accumulator: dict[str, list] = defaultdict(list)
 
         # Lists to collect samples for the table
         sample_inputs = []
@@ -813,6 +837,14 @@ class RayPPOTrainer:
                 for key, lst in result["reward_extra_info"].items():
                     reward_extra_infos_dict[key].extend(lst)
 
+            # Add token_level_scores to batch for custom metrics computation
+            test_batch.batch["token_level_scores"] = reward_tensor
+
+            # Compute custom metrics for validation
+            custom_val_metrics = compute_custom_metrics(test_batch, prefix="custom_metrics")
+            for metric_name, metric_value in custom_val_metrics.items():
+                custom_metrics_accumulator[metric_name].append(metric_value)
+
             # collect num_turns of each prompt
             if "__num_turns__" in test_batch.non_tensor_batch:
                 sample_turns.append(test_batch.non_tensor_batch["__num_turns__"])
@@ -861,6 +893,12 @@ class RayPPOTrainer:
             metric_dict["val-aux/num_turns/min"] = sample_turns.min()
             metric_dict["val-aux/num_turns/max"] = sample_turns.max()
             metric_dict["val-aux/num_turns/mean"] = sample_turns.mean()
+
+        # Add aggregated custom metrics to metric_dict
+        for metric_name, values in custom_metrics_accumulator.items():
+            if len(values) > 0:
+                # Use mean aggregation for custom metrics
+                metric_dict[f"custom_metrics/val/{metric_name.split('/')[-1]}"] = np.mean(values)
 
         return metric_dict
 
@@ -1420,6 +1458,11 @@ class RayPPOTrainer:
 
                     if self.config.algorithm.adv_estimator in ["no_concat_gae_last", "no_concat_gae_first"]:
                         batch.batch["value_mask"] = compute_value_mask(batch)
+
+                    # compute custom metrics
+                    with marked_timer("custom_metrics", timing_raw, color="magenta"):
+                        custom_train_metrics = compute_custom_metrics(batch, prefix="custom_metrics/train")
+                        metrics.update(custom_train_metrics)
 
                     # update critic
                     if self.use_critic:
