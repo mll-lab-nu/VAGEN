@@ -3,16 +3,16 @@
 set -x
 
 PROJECT_NAME="verl_vagen"
-EXPERIMENT_NAME="grpo_qwen25vl7b"
+EXPERIMENT_NAME="grpo_qwen25vl7b-0"
 
 BASEDIR=$(pwd)
 SCRIPTDIR=$(dirname "$0")
-EXPERIMENT_DIR=${BASEDIR}/exps/${PROJECT_NAME}/${EXPERIMENT_NAME}
+EXPERIMENT_DIR=/mnt/local/exps/${PROJECT_NAME}/${EXPERIMENT_NAME}
 SAVE_CHECKPOINT_DIR=${EXPERIMENT_DIR}/verl_checkpoints
 DATASET_TRAIN=${SCRIPTDIR}/train_proxy_format.yaml
 DATASET_VAL=${SCRIPTDIR}/val_proxy.yaml
 agent_loop_config_path=${BASEDIR}/vagen/configs/agent.yaml
-REF_MODEL_PATH=/mnt/local/checkpoints/checkpoint-50
+REF_MODEL_PATH=Qwen/Qwen2.5-VL-7B-Instruct
 mkdir -p ${EXPERIMENT_DIR}
 
 
@@ -57,7 +57,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
     trainer.val_before_train=True \
-    trainer.n_gpus_per_node=4 \
+    trainer.n_gpus_per_node=8 \
     trainer.nnodes=1 \
     trainer.save_freq=10 \
     trainer.test_freq=10 \
