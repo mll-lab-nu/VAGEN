@@ -12,7 +12,7 @@ SAVE_CHECKPOINT_DIR=${EXPERIMENT_DIR}/verl_checkpoints
 DATASET_TRAIN=${SCRIPTDIR}/train_proxy_format.yaml
 DATASET_VAL=${SCRIPTDIR}/val_proxy.yaml
 agent_loop_config_path=${BASEDIR}/vagen/configs/agent.yaml
-REF_MODEL_PATH=../Qwen2.5-VL-7B-Instruct
+REF_MODEL_PATH=/mnt/local/new_checkpoint_50
 mkdir -p ${EXPERIMENT_DIR}
 
 
@@ -59,8 +59,8 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     trainer.val_before_train=True \
     trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \
-    trainer.save_freq=100 \
-    trainer.test_freq=20 \
+    trainer.save_freq=10 \
+    trainer.test_freq=10 \
     trainer.project_name=${PROJECT_NAME} \
     trainer.experiment_name=${EXPERIMENT_NAME} \
     trainer.default_local_dir=${SAVE_CHECKPOINT_DIR} \
