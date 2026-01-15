@@ -12,7 +12,7 @@ SAVE_CHECKPOINT_DIR=${EXPERIMENT_DIR}/verl_checkpoints
 DATASET_TRAIN=${SCRIPTDIR}/train_proxy_format.yaml
 DATASET_VAL=${SCRIPTDIR}/val_proxy.yaml
 agent_loop_config_path=${BASEDIR}/vagen/configs/agent.yaml
-REF_MODEL_PATH=/mnt/local/new_checkpoint_50
+REF_MODEL_PATH=/mnt/local/checkpoints/new_checkpoint_50
 mkdir -p ${EXPERIMENT_DIR}
 
 
