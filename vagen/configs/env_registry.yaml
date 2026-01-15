@@ -1,3 +1,5 @@
 env_registry:
   Sokoban: vagen.envs.sokoban.sokoban_env.Sokoban
   FrozenLake: vagen.envs.frozenlake.frozenlake_env.FrozenLake
+  ScannetNoTool: view_suite.envs.scannet_proxy_task.gym_proxy_no_tool.GymProxyNoTool
+  ScannetTool: view_suite.envs.scannet_proxy_task.gym_proxy_tool.GymProxyTool

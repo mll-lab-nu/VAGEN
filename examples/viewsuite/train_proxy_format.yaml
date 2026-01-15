@@ -1,0 +1,28 @@
+envs:
+  - name: ScannetNoTool 
+    data_source: forward_dynamics
+    seed: [0,3419,1]
+    n_envs: 3419
+    max_turns: 1
+    response_length_per_turn: 2048 
+    config:
+      jsonl_path: ../data/viewsuite_5k/forward_dynamics_train_filter.jsonl
+      image_size: [512,512]
+      eval_mode: false
+      format_reward: 1.0
+      answer_reward: 0.0
+      
+  - name: ScannetNoTool 
+    n_envs: 3419 
+    data_source: inverse_dynamics 
+    seed: [0,3419,1]
+    max_turns: 1
+    response_length_per_turn: 2048 
+    config:
+      jsonl_path: ../data/viewsuite_5k/inverse_dynamics_train_filter.jsonl
+      image_size: [512,512]
+      eval_mode: false
+      format_reward: 1.0
+      answer_reward: 0.0
+
+      
