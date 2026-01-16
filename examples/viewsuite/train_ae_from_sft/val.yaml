@@ -1,0 +1,42 @@
+envs:
+
+  - name: ScannetTool
+    data_source: ae
+    seed: [0,545,1]
+    n_envs: 100
+    max_turns: 10
+    response_length_per_turn: 512
+    config:
+      jsonl_path: ${oc.env:HOME}/projects/viewsuite/data/viewsuite_5k/active_explore_val_filter.jsonl
+      image_size: [512,512]
+      eval_mode: true
+      use_example_in_sys_prompt: false
+      client_url: ${oc.env:RENDER_WS_URL}
+      render_backend: client
+      max_turns: 10
+
+  - name: ScannetNoTool 
+    data_source: forward_dynamics
+    seed: [0,545,1]
+    n_envs: 100
+    max_turns: 1
+    response_length_per_turn: 2048 
+    config:
+      jsonl_path: ${oc.env:HOME}/projects/viewsuite/data/viewsuite_5k/forward_dynamics_dev_filter.jsonl
+      image_size: [512,512]
+      eval_mode: true
+      format_reward: 1.0
+      answer_reward: 0.0
+
+  - name: ScannetNoTool 
+    n_envs: 100
+    data_source: inverse_dynamics 
+    seed: [0,545,1]
+    max_turns: 1
+    response_length_per_turn: 2048 
+    config:
+      jsonl_path: ${oc.env:HOME}/projects/viewsuite/data/viewsuite_5k/inverse_dynamics_dev_filter.jsonl
+      image_size: [512,512]
+      eval_mode: true
+      format_reward: 1.0
+      answer_reward: 0.0

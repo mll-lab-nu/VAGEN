@@ -1,0 +1,19 @@
+envs:
+  - name: ScannetTool
+    data_source: ae
+    seed: [0,3419,1]
+    n_envs: 3419
+    max_turns: 10
+    response_length_per_turn: 512
+    config:
+      jsonl_path: ${oc.env:HOME}/projects/viewsuite/data/viewsuite_5k/active_explore_train_filter.jsonl
+      image_size: [512,512]
+      eval_mode: false
+      use_example_in_sys_prompt: false
+      client_url: ${oc.env:RENDER_WS_URL}
+      render_backend: client
+      max_turns: 10
+      
+      
+
+    
