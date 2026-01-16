@@ -12,7 +12,8 @@ SAVE_CHECKPOINT_DIR=${EXPERIMENT_DIR}/verl_checkpoints
 DATASET_TRAIN=${SCRIPTDIR}/train.yaml
 DATASET_VAL=${SCRIPTDIR}/val.yaml
 agent_loop_config_path=${BASEDIR}/vagen/configs/agent.yaml
-REF_MODEL_PATH=Qwen/Qwen2.5-VL-7B-Instruct
+ACTOR_MODEL_PATH=/mnt/local/checkpoints/checkpoint-424
+CRITIC_MODEL_PATH=/mnt/local/checkpoints/checkpoint-424
 mkdir -p ${EXPERIMENT_DIR}
 
 
@@ -22,9 +23,9 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     data.train_files=${DATASET_TRAIN} \
     data.val_files=${DATASET_VAL} \
     data.train_batch_size=128 \
-    algorithm.adv_estimator=grpo \
+    algorithm.adv_estimator=gae \
     algorithm.kl_ctrl.kl_coef=0.0 \
-    actor_rollout_ref.model.path=${REF_MODEL_PATH} \
+    actor_rollout_ref.model.path=${ACTOR_MODEL_PATH} \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.model.use_fused_kernels=True \
     actor_rollout_ref.actor.optim.lr=1e-6 \
@@ -70,9 +71,10 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     +trainer.skip_special_tokens_in_validation=False \
     data.max_prompt_length=4000 \
     data.max_response_length=10000 \
+    critic.enable=True \
     critic.optim.lr=1e-5 \
     critic.model.use_remove_padding=True \
-    critic.model.path=${REF_MODEL_PATH} \
+    critic.model.path=${CRITIC_MODEL_PATH} \
     critic.model.enable_gradient_checkpointing=True \
     critic.ppo_micro_batch_size_per_gpu=1 \
     critic.model.fsdp_config.param_offload=True \
