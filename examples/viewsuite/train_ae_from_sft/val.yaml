@@ -7,7 +7,7 @@ envs:
     max_turns: 10
     response_length_per_turn: 512
     config:
-      jsonl_path: ${oc.env:HOME}/projects/viewsuite/data/viewsuite_5k/active_explore_val_filter.jsonl
+      jsonl_path: ${oc.env:HOME}/projects/viewsuite/data/viewsuite_5k/active_explore_dev_filter.jsonl
       image_size: [512,512]
       eval_mode: true
       use_example_in_sys_prompt: false
