@@ -3,11 +3,11 @@
 set -x
 
 PROJECT_NAME="verl_vagen"
-EXPERIMENT_NAME="grpo_qwen25vl7b-0"
+EXPERIMENT_NAME="fwd_inv_grpo_qwen25vl7b"
 
 BASEDIR=$(pwd)
 SCRIPTDIR=$(dirname "$0")
-EXPERIMENT_DIR=/mnt/local/exps/${PROJECT_NAME}/${EXPERIMENT_NAME}
+EXPERIMENT_DIR=${BASEDIR}/exps/${PROJECT_NAME}/${EXPERIMENT_NAME}
 SAVE_CHECKPOINT_DIR=${EXPERIMENT_DIR}/verl_checkpoints
 DATASET_TRAIN=${SCRIPTDIR}/train_proxy_format.yaml
 DATASET_VAL=${SCRIPTDIR}/val_proxy.yaml
