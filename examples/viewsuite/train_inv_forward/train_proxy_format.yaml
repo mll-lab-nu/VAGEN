@@ -6,7 +6,7 @@ envs:
     max_turns: 1
     response_length_per_turn: 2048 
     config:
-      jsonl_path: ${oc.env:HOME}/projects/viewsuite/data/viewsuite_5k/forward_dynamics_train_filter.jsonl
+      jsonl_path: /projects/p32476/projects/viewsuite/data/viewsuite_5k/forward_dynamics_train_filter.jsonl
       image_size: [512,512]
       eval_mode: false
       format_reward: 0.1
@@ -19,7 +19,7 @@ envs:
     max_turns: 1
     response_length_per_turn: 2048 
     config:
-      jsonl_path: ${oc.env:HOME}/projects/viewsuite/data/viewsuite_5k/inverse_dynamics_train_filter.jsonl
+      jsonl_path: /projects/p32476/projects/viewsuite/data/viewsuite_5k/inverse_dynamics_train_filter.jsonl
       image_size: [512,512]
       eval_mode: false
       format_reward: 0.1
