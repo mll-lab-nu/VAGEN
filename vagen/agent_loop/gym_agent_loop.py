@@ -242,6 +242,14 @@ class GymAgentLoop(AgentLoopBase):
         prompt_ids = agent_data.prompt_ids[: len(agent_data.prompt_ids) - resp_len]
         multi_modal_data = {"image": agent_data.image_data} if agent_data.image_data else {}
 
+        if len(prompt_ids) > self.prompt_length:
+            logger.warning(
+                f"In env:{agent_data.env_name}, prompt_ids length {len(prompt_ids)} exceeds prompt_length {self.prompt_length}",
+            )
+        if len(response_ids) > self.response_length:
+            logger.warning(
+                f"In env:{agent_data.env_name}, response_ids length {len(response_ids)} exceeds response_length {self.response_length}",
+            )
 
         output = AgentLoopOutput(
             prompt_ids=prompt_ids[-self.prompt_length:],
@@ -323,6 +331,8 @@ class GymAgentLoop(AgentLoopBase):
 
 
         agent_data.response_ids = output.token_ids
+        if len(output.token_ids)>agent_data.response_limit:
+            logger.warning(f"In env:{agent_data.env_name}, generated response length {len(output.token_ids)} exceeds per-turn response_limit {agent_data.response_limit}")
         agent_data.prompt_ids += agent_data.response_ids
         agent_data.response_mask += [1] * len(agent_data.response_ids)
         if output.log_probs:
