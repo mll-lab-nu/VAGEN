@@ -3,7 +3,7 @@
 set -x
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 PROJECT_NAME="verl_vagen"
-EXPERIMENT_NAME="fwd_inv_grpo_qwen25vl7b_50"
+EXPERIMENT_NAME="fwd_inv_grpo_qwen25vl7b_424"
 
 BASEDIR=$(pwd)
 SCRIPTDIR=$(dirname "$0")
@@ -12,7 +12,7 @@ SAVE_CHECKPOINT_DIR=${EXPERIMENT_DIR}/verl_checkpoints
 DATASET_TRAIN=${SCRIPTDIR}/train_proxy_format_b200.yaml
 DATASET_VAL=${SCRIPTDIR}/val_proxy_b200.yaml
 agent_loop_config_path=${BASEDIR}/vagen/configs/agent.yaml
-REF_MODEL_PATH=/mnt/local/checkpoints/checkpoint-50
+REF_MODEL_PATH=/mnt/local/checkpoints/checkpoint-424
 mkdir -p ${EXPERIMENT_DIR}
 
 
