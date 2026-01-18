@@ -9,8 +9,8 @@ BASEDIR=$(pwd)
 SCRIPTDIR=$(dirname "$0")
 EXPERIMENT_DIR=${BASEDIR}/exps/${PROJECT_NAME}/${EXPERIMENT_NAME}
 SAVE_CHECKPOINT_DIR=${EXPERIMENT_DIR}/verl_checkpoints
-DATASET_TRAIN=${SCRIPTDIR}/train_proxy_format.yaml
-DATASET_VAL=${SCRIPTDIR}/val_proxy.yaml
+DATASET_TRAIN=${SCRIPTDIR}/train_proxy_quest.yaml
+DATASET_VAL=${SCRIPTDIR}/val_proxy_quest.yaml
 agent_loop_config_path=${BASEDIR}/vagen/configs/agent.yaml
 REF_MODEL_PATH=/projects/p32476/projects/viewsuite/Qwen2.5-VL-7B-Instruct
 mkdir -p ${EXPERIMENT_DIR}
