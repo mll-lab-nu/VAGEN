@@ -7,12 +7,12 @@ EXPERIMENT_NAME="fwd_inv_grpo_qwen25vl7b_424"
 
 BASEDIR=$(pwd)
 SCRIPTDIR=$(dirname "$0")
-EXPERIMENT_DIR=/mnt/local/exps/${PROJECT_NAME}/${EXPERIMENT_NAME}
+EXPERIMENT_DIR=/mnt/disk1/exps/${PROJECT_NAME}/${EXPERIMENT_NAME}
 SAVE_CHECKPOINT_DIR=${EXPERIMENT_DIR}/verl_checkpoints
 DATASET_TRAIN=${SCRIPTDIR}/train_proxy.yaml
 DATASET_VAL=${SCRIPTDIR}/val_proxy.yaml
 agent_loop_config_path=${BASEDIR}/vagen/configs/agent.yaml
-REF_MODEL_PATH=/mnt/local/checkpoints/checkpoint-424
+REF_MODEL_PATH=/mnt/disk1/checkpoints/checkpoint-424
 mkdir -p ${EXPERIMENT_DIR}
 
 
