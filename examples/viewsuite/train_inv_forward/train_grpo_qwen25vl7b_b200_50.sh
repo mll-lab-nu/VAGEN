@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -x
-
+export CUDA_VISIBLE_DEVICES=4,5,6,7
 PROJECT_NAME="verl_vagen"
 EXPERIMENT_NAME="fwd_inv_grpo_qwen25vl7b_50"
 
