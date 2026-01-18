@@ -9,8 +9,8 @@ BASEDIR=$(pwd)
 SCRIPTDIR=$(dirname "$0")
 EXPERIMENT_DIR=/mnt/local/exps/${PROJECT_NAME}/${EXPERIMENT_NAME}
 SAVE_CHECKPOINT_DIR=${EXPERIMENT_DIR}/verl_checkpoints
-DATASET_TRAIN=${SCRIPTDIR}/train_proxy_format_b200.yaml
-DATASET_VAL=${SCRIPTDIR}/val_proxy_b200.yaml
+DATASET_TRAIN=${SCRIPTDIR}/train_proxy.yaml
+DATASET_VAL=${SCRIPTDIR}/val_proxy.yaml
 agent_loop_config_path=${BASEDIR}/vagen/configs/agent.yaml
 REF_MODEL_PATH=/mnt/local/checkpoints/checkpoint-50
 mkdir -p ${EXPERIMENT_DIR}
