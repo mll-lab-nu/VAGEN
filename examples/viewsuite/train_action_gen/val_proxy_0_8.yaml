@@ -1,0 +1,41 @@
+envs:
+  - name: ScannetAG 
+    data_source: action_generation_0_2
+    seed: [0,34,1]
+    n_envs: 34
+    max_turns: 1
+    response_length_per_turn: 2048 
+    config:
+      jsonl_path: ${oc.env:HOME}/projects/viewsuite/data/viewsuite_5k/action_gen_dev_0_2_filter.jsonl
+      image_size: [512,512]
+      eval_mode: false
+      format_reward: 0.1
+      answer_reward: 0.9
+  
+
+  - name: ScannetAG 
+    data_source: action_generation_3_5
+    seed: [0,114,1]
+    n_envs: 114
+    max_turns: 1
+    response_length_per_turn: 2048 
+    config:
+      jsonl_path: ${oc.env:HOME}/projects/viewsuite/data/viewsuite_5k/action_gen_dev_3_5_filter.jsonl
+      image_size: [512,512]
+      eval_mode: false
+      format_reward: 0.1
+      answer_reward: 0.9
+
+  - name: ScannetAG 
+    data_source: action_generation_6_8
+    seed: [0,172,1]
+    n_envs: 172
+    max_turns: 1
+    response_length_per_turn: 2048 
+    config:
+      jsonl_path: ${oc.env:HOME}/projects/viewsuite/data/viewsuite_5k/action_gen_dev_6_8_filter.jsonl
+      image_size: [512,512]
+      eval_mode: false
+      format_reward: 0.1
+      answer_reward: 0.9
+
