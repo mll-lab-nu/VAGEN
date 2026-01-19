@@ -1,8 +1,8 @@
 envs:
   - name: ScannetAG 
     data_source: action_generation
-    seed: [0,3403,1]
-    n_envs: 3403
+    seed: [0,34,1]
+    n_envs: 34
     max_turns: 1
     response_length_per_turn: 2048 
     config:
