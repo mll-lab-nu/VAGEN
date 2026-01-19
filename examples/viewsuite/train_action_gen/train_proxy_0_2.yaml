@@ -1,0 +1,17 @@
+envs:
+  - name: ScannetAG 
+    data_source: action_generation
+    seed: [0,3403,1]
+    n_envs: 3403
+    max_turns: 1
+    response_length_per_turn: 2048 
+    config:
+      jsonl_path: ${oc.env:HOME}/projects/viewsuite/data/viewsuite_5k/action_gen_train_filter_0_2.jsonl
+      image_size: [512,512]
+      eval_mode: false
+      format_reward: 0.1
+      answer_reward: 0.9
+      
+
+
+      
