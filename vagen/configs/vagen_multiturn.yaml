@@ -22,7 +22,8 @@ actor_rollout_ref:
     name: sglang
     multi_turn:
       enable: True
-      
+    temperature: 0.7
+    top_p: 0.9
 
 trainer:
   val_before_train: True
