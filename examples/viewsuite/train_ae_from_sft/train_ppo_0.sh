@@ -7,7 +7,7 @@ EXPERIMENT_NAME="train_ae_from_sft_ppo_0"
 
 BASEDIR=$(pwd)
 SCRIPTDIR=$(dirname "$0")
-EXPERIMENT_DIR=/mnt/local/exps/${PROJECT_NAME}/${EXPERIMENT_NAME}
+EXPERIMENT_DIR=/mnt/disk1/exps/${PROJECT_NAME}/${EXPERIMENT_NAME}
 SAVE_CHECKPOINT_DIR=${EXPERIMENT_DIR}/verl_checkpoints
 DATASET_TRAIN=${SCRIPTDIR}/train.yaml
 DATASET_VAL=${SCRIPTDIR}/val.yaml
