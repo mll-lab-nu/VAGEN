@@ -13,6 +13,7 @@ envs:
       client_url: ${oc.env:RENDER_WS_URL}
       render_backend: client
       max_turns: 10
+      action_only_mode: true
       
       
 
