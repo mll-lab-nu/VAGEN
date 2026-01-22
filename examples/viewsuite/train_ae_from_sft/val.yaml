@@ -26,8 +26,8 @@ envs:
       jsonl_path: ${oc.env:HOME}/projects/viewsuite/data/viewsuite_5k/forward_dynamics_dev_filter.jsonl
       image_size: [512,512]
       eval_mode: true
-      format_reward: 1.0
-      answer_reward: 0.0
+      format_reward: 0.0
+      answer_reward: 0.1
 
   - name: ScannetNoTool 
     n_envs: 100
@@ -39,5 +39,5 @@ envs:
       jsonl_path: ${oc.env:HOME}/projects/viewsuite/data/viewsuite_5k/inverse_dynamics_dev_filter.jsonl
       image_size: [512,512]
       eval_mode: true
-      format_reward: 1.0
-      answer_reward: 0.0
+      format_reward: 0.0
+      answer_reward: 0.1
