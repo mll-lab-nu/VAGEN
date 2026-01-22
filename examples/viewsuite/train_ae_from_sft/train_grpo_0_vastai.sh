@@ -7,7 +7,7 @@ EXPERIMENT_NAME="train_ae_from_sft_grpo_0"
 
 BASEDIR=$(pwd)
 SCRIPTDIR=$(dirname "$0")
-EXPERIMENT_DIR=/mnt/disk1/exps/${PROJECT_NAME}/${EXPERIMENT_NAME}
+EXPERIMENT_DIR=${BASEDIR}/exps/${PROJECT_NAME}/${EXPERIMENT_NAME}
 SAVE_CHECKPOINT_DIR=${EXPERIMENT_DIR}/verl_checkpoints
 DATASET_TRAIN=${SCRIPTDIR}/train.yaml
 DATASET_VAL=${SCRIPTDIR}/val.yaml
@@ -70,7 +70,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     trainer.log_val_generations=32 \
     trainer.max_actor_ckpt_to_keep=1 \
     trainer.max_critic_ckpt_to_keep=1 \
-    +trainer.skip_special_tokens_in_validation=False \
+    +trainer.skip_special_tokens_in_validation=True \
     data.max_prompt_length=4000 \
     data.max_response_length=10000 \
     critic.enable=True \
