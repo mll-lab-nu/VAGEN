@@ -37,3 +37,7 @@ algorithm:
   reward_mean_level: group
   reward_std_level: group
   
+filter:
+  name: reward_variance
+  filter_kwargs: {}
+  enable: False
