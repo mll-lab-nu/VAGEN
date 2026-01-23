@@ -2,7 +2,7 @@ envs:
 
   - name: ScannetTool
     data_source: ae
-    seed: [0,545,1]
+    seed: [0,378,1]
     n_envs: 100
     max_turns: 10
     response_length_per_turn: 512
@@ -18,8 +18,8 @@ envs:
 
   - name: ScannetNoTool 
     data_source: forward_dynamics
-    seed: [0,545,1]
-    n_envs: 100
+    seed: [0,378,1]
+    n_envs: 378
     max_turns: 1
     response_length_per_turn: 2048 
     config:
@@ -30,9 +30,9 @@ envs:
       answer_reward: 0.1
 
   - name: ScannetNoTool 
-    n_envs: 100
+    n_envs: 378
     data_source: inverse_dynamics 
-    seed: [0,545,1]
+    seed: [0,378,1]
     max_turns: 1
     response_length_per_turn: 2048 
     config:
