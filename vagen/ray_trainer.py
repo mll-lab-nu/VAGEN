@@ -511,7 +511,7 @@ class RayPPOTrainer:
         except Exception as e:
             print(f"Warning: Could not set total_training_steps in config. Structure missing? Error: {e}")
 
-    def _dump_generations(self, inputs, outputs, gts, scores, reward_extra_infos_dict, dump_path):
+    def _dump_generations(self, inputs, outputs, images, gts, scores, reward_extra_infos_dict, dump_path):
         """Dump rollout/validation samples as JSONL."""
         os.makedirs(dump_path, exist_ok=True)
         filename = os.path.join(dump_path, f"{self.global_steps}.jsonl")
@@ -539,6 +539,31 @@ class RayPPOTrainer:
 
         print(f"Dumped generations to {filename}")
 
+        # Save images to subfolders
+        if images:
+            image_folder = os.path.join(dump_path, f"image_{self.global_steps}")
+            os.makedirs(image_folder, exist_ok=True)
+            for idx, img_data in enumerate(images):
+                if img_data is None:
+                    continue
+                # Handle both single image and list of images
+                img_list = img_data if isinstance(img_data, list) else [img_data]
+                if not img_list:
+                    continue
+                subfolder = os.path.join(image_folder, f"images_{idx}")
+                os.makedirs(subfolder, exist_ok=True)
+                for img_idx, img in enumerate(img_list):
+                    if img is None:
+                        continue
+                    img_path = os.path.join(subfolder, f"{img_idx}.png")
+                    if hasattr(img, 'save'):
+                        # PIL Image
+                        img.save(img_path)
+                    elif isinstance(img, np.ndarray):
+                        from PIL import Image
+                        Image.fromarray(img).save(img_path)
+            print(f"Dumped images to {image_folder}")
+
     def _log_rollout_data(
         self, batch: DataProto, reward_extra_infos_dict: dict, timing_raw: dict, rollout_data_dir: str
     ):
@@ -550,11 +575,17 @@ class RayPPOTrainer:
             rollout_data_dir (str): Directory path to save the rollout data
         """
         with marked_timer("dump_rollout_generations", timing_raw, color="green"):
-            inputs = self.tokenizer.batch_decode(batch.batch["prompts"], skip_special_tokens=True)
-            outputs = self.tokenizer.batch_decode(batch.batch["responses"], skip_special_tokens=True)
+            inputs = self.tokenizer.batch_decode(batch.batch["prompts"], self.config.trainer.get("skip_special_tokens_train", True))
+            outputs = self.tokenizer.batch_decode(batch.batch["responses"], self.config.trainer.get("skip_special_tokens_train", True))
             scores = batch.batch["token_level_scores"].sum(-1).cpu().tolist()
             sample_gts = [item.non_tensor_batch.get("reward_model", {}).get("ground_truth", None) for item in batch]
-
+            # Extract images from non_tensor_batch (extra_fields are stored there)
+            sample_images=[]
+            if "image_data" in batch.non_tensor_batch:
+                batch_images = batch.non_tensor_batch["image_data"]
+                sample_images.extend(batch_images.tolist() if hasattr(batch_images, 'tolist') else batch_images)
+            else:
+                sample_images.extend([None] * len(outputs))
             reward_extra_infos_to_dump = reward_extra_infos_dict.copy()
             if "request_id" in batch.non_tensor_batch:
                 reward_extra_infos_dict.setdefault(
@@ -565,6 +596,7 @@ class RayPPOTrainer:
             self._dump_generations(
                 inputs=inputs,
                 outputs=outputs,
+                images=sample_images,
                 gts=sample_gts,
                 scores=scores,
                 reward_extra_infos_dict=reward_extra_infos_to_dump,
@@ -799,7 +831,7 @@ class RayPPOTrainer:
             pad_token_id = getattr(self.tokenizer, "pad_token_id", None)
             mask = output_ids != pad_token_id  if pad_token_id is not None else torch.ones_like(output_ids, dtype=torch.bool)
             output_texts = [
-                self.tokenizer.decode(output_ids[i][mask[i]].tolist(), skip_special_tokens=self.config.trainer.get("skip_special_tokens_in_validation", True))
+                self.tokenizer.decode(output_ids[i][mask[i]].tolist(), skip_special_tokens=self.config.trainer.get("skip_special_tokens_val", True))
                 for i in range(output_ids.size(0))
             ]
             sample_outputs.extend(output_texts)
@@ -819,7 +851,7 @@ class RayPPOTrainer:
             pad_token_id = getattr(self.tokenizer, "pad_token_id", None)
             mask = input_ids != pad_token_id  if pad_token_id is not None else torch.ones_like(input_ids, dtype=torch.bool)
             input_texts = [
-                self.tokenizer.decode(input_ids[i][mask[i]].tolist(), skip_special_tokens=self.config.trainer.get("skip_special_tokens_in_validation", True))
+                self.tokenizer.decode(input_ids[i][mask[i]].tolist(), skip_special_tokens=self.config.trainer.get("skip_special_tokens_val", True))
                 for i in range(input_ids.size(0))
             ]
             sample_inputs.extend(input_texts)
@@ -859,6 +891,7 @@ class RayPPOTrainer:
             self._dump_generations(
                 inputs=sample_inputs,
                 outputs=sample_outputs,
+                images=sample_images,
                 gts=sample_gts,
                 scores=sample_scores,
                 reward_extra_infos_dict=reward_extra_infos_dict,
