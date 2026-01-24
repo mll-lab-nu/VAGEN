@@ -62,7 +62,7 @@ from .utils.image_validation_logger import ValidationGenerationsLogger
 from .utils.concat_val_multi_turn import concat_val_multi_turn
 from . import custom_advantage
 from .custom_metric.metric import METRIC_REGISTRY
-
+from .custom_filter.filter import FILTER_REGISTRY
 @dataclass
 class ResourcePoolManager:
     """
@@ -1464,6 +1464,19 @@ class RayPPOTrainer:
                         custom_train_metrics = compute_custom_metrics(batch, prefix="custom_metrics/train")
                         metrics.update(custom_train_metrics)
 
+                    
+                    
+                    # filter the training batch for effective update (Refer to STARPO-S and DAPO)
+                    if self.config.filter.get("enable", False):
+                        batch,metrics = FILTER_REGISTRY.get(self.config.filter.name)(batch, metrics,**self.config.filter.filter_kwargs)
+                        if self.config.trainer.balance_batch:
+                            # re-balance after filtering
+                            divisor_size = self.actor_rollout_wg.world_size
+                            batch_size = len(batch.batch["attention_mask"])
+                            batch, pad_size = pad_dataproto_to_divisor(batch, divisor_size)
+                            print(f"After filtering: Pad {pad_size} samples to make batch size {batch_size} divisible by {divisor_size} dp_workers")
+                            self._balance_batch(batch, metrics=metrics, logging_prefix="filtered_global_seqlen")
+                    
                     # update critic
                     if self.use_critic:
                         with marked_timer("update_critic", timing_raw, color="pink"):
