@@ -10,7 +10,7 @@ envs:
       image_size: [512,512]
       eval_mode: false
       use_example_in_sys_prompt: false
-      client_url: ${oc.env:RENDER_WS_URL}
+      client_url_file_path: ${oc.env:HOME}/projects/viewsuite/client_url.txt
       render_backend: client
       max_turns: 10
       action_only_mode: true
