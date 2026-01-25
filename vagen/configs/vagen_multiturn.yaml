@@ -26,6 +26,9 @@ actor_rollout_ref:
 
 trainer:
   val_before_train: True
+  skip_special_tokens_val: False
+  skip_special_tokens_train: False
+  replace_image_tokens_for_logging: True
 
 algorithm:
   reward_scaling: 10.0
