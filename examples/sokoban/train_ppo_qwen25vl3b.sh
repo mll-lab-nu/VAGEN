@@ -67,7 +67,6 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     trainer.validation_data_dir=${EXPERIMENT_DIR}/validation \
     trainer.rollout_data_dir=${EXPERIMENT_DIR}/rollout_data \
     trainer.log_val_generations=32 \
-    +trainer.skip_special_tokens_in_validation=False \
     data.max_prompt_length=1000 \
     data.max_response_length=4000 \
     critic.optim.lr=1e-5 \
