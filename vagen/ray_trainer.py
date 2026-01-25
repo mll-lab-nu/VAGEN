@@ -60,6 +60,7 @@ from verl.utils.seqlen_balancing import calculate_workload, get_seqlen_balanced_
 from verl.utils.torch_functional import masked_mean
 from .utils.image_validation_logger import ValidationGenerationsLogger
 from .utils.concat_val_multi_turn import concat_val_multi_turn
+from .utils.image_token_utils import replace_image_tokens_for_logging
 from . import custom_advantage
 from .custom_metric.metric import METRIC_REGISTRY
 from .custom_filter.filter import FILTER_REGISTRY
@@ -577,6 +578,10 @@ class RayPPOTrainer:
         with marked_timer("dump_rollout_generations", timing_raw, color="green"):
             inputs = self.tokenizer.batch_decode(batch.batch["prompts"], self.config.trainer.get("skip_special_tokens_train", True))
             outputs = self.tokenizer.batch_decode(batch.batch["responses"], self.config.trainer.get("skip_special_tokens_train", True))
+            # Replace consecutive image pads with <image> for cleaner logging
+            if not self.config.trainer.get("skip_special_tokens_train", True) and self.config.trainer.get("replace_image_tokens_for_logging", False):
+                inputs = replace_image_tokens_for_logging(inputs, processor=self.processor, tokenizer=self.tokenizer)
+                outputs = replace_image_tokens_for_logging(outputs, processor=self.processor, tokenizer=self.tokenizer)
             scores = batch.batch["token_level_scores"].sum(-1).cpu().tolist()
             sample_gts = [item.non_tensor_batch.get("reward_model", {}).get("ground_truth", None) for item in batch]
             # Extract images from non_tensor_batch (extra_fields are stored there)
@@ -855,7 +860,8 @@ class RayPPOTrainer:
                 for i in range(input_ids.size(0))
             ]
             sample_inputs.extend(input_texts)
-
+            
+            
             # evaluate using reward_function
             if self.val_reward_fn is None:
                 raise ValueError("val_reward_fn must be provided for validation.")
@@ -884,6 +890,9 @@ class RayPPOTrainer:
             data_source_lst.append(test_batch.non_tensor_batch.get("data_source", ["unknown"] * reward_tensor.shape[0]))
 
         self._maybe_log_val_generations(inputs=sample_inputs, outputs=sample_outputs, scores=sample_scores, images=sample_images)
+        if not self.config.trainer.get("skip_special_tokens_val", True) and self.config.trainer.get("replace_image_tokens_for_logging", False):
+                sample_inputs = replace_image_tokens_for_logging(sample_inputs, processor=self.processor, tokenizer=self.tokenizer)
+                sample_outputs = replace_image_tokens_for_logging(sample_outputs, processor=self.processor, tokenizer=self.tokenizer)
 
         # dump generations
         val_data_dir = self.config.trainer.get("validation_data_dir", None)
