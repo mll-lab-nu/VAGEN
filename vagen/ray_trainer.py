@@ -58,12 +58,12 @@ from verl.utils.metric import reduce_metrics
 from verl.utils.rollout_skip import RolloutSkip
 from verl.utils.seqlen_balancing import calculate_workload, get_seqlen_balanced_partitions, log_seqlen_unbalance
 from verl.utils.torch_functional import masked_mean
-from .utils.image_validation_logger import ValidationGenerationsLogger
-from .utils.concat_val_multi_turn import concat_val_multi_turn
-from .utils.image_token_utils import replace_image_tokens_for_logging
-from . import custom_advantage
-from .custom_metric.metric import METRIC_REGISTRY
-from .custom_filter.filter import FILTER_REGISTRY
+from vagen.utils.image_validation_logger import ValidationGenerationsLogger
+from vagen.utils.concat_val_multi_turn import concat_val_multi_turn
+from vagen.utils.image_token_utils import replace_image_tokens_for_logging
+import vagen.custom_advantage
+from vagen.custom_metric.metric import METRIC_REGISTRY
+from vagen.custom_filter.filter import FILTER_REGISTRY
 @dataclass
 class ResourcePoolManager:
     """
@@ -576,10 +576,22 @@ class RayPPOTrainer:
             rollout_data_dir (str): Directory path to save the rollout data
         """
         with marked_timer("dump_rollout_generations", timing_raw, color="green"):
-            inputs = self.tokenizer.batch_decode(batch.batch["prompts"], self.config.trainer.get("skip_special_tokens_train", True))
-            outputs = self.tokenizer.batch_decode(batch.batch["responses"], self.config.trainer.get("skip_special_tokens_train", True))
-            # Replace consecutive image pads with <image> for cleaner logging
-            if not self.config.trainer.get("skip_special_tokens_train", True) and self.config.trainer.get("replace_image_tokens_for_logging", False):
+            
+            inputs = batch.batch["prompts"]
+            outputs = batch.batch["responses"]
+            
+            # remove pad token
+            pad = self.tokenizer.pad_token_id
+            skip_special_tokens_train = self.config.trainer.get("skip_special_tokens_train", True)
+            inputs = self.tokenizer.batch_decode(
+                [s[-l:] if l else [] for s, l in zip(inputs.tolist(),  (inputs  != pad).sum(1).tolist())], 
+                skip_special_tokens=skip_special_tokens_train)
+            
+            outputs = self.tokenizer.batch_decode(
+                [s[:l]  if l else [] for s, l in zip(outputs.tolist(), (outputs != pad).sum(1).tolist())], 
+                skip_special_tokens=skip_special_tokens_train)
+            
+            if not skip_special_tokens_train and self.config.trainer.get("replace_image_tokens_for_logging", False):
                 inputs = replace_image_tokens_for_logging(inputs, processor=self.processor, tokenizer=self.tokenizer)
                 outputs = replace_image_tokens_for_logging(outputs, processor=self.processor, tokenizer=self.tokenizer)
             scores = batch.batch["token_level_scores"].sum(-1).cpu().tolist()
@@ -754,6 +766,8 @@ class RayPPOTrainer:
         sample_uids = []
         sample_images = []
 
+        pad = self.tokenizer.pad_token_id
+        skip_special_tokens_val = self.config.trainer.get("skip_special_tokens_val", True)
         for test_data in self.val_dataloader:
             test_batch = DataProto.from_single_dict(test_data)
 
@@ -830,36 +844,32 @@ class RayPPOTrainer:
 
 
             print("validation generation end")
-
-            # Store generated outputs
-            output_ids = test_output_gen_batch.batch["responses"]
-            pad_token_id = getattr(self.tokenizer, "pad_token_id", None)
-            mask = output_ids != pad_token_id  if pad_token_id is not None else torch.ones_like(output_ids, dtype=torch.bool)
-            output_texts = [
-                self.tokenizer.decode(output_ids[i][mask[i]].tolist(), skip_special_tokens=self.config.trainer.get("skip_special_tokens_val", True))
-                for i in range(output_ids.size(0))
-            ]
-            sample_outputs.extend(output_texts)
-
-            # Extract images from non_tensor_batch (extra_fields are stored there)
-            if "image_data" in test_output_gen_batch.non_tensor_batch:
-                batch_images = test_output_gen_batch.non_tensor_batch["image_data"]
-                sample_images.extend(batch_images.tolist() if hasattr(batch_images, 'tolist') else batch_images)
-            else:
-                sample_images.extend([None] * len(output_texts))
-
             test_batch = test_batch.union(test_output_gen_batch)
             test_batch.meta_info["validate"] = True
+            # Store generated outputs
             
-            # Store prompt ids and only remove padding tokens for input texts
-            input_ids = test_batch.batch["prompts"]
-            pad_token_id = getattr(self.tokenizer, "pad_token_id", None)
-            mask = input_ids != pad_token_id  if pad_token_id is not None else torch.ones_like(input_ids, dtype=torch.bool)
-            input_texts = [
-                self.tokenizer.decode(input_ids[i][mask[i]].tolist(), skip_special_tokens=self.config.trainer.get("skip_special_tokens_val", True))
-                for i in range(input_ids.size(0))
-            ]
-            sample_inputs.extend(input_texts)
+            inputs = test_batch.batch["prompts"]
+            outputs = test_batch.batch["responses"]
+        
+            inputs = self.tokenizer.batch_decode(
+                [s[-l:] if l else [] for s, l in zip(inputs.tolist(),  (inputs  != pad).sum(1).tolist())], 
+                skip_special_tokens=skip_special_tokens_val)
+            outputs = self.tokenizer.batch_decode(
+                [s[:l]  if l else [] for s, l in zip(outputs.tolist(), (outputs != pad).sum(1).tolist())], 
+                skip_special_tokens=skip_special_tokens_val)
+           
+            sample_inputs.extend(inputs)
+            sample_outputs.extend(outputs)
+
+            # Extract images from non_tensor_batch (extra_fields are stored there)
+            if "image_data" in test_batch.non_tensor_batch:
+                batch_images = test_batch.non_tensor_batch["image_data"]
+                sample_images.extend(batch_images.tolist() if hasattr(batch_images, 'tolist') else batch_images)
+            else:
+                sample_images.extend([None] * len(outputs))
+
+            
+            
             
             
             # evaluate using reward_function
@@ -888,12 +898,12 @@ class RayPPOTrainer:
                 sample_turns.append(test_batch.non_tensor_batch["__num_turns__"])
 
             data_source_lst.append(test_batch.non_tensor_batch.get("data_source", ["unknown"] * reward_tensor.shape[0]))
-
+        
+        if not skip_special_tokens_val and self.config.trainer.get("replace_image_tokens_for_logging", False):
+            sample_inputs = replace_image_tokens_for_logging(sample_inputs, processor=self.processor, tokenizer=self.tokenizer)
+            sample_outputs = replace_image_tokens_for_logging(sample_outputs, processor=self.processor, tokenizer=self.tokenizer)
+            
         self._maybe_log_val_generations(inputs=sample_inputs, outputs=sample_outputs, scores=sample_scores, images=sample_images)
-        if not self.config.trainer.get("skip_special_tokens_val", True) and self.config.trainer.get("replace_image_tokens_for_logging", False):
-                sample_inputs = replace_image_tokens_for_logging(sample_inputs, processor=self.processor, tokenizer=self.tokenizer)
-                sample_outputs = replace_image_tokens_for_logging(sample_outputs, processor=self.processor, tokenizer=self.tokenizer)
-
         # dump generations
         val_data_dir = self.config.trainer.get("validation_data_dir", None)
         if val_data_dir:
