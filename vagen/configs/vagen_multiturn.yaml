@@ -29,6 +29,10 @@ trainer:
   skip_special_tokens_val: False
   skip_special_tokens_train: False
   replace_image_tokens_for_logging: True
+  log_image:
+    enable: True
+    max_pending: 2
+    png_compress_level: 0
 
 algorithm:
   reward_scaling: 10.0
