@@ -220,11 +220,12 @@ def reward_variance_top_p_filter(data_proto: DataProto, metrics, **kwargs) -> tu
     loss_scale = np.sqrt(num_selected_groups / num_total_groups) if num_total_groups > 0 else 1.0
 
     # 8) Apply loss scale to advantages before filtering
-    if "advantages" in data_proto.batch:
-        data_proto.batch["advantages"] = data_proto.batch["advantages"] * loss_scale
-
     # 9) Filter the data_proto
     filtered_data = data_proto.select_idxs(keep_indices)
+
+    # Apply loss scale to advantages after filtering (only to kept samples)
+    if "advantages" in filtered_data.batch:
+        filtered_data.batch["advantages"] = filtered_data.batch["advantages"] * loss_scale
 
     # 10) Update metrics
     if metrics is not None:
