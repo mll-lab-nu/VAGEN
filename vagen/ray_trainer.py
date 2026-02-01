@@ -563,6 +563,7 @@ class RayPPOTrainer:
 
             if self._max_pending_dumps > 0 and len(self._pending_dump_futures) > self._max_pending_dumps:
                 done, rest = ray.wait(self._pending_dump_futures, num_returns=1)
+                ray.get(done)
                 self._pending_dump_futures = rest
 
     def _flush_image_dumps(self):
