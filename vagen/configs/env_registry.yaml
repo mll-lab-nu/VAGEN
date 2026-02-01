@@ -1,2 +1,3 @@
 env_registry:
   Sokoban: vagen.envs.sokoban.sokoban_env.Sokoban
+  FrozenLake: vagen.envs.frozenlake.frozenlake_env.FrozenLake
