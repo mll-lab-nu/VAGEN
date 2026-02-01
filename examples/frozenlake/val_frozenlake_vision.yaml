@@ -1,0 +1,14 @@
+envs:
+  - name: FrozenLake
+    n_envs: 256
+    data_source: frozenlake
+    seed: [10001,10256,1]
+    max_turns: 5
+    response_length_per_turn: 512
+    config:
+      render_mode: vision
+      size: 4
+      p: 0.8
+      is_slippery: false
+      slip_prob: 0.0
+      max_actions_per_step: 5

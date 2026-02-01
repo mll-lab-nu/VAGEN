@@ -58,6 +58,7 @@ from verl.utils.metric import reduce_metrics
 from verl.utils.rollout_skip import RolloutSkip
 from verl.utils.seqlen_balancing import calculate_workload, get_seqlen_balanced_partitions, log_seqlen_unbalance
 from verl.utils.torch_functional import masked_mean
+from vagen.utils.image_dump_actor import ImageDumpActor
 from vagen.utils.image_validation_logger import ValidationGenerationsLogger
 from vagen.utils.concat_val_multi_turn import concat_val_multi_turn
 from vagen.utils.image_token_utils import replace_image_tokens_for_logging
@@ -416,6 +417,11 @@ class RayPPOTrainer:
             project_name=self.config.trainer.project_name,
             experiment_name=self.config.trainer.experiment_name,
         )
+        self._image_dump_actors = {}
+        self._pending_dump_futures = []
+        self._log_image_cfg = self.config.trainer.get("log_image", {})
+        self._log_image_enable = self._log_image_cfg.get("enable", False)
+        self._max_pending_dumps = self._log_image_cfg.get("max_pending", 2)
 
         # if ref_in_actor is True, the reference policy will be actor without lora applied
         self.ref_in_actor = (
@@ -541,29 +547,30 @@ class RayPPOTrainer:
         print(f"Dumped generations to {filename}")
 
         # Save images to subfolders
-        if images:
-            image_folder = os.path.join(dump_path, f"image_{self.global_steps}")
-            os.makedirs(image_folder, exist_ok=True)
-            for idx, img_data in enumerate(images):
-                if img_data is None:
-                    continue
-                # Handle both single image and list of images
-                img_list = img_data if isinstance(img_data, list) else [img_data]
-                if not img_list:
-                    continue
-                subfolder = os.path.join(image_folder, f"images_{idx}")
-                os.makedirs(subfolder, exist_ok=True)
-                for img_idx, img in enumerate(img_list):
-                    if img is None:
-                        continue
-                    img_path = os.path.join(subfolder, f"{img_idx}.png")
-                    if hasattr(img, 'save'):
-                        # PIL Image
-                        img.save(img_path)
-                    elif isinstance(img, np.ndarray):
-                        from PIL import Image
-                        Image.fromarray(img).save(img_path)
-            print(f"Dumped images to {image_folder}")
+        if images and self._log_image_enable:
+            actor = self._image_dump_actors.get(dump_path)
+            if actor is None:
+                actor = ImageDumpActor.remote(base_dir=dump_path)
+                self._image_dump_actors[dump_path] = actor
+
+            compress_level = self._log_image_cfg.get("png_compress_level", 0)
+            fut = actor.dump_images.remote(
+                step=self.global_steps,
+                images=images,
+                compress_level=compress_level,
+            )
+            self._pending_dump_futures.append(fut)
+
+            if self._max_pending_dumps > 0 and len(self._pending_dump_futures) > self._max_pending_dumps:
+                done, rest = ray.wait(self._pending_dump_futures, num_returns=1)
+                ray.get(done)
+                self._pending_dump_futures = rest
+
+    def _flush_image_dumps(self):
+        if not self._pending_dump_futures:
+            return
+        ray.get(self._pending_dump_futures)
+        self._pending_dump_futures = []
 
     def _log_rollout_data(
         self, batch: DataProto, reward_extra_infos_dict: dict, timing_raw: dict, rollout_data_dir: str
@@ -1275,6 +1282,7 @@ class RayPPOTrainer:
             pprint(f"Initial validation metrics: {val_metrics}")
             logger.log(data=val_metrics, step=self.global_steps)
             if self.config.trainer.get("val_only", False):
+                self._flush_image_dumps()
                 return
 
         if self.config.actor_rollout_ref.rollout.get("skip_rollout", False):
@@ -1635,6 +1643,7 @@ class RayPPOTrainer:
                 if is_last_step:
                     pprint(f"Final validation metrics: {last_val_metrics}")
                     progress_bar.close()
+                    self._flush_image_dumps()
                     return
 
                 # this is experimental and may be changed/removed in the future
