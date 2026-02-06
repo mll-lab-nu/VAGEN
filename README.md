@@ -66,18 +66,6 @@ We frame multi-turn VLM agentic tasks as a Partially Observable Markov Decision 
 ## News
 **[2026/02]** We have migrated the `main` branch to VAGEN-Lite, a lightweight and clean reimplementation built on VERL agent-loop for easy customization and stable performance. For the previous full-featured release, please visit the [vagen-legacy](https://github.com/RAGEN-AI/VAGEN/tree/vagen-legacy) branch.
 
-## Problem Formulation
-We frame multi-turn VLM agentic tasks as a Partially Observable Markov Decision Process (POMDP), represented by the tuple $(S, O, \phi, A, p, r, \gamma),$ where $S$ denotes the set of environment states, and $O$ is the space of observations perceived by the agent.
-
-Each observation $o_t \in O$ is a partial view of the environment state $s_t \in S$, given by the observation function $\phi$. The agent’s objective is to learn a policy $\pi_\theta$ that maximizes the expected cumulative discounted return:
-
-$$
-\max_{\theta}\mathbb{E}_{\pi_\theta,p}\left[\sum_{t=1}^{T} \gamma^{t-1} r_t \right].
-$$
-
-In our setting, the policy $\pi_\theta$ is parameterized by a VLM that takes visual images (with prompts) as observations, and outputs language token sequences as actions.
-
-
 ## Installation
 
 ```bash
