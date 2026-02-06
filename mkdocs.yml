@@ -1,0 +1,50 @@
+site_name: VAGEN
+site_description: Training VLM Agents with Multi-Turn Reinforcement Learning
+site_url: https://vagen.readthedocs.io/
+docs_dir: docs
+
+repo_name: RAGEN-AI/VAGEN
+repo_url: https://github.com/RAGEN-AI/VAGEN
+
+theme:
+  name: material
+  palette:
+    primary: indigo
+    accent: indigo
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - toc.integrate
+    - search.suggest
+    - content.code.copy
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/RAGEN-AI/VAGEN
+
+nav:
+  - Home: index.md
+  - Quick Start: quickstart.md
+  - Configuration: configuration.md
+  - Customization:
+    - Environment: custom-environment.md
+    - Filter: custom-filter.md
+    - Metric: custom-metric.md
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - toc:
+      permalink: true
+  - attr_list
+  - md_in_html
+
+plugins:
+  - search
