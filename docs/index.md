@@ -3,7 +3,7 @@
 **VAGEN** is a multi-turn reinforcement learning framework for training Vision-Language Model (VLM) agents.
 
 !!! note "Version Switch"
-    You are viewing the **VAGEN-Lite** documentation. For the previous full version, see [VAGEN-Legacy Documentation](https://github.com/RAGEN-AI/VAGEN/tree/vagen-legacy).
+    You are viewing the **VAGEN-Lite** documentation. For the previous full version, see [VAGEN-Legacy Documentation](https://vagen.readthedocs.io/en/vagen-legacy/).
 
 ## VAGEN-Lite
 
