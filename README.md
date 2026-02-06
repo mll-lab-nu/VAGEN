@@ -88,6 +88,7 @@ pip install "trl==0.26.2"
 
 ## Quick Start
 
+### Training
 VAGEN currently supports PPO / GRPO with two multi-turn training paradigms:
 
 **Multi-turn Concatenated Training**: All turns in a trajectory are concatenated into a single training instance.
@@ -103,7 +104,22 @@ bash examples/sokoban/train_ppo_qwen25vl3b.sh
 cd VAGEN
 bash examples/sokoban/train_ppo_no_concat_qwen25vl3b.sh
 ```
+### Evaluation
 
+VAGEN supports evaluation using different backends (OpenAI, Claude, Gemini, sglang, vLLM). For details, see [vagen/evaluate/adapters/README.md](vagen/evaluate/adapters/README.md).
+
+```bash
+cd VAGEN
+
+# FrozenLake evaluation with sglang
+bash examples/evaluate/frozenlake/eval_qwen25_vl_3b.sh
+
+# Sokoban evaluation
+bash examples/evaluate/sokoban/run_eval.sh
+
+# Or run directly with Python
+python -m vagen.evaluate.run_eval --config examples/evaluate/frozenlake/config.yaml
+```
 
 ## Customizing Your Environment
 
