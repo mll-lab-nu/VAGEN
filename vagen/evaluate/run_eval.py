@@ -247,13 +247,14 @@ def _expand_jobs(
     env_specs: List[EnvSpec],
     base_seed: int,
     base_dir: str,
+    default_max_turns: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     jobs: List[Dict[str, Any]] = []
     for spec_idx, spec in enumerate(env_specs):
         env_cls = get_env_cls(spec.name)
         resolved_config = _resolve_paths_in_config(copy.deepcopy(spec.config), base_dir)
         seeds = generate_seeds_for_spec(spec, base_seed, spec_idx)
-        job_max_turns = int(spec.max_turns)
+        job_max_turns = int(spec.max_turns if spec.max_turns is not None else default_max_turns or 10)
         env_chat_cfg = spec.chat_config or {}
 
         for i in range(spec.n_envs):
@@ -321,7 +322,7 @@ def main() -> None:
 
     env_specs = _parse_env_specs(cfg)
     default_max_turns = (cfg.get("experiment") or {}).get("default_max_turns")
-    jobs = _expand_jobs(env_specs, base_seed, base_dir)
+    jobs = _expand_jobs(env_specs, base_seed, base_dir, default_max_turns)
     print(f"Prepared {len(jobs)} jobs from {len(env_specs)} environment specs.")
 
     dump_dir = _resolve_dump_dir(cfg, base_dir)
