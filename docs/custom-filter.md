@@ -13,7 +13,7 @@ VAGEN supports custom filters to preprocess training data before optimization. T
 
 ### Step 1: Create Your Filter
 
-Add your filter in [`vagen/custom_filter/filter.py`](https://github.com/RAGEN-AI/VAGEN/blob/main/vagen/custom_filter/filter.py):
+Add your filter in [`vagen/custom_filter/filter.py`](https://github.com/mll-lab-nu/VAGEN/blob/main/vagen/custom_filter/filter.py):
 
 ```python
 from vagen.custom_filter.filter import register_filter
@@ -57,7 +57,7 @@ def my_filter(data_proto: DataProto, metrics: dict, **kwargs) -> tuple[DataProto
 
 ### Step 2: Enable in Config
 
-Update [`vagen/configs/vagen_multiturn.yaml`](https://github.com/RAGEN-AI/VAGEN/blob/main/vagen/configs/vagen_multiturn.yaml):
+Update [`vagen/configs/vagen_multiturn.yaml`](https://github.com/mll-lab-nu/VAGEN/blob/main/vagen/configs/vagen_multiturn.yaml):
 
 ```yaml
 filter:

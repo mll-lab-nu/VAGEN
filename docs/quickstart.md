@@ -16,7 +16,7 @@ conda create -n vagen python=3.12 -y
 conda activate vagen
 
 # Clone repository
-git clone https://github.com/RAGEN-AI/VAGEN.git
+git clone https://github.com/mll-lab-nu/VAGEN.git
 cd VAGEN
 git submodule update --init --recursive
 

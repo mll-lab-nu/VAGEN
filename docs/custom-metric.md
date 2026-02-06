@@ -12,7 +12,7 @@ VAGEN supports custom metrics for W&B logging during training.
 
 ### Step 1: Create Your Metric
 
-Add your metric in [`vagen/custom_metric/metric.py`](https://github.com/RAGEN-AI/VAGEN/blob/main/vagen/custom_metric/metric.py):
+Add your metric in [`vagen/custom_metric/metric.py`](https://github.com/mll-lab-nu/VAGEN/blob/main/vagen/custom_metric/metric.py):
 
 ```python
 from vagen.custom_metric.metric import register_metric

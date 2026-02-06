@@ -3,8 +3,8 @@ site_description: Training VLM Agents with Multi-Turn Reinforcement Learning
 site_url: https://vagen.readthedocs.io/
 docs_dir: docs
 
-repo_name: RAGEN-AI/VAGEN
-repo_url: https://github.com/RAGEN-AI/VAGEN
+repo_name: mll-lab-nu/VAGEN
+repo_url: https://github.com/mll-lab-nu/VAGEN
 
 theme:
   name: material
@@ -22,7 +22,7 @@ theme:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/RAGEN-AI/VAGEN
+      link: https://github.com/mll-lab-nu/VAGEN
 
 nav:
   - Home: index.md
