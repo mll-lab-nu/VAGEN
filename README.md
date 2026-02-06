@@ -122,7 +122,7 @@ bash examples/sokoban/train_ppo_no_concat_qwen25vl3b.sh
 VAGEN supports custom environments, filters, and metrics. See the [Documentation](https://vagen.readthedocs.io/) for details:
 
 - [Custom Environment](https://vagen.readthedocs.io/custom-environment/) - Create your own training environment
-- [Custom Filter](https://vagen.readthedocs.io/custom-filter/) - Preprocess training data (inspired by [RAGEN](https://github.com/RAGEN-AI/RAGEN))
+- [Custom Filter](https://vagen.readthedocs.io/custom-filter/) - Preprocess training data (inspired and supported by [RAGEN](https://github.com/RAGEN-AI/RAGEN))
 - [Custom Metric](https://vagen.readthedocs.io/custom-metric/) - Add W&B logging metrics
 
 
