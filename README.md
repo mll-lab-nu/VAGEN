@@ -64,7 +64,7 @@ We frame multi-turn VLM agentic tasks as a Partially Observable Markov Decision 
 
 
 ## News
-**[2026/02]** We have migrated the `main` branch to VAGEN-Lite, a lightweight and clean reimplementation built on VERL agent-loop for easy customization and stable performance. For the previous full-featured release, please visit the [vagen-legacy](https://github.com/RAGEN-AI/VAGEN/tree/vagen-legacy) branch.
+**[2026/02]** We have migrated the `main` branch to VAGEN-Lite, a lightweight and clean reimplementation built on VERL agent-loop for easy customization and stable performance. For the previous full-featured release, please visit the [vagen-legacy](https://github.com/mll-lab-nu/VAGEN/tree/vagen-legacy) branch.
 
 ## Installation
 
@@ -72,7 +72,7 @@ We frame multi-turn VLM agentic tasks as a Partially Observable Markov Decision 
 conda create -n vagen python=3.12 -y
 conda activate vagen
 
-git clone https://github.com/RAGEN-AI/VAGEN.git
+git clone https://github.com/mll-lab-nu/VAGEN.git
 cd VAGEN
 git submodule update --init --recursive
 
