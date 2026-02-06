@@ -1,0 +1,88 @@
+fileroot: ${oc.env:HOME}/projects/vagen/VAGEN
+
+envs:
+  - name: FrozenLake
+    n_envs: 128
+    tag_id: frozenlake_test
+    seed: [0,128,1]
+
+
+  
+
+
+experiment:
+  dump_dir: ${fileroot}/rollouts/Qwen2.5-VL-3B-Instruct
+  default_max_turns: 1
+
+run:
+  backend: "sglang"           # choose one: openai | azure | sglang | vllm | together | claude | gemini
+  base_seed: 0
+  max_concurrent_jobs: 64
+  resume: skip_completed      # off | skip_completed | force_rerun
+  live_summary: true          # write partial summary incrementally
+
+
+backends:
+  openai:
+    api_key: ""               # or env OPENAI_API_KEY
+    base_url: null
+    model: "gpt-4o-mini"
+    max_concurrency: 2
+    max_retries: 6
+    min_backoff: 0.5
+    max_backoff: 8.0
+
+  azure:
+    azure_endpoint: ""
+    azure_api_key: ""
+    azure_api_version: "2024-12-01-preview"
+    deployment: "gpt-5"
+    model: ${backends.azure.deployment}
+    max_concurrency: 2
+    max_retries: 6
+    min_backoff: 0.5
+    max_backoff: 8.0
+
+  sglang:
+    base_url: "http://127.0.0.1:30000/v1"
+    api_key: "EMPTY"
+    model: "Qwen/Qwen2.5-VL-7B-Instruct"
+    max_concurrency: 2
+    max_retries: 6
+    min_backoff: 0.5
+    max_backoff: 8.0
+
+  vllm:
+    base_url: "http://127.0.0.1:8000/v1"
+    api_key: "EMPTY"
+    model: "Qwen2.5-7B-Instruct"
+    max_concurrency: 2
+    max_retries: 6
+    min_backoff: 0.5
+    max_backoff: 8.0
+
+  together:
+    base_url: "https://api.together.xyz/v1"
+    api_key: ""
+    model: "meta-llama/Llama-3.1-8B-Instruct-Turbo"
+    max_concurrency: 2
+    max_retries: 6
+    min_backoff: 0.5
+    max_backoff: 8.0
+
+  claude:              # NEW
+    api_key: ""        # or env ANTHROPIC_API_KEY
+    base_url: null
+    model: "claude-3-5-sonnet-latest"
+    max_concurrency: 2
+    max_retries: 6
+    min_backoff: 0.5
+    max_backoff: 8.0
+
+  gemini:              # NEW
+    api_key: ""        # or env GEMINI_API_KEY / GOOGLE_API_KEY
+    model: "gemini-1.5-pro"
+    max_concurrency: 2
+    max_retries: 6
+    min_backoff: 0.5
+    max_backoff: 8.0
