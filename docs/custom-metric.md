@@ -88,18 +88,3 @@ def reward_variance(data: DataProto, ddof=0) -> float:
     return float(np.mean(per_group_vars)) if per_group_vars else 0.0
 ```
 
-## Available Data Fields
-
-When creating custom metrics, you can access:
-
-### `data.batch` (Tensor data)
-- `token_level_scores`: Per-token reward scores
-- `advantages`: Computed advantages
-- `returns`: Computed returns
-- `response_mask`: Valid token mask
-
-### `data.non_tensor_batch` (Non-tensor data)
-- `group_idx`: Group identifier for each sample
-- `uid`: Unique identifier
-- `turn_idx`: Turn number in multi-turn setting
-- `traj_idx`: Trajectory index

@@ -117,13 +117,55 @@ bash examples/sokoban/train_ppo_no_concat_qwen25vl3b.sh
 ```
 
 
-## Customization
+## Customizing Your Environment
 
-VAGEN supports custom environments, filters, and metrics. See the [Documentation](https://vagen.readthedocs.io/) for details:
+To train on your own environment, follow the steps below.
 
-- [Custom Environment](https://vagen.readthedocs.io/custom-environment/) - Create your own training environment
-- [Custom Filter](https://vagen.readthedocs.io/custom-filter/) - Preprocess training data (inspired and supported by [RAGEN](https://github.com/RAGEN-AI/RAGEN))
+### 1. Create Your Environment Class
+
+* Use `GymImageEnv` as the base class:
+
+  * [`vagen/envs/gym_image_env.py`](vagen/envs/gym_image_env.py)
+* Refer to Sokoban for a full implementation example:
+
+  * [`vagen/envs/sokoban/sokoban_env.py`](vagen/envs/sokoban/sokoban_env.py)
+
+
+### 2. Register the Environment
+
+Add your environment entry to:
+
+```yaml
+vagen/configs/env_registry.yaml
+```
+
+### 3. Create Configuration Files
+
+Prepare training and validation configs:
+
+* `train.yaml`
+* `val.yaml`
+
+You can follow the Sokoban examples as templates:
+
+* [`examples/sokoban/train_sokoban_vision.yaml`](examples/sokoban/train_sokoban_vision.yaml)
+* [`examples/sokoban/val_sokoban_vision.yaml`](examples/sokoban/val_sokoban_vision.yaml)
+
+
+### 4. Create a Training Script
+
+Write your training script based on:
+
+* [`examples/sokoban/train_ppo_qwen25vl3b.sh`](examples/sokoban/train_ppo_qwen25vl3b.sh)
+
+
+## More Customization
+
+See the [Documentation](https://vagen.readthedocs.io/) for more customization options:
+
+- [Custom Filter](https://vagen.readthedocs.io/custom-filter/) - Preprocess training data (inspired by [RAGEN](https://github.com/RAGEN-AI/RAGEN))
 - [Custom Metric](https://vagen.readthedocs.io/custom-metric/) - Add W&B logging metrics
+- [Configuration](https://vagen.readthedocs.io/configuration/) - Training configuration reference
 
 
 ## Citation
