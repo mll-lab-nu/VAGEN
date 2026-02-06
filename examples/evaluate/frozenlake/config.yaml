@@ -5,6 +5,15 @@ envs:
     n_envs: 128
     tag_id: frozenlake_test
     seed: [0,128,1]
+    max_turns: 5
+    response_length_per_turn: 512
+    config:
+      render_mode: vision
+      size: 4
+      p: 0.8
+      is_slippery: false
+      slip_prob: 0.0
+      max_actions_per_step: 5
 
 
   
@@ -12,7 +21,7 @@ envs:
 
 experiment:
   dump_dir: ${fileroot}/rollouts/Qwen2.5-VL-3B-Instruct
-  default_max_turns: 1
+  default_max_turns: 5
 
 run:
   backend: "sglang"           # choose one: openai | azure | sglang | vllm | together | claude | gemini
