@@ -1,17 +1,17 @@
-fileroot: ${oc.env:HOME}/projects/vagen/VAGEN
+fileroot: ${oc.env:HOME}/projects/vagen
 
 envs:
   - name: Sokoban
-    n_envs: 10
+    n_envs: 128
     tag_id: sokoban_test
-    seed: [0, 10, 1]
+    seed: [10000, 10128, 1]
     split: test
-    max_turns: 10
+    max_turns: 5
     config:
       dim_room: [6, 6]
       max_steps: 100
       num_boxes: 1
-      render_mode: text
+      render_mode: vision
       max_actions_per_step: 3
       action_sep: ","
       use_example_in_sys_prompt: true
@@ -23,7 +23,7 @@ envs:
 
 experiment:
   dump_dir: ${fileroot}/rollouts/eval_sokoban
-  default_max_turns: 10
+  default_max_turns: 5
 
 run:
   backend: "openai"
