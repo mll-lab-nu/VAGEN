@@ -34,12 +34,6 @@ pip install "trl==0.26.2"
 
 ## Quick Start
 
-### Login to W&B (optional but recommended)
-
-```bash
-wandb login
-```
-
 ### Training Paradigms
 
 VAGEN supports two multi-turn training paradigms:
@@ -54,6 +48,8 @@ sys + obs_0 + response_0 + obs_1 + response_1 + ...
 
 **Run:**
 ```bash
+cd VAGEN
+wandb login
 bash examples/sokoban/train_ppo_qwen25vl3b.sh
 ```
 
@@ -71,5 +67,7 @@ This paradigm uses custom GAE for cross-turn credit assignment.
 
 **Run:**
 ```bash
+cd VAGEN
+wandb login
 bash examples/sokoban/train_ppo_no_concat_qwen25vl3b.sh
 ```
