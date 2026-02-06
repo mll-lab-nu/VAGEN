@@ -280,6 +280,6 @@ If you find our framework and paper useful, we appreciate it if you could cite o
   title={VAGEN:Reinforcing World Model Reasoning for Multi-Turn VLM Agents},
   author={Kangrui Wang* and Pingyue Zhang* and Zihan Wang* and Yaning Gao* and Linjie Li* and Qineng Wang and Hanyang Chen and Chi Wan and Yiping Lu and Zhengyuan Yang and Lijuan Wang and Ranjay Krishna and Jiajun Wu and Li Fei-Fei and Yejin Choi and Manling Li},
   year={2025},
-  url={https://vagen-ai.github.io/}
+  url={https://arxiv.org/abs/2510.16907}
 }
 ```
