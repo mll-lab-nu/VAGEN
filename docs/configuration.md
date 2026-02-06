@@ -1,6 +1,6 @@
 # Configuration
 
-The main config file is [`vagen/configs/vagen_multiturn.yaml`](https://github.com/RAGEN-AI/VAGEN/blob/main/vagen/configs/vagen_multiturn.yaml).
+The main config file is [`vagen/configs/vagen_multiturn.yaml`](https://github.com/mll-lab-nu/VAGEN/blob/main/vagen/configs/vagen_multiturn.yaml).
 
 ## Trainer
 

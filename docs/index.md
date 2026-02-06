@@ -21,5 +21,5 @@ A lightweight reimplementation built on [VERL](https://github.com/volcengine/ver
 
 - [Paper (arXiv)](https://arxiv.org/abs/2510.16907)
 - [Project Website](https://vagen-ai.github.io/)
-- [GitHub Repository](https://github.com/RAGEN-AI/VAGEN)
-- [VAGEN-Legacy Branch](https://github.com/RAGEN-AI/VAGEN/tree/vagen-legacy)
+- [GitHub Repository](https://github.com/mll-lab-nu/VAGEN)
+- [VAGEN-Legacy Branch](https://github.com/mll-lab-nu/VAGEN/tree/vagen-legacy)
