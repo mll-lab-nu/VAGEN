@@ -165,9 +165,9 @@ Write your training script based on:
 
 See the [Documentation](https://vagen.readthedocs.io/) for more customization options:
 
-- [Custom Filter](https://vagen.readthedocs.io/custom-filter/) - Preprocess training data (supported by [RAGEN](https://github.com/RAGEN-AI/RAGEN))
-- [Custom Metric](https://vagen.readthedocs.io/custom-metric/) - Add W&B logging metrics
-- [Configuration](https://vagen.readthedocs.io/configuration/) - Training configuration reference
+- [Custom Filter](https://vagen.readthedocs.io/en/latest/custom-filter/) - Preprocess training data (supported by [RAGEN](https://github.com/RAGEN-AI/RAGEN))
+- [Custom Metric](https://vagen.readthedocs.io/en/latest/custom-metric/) - Add W&B logging metrics
+- [Configuration](https://vagen.readthedocs.io/en/latest/configuration/) - Training configuration reference
 
 
 ## Citation
