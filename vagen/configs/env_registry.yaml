@@ -4,3 +4,5 @@ env_registry:
   ScannetNoTool: view_suite.envs.scannet_proxy_task.gym_proxy_no_tool.GymProxyNoTool
   ScannetTool: view_suite.envs.scannet_proxy_task.gym_proxy_tool.GymProxyTool
   ScannetAG: view_suite.envs.scannet_proxy_task.gym_proxy_action_gen.GymProxyActionGen
+  ViewSpatialNoToolGym: view_suite.envs.view_spatial_bench.gym_view_spatial_no_tool.ViewSpatialNoToolGym
+  VSIBenchNoToolGym: view_suite.envs.vsi_bench.gym_vsi_no_tool.VSIBenchNoToolGym
