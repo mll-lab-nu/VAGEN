@@ -6,3 +6,6 @@ env_registry:
   ScannetAG: view_suite.envs.scannet_proxy_task.gym_proxy_action_gen.GymProxyActionGen
   ViewSpatialNoToolGym: view_suite.envs.view_spatial_bench.gym_view_spatial_no_tool.ViewSpatialNoToolGym
   VSIBenchNoToolGym: view_suite.envs.vsi_bench.gym_vsi_no_tool.VSIBenchNoToolGym
+  ForwardDynamics: view_suite.envs.scannet_proxy_task.forward_dynamics.ForwardDynamics
+  ActiveExploration: view_suite.envs.scannet_proxy_task.active_exploration.ActiveExploration
+  InverseDynamics: view_suite.envs.scannet_proxy_task.inverse_dynamics.InverseDynamics
