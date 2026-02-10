@@ -8,7 +8,7 @@ envs:
     config:
       jsonl_path: ${oc.env:HOME}/projects/viewsuite/data/viewsuite_5k/active_explore_train_filter.jsonl
       image_size: [512,512]
-      eval_mode: false
+      eval_mode: true
       use_example_in_sys_prompt: false
       client_url_file_path: ${oc.env:HOME}/projects/viewsuite/client_url.txt
       render_backend: client
