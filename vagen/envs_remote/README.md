@@ -1,137 +1,242 @@
 # Remote Gym Environment Framework
 
-**通用、可复用**的HTTP-based client-server框架，用于远程gym环境。
+**Generic, reusable** HTTP-based client-server framework for remote gym environments.
 
-## 核心设计
+## Core Design
 
 ```
-Client (通用)  → 只负责HTTP传输、retry、session管理
-Server (通用)  → 只负责路由、session ID管理
-Handler (定制) → 唯一需要定制的部分：实现 create_env()
+Client (Generic)  → Handles HTTP transport, retry, session management
+Server (Generic)  → Handles routing, session ID management
+Handler (Custom)  → Only component to customize: implement create_env()
 ```
 
-**原则**：Client和Server 100%复用，只需实现新的Handler。
+**Principle**: Client and Server are 100% reusable. Only implement new Handler for different environments.
 
-## 快速开始
+## Quick Start
 
-### 1. 实现Handler (Server端)
+### 1. Implement Handler (Server Side)
 
 ```python
 from vagen.envs_remote import BaseGymHandler
 
 class MyHandler(BaseGymHandler):
     async def create_env(self, env_config):
-        return MyGymEnv(env_config)  # 仅此而已！
+        return MyGymEnv(env_config)  # That's it!
 ```
 
-### 2. 启动Server
+### 2. Start Server
 
 ```python
 from vagen.envs_remote import build_gym_service
 import uvicorn
 
-app = build_gym_service(MyHandler())
+# Configure session management
+handler = MyHandler(
+    session_timeout=1800.0,  # 30 min timeout
+    max_sessions=100,        # Max 100 concurrent sessions
+)
+
+app = build_gym_service(handler)
 uvicorn.run(app, host="0.0.0.0", port=8000)
 ```
 
-### 3. 使用Client
+### 3. Use Client
+
+**Option 1: Via Config (Recommended)**
+
+`RemoteEnv` is registered in [`env_registry.yaml`](../../configs/env_registry.yaml):
+
+```yaml
+# your_config.yaml
+env_name: RemoteEnv  # Use registered remote env
+
+env_config:
+  # Client config
+  base_urls: "http://server:8000"
+  timeout: 120.0
+  retries: 8
+
+  # Environment config (passed to server)
+  max_steps: 100
+  # ... other config ...
+```
+
+Full example: [`configs/examples/remote_env_example.yaml`](../../configs/examples/remote_env_example.yaml)
+
+**Option 2: Direct Code Usage**
 
 ```python
 from vagen.envs_remote import GymImageEnvClient
 
-# 创建（同步，不连接）
+# Create (synchronous, no connection)
 env = GymImageEnvClient(env_config={
     "base_urls": ["http://server1:8000", "http://server2:8000"],
     "timeout": 120.0,
     "retries": 8,
-    # ... 环境配置 ...
+    # ... environment config ...
 })
 
-# 第一次reset时建立连接（高效，1次往返）
-obs, info = await env.reset(seed=42)  # → 发送 {config, seed}, 收到 {session_id, obs, info}
+# First reset establishes connection (efficient, 1 round-trip)
+obs, info = await env.reset(seed=42)  # → Send {config, seed}, receive {session_id, obs, info}
 
-# 正常使用
+# Normal usage
 obs, reward, done, info = await env.step("action")
 await env.close()
 ```
 
-## 兼容性
+## Compatibility
 
-### 与 gym_agent_loop.py 完全兼容
+### 100% Compatible with gym_agent_loop.py
 
 ```python
-# gym_agent_loop.py 的使用方式（无需修改）
-env = env_cls(env_config)              # 同步初始化 ✓
-init_obs, info = await env.reset(seed) # 第一次reset建立连接 ✓
-sys_obs = await env.system_prompt()    # 使用session ✓
-obs, reward, done, info = await env.step(action) # 使用session ✓
-await env.close()                      # 清理session ✓
+# gym_agent_loop.py usage (no modification needed)
+env = env_cls(env_config)              # Sync init ✓
+init_obs, info = await env.reset(seed) # First reset establishes connection ✓
+sys_obs = await env.system_prompt()    # Use session ✓
+obs, reward, done, info = await env.step(action) # Use session ✓
+await env.close()                      # Cleanup session ✓
 ```
 
-只需修改配置：
+Just modify config:
 ```yaml
-env_registry:
-  my_task: "vagen.envs_remote.GymImageEnvClient"  # 改这里
+# Use registered RemoteEnv
+env_name: RemoteEnv  # Change here (already registered in env_registry.yaml)
+
 env_config:
   base_urls: "http://your-server:8000"
-  # ... 其他配置不变 ...
+  # ... other config unchanged ...
 ```
 
-## 核心特性
+## Core Features
 
-### Client特性
+### Client Features
 - ✅ URL Pool + Failover
-- ✅ Retry with exponential backoff (可配置jitter)
-- ✅ Lazy connection (reset时才连接)
-- ✅ Session locking (一个env = 一个session)
+- ✅ Retry with exponential backoff (configurable jitter)
+- ✅ Lazy connection (connect on reset)
+- ✅ Session locking (one env = one session)
 
-### Server特性
-- ✅ Session管理 (unique session_id)
-- ✅ 并发控制 (可配置)
-- ✅ API Key认证 (可选)
-- ✅ 超时清理 (自动)
+### Server Features
+- ✅ Session management (unique session_id)
+- ✅ Concurrency control (configurable)
+- ✅ API Key authentication (optional)
+- ✅ Timeout cleanup (automatic)
+- ✅ Max session limit (prevent resource exhaustion)
 
-### Protocol优化
-**第一次reset优化**：合并connect + reset为1次往返
+### Protocol Optimization
+**First reset optimization**: Merge connect + reset into 1 round-trip
 ```
 Client → Server: {env_config, seed}
 Client ← Server: {session_id, obs, info}
 ```
 
-## 配置参数
+## Session Management
 
-### Client配置 (env_config)
+### Complete Session Lifecycle
 
-| 参数 | 类型 | 默认值 | 说明 |
-|-----|------|--------|-----|
-| `base_urls` | str/list | required | 服务器URL(s) |
-| `timeout` | float | 120.0 | 请求超时(秒) |
-| `retries` | int | 8 | 重试次数 |
-| `backoff` | float | 2.0 | 退避乘数 |
-| `backoff_jitter_min` | float | 0.7 | Jitter最小值 |
-| `backoff_jitter_range` | float | 0.6 | Jitter范围 |
-| `token` | str | None | API密钥 |
-| `failover_after_failures` | int | 4 | N次失败后切换URL |
+```
+1. Client Connect
+   └→ Server checks: sessions < max_sessions?
+      ├─ Yes → Create session, return session_id
+      └─ No  → Return 503 "Max sessions limit reached"
 
-### Server配置 (环境变量)
+2. Client Interaction (reset/step)
+   └→ Update last_access on each call
 
-| 变量 | 默认值 | 说明 |
-|------|--------|-----|
-| `GYM_API_KEY` | "" | API密钥 (空=无认证) |
-| `GYM_MAX_INFLIGHT` | 0 | 最大并发数 (0=无限) |
-| `GYM_ADMIT_TIMEOUT` | 5.0 | 队列超时(秒) |
+3. Timeout Cleanup (automatic background)
+   └→ Check every minute: (now - last_access) > timeout?
+      └─ Yes → env.close() + delete session
 
-## 高级用法
+4. Explicit Close
+   └→ Client: await env.close()
+      └→ Server: env.close() + immediately delete session
 
-### 多进程 + GPU分配
+5. Server Shutdown
+   └→ Close all sessions + cleanup resources
+```
 
-Handler可以返回代理对象而非真实环境：
+### Session Tracking
 
 ```python
-# 示例 1: GPU Round-Robin (简单)
+# Handler maintains session state internally
+self._sessions: Dict[str, SessionContext] = {
+    "session_id_1": SessionContext(
+        session_id="...",
+        env=env_instance,
+        created_at=1234567890.0,
+        last_access=1234567895.0,  # Updated on each call
+    ),
+}
+```
+
+**Tracking features**:
+- Each client gets unique `session_id` (UUID)
+- `last_access` updated on every `reset/step/system_prompt`
+- Query active sessions via `GET /sessions` API
+
+### Query Session Status
+
+```bash
+# Query all active sessions
+curl http://localhost:8000/sessions
+
+# Response
+{
+  "num_sessions": 3,
+  "max_sessions": 100,
+  "session_timeout": 1800.0,
+  "sessions": [
+    {
+      "session_id": "abc123...",
+      "idle_seconds": 5.0,
+      "will_timeout_in": 1795.0
+    }
+  ]
+}
+```
+
+## Configuration
+
+### Client Config (env_config)
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `base_urls` | str/list | required | Server URL(s) |
+| `timeout` | float | 120.0 | Request timeout (seconds) |
+| `retries` | int | 8 | Number of retries |
+| `backoff` | float | 2.0 | Backoff multiplier |
+| `backoff_jitter_min` | float | 0.7 | Minimum jitter factor |
+| `backoff_jitter_range` | float | 0.6 | Jitter range |
+| `token` | str | None | API key |
+| `failover_after_failures` | int | 4 | Failover after N failures |
+
+### Server Config (Environment Variables)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `GYM_API_KEY` | "" | API key (empty = no auth) |
+| `GYM_MAX_INFLIGHT` | 0 | Max concurrent requests (0 = unlimited) |
+| `GYM_ADMIT_TIMEOUT` | 5.0 | Queue timeout (seconds) |
+
+### Handler Config (Constructor)
+
+```python
+handler = MyHandler(
+    session_timeout=1800.0,  # 30 min idle → auto cleanup
+    max_sessions=100,        # Max 100 concurrent sessions (0 = unlimited)
+)
+```
+
+## Advanced Usage
+
+### Multi-Process + GPU Allocation
+
+Handler can return proxy objects instead of real environments:
+
+```python
+# Example 1: GPU Round-Robin (simple)
 class GPUHandler(BaseGymHandler):
-    def __init__(self, gpus=[0, 1, 2, 3]):
-        super().__init__()
+    def __init__(self, gpus=[0, 1, 2, 3], session_timeout=3600.0):
+        super().__init__(session_timeout=session_timeout)
         self.gpus = gpus
         self.next_gpu = 0
 
@@ -139,63 +244,73 @@ class GPUHandler(BaseGymHandler):
         gpu_id = self.gpus[self.next_gpu]
         self.next_gpu = (self.next_gpu + 1) % len(self.gpus)
 
-        # 传递gpu_id给环境
+        # Pass gpu_id to environment
         return MyEnv({**env_config, "device": f"cuda:{gpu_id}"})
 
-# 示例 2: 多进程隔离 (完整示例见 examples/)
+# Example 2: Multi-Process Isolation (see examples/ for full implementation)
 class MultiProcessHandler(BaseGymHandler):
     async def create_env(self, env_config):
-        # 返回代理对象，实际环境在worker进程中
+        # Return proxy object, real env runs in worker process
         return ProcessEnvProxy(worker_pool, env_config)
 ```
 
-详细示例：
-- [`examples/gpu_round_robin_handler.py`](examples/gpu_round_robin_handler.py) - GPU分配
-- [`examples/multiprocess_handler.py`](examples/multiprocess_handler.py) - 多进程隔离
+Detailed examples:
+- [`examples/gpu_round_robin_handler.py`](examples/gpu_round_robin_handler.py) - GPU allocation
+- [`examples/multiprocess_handler.py`](examples/multiprocess_handler.py) - Multi-process isolation
 
-### 自定义Handler
+### Custom Handler
 
 ```python
 class CustomHandler(BaseGymHandler):
     def __init__(self, **kwargs):
-        super().__init__()
-        # 初始化资源池（进程池、GPU管理器等）
+        super().__init__(**kwargs)
+        # Initialize resource pool (process pool, GPU manager, etc.)
         self.resource_pool = ResourcePool()
 
     async def create_env(self, env_config):
-        # 自定义资源分配逻辑
+        # Custom resource allocation logic
         resource = await self.resource_pool.acquire()
 
-        # 可以返回：
-        # - 真实环境对象
-        # - 代理对象（转发到worker进程）
-        # - 远程环境引用
-        # 只要实现GymImageEnv接口即可
+        # Can return:
+        # - Real environment object
+        # - Proxy object (forward to worker process)
+        # - Remote environment reference
+        # As long as it implements GymImageEnv interface
         return CustomEnvProxy(resource, env_config)
 
     async def aclose(self):
-        # 清理资源
+        # Cleanup resources
         await self.resource_pool.close()
         await super().aclose()
 ```
 
-## API
+## API Reference
 
 ### BaseGymHandler
 
 ```python
 class BaseGymHandler:
+    def __init__(self, session_timeout=3600.0, max_sessions=0):
+        """
+        Args:
+            session_timeout: Max idle time before cleanup (seconds)
+            max_sessions: Max concurrent sessions (0 = unlimited)
+        """
+
     async def create_env(self, env_config) -> GymImageEnv:
-        """创建环境实例 (必须实现)"""
+        """Create environment instance (must implement)"""
 
     async def connect(self, env_config, seed=None) -> HandlerResult:
-        """处理连接请求 (自动调用 create_env)"""
+        """Handle connect request (automatically calls create_env)"""
 
     async def call(self, session_id, method, params, images) -> HandlerResult:
-        """执行方法调用"""
+        """Execute method call"""
+
+    def get_session_stats(self) -> Dict[str, Any]:
+        """Get statistics about current sessions"""
 
     async def aclose(self):
-        """清理资源"""
+        """Cleanup resources"""
 ```
 
 ### GymImageEnvClient
@@ -203,54 +318,97 @@ class BaseGymHandler:
 ```python
 class GymImageEnvClient(GymImageEnv):
     def __init__(self, env_config):
-        """同步初始化 (不连接)"""
+        """Synchronous initialization (no connection)"""
 
     async def reset(self, seed) -> (obs, info):
-        """第一次调用时建立连接"""
+        """Establish connection on first call"""
 
     async def step(self, action) -> (obs, reward, done, info):
-        """使用已建立的session"""
+        """Use established session"""
 
     async def close():
-        """关闭session"""
+        """Close session"""
 ```
 
-## 故障排查
+## Troubleshooting
 
-### Q: 第一次reset很慢？
-A: 正常，需要建立连接+创建环境。已优化到1次往返。
+### Q: First reset is slow?
+A: Normal, needs to establish connection + create environment. Already optimized to 1 round-trip.
 
-### Q: 如何处理服务器断连？
-A: Client自动retry + failover到下一个URL。
+### Q: How to handle server disconnection?
+A: Client automatically retries + fails over to next URL.
 
-### Q: 能否并行多个环境？
-A: 可以！每个env实例都有独立session_id。
+### Q: Can I run multiple environments in parallel?
+A: Yes! Each env instance has independent session_id.
 
-### Q: 如何实现GPU分配？
-A: 在Handler的`create_env()`中实现，见[examples/](examples/)。
+### Q: How to implement GPU allocation?
+A: Implement in Handler's `create_env()`, see [examples/](examples/).
 
-## 文件结构
+### Q: Connection rejected with "Max sessions limit reached"?
+A: Wait for other sessions to timeout, or contact admin to increase `max_sessions`.
+
+### Q: Session unexpectedly timed out?
+A: Increase `session_timeout` or ensure client has activity before timeout.
+
+## Monitoring
+
+### Health Check
+
+```bash
+curl http://localhost:8000/health
+
+{
+  "ok": true,
+  "service": "gym-env-service",
+  "max_inflight": 50
+}
+```
+
+### Session Monitoring
+
+```bash
+# Check session count
+watch -n 10 'curl -s http://localhost:8000/sessions | jq ".num_sessions"'
+
+# View all session details
+curl http://localhost:8000/sessions | jq
+```
+
+### Logs
+
+```bash
+# Handler logs
+[Handler] Created session abc123 (1/100)
+[Handler] Session def456 timed out after 1805.3s idle
+[Handler] Closed session abc123 (0/100 remaining)
+
+# Service logs
+[Service] Connect rejected: Max sessions limit reached (100)
+```
+
+## File Structure
 
 ```
 envs_remote/
-├── __init__.py                   # 导出接口
-├── gym_image_env_client.py       # Client实现
-├── service.py                    # FastAPI服务
-├── handler.py                    # Handler基类
-├── multipart_codec.py            # 编解码工具
-├── README.md                     # 本文档
+├── __init__.py                   # Export interface
+├── gym_image_env_client.py       # Client implementation
+├── service.py                    # FastAPI service
+├── handler.py                    # Handler base class
+├── multipart_codec.py            # Encoding/decoding utilities
+├── README.md                     # This document
 └── examples/
-    ├── simple_example.py         # 基础示例
-    ├── gpu_round_robin_handler.py    # GPU分配
-    └── multiprocess_handler.py       # 多进程隔离
+    ├── simple_example.py         # Basic example
+    ├── gpu_round_robin_handler.py    # GPU allocation
+    └── multiprocess_handler.py       # Multi-process isolation
 ```
 
-## 总结
+## Summary
 
-✅ **100%兼容** gym_agent_loop.py
-✅ **零代码修改** - 只需改配置
-✅ **性能优化** - 第一次reset合并连接(1次往返)
-✅ **高度可扩展** - Handler支持任意资源管理策略
-✅ **生产就绪** - Retry, failover, 超时清理完备
+✅ **100% Compatible** with gym_agent_loop.py
+✅ **Zero Code Changes** - Just modify config
+✅ **Performance Optimized** - First reset merges connection (1 round-trip)
+✅ **Highly Extensible** - Handler supports arbitrary resource management
+✅ **Production Ready** - Complete session management, retry, failover, timeout cleanup
+✅ **Resource Safe** - Automatic cleanup, max session limits, explicit close
 
-可以放心使用！🚀
+Ready for production use! 🚀
