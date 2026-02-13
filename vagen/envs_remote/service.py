@@ -99,6 +99,24 @@ def build_gym_service(handler: BaseGymHandler) -> FastAPI:
             "max_inflight": MAX_INFLIGHT if MAX_INFLIGHT > 0 else "unlimited",
         }
 
+    @app.get("/sessions")
+    async def sessions(request: Request):
+        """
+        Get statistics about active sessions.
+
+        Returns:
+            JSON with session statistics:
+            - num_sessions: Current number of active sessions
+            - max_sessions: Maximum allowed sessions
+            - sessions: List of session details (session_id, idle_time, etc.)
+
+        Requires authentication if API_KEY is set.
+        """
+        _auth(request)
+
+        stats = handler.get_session_stats()
+        return stats
+
     @app.post("/connect")
     async def connect(
         request: Request,
@@ -151,6 +169,13 @@ def build_gym_service(handler: BaseGymHandler) -> FastAPI:
                 media_type=f'multipart/mixed; boundary="{boundary}"',
             )
 
+        except RuntimeError as e:
+            # Handler raised RuntimeError (e.g., max sessions reached)
+            if "Max sessions limit reached" in str(e):
+                LOGGER.warning(f"[Service] Connect rejected: {e}")
+                raise HTTPException(status_code=503, detail=str(e))
+            LOGGER.error(f"[Service] Connect error: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
         except Exception as e:
             LOGGER.error(f"[Service] Connect error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
@@ -217,6 +242,11 @@ def build_gym_service(handler: BaseGymHandler) -> FastAPI:
         except ValueError as e:
             # Handler raised ValueError (e.g., session not found)
             raise HTTPException(status_code=404, detail=str(e))
+        except RuntimeError as e:
+            # Handler raised RuntimeError (e.g., max sessions reached)
+            if "Max sessions limit reached" in str(e):
+                raise HTTPException(status_code=503, detail=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
         except Exception as e:
             LOGGER.error(f"[Service] Call error: {e}")
             raise HTTPException(status_code=500, detail=str(e))

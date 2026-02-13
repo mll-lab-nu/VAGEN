@@ -52,14 +52,20 @@ class BaseGymHandler(ABC):
     - Resource cleanup and timeout handling
     """
 
-    def __init__(self, session_timeout: float = 3600.0):
+    def __init__(
+        self,
+        session_timeout: float = 3600.0,
+        max_sessions: int = 0,
+    ):
         """
         Initialize handler.
 
         Args:
             session_timeout: Maximum idle time before session cleanup (seconds)
+            max_sessions: Maximum number of concurrent sessions (0 = unlimited)
         """
         self.session_timeout = session_timeout
+        self.max_sessions = max_sessions
         self._sessions: Dict[str, SessionContext] = {}
         self._cleanup_task: Optional[asyncio.Task] = None
 
@@ -95,7 +101,17 @@ class BaseGymHandler(ABC):
         Returns:
             HandlerResult with session_id
             If seed provided: also includes obs, info, and images from reset
+
+        Raises:
+            RuntimeError: If max_sessions limit reached
         """
+        # Check session limit
+        if self.max_sessions > 0 and len(self._sessions) >= self.max_sessions:
+            raise RuntimeError(
+                f"Max sessions limit reached ({self.max_sessions}). "
+                f"Please try again later or close existing sessions."
+            )
+
         session_id = uuid.uuid4().hex
         env = await self.create_env(env_config)
 
@@ -107,7 +123,8 @@ class BaseGymHandler(ABC):
         )
 
         LOGGER.info(
-            f"[Handler] Created session {session_id}"
+            f"[Handler] Created session {session_id} "
+            f"({len(self._sessions)}/{self.max_sessions if self.max_sessions > 0 else 'unlimited'})"
             + (f" with initial seed {seed}" if seed is not None else "")
         )
 
@@ -209,7 +226,10 @@ class BaseGymHandler(ABC):
         """Handle close call and cleanup session."""
         await ctx.env.close()
         del self._sessions[ctx.session_id]
-        LOGGER.info(f"[Handler] Closed session {ctx.session_id}")
+        LOGGER.info(
+            f"[Handler] Closed session {ctx.session_id} "
+            f"({len(self._sessions)}/{self.max_sessions if self.max_sessions > 0 else 'unlimited'} remaining)"
+        )
         return HandlerResult(data={"closed": True})
 
     @staticmethod
@@ -261,6 +281,36 @@ class BaseGymHandler(ABC):
                 break
             except Exception as e:
                 LOGGER.error(f"[Handler] Cleanup loop error: {e}")
+
+    def get_session_stats(self) -> Dict[str, Any]:
+        """
+        Get statistics about current sessions.
+
+        Returns:
+            Dict with session statistics:
+            - num_sessions: Current number of active sessions
+            - max_sessions: Maximum allowed sessions (0 = unlimited)
+            - sessions: List of session info dicts
+        """
+        now = time.time()
+        sessions_info = []
+
+        for session_id, ctx in self._sessions.items():
+            idle_time = now - ctx.last_access
+            sessions_info.append({
+                "session_id": session_id,
+                "created_at": ctx.created_at,
+                "last_access": ctx.last_access,
+                "idle_seconds": idle_time,
+                "will_timeout_in": max(0, self.session_timeout - idle_time),
+            })
+
+        return {
+            "num_sessions": len(self._sessions),
+            "max_sessions": self.max_sessions,
+            "session_timeout": self.session_timeout,
+            "sessions": sessions_info,
+        }
 
     async def aclose(self):
         """Cleanup all sessions on shutdown."""
