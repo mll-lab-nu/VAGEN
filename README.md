@@ -178,6 +178,7 @@ conda activate vagen
 
 # verl
 git clone https://github.com/JamesKrW/verl.git
+git checkout vagen-legacy
 cd verl
 pip install -e .
 cd ../
