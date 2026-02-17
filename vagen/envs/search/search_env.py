@@ -1,50 +1,11 @@
 import asyncio
 import re
 import json
+import httpx
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 from vagen.envs.gym_image_env import GymImageEnv
-
-# ------------------------------
-# Minimal Local Retriever (TF-IDF)
-# ------------------------------
-class TfidfLocalRetriever:
-    """
-    Very small local retriever: fit TF-IDF on corpus texts once per episode (or cache globally).
-    Returns top-k docs with scores.
-    """
-    def __init__(self):
-        self._vectorizer = None
-        self._X = None
-        self._docs = None
-
-    def fit(self, docs: List[Dict[str, Any]]) -> None:
-        # Lazy import to avoid hard dependency at import time
-        from sklearn.feature_extraction.text import TfidfVectorizer
-        self._docs = docs
-        texts = [d["text"] for d in docs]
-        self._vectorizer = TfidfVectorizer(stop_words="english", max_features=50000)
-        self._X = self._vectorizer.fit_transform(texts)
-
-    def search(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
-        from sklearn.metrics.pairwise import cosine_similarity
-        if self._vectorizer is None or self._X is None or self._docs is None:
-            raise RuntimeError("Retriever not fitted. Call fit(docs) first.")
-        qv = self._vectorizer.transform([query])
-        scores = cosine_similarity(qv, self._X).ravel()
-        # top-k indices
-        idxs = scores.argsort()[::-1][:top_k]
-        out = []
-        for i in idxs:
-            d = self._docs[int(i)]
-            out.append({
-                "id": d.get("id", str(i)),
-                "text": d["text"],
-                "score": float(scores[int(i)]),
-                "title": d.get("title", None),
-            })
-        return out
 
 
 # ------------------------------
@@ -148,6 +109,7 @@ def _parse_action(action_str: str) -> Dict[str, Any]:
 class SearchR1EnvConfig:
     # Dataset: list of episodes. Each episode: {"question": str, "answer": str, "corpus": [{"id","text",...}, ...]}
     dataset: Optional[List[Dict[str, Any]]] = None
+    retrieval_server_url: str = "http://127.0.0.1:8000"
 
     # Episode budgets
     max_steps: int = 8
@@ -181,7 +143,7 @@ class SearchR1Env(GymImageEnv):
         if not self.config.dataset:
             raise ValueError("SearchR1Env requires env_config['dataset'] as a list of episodes.")
 
-        self._retriever = TfidfLocalRetriever()
+        self.client = httpx.AsyncClient(timeout=30.0)
 
         # Episode state
         self._episode: Optional[Dict[str, Any]] = None
@@ -212,8 +174,6 @@ class SearchR1Env(GymImageEnv):
         corpus = self._episode.get("corpus", [])
         if not isinstance(corpus, list) or not corpus:
             raise ValueError("Each episode must contain a non-empty 'corpus' list of {text,...} docs.")
-        # Fit retriever (can be cached globally if your corpus is fixed)
-        await asyncio.to_thread(self._retriever.fit, corpus)
 
         obs = {"obs_str": self._render_obs()}
         return obs, {}
@@ -247,7 +207,8 @@ class SearchR1Env(GymImageEnv):
                 self._searches_used += 1
                 reward += self.config.search_penalty
                 q = parsed["query"]
-                results = await asyncio.to_thread(self._retriever.search, q, self.config.top_k)
+                response = await self.client.post(f"{self.config.retrieval_server_url}/retrieve", json={"query": q, "top_k": self.config.top_k})
+                results = response.json().get("results", [])
 
                 # Append evidence with cap + de-dup by id
                 seen = {e.get("id") for e in self._evidence}
