@@ -108,7 +108,7 @@ def _parse_action(action_str: str) -> Dict[str, Any]:
 @dataclass
 class SearchR1EnvConfig:
     # Dataset: list of episodes. Each episode: {"question": str, "answer": str, "corpus": [{"id","text",...}, ...]}
-    dataset: Optional[List[Dict[str, Any]]] = None
+    dataset: Optional[List[Dict[str, Any]]] | str = None
     retrieval_server_url: str = "http://127.0.0.1:8000"
 
     # Episode budgets
@@ -142,7 +142,17 @@ class SearchR1Env(GymImageEnv):
         self.config = SearchR1EnvConfig(**env_config)
         if not self.config.dataset:
             raise ValueError("SearchR1Env requires env_config['dataset'] as a list of episodes.")
-
+        
+        if isinstance(self.config.dataset, str):
+            if self.config.dataset == "hotpotqa":
+                from prepare_hotpotqa_data import prepare_hotpotqa_data
+                if self.config.mode == "train":
+                    self.config.dataset, _ = prepare_hotpotqa_data(train_size=3000)
+                else:
+                    _, self.config.dataset = prepare_hotpotqa_data(test_size=1000)
+            else:
+                raise ValueError(f"Unknown dataset: {self.config.dataset}")
+        
         self.client = httpx.AsyncClient(timeout=30.0)
 
         # Episode state
