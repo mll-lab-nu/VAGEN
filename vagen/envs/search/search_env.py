@@ -208,15 +208,23 @@ class SearchR1Env(GymImageEnv):
                 reward += self.config.search_penalty
                 q = parsed["query"]
                 response = await self.client.post(f"{self.config.retrieval_server_url}/retrieve", json={"query": q, "top_k": self.config.top_k})
-                results = response.json()[0]
+                data = response.json()
+            raw_results = data.get("results", [])
+            results = []
+            for r in raw_results:
+                results.append({
+                    "id": r["document"]["id"],
+                    "text": r["document"]["contents"],
+                    "score": r["score"],
+                })
 
-                # Append evidence with cap + de-dup by id
-                seen = {e.get("id") for e in self._evidence}
-                for r in results:
-                    if r.get("id") not in seen:
-                        self._evidence.append(r)
-                        seen.add(r.get("id"))
-                self._evidence = self._evidence[: self.config.max_evidence_items]
+            seen = {e.get("id") for e in self._evidence}
+            for r in results:
+                if r.get("id") not in seen:
+                    self._evidence.append(r)
+                    seen.add(r.get("id"))
+
+            self._evidence = self._evidence[: self.config.max_evidence_items]
 
         elif not done and parsed["action_type"] == "final":
             pred = parsed["answer"]
