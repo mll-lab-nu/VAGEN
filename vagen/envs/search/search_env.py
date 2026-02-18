@@ -193,6 +193,7 @@ class SearchR1Env(GymImageEnv):
         return obs, {}
 
     async def step(self, action_str: str) -> Tuple[Dict[str, Any], float, bool, Dict[str, Any]]:
+        print("action_str:", action_str)
         self._steps_used += 1
         reward = 0.0
         done = False
