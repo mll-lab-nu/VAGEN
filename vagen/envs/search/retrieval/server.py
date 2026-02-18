@@ -319,6 +319,9 @@ class DenseRetriever(BaseRetriever):
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
+        print(results)
+        print(scores)
+        
         if return_score:
             return results, scores
         else:

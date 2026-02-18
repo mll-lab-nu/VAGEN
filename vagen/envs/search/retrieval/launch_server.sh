@@ -43,8 +43,8 @@ fi
 # Configuration
 RETRIEVER_NAME="e5"
 RETRIEVER_MODEL="intfloat/e5-base-v2"
-TOPK=10
-BATCH_SIZE=512
+TOPK=5
+BATCH_SIZE=32
 GPU_ID=0
 LOG_LEVEL=${4:-"INFO"}  # Optional fourth argument: DEBUG, INFO, WARNING, ERROR
 
