@@ -208,7 +208,7 @@ class SearchR1Env(GymImageEnv):
                 reward += self.config.search_penalty
                 q = parsed["query"]
                 response = await self.client.post(f"{self.config.retrieval_server_url}/retrieve", json={"query": q, "top_k": self.config.top_k})
-                results = response.json().get("results", [])
+                results = response.json()[0]
 
                 # Append evidence with cap + de-dup by id
                 seen = {e.get("id") for e in self._evidence}
