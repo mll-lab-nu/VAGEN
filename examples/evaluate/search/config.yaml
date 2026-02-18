@@ -2,12 +2,13 @@ fileroot: ${oc.env:HOME}/projects/vagen/VAGEN
 
 envs:
   - name: SearchR1
-    n_envs: 32
+    n_envs: 1
     tag_id: search_test
     seed: [0,32,1]
     max_turns: 5
     response_length_per_turn: 512
     config:
+      dataset: "hotpotqa"
       retrieval_server_url: "http://127.0.0.1:8000"
       top_k: 5
       max_evidence_items: 15

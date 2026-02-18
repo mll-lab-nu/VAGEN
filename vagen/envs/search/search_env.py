@@ -109,6 +109,7 @@ def _parse_action(action_str: str) -> Dict[str, Any]:
 class SearchR1EnvConfig:
     # Dataset: list of episodes. Each episode: {"question": str, "answer": str, "corpus": [{"id","text",...}, ...]}
     dataset: Optional[List[Dict[str, Any]]] | str = None
+    mode: str = "test"
     retrieval_server_url: str = "http://127.0.0.1:8000"
 
     # Episode budgets
@@ -145,11 +146,11 @@ class SearchR1Env(GymImageEnv):
         
         if isinstance(self.config.dataset, str):
             if self.config.dataset == "hotpotqa":
-                from prepare_hotpotqa_data import prepare_hotpotqa_data
+                from vagen.envs.search.prepare_hotpotqa_data import prepare_hotpotqa_data
                 if self.config.mode == "train":
-                    self.config.dataset, _ = prepare_hotpotqa_data(train_size=3000)
+                    self.config.dataset, _ = prepare_hotpotqa_data(train_size=3000, test_size=1000)
                 else:
-                    _, self.config.dataset = prepare_hotpotqa_data(test_size=1000)
+                    _, self.config.dataset = prepare_hotpotqa_data(train_size=3000, test_size=1000)
             else:
                 raise ValueError(f"Unknown dataset: {self.config.dataset}")
         
@@ -175,15 +176,18 @@ class SearchR1Env(GymImageEnv):
         idx = seed % len(self.config.dataset)
         self._episode = self.config.dataset[idx]
         self._question = str(self._episode["question"])
-        self._gold = str(self._episode["answer"])
+        
+        if "answer" in self._episode:
+            self._gold = str(self._episode["answer"])
+        elif "ground_truth" in self._episode:
+            self._gold = str(self._episode["ground_truth"])
+        else:
+            raise ValueError("Each episode must contain either 'answer' or 'ground_truth'.")
+        
         self._evidence = []
         self._steps_used = 0
         self._searches_used = 0
         self.total_reward = 0.0
-
-        corpus = self._episode.get("corpus", [])
-        if not isinstance(corpus, list) or not corpus:
-            raise ValueError("Each episode must contain a non-empty 'corpus' list of {text,...} docs.")
 
         obs = {"obs_str": self._render_obs()}
         return obs, {}
@@ -264,6 +268,9 @@ class SearchR1Env(GymImageEnv):
 
         self.total_reward += reward
         obs = {"obs_str": self._render_obs()}
+        print("obs_str:", obs["obs_str"])
+        print(f"reward={reward} done={done} info={info.get('error', '')} correct={info.get('correct', None)}")
+        
         return obs, reward, done, info
 
     def _render_obs(self) -> str:
