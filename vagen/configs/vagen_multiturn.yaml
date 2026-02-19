@@ -54,4 +54,6 @@ filter:
 
 huggingface_hub:
   repo_id: null
+  # Explicitly override HFUploadActor.__init__ default private=True.
+  # For this config, repositories are intended to be public by default.
   private: false
