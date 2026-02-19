@@ -270,10 +270,14 @@ class BaseGymHandler(ABC):
 
                 # Cleanup timed-out sessions
                 for session_id in to_remove:
+                    ctx = self._sessions.get(session_id)
+                    if ctx is None:
+                        # Session may have been removed concurrently
+                        continue
                     try:
-                        ctx = self._sessions[session_id]
                         await ctx.env.close()
-                        del self._sessions[session_id]
+                        # Use pop with default to avoid KeyError if concurrently removed
+                        self._sessions.pop(session_id, None)
                     except Exception as e:
                         LOGGER.error(f"[Handler] Error cleaning up session {session_id}: {e}")
 
