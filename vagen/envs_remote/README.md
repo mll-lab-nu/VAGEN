@@ -61,7 +61,7 @@ env_config:
   # ... other config ...
 ```
 
-Full example: [`configs/examples/remote_env_example.yaml`](../../configs/examples/remote_env_example.yaml)
+Full example: see the configuration examples under the `configs` directory in this repository.
 
 **Option 2: Direct Code Usage**
 
