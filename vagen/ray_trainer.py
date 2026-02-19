@@ -59,6 +59,7 @@ from verl.utils.rollout_skip import RolloutSkip
 from verl.utils.seqlen_balancing import calculate_workload, get_seqlen_balanced_partitions, log_seqlen_unbalance
 from verl.utils.torch_functional import masked_mean
 from vagen.utils.image_dump_actor import ImageDumpActor
+from vagen.utils.upload_hugging_face import HFUploadManager
 from vagen.utils.image_validation_logger import ValidationGenerationsLogger
 from vagen.utils.concat_val_multi_turn import concat_val_multi_turn
 from vagen.utils.image_token_utils import replace_image_tokens_for_logging
@@ -422,6 +423,9 @@ class RayPPOTrainer:
         self._log_image_cfg = self.config.trainer.get("log_image", {})
         self._log_image_enable = self._log_image_cfg.get("enable", False)
         self._max_pending_dumps = self._log_image_cfg.get("max_pending", 2)
+
+        # HuggingFace Hub upload
+        self._hf_upload_manager = HFUploadManager(config)
 
         # if ref_in_actor is True, the reference policy will be actor without lora applied
         self.ref_in_actor = (
@@ -1582,13 +1586,22 @@ class RayPPOTrainer:
                 # 2. It's the last training step.
                 # 3. The current step number is a multiple of the save frequency.
                 # 4. The ESI(Elastic Server Instance)/training plan is close to expiration.
-                if self.config.trainer.save_freq > 0 and (
+                should_save_ckpt = self.config.trainer.save_freq > 0 and (
                     is_last_step or self.global_steps % self.config.trainer.save_freq == 0 or esi_close_to_expiration
-                ):
+                )
+                should_upload_hf = self._hf_upload_manager.should_upload(self.global_steps)
+
+                if should_save_ckpt or should_upload_hf:
+                    # Flush pending HF uploads before saving to avoid conflicts
+                    # with checkpoint deletion (max_actor_ckpt_to_keep)
+                    self._hf_upload_manager.flush()
                     if esi_close_to_expiration:
                         print("Force saving checkpoint: ESI instance expiration approaching.")
                     with marked_timer("save_checkpoint", timing_raw, color="green"):
                         self._save_checkpoint()
+
+                if should_upload_hf:
+                    self._hf_upload_manager.maybe_upload(self.global_steps)
 
                 with marked_timer("stop_profile", timing_raw):
                     next_step_profile = (
@@ -1644,6 +1657,7 @@ class RayPPOTrainer:
                     pprint(f"Final validation metrics: {last_val_metrics}")
                     progress_bar.close()
                     self._flush_image_dumps()
+                    self._hf_upload_manager.flush()
                     return
 
                 # this is experimental and may be changed/removed in the future
