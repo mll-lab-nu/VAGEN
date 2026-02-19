@@ -114,15 +114,14 @@ async def run_client(urls: list = None):
 
     try:
         # Use like any GymImageEnv
-        print("\n=== Getting system prompt ===")
-        system_prompt = await client.system_prompt()
-        print(f"System: {system_prompt['obs_str']}")
-
         print("\n=== Resetting environment ===")
         obs, info = await client.reset(seed=42)
         print(f"Obs: {obs['obs_str']}")
         print(f"Info: {info}")
 
+        print("\n=== Getting system prompt ===")
+        system_prompt = await client.system_prompt()
+        print(f"System: {system_prompt['obs_str']}")
         print("\n=== Running episode ===")
         for i in range(5):
             action = f"Action #{i + 1}"
