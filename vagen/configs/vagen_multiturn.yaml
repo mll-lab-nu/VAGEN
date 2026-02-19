@@ -29,8 +29,11 @@ trainer:
   skip_special_tokens_val: False
   skip_special_tokens_train: False
   replace_image_tokens_for_logging: True
+  hf_save_freq: null
+  max_actor_ckpt_to_keep: 1
+  max_critic_ckpt_to_keep: 1
   log_image:
-    enable: True
+    enable: false
     max_pending: 2
     png_compress_level: 0
 
@@ -48,3 +51,7 @@ filter:
   name: reward_variance
   filter_kwargs: {}
   enable: False
+
+huggingface_hub:
+  repo_id: null
+  private: false
