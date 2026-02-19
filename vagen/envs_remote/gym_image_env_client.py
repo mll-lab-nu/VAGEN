@@ -38,7 +38,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import httpx
 from PIL import Image
 
-from ..gym_image_env import GymImageEnv
+from vagen.envs.gym_image_env import GymImageEnv
 from .multipart_codec import encode_multipart, decode_multipart
 
 LOGGER = logging.getLogger(__name__)
