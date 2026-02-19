@@ -262,7 +262,7 @@ class GymImageEnvClient(GymImageEnv):
             return self._current_url_index
 
         offset = attempt - self.failover_after_failures
-        return min(offset, len(self.base_urls) - 1) % len(self.base_urls)
+        return offset % len(self.base_urls)
 
     async def _call(
         self,
