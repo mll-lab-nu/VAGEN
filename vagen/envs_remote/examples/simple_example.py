@@ -17,7 +17,7 @@ import asyncio
 import sys
 from typing import Any, Dict
 
-from vagen.envs.remote import BaseGymHandler, GymImageEnvClient, build_gym_service
+from vagen.envs_remote import BaseGymHandler, GymImageEnvClient, build_gym_service
 from vagen.envs.gym_image_env import GymImageEnv
 
 
