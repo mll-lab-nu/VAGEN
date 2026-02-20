@@ -191,6 +191,9 @@ refer to `vagen/configs/vagen_multiturn.yaml`
 
 ### Image Logging
 ```yaml
+# Warning:
+# - If you set a training-data rollout dir AND enable image logging, training images will also be dumped to disk.
+#   This can consume a large amount of storage very quickly. Monitor disk usage and consider cleanup/limits.
 trainer:
   log_image:
     enable: false      # true can enable saving rollout/validation images to disk
