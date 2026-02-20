@@ -2,7 +2,7 @@
 
 set -x
 
-PROJECT_NAME="verl_vagen"
+PROJECT_NAME="vagen_experiments"
 EXPERIMENT_NAME="grpo_qwen25vl3b"
 
 BASEDIR=$(pwd)
@@ -82,7 +82,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     actor_rollout_ref.actor.strategy=fsdp2 \
     critic.strategy=fsdp2 \
     reward_model.strategy=fsdp2 \
-    trainer.total_epochs=10 2>&1 | \
+    trainer.total_training_steps=400 2>&1 | \
     tee ${EXPERIMENT_DIR}/${PROJECT_NAME}_${EXPERIMENT_NAME}.log >(tee ${BASEDIR}/${PROJECT_NAME}_${EXPERIMENT_NAME}.log >/dev/null)
 # actor_rollout_ref.model.lora_rank=8 \
 #     actor_rollout_ref.model.lora_alpha=16 \

@@ -30,6 +30,8 @@ def format_prompt(max_actions_per_step, action_sep, add_example=True, prompt_for
         return free_think_format_prompt(max_actions_per_step, action_sep, add_example)
     elif prompt_format == "wm":
         return wm_format_prompt(max_actions_per_step, action_sep, add_example)
+    elif prompt_format == "free_wm":
+        return free_wm_format_prompt(max_actions_per_step, action_sep, add_example)
     else:
         raise ValueError(f"Unknown prompt format: {prompt_format}")
 
@@ -57,7 +59,6 @@ Example 3:
         return base_prompt + "\n" + examples
 
     return base_prompt
-
 
 
 
@@ -102,6 +103,59 @@ Example 3:
 <observation>The box is same row and right of the player, and the target is same row and left of the player</observation>
 <think>I should move right to push the box right while keeping the target on my left</think>
 <answer>Right</answer>
+<prediction>The box will be same row and right of the player, and the target will be same row and left of the player</prediction>
+"""
+        return base_prompt + "\n" + examples
+
+    return base_prompt
+
+
+def free_wm_format_prompt(max_actions_per_step, action_sep, add_example=True):
+    """Generate format prompt for free_wm format: observation, answer, prediction with free reasoning between tags."""
+    base_prompt = f"""You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}.
+Your response must be in the format of:
+<observation>...</observation> your reasoning <answer>...</answer> your reasoning <prediction>...</prediction>.
+
+You may include free-form reasoning text between the tags.
+
+Rules for <observation> and <prediction>:
+- You must strictly describe the relative position of the `target` and any visible `box` objects **relative to the player**.
+- For each object, you MUST include:
+  - exactly ONE vertical relationship: `above`, `below`, or `same row`
+  - exactly ONE horizontal relationship: `left`, `right`, or `same column`
+- Use ONLY the terms: `above`, `below`, `same row`, `left`, `right`, `same column`.
+- Always use the phrasing pattern:
+  "X is <vertical> and <horizontal> of the player".
+- Do NOT use the word `same` alone.
+- Do not include any extra information.
+
+Rules for <answer>:
+- Output 1 to {max_actions_per_step} action(s).
+- Valid actions are: Up, Down, Left, Right.
+- Separate multiple actions with `{action_sep}`.
+"""
+
+    if add_example:
+        examples = f"""
+Example 1:
+<observation>The box is below and right of the player, and the target is below and right of the player</observation>
+I should move right to align my column with the box and the target.
+<answer>Right</answer>
+After moving right, the box and target should still be below me but now in the same column.
+<prediction>The box will be below and same column of the player, and the target will be below and same column of the player</prediction>
+
+Example 2:
+<observation>The box is above and left of the player, and the target is above and same column of the player</observation>
+I should move up to align my row with the box and reach the target's row position.
+<answer>Up</answer>
+After moving up, the box should be on the same row to my left, and the target on the same row in the same column.
+<prediction>The box will be same row and left of the player, and the target will be same row and same column of the player</prediction>
+
+Example 3:
+<observation>The box is same row and right of the player, and the target is same row and left of the player</observation>
+I should move right to push the box right while keeping the target on my left.
+<answer>Right</answer>
+After pushing right, the box stays to my right and the target stays to my left.
 <prediction>The box will be same row and right of the player, and the target will be same row and left of the player</prediction>
 """
         return base_prompt + "\n" + examples
