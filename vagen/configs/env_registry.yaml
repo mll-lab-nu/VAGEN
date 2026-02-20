@@ -1,4 +1,5 @@
 env_registry:
+  # Local environments
   Sokoban: vagen.envs.sokoban.sokoban_env.Sokoban
   FrozenLake: vagen.envs.frozenlake.frozenlake_env.FrozenLake
   ScannetNoTool: view_suite.envs.scannet_proxy_task.gym_proxy_no_tool.GymProxyNoTool
@@ -9,3 +10,6 @@ env_registry:
   ForwardDynamics: view_suite.envs.scannet_proxy_task.forward_dynamics.ForwardDynamics
   ActiveExploration: view_suite.envs.scannet_proxy_task.active_exploration.ActiveExploration
   InverseDynamics: view_suite.envs.scannet_proxy_task.inverse_dynamics.InverseDynamics
+
+  # Remote environment client (generic, reusable for any remote env)
+  RemoteEnv: vagen.envs_remote.GymImageEnvClient
