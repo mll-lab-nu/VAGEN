@@ -2,7 +2,7 @@
 
 set -x
 
-PROJECT_NAME="verl_vagen"
+PROJECT_NAME="vagen_experiments"
 EXPERIMENT_NAME="ppo_qwen25vl3b"
 
 BASEDIR=$(pwd)
@@ -76,7 +76,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     critic.ppo_micro_batch_size_per_gpu=1 \
     critic.model.fsdp_config.param_offload=True \
     critic.model.fsdp_config.optimizer_offload=True \
-    trainer.total_epochs=10 2>&1 | \
+    trainer.total_training_steps=400 2>&1 | \
     tee ${EXPERIMENT_DIR}/${PROJECT_NAME}_${EXPERIMENT_NAME}.log >(tee ${BASEDIR}/${PROJECT_NAME}_${EXPERIMENT_NAME}.log >/dev/null)
 # actor_rollout_ref.model.lora_rank=8 \
 #     actor_rollout_ref.model.lora_alpha=16 \
