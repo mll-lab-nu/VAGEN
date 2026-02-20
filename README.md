@@ -76,12 +76,11 @@ git clone https://github.com/mll-lab-nu/VAGEN.git
 cd VAGEN
 git submodule update --init --recursive
 
-pip install -e .
-
 cd verl
 USE_MEGATRON=0 bash scripts/install_vllm_sglang_mcore.sh
 pip install --no-deps -e .
-
+cd ..
+pip install -e .
 pip install "trl==0.26.2"
 ```
 
