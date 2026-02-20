@@ -79,7 +79,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     filter.enable=True \
     filter.name=reward_variance \
     +filter.filter_kwargs.topk=0.2 \
-    trainer.total_epochs=10 2>&1 | \
+    trainer.total_training_steps=400 2>&1 | \
     tee ${EXPERIMENT_DIR}/${PROJECT_NAME}_${EXPERIMENT_NAME}.log >(tee ${BASEDIR}/${PROJECT_NAME}_${EXPERIMENT_NAME}.log >/dev/null)
 # actor_rollout_ref.model.lora_rank=8 \
 #     actor_rollout_ref.model.lora_alpha=16 \
