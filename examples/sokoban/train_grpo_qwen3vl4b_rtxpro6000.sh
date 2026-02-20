@@ -2,18 +2,17 @@
 
 set -x
 
-
 PROJECT_NAME="vagen_experiments"
-EXPERIMENT_NAME="frozenlake_grpo_qwen25vl3b_nofilter_vision"
+EXPERIMENT_NAME="grpo_qwen3vl4b"
 
 BASEDIR=$(pwd)
 SCRIPTDIR=$(dirname "$0")
 EXPERIMENT_DIR=${BASEDIR}/exps/${PROJECT_NAME}/${EXPERIMENT_NAME}
 SAVE_CHECKPOINT_DIR=${EXPERIMENT_DIR}/verl_checkpoints
-DATASET_TRAIN=${SCRIPTDIR}/train_frozenlake_vision.yaml
-DATASET_VAL=${SCRIPTDIR}/val_frozenlake_vision.yaml
+DATASET_TRAIN=${SCRIPTDIR}/train_sokoban_free_wm.yaml
+DATASET_VAL=${SCRIPTDIR}/val_sokoban_free_wm.yaml
 agent_loop_config_path=${BASEDIR}/vagen/configs/agent.yaml
-REF_MODEL_PATH=Qwen/Qwen2.5-VL-3B-Instruct
+REF_MODEL_PATH=Qwen/Qwen3-VL-4B-Instruct
 mkdir -p ${EXPERIMENT_DIR}
 
 
@@ -60,16 +59,14 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     trainer.val_before_train=True \
     trainer.n_gpus_per_node=2 \
     trainer.nnodes=1 \
-    trainer.save_freq=40 \
+    trainer.save_freq=100 \
     trainer.test_freq=20 \
     trainer.project_name=${PROJECT_NAME} \
     trainer.experiment_name=${EXPERIMENT_NAME} \
     trainer.default_local_dir=${SAVE_CHECKPOINT_DIR} \
-    trainer.validation_data_dir=null \
-    trainer.rollout_data_dir=null \
+    trainer.validation_data_dir=${EXPERIMENT_DIR}/validation \
+    trainer.rollout_data_dir=${EXPERIMENT_DIR}/rollout_data \
     trainer.log_val_generations=32 \
-    trainer.max_actor_ckpt_to_keep=1 \
-    trainer.max_critic_ckpt_to_keep=1 \
     data.max_prompt_length=1000 \
     data.max_response_length=4000 \
     critic.optim.lr=1e-5 \
@@ -79,6 +76,13 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     critic.ppo_micro_batch_size_per_gpu=1 \
     critic.model.fsdp_config.param_offload=True \
     critic.model.fsdp_config.optimizer_offload=True \
-    filter.enable=False \
+    +actor_rollout_ref.rollout.engine_kwargs.sglang.attention_backend=flashinfer \
+    +actor_rollout_ref.rollout.engine_kwargs.sglang.mm_attention_backend=triton_attn \
+    actor_rollout_ref.ref.strategy=fsdp2 \
+    actor_rollout_ref.actor.strategy=fsdp2 \
     trainer.total_training_steps=400 2>&1 | \
     tee ${EXPERIMENT_DIR}/${PROJECT_NAME}_${EXPERIMENT_NAME}.log >(tee ${BASEDIR}/${PROJECT_NAME}_${EXPERIMENT_NAME}.log >/dev/null)
+# actor_rollout_ref.model.lora_rank=8 \
+#     actor_rollout_ref.model.lora_alpha=16 \
+#     actor_rollout_ref.rollout.load_format="safetensors" \
+#     actor_rollout_ref.model.target_modules="all-linear" \

@@ -2,7 +2,7 @@
 
 set -x
 
-PROJECT_NAME="ragen-exp"
+PROJECT_NAME="vagen_experiments"
 EXPERIMENT_NAME="frozenlake_grpo_qwen25vl3b_filter_vision"
 
 BASEDIR=$(pwd)

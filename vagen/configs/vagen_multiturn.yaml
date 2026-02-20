@@ -29,7 +29,6 @@ trainer:
   skip_special_tokens_val: False
   skip_special_tokens_train: False
   replace_image_tokens_for_logging: True
-  hf_save_freq: null
   max_actor_ckpt_to_keep: 1
   max_critic_ckpt_to_keep: 1
   log_image:
@@ -53,7 +52,6 @@ filter:
   enable: False
 
 huggingface_hub:
+  hf_save_freq: null
   repo_id: null
-  # Explicitly override HFUploadActor.__init__ default private=True.
-  # For this config, repositories are intended to be public by default.
   private: false
