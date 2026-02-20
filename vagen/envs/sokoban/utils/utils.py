@@ -114,12 +114,81 @@ def parse_wm(response: str, action_sep: str = ",", max_actions: int = 3) -> Dict
         "format_correct": format_correct,
     }
 
+def parse_free_wm(response: str, action_sep: str = ",", max_actions: int = 3) -> Dict:
+    """
+    Parse free_wm format response:
+    <observation>...</observation> ... <answer>...</answer> ... <prediction>...</prediction>
+
+    Like wm but without the <think> tag. Free-form reasoning text is allowed
+    between the tags and is captured as reasoning_content.
+    """
+    pattern = (
+        r'<observation>(.*?)</observation>'
+        r'(.*?)'
+        r'<answer>(.*?)</answer>'
+        r'(.*?)'
+        r'<prediction>(.*?)</prediction>'
+    )
+
+    match = re.search(pattern, response, re.DOTALL)
+    format_correct = match is not None
+
+    if not match:
+        observation_content = ""
+        prediction_content = ""
+        action_content = ""
+        reasoning_content = ""
+        actions: List[str] = []
+    else:
+        observation_content = match.group(1).strip()
+        reasoning_before_answer = match.group(2).strip()
+        action_content = match.group(3).strip()
+        reasoning_after_answer = match.group(4).strip()
+        prediction_content = match.group(5).strip()
+
+        # Combine any free-form reasoning between tags
+        reasoning_parts = [p for p in [reasoning_before_answer, reasoning_after_answer] if p]
+        reasoning_content = " ".join(reasoning_parts)
+
+        # Parse actions
+        actions = [
+            action.strip().lower()
+            for action in action_content.split(action_sep)
+            if action.strip()
+        ]
+
+        # Limit number of actions
+        if len(actions) > max_actions:
+            actions = actions[:max_actions]
+            action_content = action_sep.join(actions)
+
+    # Reconstruct formatted response (canonical)
+    llm_response = (
+        f"<observation>{observation_content}</observation>"
+        f"<answer>{action_content}</answer>"
+        f"<prediction>{prediction_content}</prediction>"
+    )
+
+    return {
+        "llm_raw_response": response,
+        "llm_response": llm_response,
+        "observation_content": observation_content,
+        "think_content": reasoning_content,
+        "reasoning_content": reasoning_content,
+        "prediction_content": prediction_content,
+        "action_content": action_content,
+        "actions": actions,
+        "format_correct": format_correct,
+    }
+
 def parse_response(response: str, prompt_format: str = "free_think", action_sep: str = ",", max_actions: int = 3) -> Dict:
     """Parse LLM response based on the specified prompt format"""
     if prompt_format == "free_think":
         return parse_free_think(response, action_sep, max_actions)
     elif prompt_format == "wm":
         return parse_wm(response, action_sep, max_actions)
+    elif prompt_format == "free_wm":
+        return parse_free_wm(response, action_sep, max_actions)
     else:
         raise ValueError(f"Unknown prompt format: {prompt_format}")
     
