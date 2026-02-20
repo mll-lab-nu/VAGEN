@@ -94,9 +94,25 @@ VAGEN currently supports PPO / GRPO with two multi-turn training paradigms:
 **Multi-turn Concatenated Training**: All turns in a trajectory are concatenated into a single training instance.
 
 ```bash
+# Qwen/Qwen2.5-VL-3B-Instruct
 cd VAGEN
 bash examples/sokoban/train_ppo_qwen25vl3b.sh
 ```
+
+```bash
+# Qwen/Qwen3-VL-4B-Instruct
+# pip install transformers==0.57.1
+# pip install "sglang[all]==0.5.3.post3"
+cd VAGEN
+bash examples/sokoban/train_grpo_qwen3vl4b.sh
+```
+
+```bash
+# Enable reward variance based top-p filtering
+cd VAGEN
+bash examples/frozenlake/train_grpo_qwen25vl3b_filtertopp_vision.sh
+```
+
 
 **Multi-turn Non-Concatenated Training**: Each trajectory is split into multiple turn-level training instances.
 
@@ -110,10 +126,12 @@ VAGEN supports evaluation using different backends (OpenAI, Claude, Gemini, sgla
 
 ```bash
 cd VAGEN
-
 # FrozenLake evaluation with sglang
 bash examples/evaluate/frozenlake/eval_qwen25_vl_3b.sh
+```
 
+```bash
+cd VAGEN
 # Sokoban evaluation
 bash examples/evaluate/sokoban/run_eval.sh
 
@@ -169,6 +187,34 @@ See the [Documentation](https://vagen.readthedocs.io/) for more customization op
 - [Custom Metric](https://vagen.readthedocs.io/en/latest/custom-metric/) - Add W&B logging metrics
 - [Configuration](https://vagen.readthedocs.io/en/latest/configuration/) - Training configuration reference
 
+## Useful Configs
+refer to `vagen/configs/vagen_multiturn.yaml`
+
+### Image Logging
+```yaml
+trainer:
+  log_image:
+    enable: false      # true can enable saving rollout/validation images to disk
+    max_pending: 2     # max concurrent async image dump tasks
+    png_compress_level: 0  # PNG compression (0 = fastest, 9 = smallest)
+```
+
+### HuggingFace Hub Upload
+```yaml
+# export HF_TOKEN=xxx
+huggingface_hub:
+  hf_save_freq: null   # upload every N steps (must be a multiple of trainer.save_freq); null = disabled
+  repo_id: null         # HuggingFace repo id, e.g. "user/my-model"
+  private: false        # whether the repo is private
+```
+
+### Training Data Filtering
+```yaml
+filter:
+  name: reward_variance   # filter strategy name (registered in FILTER_REGISTRY)
+  filter_kwargs: {}        # extra kwargs passed to the filter function
+  enable: false            # set to true to enable filtering
+```
 
 ## Citation
 

@@ -75,7 +75,8 @@ class HFUploadManager:
     """
 
     def __init__(self, config):
-        self._hf_save_freq: Optional[int] = config.trainer.get("hf_save_freq", None)
+        hf_hub_cfg = OmegaConf.to_container(config.get("huggingface_hub", {}), resolve=True) or {}
+        self._hf_save_freq: Optional[int] = hf_hub_cfg.get("hf_save_freq", None)
         self._actor: Optional[ray.actor.ActorHandle] = None
         self._pending_future = None
         self._default_local_dir: str = config.trainer.default_local_dir
@@ -95,9 +96,10 @@ class HFUploadManager:
                 f"hf_save_freq ({self._hf_save_freq}) must be a multiple of save_freq ({save_freq})."
             )
 
-        hf_hub_cfg = OmegaConf.to_container(config.get("huggingface_hub", {}), resolve=True) or {}
-        if hf_hub_cfg.get("repo_id"):
-            self._actor = HFUploadActor.remote(**hf_hub_cfg)
+        # Remove hf_save_freq from the dict before passing to HFUploadActor
+        actor_kwargs = {k: v for k, v in hf_hub_cfg.items() if k != "hf_save_freq"}
+        if actor_kwargs.get("repo_id"):
+            self._actor = HFUploadActor.remote(**actor_kwargs)
         else:
             print("Warning: hf_save_freq is set but huggingface_hub.repo_id is missing, skipping HF upload.")
 
