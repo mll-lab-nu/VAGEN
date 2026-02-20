@@ -8,6 +8,7 @@ setup(
         "gym-sokoban",
         "gymnasium",
         "gymnasium[toy-text]",
+        "uvicorn<0.41",
     ],
     python_requires=">=3.10",
 )
