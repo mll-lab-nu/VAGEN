@@ -3,7 +3,7 @@
 set -x
 
 PROJECT_NAME="verl_vagen"
-EXPERIMENT_NAME="grpo_qwen3vl4b"
+EXPERIMENT_NAME="ppo_qwen3vl2b"
 
 BASEDIR=$(pwd)
 SCRIPTDIR=$(dirname "$0")
@@ -12,7 +12,7 @@ SAVE_CHECKPOINT_DIR=${EXPERIMENT_DIR}/verl_checkpoints
 DATASET_TRAIN=${SCRIPTDIR}/train_sokoban_free_wm.yaml
 DATASET_VAL=${SCRIPTDIR}/val_sokoban_free_wm.yaml
 agent_loop_config_path=${BASEDIR}/vagen/configs/agent.yaml
-REF_MODEL_PATH=Qwen/Qwen3-VL-4B-Instruct
+REF_MODEL_PATH=Qwen/Qwen3-VL-2B-Instruct
 mkdir -p ${EXPERIMENT_DIR}
 
 
@@ -21,8 +21,8 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     --config-name='vagen_multiturn' \
     data.train_files=${DATASET_TRAIN} \
     data.val_files=${DATASET_VAL} \
-    data.train_batch_size=32 \
-    algorithm.adv_estimator=grpo \
+    data.train_batch_size=128 \
+    algorithm.adv_estimator=gae \
     algorithm.kl_ctrl.kl_coef=0.0 \
     actor_rollout_ref.model.path=${REF_MODEL_PATH} \
     actor_rollout_ref.model.use_remove_padding=True \
@@ -40,7 +40,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.name=sglang \
     actor_rollout_ref.rollout.mode=async \
-    actor_rollout_ref.rollout.n=8 \
+    actor_rollout_ref.rollout.n=1 \
     actor_rollout_ref.rollout.max_num_batched_tokens=10000 \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
     actor_rollout_ref.rollout.enforce_eager=True \
