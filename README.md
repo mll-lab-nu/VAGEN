@@ -66,6 +66,19 @@ We frame multi-turn VLM agentic tasks as a Partially Observable Markov Decision 
 ## News
 **[2026/02]** We have migrated the `main` branch to VAGEN-Lite, a lightweight and clean reimplementation built on VERL agent-loop for easy customization and stable performance. For the previous full-featured release, please visit the [vagen-legacy](https://github.com/mll-lab-nu/VAGEN/tree/vagen-legacy) branch.
 
+**[2025/12]** Introducing [VAGEN-Lite](https://github.com/mll-lab-nu/VAGEN/tree/vagen-lite): a lightweight and clean reimplementation of VAGEN, built on the VERL agent-loop for easy customization and stable performance.
+
+**[2025/09]** VAGEN is accepted by Neurips 2025
+
+**[2025/04]** We've introduced a new modular design for environments and services in VAGEN:
+- Enhanced environment framework for easier creation of custom environments
+- New service architecture for efficient distributed training
+- Check out our new guides:
+  - [Creating Environments](./docs/envs/create-env.md): New environment protocal.
+  - [Creating Services](./docs/envs/create-service.md): We now support hosting environments in a separate process
+
+**[2025/03]** We release VAGEN, a multi-turn reinforcement learning framework for training VLM Agents!
+
 ## Installation
 
 ```bash
