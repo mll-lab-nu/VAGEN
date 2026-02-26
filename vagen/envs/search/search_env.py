@@ -16,9 +16,9 @@ def _system_prompt() -> str:
         "You are a Search-R1 style agent. You can iteratively SEARCH a local corpus and then produce a FINAL answer.\n\n"
         "## Action format (choose ONE each step)\n"
         "1) Search:\n"
-        "   <think>...</think><search>your query</search>\n"
+        "   <search>your query</search>\n"
         "2) Final answer:\n"
-        "   <think>...</think><final>your answer</final>\n\n"
+        "   <final>your answer</final>\n\n"
         "## Rules\n"
         "- Use SEARCH when you lack evidence.\n"
         "- Use FINAL only when you are confident.\n"
@@ -224,14 +224,14 @@ class SearchR1Env(GymImageEnv):
                 q = parsed["query"]
                 response = await self.client.post(f"{self.config.retrieval_server_url}/retrieve", json={"query": q, "top_k": self.config.top_k})
                 data = response.json()
-            raw_results = data.get("results", [])
-            results = []
-            for r in raw_results:
-                results.append({
-                    "id": r["document"]["id"],
-                    "text": r["document"]["contents"],
-                    "score": r["score"],
-                })
+                raw_results = data.get("results", [])
+                results = []
+                for r in raw_results:
+                    results.append({
+                        "id": r["document"]["id"],
+                        "text": r["document"]["contents"],
+                        "score": r["score"],
+                    })
 
             seen = {e.get("id") for e in self._evidence}
             for r in results:
