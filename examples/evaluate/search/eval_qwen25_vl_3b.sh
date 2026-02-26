@@ -32,6 +32,7 @@ python3 -m sglang.launch_server \
   --tp "${TP_SIZE}" \
   --trust-remote-code \
   --mem-fraction-static "${MEM_FRACTION}" \
+  --disable-cuda-graph \
   >"${SERVER_LOG}" 2>&1 &
 SERVER_PID=$!
 
