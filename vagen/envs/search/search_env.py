@@ -32,11 +32,15 @@ def _format_observation(question: str, evidence: List[Dict[str, Any]], budgets: 
         title = f" ({e['title']})" if e.get("title") else ""
         ev_lines.append(f"[{i}] id={e.get('id')}{title} score={e.get('score', 0):.3f}\n{e.get('text','')}")
     ev_block = "\n\n".join(ev_lines) if ev_lines else "(none yet)"
+    if budgets["remaining_searches"] <= 0:
+        action_hint = "You have no searches left. You MUST respond with <final>your answer</final>.\n"
+    else:
+        action_hint = "Respond with either <search>...</search> or <final>...</final>.\n"
     return (
         f"Question:\n{question}\n\n"
         f"Budgets: remaining_searches={budgets['remaining_searches']} remaining_steps={budgets['remaining_steps']}\n\n"
         f"Retrieved evidence (top snippets so far):\n{ev_block}\n\n"
-        "Respond with either <search>...</search> or <final>...</final>.\n"
+        + action_hint
     )
 
 def _normalize_answer(s: str) -> str:
@@ -233,13 +237,13 @@ class SearchR1Env(GymImageEnv):
                         "score": r["score"],
                     })
 
-            seen = {e.get("id") for e in self._evidence}
-            for r in results:
-                if r.get("id") not in seen:
-                    self._evidence.append(r)
-                    seen.add(r.get("id"))
+                seen = {e.get("id") for e in self._evidence}
+                for r in results:
+                    if r.get("id") not in seen:
+                        self._evidence.append(r)
+                        seen.add(r.get("id"))
 
-            self._evidence = self._evidence[: self.config.max_evidence_items]
+                self._evidence = self._evidence[: self.config.max_evidence_items]
 
         elif not done and parsed["action_type"] == "final":
             pred = parsed["answer"]
