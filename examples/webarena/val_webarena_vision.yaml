@@ -1,0 +1,17 @@
+envs:
+  - name: WebArena
+    n_envs: 100
+    data_source: webarena_val
+    seed: [500, 600, 1]
+    max_turns: 15
+    response_length_per_turn: 1024
+    config:
+      task_file: "path/to/webarena/config_files/test.raw.json"  # UPDATE THIS PATH
+      task_ids: null  # Use different seed range for val split
+      render_mode: vision
+      max_steps: 15
+      viewport_width: 1280
+      viewport_height: 720
+      format_reward: 0.01
+      success_reward: 1.0
+      headless: true
