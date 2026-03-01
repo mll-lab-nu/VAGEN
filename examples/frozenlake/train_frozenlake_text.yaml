@@ -1,0 +1,14 @@
+envs:
+  - name: FrozenLake # registered env name
+    n_envs: 10000
+    data_source: frozenlake # nickname for logging
+    seed: [1,10000,1] # sample n_env seeds from seed[0] to seed[1] with each seed repeat at most seed[2] times
+    max_turns: 5 # max number of interaction turns per episode
+    response_length_per_turn: 512 # max response length per turn
+    config: # env-specific config
+      render_mode: text
+      size: 4
+      p: 0.8
+      is_slippery: false
+      slip_prob: 0.0
+      max_actions_per_step: 5

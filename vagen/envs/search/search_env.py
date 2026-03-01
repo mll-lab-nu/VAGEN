@@ -17,7 +17,7 @@ You must conduct reasoning inside <think> and </think> first every time you get 
 After reasoning, if you find you lack some knowledge, you can call a search engine by <search> query </search> and it will return the top searched results between <information> and </information>. \
 You can search as many times as your want. \
 If you find no further external knowledge needed, you can directly provide the answer inside <answer> and </answer>, without detailed illustrations. For example, <answer> Beijing </answer>.\n"""
-    return prompt
+    
 
 
 def _format_observation(question: str, evidence: List[Dict[str, Any]], budgets: Dict[str, int]) -> str:
