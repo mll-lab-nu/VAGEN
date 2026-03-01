@@ -2,7 +2,7 @@ fileroot: ${oc.env:HOME}/projects/vagen/VAGEN
 
 envs:
   - name: SearchR1
-    n_envs: 1
+    n_envs: 32
     tag_id: search_test
     seed: [0,32,1]
     max_turns: 5

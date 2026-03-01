@@ -12,19 +12,13 @@ from vagen.envs.gym_image_env import GymImageEnv
 # Prompt helpers (SearchR1 style)
 # ------------------------------
 def _system_prompt() -> str:
-    return (
-        "You are a Search-R1 style agent. You can iteratively SEARCH a local corpus and then produce a FINAL answer.\n\n"
-        "## Action format (choose ONE each step)\n"
-        "1) Search:\n"
-        "   <search>your query</search>\n"
-        "2) Final answer:\n"
-        "   <final>your answer</final>\n\n"
-        "## Rules\n"
-        "- Use SEARCH when you lack evidence.\n"
-        "- Use FINAL only when you are confident.\n"
-        "- Keep queries short and specific.\n"
-        "- Do NOT hallucinate: rely on retrieved snippets.\n"
-    )
+    prompt = f"""Answer the given question. \
+You must conduct reasoning inside <think> and </think> first every time you get new information. \
+After reasoning, if you find you lack some knowledge, you can call a search engine by <search> query </search> and it will return the top searched results between <information> and </information>. \
+You can search as many times as your want. \
+If you find no further external knowledge needed, you can directly provide the answer inside <answer> and </answer>, without detailed illustrations. For example, <answer> Beijing </answer>.\n"""
+    return prompt
+
 
 def _format_observation(question: str, evidence: List[Dict[str, Any]], budgets: Dict[str, int]) -> str:
     ev_lines = []
