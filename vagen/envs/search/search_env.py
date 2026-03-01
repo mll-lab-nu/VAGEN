@@ -27,9 +27,9 @@ def _format_observation(question: str, evidence: List[Dict[str, Any]], budgets: 
         ev_lines.append(f"[{i}] id={e.get('id')}{title} score={e.get('score', 0):.3f}\n{e.get('text','')}")
     ev_block = "\n\n".join(ev_lines) if ev_lines else "(none yet)"
     if budgets["remaining_searches"] <= 0:
-        action_hint = "You have no searches left. You MUST respond with <final>your answer</final>.\n"
+        action_hint = "You have no searches left. You MUST respond with <answer>your answer</answer>.\n"
     else:
-        action_hint = "Respond with either <search>...</search> or <final>...</final>.\n"
+        action_hint = "Respond with either <search>...</search> or <answer>...</answer>.\n"
     return (
         f"Question:\n{question}\n\n"
         f"Budgets: remaining_searches={budgets['remaining_searches']} remaining_steps={budgets['remaining_steps']}\n\n"
@@ -51,7 +51,7 @@ def _parse_action(action_str: str) -> Dict[str, Any]:
     """
     Robust action parser.
     Accepts:
-      - <search>...</search> or <final>...</final>
+      - <search>...</search> or <answer>...</answer>
       - JSON: {"action":"search","query":"..."} or {"action":"final","answer":"..."}
     """
     out = {
@@ -90,7 +90,7 @@ def _parse_action(action_str: str) -> Dict[str, Any]:
             out.update(format_correct=True, action_type="search", query=q)
             return out
 
-    m_final = re.search(r"<final>(.*?)</final>", s, re.DOTALL | re.IGNORECASE)
+    m_final = re.search(r"<answer>(.*?)</answer>", s, re.DOTALL | re.IGNORECASE)
     if m_final:
         a = m_final.group(1).strip()
         if a:
