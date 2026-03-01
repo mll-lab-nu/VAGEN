@@ -1,0 +1,82 @@
+# EB-ALFRED Evaluation Config (ERA-aligned)
+#
+# Uses the remote environment pattern:
+#   1. Start the EB-ALFRED server (requires GPU + X display):
+#      DISPLAY=:0 python -m vagen.envs.eb_alfred.serve --port 8000
+#
+#   2. Run evaluation:
+#      python -m vagen.evaluate.run_eval --config examples/evaluate/eb_alfred/config.yaml
+#
+# Key ERA-aligned settings:
+#   - No-concat mode: system prompt (with task + actions) + current obs only per turn
+#   - Multi-step planning: up to 20 actions per LLM call
+#   - Max 30 env steps per episode (matches ERA's _max_episode_steps)
+#   - ERA-style replan: break on action failure, model replans next turn
+#   - Task examples in system prompt (cleaning, slicing, heating patterns)
+
+envs:
+  - name: RemoteEnv
+    n_envs: 50
+    tag_id: eb_alfred_eval
+    seed: [0, 50, 1]
+    split: test
+    concat_history: false          # no-concat: system + current obs only per turn
+    max_turns: 30
+    config:
+      base_urls:
+        - "http://localhost:8000"
+      timeout: 600
+      eval_set: base               # options: base, common_sense, complex, long_horizon
+      x_display: "0"
+      obs_image_size: 500
+      max_turns: 30
+      max_actions_per_step: 20     # multi-step planning (ERA-aligned)
+      max_env_steps: 30            # total env actions cap (ERA-aligned)
+      action_sep: ","
+      prompt_format: free_think
+      use_example_in_sys_prompt: true
+      format_reward: 0.1
+      success_reward: 1.0
+    chat_config:
+      temperature: 0
+      max_tokens: 2048
+      top_p: 1.0
+
+experiment:
+  dump_dir: ./rollouts/eval_eb_alfred
+  default_max_turns: 30
+
+run:
+  backend: openai
+  base_seed: 0
+  max_concurrent_jobs: 10
+  resume: skip_completed
+  live_summary: true
+
+backends:
+  openai:
+    api_key: ""                    # uses OPENAI_API_KEY env var
+    base_url: null
+    model: "gpt-4.1"
+    max_concurrency: 100
+    max_retries: 6
+    min_backoff: 0.5
+    max_backoff: 8.0
+
+  sglang:
+    base_url: "http://127.0.0.1:30000/v1"
+    api_key: "EMPTY"
+    model: "Qwen/Qwen2.5-VL-7B-Instruct"
+    max_concurrency: 50
+    max_retries: 6
+    min_backoff: 0.5
+    max_backoff: 8.0
+
+  claude:
+    api_key: ""
+    base_url: null
+    model: "claude-sonnet-4-6"
+    max_concurrency: 10
+    max_retries: 6
+    min_backoff: 0.5
+    max_backoff: 8.0
