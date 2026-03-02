@@ -1,6 +1,6 @@
 import re
 from collections import deque
-from typing import Tuple
+from typing import Dict, Any, Optional, Tuple
 import hashlib
 import numpy as np
 
@@ -95,6 +95,129 @@ def format_llm_output(think_content: str, answer_content: str, enable_think: boo
     if enable_think:
         return f"{THINK_LABEL}\n{think_content}\n{ANSWER_LABEL}\n{answer_content}"
     return f"{ANSWER_LABEL}\n{answer_content}"
+
+
+def get_agent_view(exploration_manager, pos: np.ndarray, ori: np.ndarray, image_handler, seed=None):
+    """Return (image, image_path) for the agent at the given position and orientation.
+
+    Resolves the position to an object name (or 'agent' for the initial position)
+    then delegates to image_handler.
+    """
+    position_name = 'agent' if np.allclose(exploration_manager.init_pos, pos) else None
+    if position_name is None:
+        for obj in exploration_manager.exploration_room.all_objects:
+            if np.allclose(obj.pos, pos):
+                position_name = obj.name
+                break
+    assert position_name is not None, (
+        f"Agent position not found for {pos}, sample id: {seed}"
+    )
+    direction = BaseAction._ori_to_direction_label(ori)
+    return image_handler.get_image(position_name, direction), image_handler.get_image_path(position_name, direction)
+
+
+def execute_exploration_action(
+    action_str: str,
+    exploration_manager,
+    action_classes: list,
+    remaining_exp_steps: int,
+    config,
+    prompter,
+    image_handler=None,
+    seed=None,
+) -> Tuple[Dict[str, Any], float, bool, Dict[str, Any], Any, int, bool, Optional[str]]:
+    """Execute a single exploration action and return updated env state.
+
+    Args:
+        action_str: Raw action string from the agent.
+        exploration_manager: ExplorationManager (mutated in-place).
+        action_classes: Available action classes for parsing.
+        remaining_exp_steps: Remaining steps *before* this call (decremented inside).
+        config: SpatialGymConfig.
+        prompter: PromptManager.
+        image_handler: ImageHandler (required for vision mode).
+        seed: Current episode seed (for error messages).
+
+    Returns:
+        (obs, reward, done, info, exp_log,
+         new_remaining_exp_steps, awaiting_cogmap, image_path)
+    """
+    from ..actions.actions import ActionSequence, ForcedTermAction
+    from .action_utils import action_results_to_text
+
+    obs_str = ""
+    reward = -0.1
+    done = False
+    info: Dict[str, Any] = {'is_valid_action': True}
+    obs: Dict[str, Any] = {}
+    exp_log = None
+    image_path: Optional[str] = None
+    awaiting_cogmap = False
+
+    remaining_exp_steps -= 1
+
+    if remaining_exp_steps < 0:
+        # Safety net: budget was already zero on the previous step but forced term
+        # wasn't triggered (shouldn't happen in normal flow).
+        action_sequence = ActionSequence(motion_actions=[], final_action=ForcedTermAction())
+        is_valid = True
+        info['forced_term'] = True
+    else:
+        action_sequence = ActionSequence.parse(action_str, action_classes=action_classes)
+        is_valid = bool(action_str) and bool(action_sequence)
+
+    if not is_valid:
+        obs_str += prompter.invalid_action_message() + "\n"
+        info["is_valid_action"] = False
+        reward -= 0.5
+    else:
+        action_results = exploration_manager.execute_action_sequence(action_sequence)
+        for res in action_results:
+            if res.data and 'reported_changes' in res.data:
+                info['reported_changes'] = res.data['reported_changes']
+        obs_str += action_results_to_text(
+            action_results,
+            config.image_placeholder if config.render_mode == 'vision' else None,
+        )
+        exp_log = exploration_manager.turn_logs[-1]
+        if exp_log:
+            exp_log.room_state = None
+            exp_log.agent_state = None
+        if action_sequence.final_action and action_sequence.final_action.is_term():
+            awaiting_cogmap = True
+            obs = {'obs_str': prompter.get_cogmap_output_prompt()}
+
+    # Budget exhausted and agent didn't call Term(): force into cogmap phase on this
+    # very turn, so no extra step is needed from the framework.
+    if not awaiting_cogmap and remaining_exp_steps <= 0:
+        awaiting_cogmap = True
+        obs = {'obs_str': prompter.get_cogmap_output_prompt()}
+        info['forced_term'] = True
+
+    # Normal continuation: steps remaining + optional vision.
+    # Only shown for valid actions that are not terminating.
+    if not awaiting_cogmap and is_valid:
+        obs_str += "\n" + prompter.steps_left_message(remaining_exp_steps)
+        if config.render_mode == 'vision' and image_handler is not None:
+            image, image_path = get_agent_view(
+                exploration_manager,
+                exploration_manager.agent.pos,
+                exploration_manager.agent.ori,
+                image_handler,
+                seed=seed,
+            )
+            obs = {
+                'multi_modal_input': {config.image_placeholder: [image]},
+                'obs_str': obs_str,
+            }
+
+    if not obs:
+        obs = {'obs_str': obs_str}
+
+    if not done and not awaiting_cogmap:
+        obs['obs_str'] += '\n' + prompter.get_format_footer(True)
+
+    return obs, reward, done, info, exp_log, remaining_exp_steps, awaiting_cogmap, image_path
 
 
 def compute_shortest_path(

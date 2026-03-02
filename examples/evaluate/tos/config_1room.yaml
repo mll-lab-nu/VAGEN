@@ -1,9 +1,9 @@
 envs:
   - name: SpatialGym
-    n_envs: 5
+    n_envs: 20
     tag_id: tos_1room
-    seed_list: [0, 1, 2, 3, 4]
-    max_turns: 10
+    seed_list: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    max_turns: 11
     config:
       exp_type: active
       render_mode: vision
@@ -21,7 +21,7 @@ envs:
 
 experiment:
   dump_dir: ./rollouts/tos_1room
-  default_max_turns: 10
+  default_max_turns: 11
 
 run:
   backend: openai
