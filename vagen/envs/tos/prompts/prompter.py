@@ -11,35 +11,201 @@ from ..core.relationship import (
     ProximityRelationship,
     DegreeRel, OrientationRel
 )
-from .prompts import *
-from .cogmap_prompts import BASE_COGMAP_PROMPT, COGMAP_INSTRUCTION_GLOBAL_ONLY
+from .prompts import (
+    SHARED_INTRO_TEXT, SHARED_INTRO_VISION,
+    SHARED_MULTIROOM_RULES, SHARED_RULES_COMMON, ACTIVE_RULES_EXTRA,
+    VISION_EXAMPLE,
+)
+from .cogmap_prompts import (
+    BASE_COGMAP_PROMPT, COGMAP_INSTRUCTION_GLOBAL_ONLY,
+)
 from ..utils.utils import THINK_LABEL, ANSWER_LABEL
 
-COGMAP_TASK_INSTRUCTION = """\
-## Cognitive Map Output Requirement
 
-After you terminate exploration, output your global cognitive map in JSON format.
-Do not output action sequences in this stage.
+# ---------------------------------------------------------------------------
+# System-level prompt template (assembled once per config, not per sample)
+# ---------------------------------------------------------------------------
 
-THINK:
-[Your spatial reasoning]
-FINAL ANSWER:
-{{"agent": {{"position": [0, 0], "facing": "north"}}, "chair": {{"position": [0, 2], "facing": "south"}}, "green door": {{"position": [0, 5], "facing": "north"}}}}
+_SYSTEM_PROMPT_TEXT = """\
+# Spatial {task_title}
 
-Rules: integer positions only (never "unknown"); start=(0,0) north; include all observed objects.
-Facing rule for final global cogmap: ONLY use "north|south|east|west" for every entry (including agent and objects).
-Even if exploration used 8 headings, do NOT output diagonal facings (northeast/southeast/southwest/northwest); project to the nearest cardinal direction.
+{intro}
 
-Schema and rules:
-{schema}
-"""
+{goal_section}## Environment Rules
+
+{multiroom_rules}
+{extra_rules}{common_rules}
+## Observation Format
+
+{observation_instructions}
+
+## Available Actions
+
+{action_instructions}
+
+## Cognitive Map Output
+
+After you call `Term()`, you will be asked to output a global cognitive map as JSON.
+
+{cogmap_schema}
+## Response Format
+
+{format_instructions}"""
+
+_SYSTEM_PROMPT_VISION = """\
+# Spatial {task_title}
+
+{intro}
+
+{goal_section}## Environment Rules
+
+{multiroom_rules}
+{extra_rules}{common_rules}
+## Observation
+
+{observation_instructions}
+
+## Available Actions
+
+{action_instructions}
+
+## Cognitive Map Output
+
+After you call `Term()`, you will be asked to output a global cognitive map as JSON.
+
+{cogmap_schema}
+## Response Format
+
+{format_instructions}"""
+
 
 class PromptManager:
-    @staticmethod
-    def system_prompt() -> str:
-        return  f"You answer should strictly follow this format:\n{THINK_LABEL} Your thoughts\n{ANSWER_LABEL} Your final answer"
+    def __init__(self, config, np_random: np.random.RandomState = None, image_handler=None):
+        self.config = config
+        self.image_handler = image_handler
+        self.np_random = np_random
+        self.enable_think = bool(self.config.prompt_config.get('enable_think', True))
 
-    # Simple env message helpers
+    # ------------------------------------------------------------------
+    # System prompt — contains ALL static instructions (no sample data)
+    # ------------------------------------------------------------------
+
+    def system_prompt(self) -> str:
+        """Return the full static system prompt for this config."""
+        is_vision = self.config.render_mode == 'vision'
+        is_active = self.config.exp_type == 'active'
+
+        intro = SHARED_INTRO_VISION if is_vision else SHARED_INTRO_TEXT
+
+        goal_section = (
+            "**Goal**: Minimize total COST while building a complete and accurate map of the environment.\n\n"
+            if is_active else ""
+        )
+
+        extra_rules = ACTIVE_RULES_EXTRA if is_active else ""
+
+        if is_vision:
+            observation_instructions = (
+                "Use the rendered image as the primary observation signal. "
+                "Do not assume hidden objects; only use what has been observed."
+            )
+        else:
+            observation_instructions = (
+                PairwiseRelationship.prompt()
+                + f"\n{DegreeRel.prompt()}"
+                + f"\n{OrientationRel.prompt()}"
+                + f"\n{PairwiseRelationshipDiscrete.prompt()}"
+                + f"\n{ProximityRelationship.prompt()}"
+            )
+
+        action_instructions = ActionSequence.get_usage_instructions(is_vision)
+
+        cogmap_schema = BASE_COGMAP_PROMPT + "\n" + COGMAP_INSTRUCTION_GLOBAL_ONLY
+
+        if self.enable_think:
+            format_instructions = (
+                f"Always output:\n"
+                f"{THINK_LABEL}\n[Your reasoning]\n"
+                f"{ANSWER_LABEL}\n[Your answer]\n\n"
+                "During exploration: `FINAL ANSWER` must be `Actions: [ ... ]`.\n"
+                "During cognitive map output: `FINAL ANSWER` must be the JSON map only."
+            )
+        else:
+            format_instructions = (
+                f"Always output:\n"
+                f"{ANSWER_LABEL}\n[Your answer]\n\n"
+                "During exploration: `FINAL ANSWER` must be `Actions: [ ... ]`.\n"
+                "During cognitive map output: `FINAL ANSWER` must be the JSON map only."
+            )
+
+        template = _SYSTEM_PROMPT_VISION if is_vision else _SYSTEM_PROMPT_TEXT
+        return template.format(
+            task_title="Exploration Task" if is_active else "Reasoning Task",
+            intro=intro,
+            goal_section=goal_section,
+            multiroom_rules=SHARED_MULTIROOM_RULES,
+            extra_rules=extra_rules,
+            common_rules=SHARED_RULES_COMMON,
+            observation_instructions=observation_instructions,
+            action_instructions=action_instructions,
+            cogmap_schema=cogmap_schema,
+            format_instructions=format_instructions,
+        )
+
+    # ------------------------------------------------------------------
+    # Initial observation — only sample-specific content
+    # ------------------------------------------------------------------
+
+    def get_initial_observation_prompt(
+            self,
+            room: Room,
+            agent: Agent,
+            exp_history=None,
+    ) -> tuple:
+        """Return the initial user message with only sample-specific info."""
+        obs = {}
+        is_vision = self.config.render_mode == 'vision'
+        is_active = self.config.exp_type == 'active'
+
+        room_desc = get_room_description(room, agent)
+
+        images_path = []
+        if is_vision:
+            images = [self.image_handler.get_image('instruction'), self.image_handler.get_image('label')]
+            images_path = [
+                self.image_handler.get_image_path('instruction'),
+                self.image_handler.get_image_path('label'),
+            ]
+            if not is_active:
+                images.extend(exp_history['multi_modal_data'][self.config.image_placeholder])
+                images_path.extend(exp_history['multi_modal_data_paths'])
+            obs['multi_modal_data'] = {self.config.image_placeholder: images}
+
+        lines = ["## Room Layout and Initial State", room_desc]
+
+        if is_active:
+            lines.append(f"\nYou have a maximum of {self.config.max_exp_steps} exploration steps.")
+
+        if not is_active and exp_history:
+            lines.append(f"\n## Exploration History\n{exp_history['obs_str']}")
+
+        if is_vision and not is_active:
+            lines.append(
+                "\n" + VISION_EXAMPLE.format(image_placeholder=self.config.image_placeholder)
+            )
+
+        obs_str = "\n".join(lines)
+
+        if is_active:
+            obs_str = obs_str + "\n\n" + self.get_format_footer(True)
+
+        obs['obs_str'] = obs_str
+        return obs, images_path
+
+    # ------------------------------------------------------------------
+    # Per-step helpers
+    # ------------------------------------------------------------------
+
     def invalid_action_message(self) -> str:
         return (
             "Invalid action. Each sequence must end with one final action: "
@@ -65,11 +231,9 @@ class PromptManager:
         return "Task finished"
 
     def get_format_footer(self, is_exploration: bool) -> str:
-        # Decide answer hint
         if is_exploration:
             answer_hint = "Actions: [ ... ]"
         else:
-            # Special stricter format for InternVL during evaluation
             if self._is_internvl_model():
                 answer_hint = "[ONLY the letter (A, B, C, ...)]"
             else:
@@ -83,97 +247,32 @@ class PromptManager:
             return f"Strictly follow this format:\n{ANSWER_LABEL}\n{answer_hint}{cogmap_hint}"
 
     def get_cogmap_output_prompt(self) -> str:
-        schema = BASE_COGMAP_PROMPT + "\n" + COGMAP_INSTRUCTION_GLOBAL_ONLY
-        prompt = COGMAP_TASK_INSTRUCTION.format(schema=schema)
+        """Short trigger message — full schema is already in the system prompt."""
+        prompt = (
+            "Exploration complete. Now output your **global cognitive map** as JSON.\n"
+            "Rules: integer positions only (never \"unknown\"); start=(0,0) north; include all observed objects.\n"
+            "Facing rule: ONLY use \"north|south|east|west\" for every entry (including agent). "
+            "Do NOT output diagonal facings (northeast/southeast/southwest/northwest); "
+            "project to the nearest cardinal direction.\n"
+        )
         if self.enable_think:
-            prompt += f"\n\nStrictly follow this format:\n{THINK_LABEL}\n[Your thoughts on the global cognitive map]\n{ANSWER_LABEL}\n[JSON cognitive map only]"
+            prompt += (
+                f"\nStrictly follow this format:\n{THINK_LABEL}\n"
+                "[Your thoughts on the global cognitive map]\n"
+                f"{ANSWER_LABEL}\n[JSON cognitive map only]"
+            )
         else:
-            prompt += f"\n\nStrictly follow this format:\n{ANSWER_LABEL}\n[JSON cognitive map only]"
+            prompt += f"\nStrictly follow this format:\n{ANSWER_LABEL}\n[JSON cognitive map only]"
         return prompt
 
-    def __init__(self, config, np_random: np.random.RandomState, image_handler = None):
-        self.config = config
-        self.image_handler = image_handler
-        self.np_random = np_random
-        self.enable_think = bool(self.config.prompt_config.get('enable_think', True))
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
 
     def _is_internvl_model(self) -> bool:
-        """Return True if current model is InternVL."""
         try:
             model_cfg = self.config.get_model_config()
             model_name = str((model_cfg or {}).get('model_name', '')).lower()
             return 'internvl' in model_name
         except Exception:
             return False
-
-    def get_initial_observation_prompt(
-            self,
-            room: Room,
-            agent: Agent,
-            exp_history = None
-        ) -> tuple:
-        """
-        Generates the initial observation prompt based on the exploration type.
-        """
-        obs = {}
-        is_vision, is_active = self.config.render_mode == 'vision', self.config.exp_type == 'active'
-
-        room_desc = get_room_description(room, agent)
-
-        if is_vision:
-            observation_instructions = (
-                "Use the rendered image as the primary observation signal. "
-                "Do not assume hidden objects; only use what has been observed."
-            )
-        else:
-            observation_instructions = (
-                PairwiseRelationship.prompt()
-                + f"\n{DegreeRel.prompt()}"
-                + f"\n{OrientationRel.prompt()}"
-                + f"\n{PairwiseRelationshipDiscrete.prompt()}"
-                + f"\n{ProximityRelationship.prompt()}"
-            )
-
-        action_instructions = f"Action Instructions:\n{ActionSequence.get_usage_instructions(is_vision)}"
-        exp_history_str = ""
-        if not is_active:
-            exp_history_str = f"## Exploration History\n{exp_history['obs_str']}"
-        images_path = []
-        if is_vision:
-            images = [self.image_handler.get_image('instruction'), self.image_handler.get_image('label')]
-            images_path = [self.image_handler.get_image_path('instruction'), self.image_handler.get_image_path('label')]
-            if not is_active:
-                images.extend(exp_history['multi_modal_data'][self.config.image_placeholder])
-                images_path.extend(exp_history['multi_modal_data_paths'])
-            obs['multi_modal_data'] = {self.config.image_placeholder: images}
-
-        
-        template = INSTRUCTION_TEMPLATE_VISION if is_vision else INSTRUCTION_TEMPLATE_TEXT
-
-        fmt_kwargs = {
-            'title': 'Spatial Exploration Task' if is_active else 'Spatial Reasoning Task',
-            'intro': SHARED_INTRO_TEXT if not is_vision else SHARED_INTRO_VISION,
-            'goal_lines': (
-                'Goal: **Minimize total COST** while building a complete and accurate map of the environment.'
-                if is_active else ''
-            ),
-            'observation_instructions': observation_instructions,
-            'action_instructions': action_instructions,
-            'room_info': room_desc,
-            'steps_left': (
-                f"\n\nYou have a maximum of {self.config.max_exp_steps} exploration steps."
-                if is_active else ''
-            ),
-            'multiroom_rules': SHARED_MULTIROOM_RULES,
-            'active_rules_extra': ACTIVE_RULES_EXTRA if is_active else '',
-            'rules_common': SHARED_RULES_COMMON,
-            'exp_history': exp_history_str,
-            'vision_example': (VISION_EXAMPLE.format(image_placeholder=self.config.image_placeholder) if is_vision else ''),
-        }
-
-        obs_str = template.format(**fmt_kwargs)
-        if is_active:
-            obs_str = obs_str + "\n" + self.get_format_footer(is_active)
-
-        obs['obs_str'] = obs_str
-        return obs, images_path

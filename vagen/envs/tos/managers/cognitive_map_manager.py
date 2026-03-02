@@ -1406,6 +1406,36 @@ class CognitiveMapManager:
         L = float(np.sqrt((P ** 2).sum(axis=1).mean()))
         self._pos_norm_L = (L if L > 0 else 1.0)
 
+    @staticmethod
+    def score_global_cogmap(cogmap_str: str, room: 'Room', agent: 'Agent', observed_items: list) -> float:
+        """Score a cogmap JSON string against ground truth.
+
+        Args:
+            cogmap_str: Raw cogmap string (JSON or LLM response containing JSON).
+            room: Ground-truth Room from the exploration manager.
+            agent: Ground-truth Agent from the exploration manager.
+            observed_items: Iterable of observed item names.
+
+        Returns:
+            Score in [0, 1] (average of position and facing accuracy).
+        """
+        try:
+            mgr = CognitiveMapManager()
+            turn_log = mgr.evaluate_cogmap_type(
+                cogmap_str,
+                room,
+                agent,
+                list(observed_items),
+                map_type="global",
+            )
+            if turn_log and turn_log.metrics.valid:
+                pos = float(turn_log.metrics.pos) if turn_log.metrics.pos is not None else 0.0
+                facing = float(turn_log.metrics.facing) if turn_log.metrics.facing is not None else 0.0
+                return max(0.0, min(1.0, (pos + facing) / 2.0))
+        except Exception:
+            pass
+        return 0.0
+
 
 def test_evaluate_cogmaps():
     """Test function to demonstrate calling CognitiveMapManager.evaluate_cogmaps method."""
