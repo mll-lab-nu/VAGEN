@@ -5,16 +5,21 @@ from ..core.object import Agent
 from ..actions.actions import ActionSequence
 
 from ..utils.room_utils import get_room_description
-from .prompts import (
-    SHARED_INTRO_VISION,
-    SHARED_MULTIROOM_RULES, SHARED_RULES_COMMON, ACTIVE_RULES_EXTRA,
-    VISION_OBSERVATION_INSTRUCTIONS, VISION_EXAMPLE,
-)
 from .cogmap_prompts import (
     BASE_COGMAP_PROMPT, COGMAP_INSTRUCTION_GLOBAL_ONLY,
 )
 from ..utils.utils import THINK_LABEL, ANSWER_LABEL
 
+
+_VISION_EXAMPLE = """\
+Here is an example of your observation: blue cylinder 1 m straight ahead; red cylinder 2 m straight ahead; yellow cylinder 2 m at 45° to your front-left; green cylinder 3 m at 22.5° to your front-slight-right:
+{image_placeholder}
+
+The image shows all objects in the room. Each tile is numbered (1-N) in the top-left, matching the object order in the room layout.
+For items with a facing direction, two copies are shown side-by-side: the left copy has its front facing the camera; the right copy has its front facing left.
+Items without a meaningful facing direction are shown once.
+{image_placeholder}
+"""
 
 # ---------------------------------------------------------------------------
 # System-level prompt template (assembled once per config, not per sample)
@@ -23,25 +28,28 @@ from ..utils.utils import THINK_LABEL, ANSWER_LABEL
 _SYSTEM_PROMPT = """\
 # Spatial {task_title}
 
-{intro}
+You are a spatial reasoner in a 3D simulated environment. The world is rendered in 3D but abstracted into a discrete 2D grid of size N×M. Every entity, including yourself, is represented by integer coordinates (x, y) on this grid.
 
 {goal_section}## Environment Rules
 
-{multiroom_rules}
-{extra_rules}{common_rules}
+Multi-room rules (may exist multiple rooms):
+- Your vision is confined to your current room.
+- Doors block vision between rooms.
+- Exception: When located in a doorway, door is open and invisible, you can see into both connected rooms.
+- Rooms connect via doors on vertical (front/back) or horizontal (left/right) walls.
+{extra_rules}- FOV is 90°. Track your position and facing after every Rotate() or JumpTo().
+- Agent facing uses 8 headings: north/northeast/east/southeast/south/southwest/west/northwest.
+- World axes are unchanged: +y=north, +x=east.
+- Object facing (for non-agent objects) is still only one of north/east/south/west.
+
 ## Observation
 
-{observation_instructions}
+Use the rendered image as the primary observation signal. Do not assume hidden objects; only use what has been observed.
 
 ## Available Actions
 
 {action_instructions}
 
-## Cognitive Map Output
-
-After you call `Term()`, you will be asked to output a global cognitive map as JSON.
-
-{cogmap_schema}
 ## Response Format
 
 {format_instructions}"""
@@ -69,36 +77,30 @@ class PromptManager:
 
         action_instructions = ActionSequence.get_usage_instructions(True)
 
-        cogmap_schema = BASE_COGMAP_PROMPT + "\n" + COGMAP_INSTRUCTION_GLOBAL_ONLY
-
         if self.enable_think:
             format_instructions = (
                 f"Always output:\n"
                 f"{THINK_LABEL}\n[Your reasoning]\n"
                 f"{ANSWER_LABEL}\n[Your answer]\n\n"
-                "During exploration: `FINAL ANSWER` must be `Actions: [ ... ]`.\n"
-                "During cognitive map output: `FINAL ANSWER` must be the JSON map only.\n\n"
+                "`FINAL ANSWER` must be `Actions: [ ... ]`.\n\n"
                 "**Keep your response brief and concise. Avoid unnecessary verbosity.**"
             )
         else:
             format_instructions = (
                 f"Always output:\n"
                 f"{ANSWER_LABEL}\n[Your answer]\n\n"
-                "During exploration: `FINAL ANSWER` must be `Actions: [ ... ]`.\n"
-                "During cognitive map output: `FINAL ANSWER` must be the JSON map only.\n\n"
+                "`FINAL ANSWER` must be `Actions: [ ... ]`.\n\n"
                 "**Keep your response brief and concise. Avoid unnecessary verbosity.**"
             )
 
         return _SYSTEM_PROMPT.format(
             task_title="Exploration Task" if is_active else "Reasoning Task",
-            intro=SHARED_INTRO_VISION,
             goal_section=goal_section,
-            multiroom_rules=SHARED_MULTIROOM_RULES,
-            extra_rules=ACTIVE_RULES_EXTRA if is_active else "",
-            common_rules=SHARED_RULES_COMMON,
-            observation_instructions=VISION_OBSERVATION_INSTRUCTIONS,
+            extra_rules=(
+                "- Explore: jump to doors early (doorway sees both rooms), then cover each room systematically.\n"
+                "- Coordinates: start=(0,0) north; +y=north, +x=east.\n"
+            ) if is_active else "",
             action_instructions=action_instructions,
-            cogmap_schema=cogmap_schema,
             format_instructions=format_instructions,
         )
 
@@ -133,13 +135,13 @@ class PromptManager:
         if is_active:
             lines.append(f"\nYou have a maximum of {self.config.max_exp_steps} exploration steps.")
             lines.append(
-                "\n" + VISION_EXAMPLE.format(image_placeholder=self.config.image_placeholder)
+                "\n" + _VISION_EXAMPLE.format(image_placeholder=self.config.image_placeholder)
             )
 
         if not is_active and exp_history:
             lines.append(f"\n## Exploration History\n{exp_history['obs_str']}")
             lines.append(
-                "\n" + VISION_EXAMPLE.format(image_placeholder=self.config.image_placeholder)
+                "\n" + _VISION_EXAMPLE.format(image_placeholder=self.config.image_placeholder)
             )
 
         obs_str = "\n".join(lines)
@@ -195,13 +197,15 @@ class PromptManager:
             return f"Strictly follow this format:\n{ANSWER_LABEL}\n{answer_hint}{cogmap_hint}"
 
     def get_cogmap_output_prompt(self) -> str:
-        """Short trigger message — full schema is already in the system prompt."""
+        """Full cogmap prompt including schema, given to the agent after Term()."""
+        cogmap_schema = BASE_COGMAP_PROMPT + "\n" + COGMAP_INSTRUCTION_GLOBAL_ONLY
         prompt = (
             "Exploration complete. Now output your **global cognitive map** as JSON.\n"
             "Rules: integer positions only (never \"unknown\"); start=(0,0) north; include all observed objects.\n"
             "Facing rule: ONLY use \"north|south|east|west\" for every entry (including agent). "
             "Do NOT output diagonal facings (northeast/southeast/southwest/northwest); "
-            "project to the nearest cardinal direction.\n"
+            "project to the nearest cardinal direction.\n\n"
+            + cogmap_schema
         )
         if self.enable_think:
             prompt += (
