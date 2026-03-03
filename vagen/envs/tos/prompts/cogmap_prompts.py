@@ -22,19 +22,6 @@ Represent the scene as a JSON map.
 - MUST include facing key for objects that have a facing direction.
 """
 
-BASE_COGMAP_PROMPT_FALSE_BELIEF = """\
-## Cognitive Map (JSON)
-
-Represent the scene as a JSON map. 
-
-### Schema (shared)
-- position: [x, y] integers
-- facing: "north|south|east|west" (global) or "+x|-x|+y|-y" (local/rooms)
-
-### General rules (shared)
-- MUST include facing key if the object has facing direction.
-"""
-
 from ..utils.utils import THINK_LABEL, ANSWER_LABEL
 
 def _cogmap_format_rules(enable_think: bool) -> str:
@@ -72,26 +59,6 @@ Example:
 ```
 """
 
-# False-belief global cogmap: reuse global instructions but override "observed-only".
-COGMAP_INSTRUCTION_FALSE_BELIEF_GLOBAL = """\
-## Global Cognitive Map 
-
-- Grid: concise global map on an N×M grid.
-- Frame: origin [0,0] is your initial position; your initial facing direction is north.
-- Content: include ALL objects and gates; include the agent
-- Facing: use "north|south|east|west" (cardinal direction only).
-
-NOTE: you must include all objects and gates.
-
-Example:
-```json
-{
-    "agent": {"position": [2, 3], "facing": "east"},
-    "chair": {"position": [2, 4], "facing": "north"},
-    "sofa": {"position": [5, 1], "facing": "west"}
-}
-```
-"""
 
 # Local-only specifics
 COGMAP_INSTRUCTION_LOCAL_ONLY = """\
@@ -122,8 +89,6 @@ def get_cogmap_prompt(map_type: str, enable_think: bool = True, all_candidate_co
     fmt = _cogmap_format_rules(enable_think)
     if t == "global":
         return f"{BASE_COGMAP_PROMPT}\n\n{COGMAP_INSTRUCTION_GLOBAL_ONLY}\n\n{fmt}"
-    if t in {"global_fb", "cogmap_fb", "false_belief"}:
-        return f"{BASE_COGMAP_PROMPT_FALSE_BELIEF}\n\n{COGMAP_INSTRUCTION_FALSE_BELIEF_GLOBAL}\n\n{fmt}"
     if t == "local":
         return f"{BASE_COGMAP_PROMPT}\n\n{COGMAP_INSTRUCTION_LOCAL_ONLY}\n\n{fmt}"
     if t == "fog_probe":
