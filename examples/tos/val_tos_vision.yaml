@@ -1,0 +1,17 @@
+envs:
+  - name: SpatialGym
+    n_envs: 64
+    data_source: tos
+    seed: [9001, 9064, 1]
+    max_turns: 16
+    response_length_per_turn: 1024
+    config:
+      exp_type: active
+      render_mode: vision
+      max_exp_steps: 15
+      data_dir: vagen/envs/tos/room_data/2-room
+      eval_tasks:
+        - task_type: rot
+          task_kwargs: {}
+      prompt_config:
+        enable_think: true

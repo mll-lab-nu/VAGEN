@@ -1,4 +1,3 @@
-SHARED_INTRO_TEXT = "You are a spatial reasoner in a 2D, text-only N×M grid. Every object including you is a point at integer (x, y) coordinates."
 SHARED_INTRO_VISION = (
     "You are a spatial reasoner in a 3D simulated environment. "
     "The world is rendered in 3D but abstracted into a discrete 2D grid of size N×M. "
@@ -25,6 +24,11 @@ ACTIVE_RULES_EXTRA = """\
 - Coordinates: start=(0,0) north; +y=north, +x=east.
 """
 
+VISION_OBSERVATION_INSTRUCTIONS = (
+    "Use the rendered image as the primary observation signal. "
+    "Do not assume hidden objects; only use what has been observed."
+)
+
 VISION_EXAMPLE = """\
 Here is an example of your observation: blue cylinder 1 m straight ahead; red cylinder 2 m straight ahead; yellow cylinder 2 m at 45° to your front-left; green cylinder 3 m at 22.5° to your front-slight-right:
 {image_placeholder}
@@ -33,58 +37,4 @@ The image shows all objects in the room. Each tile is numbered (1-N) in the top-
 For items with a facing direction, two copies are shown side-by-side: the left copy has its front facing the camera; the right copy has its front facing left.
 Items without a meaningful facing direction are shown once.
 {image_placeholder}
-"""
-
-INSTRUCTION_TEMPLATE_TEXT = """\
-# {title}
-
-{intro}
-
-{goal_lines}
-
-{multiroom_rules}
-
-Relationship instructions:
-{observation_instructions}
-
-{action_instructions}
-
-Rules:
-{active_rules_extra}{rules_common}
-
-Room Layout and initial state:
-{room_info}
-{steps_left}
-
-{exp_history}
-"""
-
-
-
-
-
-INSTRUCTION_TEMPLATE_VISION = """\
-# {title}
-
-{intro}
-
-{goal_lines}
-
-{multiroom_rules}
-
-Observation instructions:
-{observation_instructions}
-
-{action_instructions}
-
-Rules:
-{active_rules_extra}{rules_common}
-
-Room Layout and initial state:
-{room_info}
-{steps_left}
-
-{vision_example}
-
-{exp_history}
 """
