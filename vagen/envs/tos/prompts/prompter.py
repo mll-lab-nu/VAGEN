@@ -130,7 +130,8 @@ class PromptManager:
             images_path.extend(exp_history['multi_modal_data_paths'])
         obs['multi_modal_data'] = {self.config.image_placeholder: images}
 
-        lines = ["## Room Layout and Initial State", room_desc]
+        lines = ["## Room Layout and Initial State", room_desc,
+                 "Note: the rooms listed above are ALL rooms in this environment; do not assume additional rooms exist."]
 
         if is_active:
             lines.append(f"\nYou have a maximum of {self.config.max_exp_steps} exploration steps.")

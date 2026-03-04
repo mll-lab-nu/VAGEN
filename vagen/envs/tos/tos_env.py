@@ -146,12 +146,13 @@ class SpatialGym(GymImageEnv):
                 action_str, enable_think=bool(self.config.prompt_config.get('enable_think', True))
             )
             cogmap_str = cogmap_answer if cogmap_answer else action_str
-            cogmap_score = CognitiveMapManager.score_global_cogmap(
+            cogmap_scores = CognitiveMapManager.score_global_cogmap(
                 cogmap_str,
                 self.exploration_manager.exploration_room,
                 self.exploration_manager.agent,
                 list(self.exploration_manager.observed_items),
             )
+            cogmap_score = cogmap_scores['overall']
             reward = cogmap_score * COGMAP_REWARD_SCALE
             if self.forced_term_occurred:
                 reward -= FORCED_TERM_PENALTY
@@ -160,6 +161,9 @@ class SpatialGym(GymImageEnv):
             self.awaiting_cogmap_output = False
             info = {
                 'cogmap_score': cogmap_score,
+                'cogmap_dir': cogmap_scores['dir'],
+                'cogmap_facing': cogmap_scores['facing'],
+                'cogmap_pos': cogmap_scores['pos'],
                 'success': cogmap_score > 0.0,
                 'forced_term': self.forced_term_occurred,
             }

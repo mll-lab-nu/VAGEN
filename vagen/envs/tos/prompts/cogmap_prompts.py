@@ -15,7 +15,7 @@ Represent the scene as a JSON map.
 
 ### Schema (shared)
 - position: [x, y] integers
-- facing: "north|south|east|west" (global) or "+x|-x|+y|-y" (local/rooms)
+- facing: direction the object's front face points — "north|south|east|west" (global) or "+x|-x|+y|-y" (local/rooms)
 
 ### General rules (shared)
 - Include only observed objects.
@@ -45,9 +45,9 @@ COGMAP_INSTRUCTION_GLOBAL_ONLY = """\
 
 - Grid: concise global map on an N×M grid.
 - Frame: origin [0,0] is your initial position; your initial facing direction is north.
-- Content: include all observed objects and gates; include the agent
-- Facing: use "north|south|east|west" (cardinal direction only).
-- Never output diagonal facing labels. If exploration evidence suggests a diagonal heading, project it to the nearest cardinal direction.
+- Positions: derive each object's [x, y] from its observed grid coordinates during exploration.
+- Content: include all observed objects and gates; include the agent.
+- Facing: use "north|south|east|west" (cardinal direction only). Project diagonal headings to the nearest cardinal.
 
 Example:
 ```json
