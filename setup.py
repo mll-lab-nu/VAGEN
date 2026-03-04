@@ -9,6 +9,14 @@ setup(
         "gymnasium",
         "gymnasium[toy-text]",
         "uvicorn<0.41",
+        # tos dependencies
+        "numpy",
+        "matplotlib",
+        "scipy",
+        "pillow",
+        "tqdm",
+        "imageio",
+        "omegaconf",
     ],
     python_requires=">=3.10",
 )
