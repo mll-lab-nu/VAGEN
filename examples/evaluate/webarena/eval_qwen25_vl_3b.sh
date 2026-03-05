@@ -49,6 +49,9 @@ source "${SCRIPT_DIR}/wait_for_server.sh"
 wait_for_server
 
 # ---------- Run Eval ----------
+# WebArena config files use relative paths like ./.auth/; cd so they resolve
+cd /work/nvme/bgig/ryu4/webarena
+
 python -m vagen.evaluate.run_eval --config "${CONFIG}" \
   run.backend=sglang \
   backends.sglang.base_url="http://127.0.0.1:${PORT}/v1" \

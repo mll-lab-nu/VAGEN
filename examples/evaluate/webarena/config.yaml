@@ -2,7 +2,7 @@ fileroot: /work/nvme/bgig/ryu4/VAGEN
 
 envs:
   - name: WebArena
-    n_envs: 32
+    n_envs: 1
     tag_id: webarena_test
     seed: [0,32,1]
     max_turns: 5
