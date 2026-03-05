@@ -102,10 +102,25 @@ class GeminiAdapter(ModelAdapter):
         else:
             model = genai.GenerativeModel(self.model)
 
+        # Build GenerationConfig from chat_config params.
+        # Gemini does NOT accept temperature/top_p/etc. as direct kwargs to
+        # generate_content(); they must be wrapped in GenerationConfig.
+        # Also, Gemini uses max_output_tokens (not max_tokens).
+        gen_config_keys = {"temperature", "top_p", "top_k", "max_output_tokens",
+                           "stop_sequences", "candidate_count"}
+        gen_config_kwargs = {k: chat_config.pop(k) for k in gen_config_keys if k in chat_config}
+        if "max_tokens" in chat_config:
+            gen_config_kwargs.setdefault("max_output_tokens", chat_config.pop("max_tokens"))
+
+        generation_config = genai.GenerationConfig(**gen_config_kwargs) if gen_config_kwargs else None
+
         def _call():
+            kwargs = dict(chat_config)
+            if generation_config is not None:
+                kwargs["generation_config"] = generation_config
             return model.generate_content(
                 contents=contents,
-                **chat_config
+                **kwargs
             )
 
         resp = await asyncio.to_thread(_call)

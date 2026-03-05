@@ -16,7 +16,7 @@ envs:
         enable_think: true
     chat_config:
       temperature: 0.0
-      max_tokens: 2048
+      max_tokens: 32768
       top_p: 1.0
 
 experiment:

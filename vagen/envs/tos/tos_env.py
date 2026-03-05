@@ -17,6 +17,8 @@ from gymnasium.utils import seeding
 # Reward constants
 COGMAP_REWARD_SCALE = 10.0   # cogmap scores in [0,1] scaled to [0,10]
 FORCED_TERM_PENALTY = 2.0    # penalty for not calling Term() explicitly
+DIR_RANDOM_BASELINE = 1.0 / 8.0   # 8 equal cardinal bins → random accuracy = 1/8
+FACING_RANDOM_BASELINE = 1.0 / 4.0  # 4 cardinal orientations → random accuracy = 1/4
 
 
 class SpatialGym(GymImageEnv):
@@ -152,7 +154,11 @@ class SpatialGym(GymImageEnv):
                 self.exploration_manager.agent,
                 list(self.exploration_manager.observed_items),
             )
-            cogmap_score = cogmap_scores['overall']
+            cogmap_score = (
+                max(0.0, cogmap_scores['dir'] - DIR_RANDOM_BASELINE) +
+                max(0.0, cogmap_scores['facing'] - FACING_RANDOM_BASELINE) +
+                cogmap_scores['pos']
+            ) / 3.0
             reward = cogmap_score * COGMAP_REWARD_SCALE
             if self.forced_term_occurred:
                 reward -= FORCED_TERM_PENALTY
