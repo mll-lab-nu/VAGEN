@@ -1,9 +1,9 @@
 fileroot: ${oc.env:HOME}/projects/vagen/VAGEN
 
 envs:
-  - name: 
+  - name: WebArena
     n_envs: 32
-    tag_id: search_test
+    tag_id: webarena_test
     seed: [0,32,1]
     max_turns: 5
     response_length_per_turn: 512

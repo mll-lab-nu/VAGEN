@@ -1,0 +1,20 @@
+envs:
+  - name: SearchR1 # registered env name
+    n_envs: 3000
+    data_source: search # nickname for logging
+    seed: [1,3000,1] # sample n_env seeds from seed[0] to seed[1] with each seed repeat at most seed[2] times
+    max_turns: 5 # max number of interaction turns per episode
+    response_length_per_turn: 512 # max response length per turn
+    config: # env-specific config
+      dataset: hotpotqa
+      mode: train
+      retrieval_server_url: "http://127.0.0.1:8000"
+      max_steps: 8
+      max_searches: 4
+      top_k: 5
+      max_evidence_items: 15
+      format_reward: 0.01
+      search_penalty: -0.01
+      correct_reward: 1.0
+      wrong_reward: 0.0
+      strict_format: false
