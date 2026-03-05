@@ -8,10 +8,13 @@ envs:
     max_turns: 5
     response_length_per_turn: 512
     config:
-      dataset: "hotpotqa"
-      retrieval_server_url: "http://127.0.0.1:8000"
-      top_k: 5
-      max_evidence_items: 15
+      config_dir: "config_files"
+      headless: true
+      observation_type: "accessibility_tree"
+      current_viewport_only: true
+      max_steps: 30
+      format_reward: 0.01
+      success_reward: 1.0
 
 
 experiment:
