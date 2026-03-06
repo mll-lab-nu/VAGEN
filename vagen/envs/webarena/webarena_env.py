@@ -91,7 +91,7 @@ class WebArenaEnv(GymImageEnv):
         super().__init__(env_config)
         self.config = WebArenaEnvConfig(**env_config)
 
-        from browser_env import ScriptBrowserEnv
+        from vagen.envs.webarena.browser_env import ScriptBrowserEnv
 
         self.browser_env = ScriptBrowserEnv(
             headless=self.config.headless,
@@ -166,7 +166,7 @@ class WebArenaEnv(GymImageEnv):
 
     async def _evaluate_success(self, info: Dict[str, Any]) -> float:
         """Run WebArena evaluator to check task success."""
-        from evaluation_harness import evaluator_router
+        from vagen.envs.webarena.evaluation_harness.evaluators import evaluator_router
 
         def _eval():
             evaluator = evaluator_router(self._current_config_file)
@@ -215,7 +215,7 @@ class WebArenaEnv(GymImageEnv):
                 info["answer"] = answer
                 obs = {"text": f"Agent submitted answer: {answer}"}
             else:
-                from browser_env import create_id_based_action
+                from vagen.envs.webarena.browser_env import create_id_based_action
 
                 try:
                     action = create_id_based_action(action_text)
