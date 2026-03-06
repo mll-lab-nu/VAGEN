@@ -24,7 +24,7 @@ experiment:
 run:
   backend: "sglang"           # choose one: openai | azure | sglang | vllm | together | claude | gemini
   base_seed: 0
-  max_concurrent_jobs: 64
+  max_concurrent_jobs: 1
   resume: skip_completed      # off | skip_completed | force_rerun
   live_summary: true          # write partial summary incrementally
 
