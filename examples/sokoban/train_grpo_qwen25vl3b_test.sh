@@ -48,6 +48,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     actor_rollout_ref.rollout.enable_chunked_prefill=True \
     actor_rollout_ref.actor.fsdp_config.param_offload=True \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=True \
+    actor_rollout_ref.actor.fsdp_config.model_dtype=torch.bfloat16 \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
     actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=1 \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
