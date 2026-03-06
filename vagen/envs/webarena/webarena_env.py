@@ -1,4 +1,5 @@
 import asyncio
+import concurrent.futures
 import re
 import json
 import os
@@ -101,6 +102,7 @@ class WebArenaEnv(GymImageEnv):
                 "height": self.config.viewport_height,
             },
         )
+        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
         # Resolve config file list
         if self.config.config_files is not None:
@@ -127,8 +129,12 @@ class WebArenaEnv(GymImageEnv):
     # ------------------------------------------------------------------
     # GymImageEnv abstract methods
     # ------------------------------------------------------------------
+    async def _run_sync(self, fn, *args):
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(self._executor, fn, *args)
+
     async def close(self) -> None:
-        await asyncio.to_thread(self.browser_env.close)
+        await self._run_sync(self.browser_env.close)
 
     async def system_prompt(self) -> Dict[str, Any]:
         return {"obs_str": _system_prompt()}
@@ -137,8 +143,8 @@ class WebArenaEnv(GymImageEnv):
         idx = seed % len(self._config_files)
         config_file = self._config_files[idx]
 
-        obs, info = await asyncio.to_thread(
-            self.browser_env.reset, options={"config_file": config_file}
+        obs, info = await self._run_sync(
+            lambda: self.browser_env.reset(options={"config_file": config_file})
         )
 
         self._steps_used = 0
@@ -174,8 +180,8 @@ class WebArenaEnv(GymImageEnv):
 
             try:
                 action = create_id_based_action(parsed["action"])
-                obs, _, terminated, _, step_info = await asyncio.to_thread(
-                    self.browser_env.step, action
+                obs, _, terminated, _, step_info = await self._run_sync(
+                    lambda: self.browser_env.step(action)
                 )
                 info.update(step_info)
                 done = terminated
