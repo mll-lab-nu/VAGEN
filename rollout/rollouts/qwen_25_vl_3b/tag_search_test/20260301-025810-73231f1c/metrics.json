@@ -1,0 +1,45 @@
+{
+  "rollout_id": "20260301-025810-73231f1c",
+  "seed": 10,
+  "terminated": true,
+  "finish_reason": "done",
+  "success": false,
+  "cumulative_reward": 0.01,
+  "rewards": [
+    0.01
+  ],
+  "num_turns": 1,
+  "infos": [
+    {},
+    {
+      "format_correct": true,
+      "action_type": "final",
+      "query": null,
+      "answer": "The fight song of the university whose main campus is in Lawrence, Kansas and whose branch campuses are in the Kansas City metropolitan area is \"The Kansas City Fight Song.\"",
+      "raw": "<think>\nThe university being referred to is most likely Kansas City University, as it has campuses in Lawrence, Kansas, and the Kansas City metropolitan area. The fight song of this university is \"The Kansas City Fight Song.\"\n</think>\n<answer>\nThe fight song of the university whose main campus is in Lawrence, Kansas and whose branch campuses are in the Kansas City metropolitan area is \"The Kansas City Fight Song.\"\n</answer>",
+      "correct": false,
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": true,
+          "action_type": "final",
+          "searches_used": 0,
+          "steps_used": 1
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    }
+  ],
+  "env_config": {
+    "dataset": "hotpotqa",
+    "retrieval_server_url": "http://127.0.0.1:8000",
+    "top_k": 5,
+    "max_evidence_items": 15
+  },
+  "max_turns": 5,
+  "tag_id": "search_test",
+  "split": "default",
+  "env_name": "SearchR1"
+}

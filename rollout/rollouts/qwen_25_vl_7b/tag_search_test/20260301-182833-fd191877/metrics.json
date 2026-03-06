@@ -1,0 +1,65 @@
+{
+  "rollout_id": "20260301-182833-fd191877",
+  "seed": 2,
+  "terminated": true,
+  "finish_reason": "done",
+  "success": true,
+  "cumulative_reward": 1.01,
+  "rewards": [
+    0.0,
+    1.01
+  ],
+  "num_turns": 2,
+  "infos": [
+    {},
+    {
+      "format_correct": true,
+      "action_type": "search",
+      "query": "science fantasy young adult series, told in first person, companion books, enslaved worlds, alien species",
+      "answer": null,
+      "raw": "<search>science fantasy young adult series, told in first person, companion books, enslaved worlds, alien species</search>",
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": true,
+          "action_type": "search",
+          "searches_used": 1,
+          "steps_used": 1
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    },
+    {
+      "format_correct": true,
+      "action_type": "final",
+      "query": null,
+      "answer": "Animorphs",
+      "raw": "<answer>Animorphs</answer>",
+      "correct": true,
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": true,
+          "action_type": "final",
+          "searches_used": 1,
+          "steps_used": 2
+        },
+        "traj_metrics": {
+          "success": true
+        }
+      },
+      "success": true
+    }
+  ],
+  "env_config": {
+    "dataset": "hotpotqa",
+    "retrieval_server_url": "http://127.0.0.1:8000",
+    "top_k": 5,
+    "max_evidence_items": 15
+  },
+  "max_turns": 5,
+  "tag_id": "search_test",
+  "split": "default",
+  "env_name": "SearchR1"
+}

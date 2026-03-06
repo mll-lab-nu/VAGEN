@@ -1,0 +1,85 @@
+{
+  "rollout_id": "20260228-230424-f06c376d",
+  "seed": 20,
+  "terminated": true,
+  "finish_reason": "done",
+  "success": false,
+  "cumulative_reward": 0.01,
+  "rewards": [
+    0.0,
+    0.0,
+    0.01
+  ],
+  "num_turns": 3,
+  "infos": [
+    {},
+    {
+      "format_correct": true,
+      "action_type": "search",
+      "query": "Which other Mexican Formula One race car driver has held the podium besides the Force India driver born in 1990?",
+      "answer": null,
+      "raw": "<search>Which other Mexican Formula One race car driver has held the podium besides the Force India driver born in 1990?</search>",
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": true,
+          "action_type": "search",
+          "searches_used": 1,
+          "steps_used": 1
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    },
+    {
+      "format_correct": true,
+      "action_type": "search",
+      "query": "Which other Mexican Formula One race car driver has held the podium besides the Force India driver born in 1990?",
+      "answer": null,
+      "raw": "<search>Which other Mexican Formula One race car driver has held the podium besides the Force India driver born in 1990?</search>",
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": true,
+          "action_type": "search",
+          "searches_used": 2,
+          "steps_used": 2
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    },
+    {
+      "format_correct": true,
+      "action_type": "final",
+      "query": null,
+      "answer": "Another Mexican Formula One race car driver besides the Force India driver Sergio Pérez who has held the podium is Pedro Rodríguez.",
+      "raw": "<final>Another Mexican Formula One race car driver besides the Force India driver Sergio Pérez who has held the podium is Pedro Rodríguez.</final>",
+      "correct": false,
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": true,
+          "action_type": "final",
+          "searches_used": 2,
+          "steps_used": 3
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    }
+  ],
+  "env_config": {
+    "dataset": "hotpotqa",
+    "retrieval_server_url": "http://127.0.0.1:8000",
+    "top_k": 5,
+    "max_evidence_items": 15
+  },
+  "max_turns": 5,
+  "tag_id": "search_test",
+  "split": "default",
+  "env_name": "SearchR1"
+}

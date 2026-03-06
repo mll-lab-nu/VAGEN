@@ -1,0 +1,4886 @@
+{
+  "created_at": "2026-03-01T18:30:08.340334",
+  "n_episodes": 32,
+  "success_rate": 0.09375,
+  "avg_cumulative_reward": 0.1037499999999999,
+  "avg_turns": 2.25,
+  "error_rollouts": [],
+  "episodes": [
+    {
+      "rollout_id": "20260228-230424-f06c376d",
+      "seed": 20,
+      "num_turns": 3,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "Which other Mexican Formula One race car driver has held the podium besides the Force India driver born in 1990?",
+            "answer": null,
+            "raw": "<search>Which other Mexican Formula One race car driver has held the podium besides the Force India driver born in 1990?</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 1,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 2,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "Which other Mexican Formula One race car driver has held the podium besides the Force India driver born in 1990?",
+            "answer": null,
+            "raw": "<search>Which other Mexican Formula One race car driver has held the podium besides the Force India driver born in 1990?</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 2,
+                "steps_used": 2
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 3,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "Another Mexican Formula One race car driver besides the Force India driver Sergio Pérez who has held the podium is Pedro Rodríguez.",
+            "raw": "<final>Another Mexican Formula One race car driver besides the Force India driver Sergio Pérez who has held the podium is Pedro Rodríguez.</final>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 2,
+                "steps_used": 3
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-030042-57b3b681",
+      "seed": 11,
+      "num_turns": 1,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "Frank Darabont",
+            "raw": "<answer> Frank Darabont </answer>\n",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 0,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-030043-ec416f05",
+      "seed": 17,
+      "num_turns": 1,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "Yes, both Giuseppe Verdi and Ambroise Thomas were opera composers.",
+            "raw": "<answer>Yes, both Giuseppe Verdi and Ambroise Thomas were opera composers.</answer>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 0,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-030048-644f6930",
+      "seed": 29,
+      "num_turns": 1,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "Cavern Quest",
+            "raw": "<answer> Cavern Quest </answer>\n",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 0,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182822-481f2321",
+      "seed": 0,
+      "num_turns": 4,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "Scott Derrickson nationality, Ed Wood nationality",
+            "answer": null,
+            "raw": "Scott Derrickson and Ed Wood were not from the same nationality. To verify this, let's search for their nationalities.\n\n<search>Scott Derrickson nationality, Ed Wood nationality</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 1,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 2,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "Scott Derrickson nationality, Ed Wood nationality",
+            "answer": null,
+            "raw": "Based on the snippets provided, Scott Derrickson is from the United States, having been born and raised in the United States. Ed Wood, on the other hand, appears to be of Scottish origin, though it's not explicitly stated. However, given the lack of specific nationality details for Ed Wood, we should proceed cautiously without definitive proof.\n\n<search>Scott Derrickson nationality, Ed Wood nationality</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 2,
+                "steps_used": 2
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 3,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "Scott Derrickson nationality, Ed Wood nationality",
+            "answer": null,
+            "raw": "Based on the snippets provided, Scott Derrickson is from the United States, having been born and raised there. However, there is no specific nationality mentioned for Ed Wood. Given the lack of definitive information about Ed Wood's nationality, we cannot conclusively state whether Scott Derrickson and Ed Wood share the same nationality.\n\n<search>Scott Derrickson nationality, Ed Wood nationality</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 3,
+                "steps_used": 3
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 4,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "Based on the available information, we cannot definitively determine whether Scott Derrickson and Ed Wood are of the same nationality. Scott Derrickson is from the United States, but specific nationality information for Ed Wood is not provided.",
+            "raw": "Based on the snippets provided, Scott Derrickson is from the United States. However, there is no specific nationality mentioned for Ed Wood. Given the lack of definitive information about Ed Wood's nationality, we cannot conclusively state whether Scott Derrickson and Ed Wood share the same nationality.\n\n<answer>Based on the available information, we cannot definitively determine whether Scott Derrickson and Ed Wood are of the same nationality. Scott Derrickson is from the United States, but specific nationality information for Ed Wood is not provided.</answer>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 3,
+                "steps_used": 4
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182823-01ce4a94",
+      "seed": 1,
+      "num_turns": 3,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "Corliss Archer actress government position in film",
+            "answer": null,
+            "raw": "<search> Corliss Archer actress government position in film </search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 1,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 2,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "Corliss Archer actress government position in film",
+            "answer": null,
+            "raw": "<search> Corliss Archer actress government position in film </search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 2,
+                "steps_used": 2
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 3,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "The woman who portrayed Corliss Archer in the film \"A Kiss for Corliss\" (1949) was Shirley Temple.",
+            "raw": "<answer> The woman who portrayed Corliss Archer in the film \"A Kiss for Corliss\" (1949) was Shirley Temple. </answer>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 2,
+                "steps_used": 3
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182824-e3f9372a",
+      "seed": 5,
+      "num_turns": 2,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "Who formed the South Korean boy group that debuted with the album 2014 S/S?",
+            "answer": null,
+            "raw": "<search>Who formed the South Korean boy group that debuted with the album 2014 S/S?</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 1,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 2,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "MarblePop Entertainment",
+            "raw": "<answer>MarblePop Entertainment</answer>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 1,
+                "steps_used": 2
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182825-522833e8",
+      "seed": 18,
+      "num_turns": 3,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "president terms of office",
+            "answer": null,
+            "raw": "To answer the question, we need to identify the president who served when Roger O. Egeberg was Assistant Secretary for Health and Scientific Affairs. This involves searching for lists of U.S. presidents along with their terms of office.\n\n<search>president terms of office</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 1,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 2,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "years of service of Roger O. Egeberg as Assistant Secretary for Health and Scientific Affairs",
+            "answer": null,
+            "raw": "Based on the information provided, it seems that the search results are not directly related to the president and the years he served. We need more specific details about Roger O. Egeberg and his role to accurately answer the question.\n\n<search>years of service of Roger O. Egeberg as Assistant Secretary for Health and Scientific Affairs</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 2,
+                "steps_used": 2
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 3,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "1969 to 1974",
+            "raw": "Based on the information provided, Roger O. Egeberg served as Assistant Secretary for Health and Scientific Affairs in the Department of Health, Education, and Welfare (now the United States Department of Health and Human Services) during the Nixon administration. The Nixon administration lasted from January 20, 1969, to August 9, 1974.\n\n<answer>1969 to 1974</answer>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 2,
+                "steps_used": 3
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182826-52fd1f1a",
+      "seed": 9,
+      "num_turns": 4,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "Local H and For Against origin",
+            "answer": null,
+            "raw": "<search>Local H and For Against origin</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 1,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 2,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "Local H and For Against origin United States",
+            "answer": null,
+            "raw": "Based on the information gathered, there is no evidence that suggests \"Local H and For Against\" are from the United States. The search terms did not provide any direct answer. I need to refine the search query.\n\n<search>Local H and For Against origin United States</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 2,
+                "steps_used": 2
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 3,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "Local H and For Against from the United States origin",
+            "answer": null,
+            "raw": "Based on the available information, there is no direct evidence to conclude whether \"Local H and For Against\" are from the United States. The search results do not reference these terms directly.\n\n<search>Local H and For Against from the United States origin</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 3,
+                "steps_used": 3
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 4,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "Local H might not be from the United States.",
+            "raw": "Based on the information gathered, \"For Against\" appears to be from the United States, as it is referenced as a United States-based post-punk/dream pop band from Lincoln, Nebraska. However, there is no direct information about \"Local H\". Since \"For Against\" is confirmed to be from the United States, but \"Local H\" lacks definitive information from the snippets, we cannot conclusively state that both are from the United States.\n\n<answer>Local H might not be from the United States.</answer>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 3,
+                "steps_used": 4
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182826-7df1aef2",
+      "seed": 26,
+      "num_turns": 2,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "Virginia Commonwealth University founded year",
+            "answer": null,
+            "raw": "<search>Virginia Commonwealth University founded year</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 1,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 2,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "Virginia Commonwealth University was founded in 1838.",
+            "raw": "<answer>Virginia Commonwealth University was founded in 1838.</answer>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 1,
+                "steps_used": 2
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182828-9a457e65",
+      "seed": 10,
+      "num_turns": 3,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "university in Lawrence, Kansas with branch campuses in Kansas City metropolitan area",
+            "answer": null,
+            "raw": "To answer the question, we need to identify the university with a main campus in Lawrence, Kansas, and with branch campuses in the Kansas City metropolitan area. Then, we need to determine the fight song of this university.\n\nLet's start by identifying the university in question.\n\n<search>university in Lawrence, Kansas with branch campuses in Kansas City metropolitan area</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 1,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 2,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "fight song of the university of kansas",
+            "answer": null,
+            "raw": "Based on the information provided, the university in question is the University of Kansas, which has a main campus in Lawrence, Kansas, and branch campuses in the Kansas City metropolitan area.\n\nTo find the fight song of the University of Kansas, we need to search for the fight song related to the university.\n\n<search>fight song of the university of kansas</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 2,
+                "steps_used": 2
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 3,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "I'm a Jayhawk",
+            "raw": "The fight song of the University of Kansas is \"I'm a Jayhawk\". \n\n<answer>I'm a Jayhawk</answer>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 2,
+                "steps_used": 3
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182828-fcfd07c4",
+      "seed": 4,
+      "num_turns": 4,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "the director of the romantic comedy \"Big Stone Gap\" and their location in New York City",
+            "answer": null,
+            "raw": "The movie \"Big Stone Gap\" is a romantic comedy, but the information about the director's location in New York City is not provided in the evidence. To answer this question accurately, we need to find out who the director is and their location.\n\nGiven that we don't have any specific information about the movie or its director, it's likely we will need to search for this information.\n\n<search>the director of the romantic comedy \"Big Stone Gap\" and their location in New York City</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 1,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 2,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "the director of the romantic comedy \"Big Stone Gap\" and their location in New York City",
+            "answer": null,
+            "raw": "Based on the information provided, the movie \"Big Stone Gap\" is a 2014 American drama romantic comedy film based on a novel by Adriana Trigiani. While the evidence gives us basic information about the film's genre and plot, it does not specify the director or their location in New York City. To answer this question, we would need to find out the director of the film and their address or contact information.\n\n<search>the director of the romantic comedy \"Big Stone Gap\" and their location in New York City</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 2,
+                "steps_used": 2
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 3,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "Adriana Trigiani's location in New York City",
+            "answer": null,
+            "raw": "Based on the information provided, Adriana Trigiani is the director of the romantic comedy \"Big Stone Gap.\" The evidence states that Adriana Trigiani directed the film in 2014. However, it does not explicitly mention her location in New York City. Without a specific location given, we cannot definitively answer that she is based in a particular New York city.\n\nGiven the available information, we cannot determine the location of Adriana Trigiani with certainty. To find this out, we would likely need to search for her personal details or further biographical information.\n\n<search>Adriana Trigiani's location in New York City</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 3,
+                "steps_used": 3
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 4,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "Adriana Trigiani is based in New York City.",
+            "raw": "Based on the evidence provided, Adriana Trigiani, the director of the romantic comedy \"Big Stone Gap,\" is based in New York City. The snippets indicate that Adriana Trigiani is an Italian American writer, film director, and entrepreneur based in New York City since 1985.\n\n<answer>Adriana Trigiani is based in New York City.</answer>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 3,
+                "steps_used": 4
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182829-0931a6e5",
+      "seed": 28,
+      "num_turns": 1,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": true,
+      "cumulative_reward": 1.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 1.01,
+          "success": true,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "Henry J. Kaiser",
+            "raw": "<think> To answer the question, we need to identify an American industrialist famous for becoming a pioneer in modern American shipbuilding. Kaiser Ventures, which was founded by Henry J. Kaiser, fits this description as he was a prominent industrialist known for his contributions to the shipbuilding industry.\n\nHenry J. Kaiser was indeed an influential figure in the American shipbuilding industry, helping to pioneer the use of prefabrication, mass production, and the use of steel in shipbuilding, key innovations that made the modern shipbuilding industry viable.\n\nGiven this reasoning, we should conclude that the industrialist in question is Henry J. Kaiser.\n\n</think>\n<answer> Henry J. Kaiser </answer>",
+            "correct": true,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 0,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": true
+              }
+            },
+            "success": true
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182830-af788893",
+      "seed": 15,
+      "num_turns": 2,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "Brown State Fishing Lake identification and location",
+            "answer": null,
+            "raw": "To answer the question, I need to identify the country in which Brown State Fishing Lake is located. Without this information, I cannot determine the population of the country. \n\nLet's proceed by searching for information about Brown State Fishing Lake to identify the country associated with it.\n\n<search>Brown State Fishing Lake identification and location</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 1,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 2,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "10,724 people",
+            "raw": "Based on the information provided, Brown State Fishing Lake is associated with Brown County, Kansas. According to the U.S. Census Bureau, the population of Brown County, Kansas, as of the 2000 census, was 10,724 people.\n\n<answer>10,724 people</answer>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 1,
+                "steps_used": 2
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182831-34e5b590",
+      "seed": 21,
+      "num_turns": 2,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "singer of \"A Rather Blustery Day\" and their voice acting roles",
+            "answer": null,
+            "raw": "<search> singer of \"A Rather Blustery Day\" and their voice acting roles </search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 1,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 2,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "Jim Cummings",
+            "raw": "<answer>Jim Cummings</answer>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 1,
+                "steps_used": 2
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182832-b9c4c525",
+      "seed": 24,
+      "num_turns": 2,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "father of Kasper Schmeichel voted to be by the IFFHS in 1992",
+            "answer": null,
+            "raw": "<search> father of Kasper Schmeichel voted to be by the IFFHS in 1992 </search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 1,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 2,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "Peter Schmeichel",
+            "raw": "<answer> Peter Schmeichel </answer>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 1,
+                "steps_used": 2
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182833-fd191877",
+      "seed": 2,
+      "num_turns": 2,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": true,
+      "cumulative_reward": 1.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "science fantasy young adult series, told in first person, companion books, enslaved worlds, alien species",
+            "answer": null,
+            "raw": "<search>science fantasy young adult series, told in first person, companion books, enslaved worlds, alien species</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 1,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 2,
+          "reward": 1.01,
+          "success": true,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "Animorphs",
+            "raw": "<answer>Animorphs</answer>",
+            "correct": true,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 1,
+                "steps_used": 2
+              },
+              "traj_metrics": {
+                "success": true
+              }
+            },
+            "success": true
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182834-a60f287c",
+      "seed": 32,
+      "num_turns": 2,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "French ace pilot and adventurer fly L'Oiseau Blanc",
+            "answer": null,
+            "raw": "<search>French ace pilot and adventurer fly L'Oiseau Blanc</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 1,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 2,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "Charles Nungesser and François Coli",
+            "raw": "<answer>Charles Nungesser and François Coli</answer>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 1,
+                "steps_used": 2
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182835-c9362d08",
+      "seed": 27,
+      "num_turns": 3,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "Dickyosperma, Huernia genus",
+            "answer": null,
+            "raw": "<search>Dickyosperma, Huernia genus</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 1,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 2,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "Dictyosperma, Huernia genus description",
+            "answer": null,
+            "raw": "<search>Dictyosperma, Huernia genus description</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 2,
+                "steps_used": 2
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 3,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "Yes, both Dictyosperma and Huernia are described as genera.",
+            "raw": "<answer>Yes, both Dictyosperma and Huernia are described as genera.</answer>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 2,
+                "steps_used": 3
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182836-e7c3f99e",
+      "seed": 30,
+      "num_turns": 2,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "Release date of Poison's album \"Shut Up, Make Love\"",
+            "answer": null,
+            "raw": "<search>Release date of Poison's album \"Shut Up, Make Love\"</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 1,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 2,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "On March 14, 2000, \"Shut Up, Make Love\" was released by Poison.",
+            "raw": "<answer>On March 14, 2000, \"Shut Up, Make Love\" was released by Poison.</answer>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 1,
+                "steps_used": 2
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182837-091b0e16",
+      "seed": 7,
+      "num_turns": 2,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "the seating capacity of the arena where the Lewiston Maineiacs played their home games",
+            "answer": null,
+            "raw": "<search>the seating capacity of the arena where the Lewiston Maineiacs played their home games</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 1,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 2,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "The arena where the Lewiston Maineiacs played their home games can seat 3,677 people.",
+            "raw": "<answer>The arena where the Lewiston Maineiacs played their home games can seat 3,677 people.</answer>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 1,
+                "steps_used": 2
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182837-482d4c53",
+      "seed": 6,
+      "num_turns": 2,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": true,
+      "cumulative_reward": 1.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "Aladin as a consultant who helped organizations",
+            "answer": null,
+            "raw": "To address the question, I need to find out who was known by the stage name Aladin and was a consultant who helped organizations improve their performance. However, I currently lack any specific evidence or links to directly answer the question. Given this, I would need to search for this information to find the answer.\n<search>Aladin as a consultant who helped organizations</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 1,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 2,
+          "reward": 1.01,
+          "success": true,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "Eenasul Fateh",
+            "raw": "Based on the retrieved information, the person known by his stage name Aladin and who helped organizations improve their performance as a consultant is Eenasul Fateh. He worked in various capacities including as a cultural practitioner, magician, and consultant, and contributed to various organizations, particularly in the cultural and management sectors.\n\n<answer>Eenasul Fateh</answer>",
+            "correct": true,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 1,
+                "steps_used": 2
+              },
+              "traj_metrics": {
+                "success": true
+              }
+            },
+            "success": true
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182838-dc90223a",
+      "seed": 14,
+      "num_turns": 2,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "David Beckham's career timeline and the Manchester United managerial tenure timeframe of the football manager who recruited him",
+            "answer": null,
+            "raw": "<search>David Beckham's career timeline and the Manchester United managerial tenure timeframe of the football manager who recruited him</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 1,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 2,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "2003",
+            "raw": "<answer>2003</answer>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 1,
+                "steps_used": 2
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182839-8299e16c",
+      "seed": 8,
+      "num_turns": 2,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "Age comparison between Annie Morton and Terry Richardson",
+            "answer": null,
+            "raw": "<search>Age comparison between Annie Morton and Terry Richardson</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 1,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 2,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "Annie Morton is older than Terry Richardson. Annie Morton was born on October 8, 1970, while Terry Richardson is mentioned but does not specify his birth year directly. However, based on the general knowledge, Terry Richardson, who is known as a photographer and artist, typically works in the late 20th and early 21st centuries, suggesting he is likely younger than Annie Morton, who was born in October 1970.",
+            "raw": "<answer>Annie Morton is older than Terry Richardson. Annie Morton was born on October 8, 1970, while Terry Richardson is mentioned but does not specify his birth year directly. However, based on the general knowledge, Terry Richardson, who is known as a photographer and artist, typically works in the late 20th and early 21st centuries, suggesting he is likely younger than Annie Morton, who was born in October 1970. </answer>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 1,
+                "steps_used": 2
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182840-868b6659",
+      "seed": 19,
+      "num_turns": 1,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "Neither Henry Roth nor Robert Erskine Childers was from England.",
+            "raw": "<answer> Neither Henry Roth nor Robert Erskine Childers was from England. </answer>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 0,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182841-c4f01612",
+      "seed": 16,
+      "num_turns": 2,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "What was the former name of a conference that hosted the Vermont Catamounts men's soccer team from 1988 to 1996?",
+            "answer": null,
+            "raw": "<search>What was the former name of a conference that hosted the Vermont Catamounts men's soccer team from 1988 to 1996?</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 1,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 2,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "America East Conference (AEC)",
+            "raw": "<answer>America East Conference (AEC)</answer>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 1,
+                "steps_used": 2
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182842-4c8428fb",
+      "seed": 3,
+      "num_turns": 2,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "Are the Laleli Mosque and Esma Sultan Mansion located in the same neighborhood?",
+            "answer": null,
+            "raw": "<search> Are the Laleli Mosque and Esma Sultan Mansion located in the same neighborhood? </search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 1,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 2,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "Yes, the Laleli Mosque and Esma Sultan Mansion are not necessarily located in the same neighborhood. The Laleli Mosque is located in Laleli, Fatih, Istanbul, Turkey. The Esma Sultan Mansion, also known as the Esma Sultan Palace, is located in Ortaköy neighborhood of Istanbul, Turkey.",
+            "raw": "<answer>Yes, the Laleli Mosque and Esma Sultan Mansion are not necessarily located in the same neighborhood. The Laleli Mosque is located in Laleli, Fatih, Istanbul, Turkey. The Esma Sultan Mansion, also known as the Esma Sultan Palace, is located in Ortaköy neighborhood of Istanbul, Turkey.</answer>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 1,
+                "steps_used": 2
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182843-0510667b",
+      "seed": 23,
+      "num_turns": 2,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "Badly Drawn Boy instrument to person ratio",
+            "answer": null,
+            "raw": "<search>Badly Drawn Boy instrument to person ratio</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 1,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 2,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "Without further information about the specific musical instruments used by Badly Drawn Boy and Wolf Alice, it's not possible to determine which band has a higher instrument to person ratio. The provided snippets are unrelated to musical acts or their instrument-to-person ratios.",
+            "raw": "<answer>Without further information about the specific musical instruments used by Badly Drawn Boy and Wolf Alice, it's not possible to determine which band has a higher instrument to person ratio. The provided snippets are unrelated to musical acts or their instrument-to-person ratios.</answer>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 1,
+                "steps_used": 2
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182844-a37c63a2",
+      "seed": 12,
+      "num_turns": 5,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "Arnold Schwarzenegger movies as a New York Police detective",
+            "answer": null,
+            "raw": "<think> To answer this question, I need to identify the movie Arnold Schwarzenegger starred in, where he portrayed a character who was a New York Police detective. Then, I should check the promotional activities of Guns N' Roses related to that movie. However, I don't have any direct information from the snippets so far, so I'll need to search.\n\n<search>Arnold Schwarzenegger movies as a New York Police detective</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 1,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 2,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "Arnold Schwarzenegger movie where he was a New York Police detective",
+            "answer": null,
+            "raw": "<think> Based on the snippets, Arnold Schwarzenegger starred in multiple films, including \"Commando\", \"The Running Man\", \"Predator\", and \"Total Recall\". However, I need to find the specific film where he portrayed a New York Police detective. There seems to be a gap in the information provided for this specific detail.\n\n<information>Arnold Schwarzenegger starred in multiple films but this does not provide specific information about the film where he portrayed a New York Police detective.</information>\n\nI need to search for more specific information to answer the question accurately.\n\n<search>Arnold Schwarzenegger movie where he was a New York Police detective</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 2,
+                "steps_used": 2
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 3,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "Arnold Schwarzenegger movies as a detective in New York Police",
+            "answer": null,
+            "raw": "<think> The information provided is fragmented and does not include the specific movie starring Arnold Schwarzenegger in the role of a former New York Police detective, nor does it mention any promo performances by Guns N Roses. I need to look for more specific details about the movie and the promo performances for it.\n\n<search>Arnold Schwarzenegger movies as a detective in New York Police</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 3,
+                "steps_used": 3
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 4,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "Arnold Schwarzenegger movie as a New York City Police detective",
+            "answer": null,
+            "raw": "<think> From the snippets, Arnold Schwarzenegger starred in many films in the 1980s and early 1990s. However, the specific film where he portrayed a New York Police detective is not mentioned. To find this out, I would need to research more specifically related to Schwarzenegger's films and Guns N' Roses' promo activities.\n\n<search>Arnold Schwarzenegger movie as a New York City Police detective</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 4,
+                "steps_used": 4
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 5,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "There is insufficient information in the snippets to determine the specific year when Guns N' Roses performed a promo for a movie starring Arnold Schwarzenegger as a former New York Police detective. Further research would be needed to find this information.",
+            "raw": "<answer>There is insufficient information in the snippets to determine the specific year when Guns N' Roses performed a promo for a movie starring Arnold Schwarzenegger as a former New York Police detective. Further research would be needed to find this information.</answer>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 4,
+                "steps_used": 5
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182845-728069c2",
+      "seed": 31,
+      "num_turns": 1,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "Buck-Tick hailed from Japan.",
+            "raw": "<answer> Buck-Tick hailed from Japan. </answer>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 0,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182845-a18f9965",
+      "seed": 13,
+      "num_turns": 2,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "Random House Tower and 888 7th Avenue usage in property investments",
+            "answer": null,
+            "raw": "<search>Random House Tower and 888 7th Avenue usage in property investments</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 1,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 2,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "Yes, both Random House Tower and 888 7th Avenue are used for properties. Random House Tower, also known as the Park Imperial Apartments, serves as the American headquarters of Penguin Random House and acts as a luxury apartment complex. 888 7th Avenue, on the other hand, is a modern-style office skyscraper in New York City. Both structures are primarily associated with real estate, with Random House Tower specifically housing apartments and a corporate office, and 888 7th Avenue serving as an office building.",
+            "raw": "<answer>Yes, both Random House Tower and 888 7th Avenue are used for properties. Random House Tower, also known as the Park Imperial Apartments, serves as the American headquarters of Penguin Random House and acts as a luxury apartment complex. 888 7th Avenue, on the other hand, is a modern-style office skyscraper in New York City. Both structures are primarily associated with real estate, with Random House Tower specifically housing apartments and a corporate office, and 888 7th Avenue serving as an office building.</answer>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 1,
+                "steps_used": 2
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    },
+    {
+      "rollout_id": "20260301-182846-306b0f73",
+      "seed": 22,
+      "num_turns": 2,
+      "terminated": true,
+      "finish_reason": "done",
+      "success": false,
+      "cumulative_reward": 0.01,
+      "per_turn": [
+        {
+          "turn": 0,
+          "reward": null,
+          "success": false,
+          "info": {}
+        },
+        {
+          "turn": 1,
+          "reward": 0.0,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "search",
+            "query": "devices that control Apple TV aside from the Apple Remote",
+            "answer": null,
+            "raw": "<search>devices that control Apple TV aside from the Apple Remote</search>",
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "search",
+                "searches_used": 1,
+                "steps_used": 1
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        },
+        {
+          "turn": 2,
+          "reward": 0.01,
+          "success": false,
+          "info": {
+            "format_correct": true,
+            "action_type": "final",
+            "query": null,
+            "answer": "Siri Remote",
+            "raw": "<answer>Siri Remote</answer>",
+            "correct": false,
+            "metrics": {
+              "turn_metrics": {
+                "format_correct": true,
+                "action_type": "final",
+                "searches_used": 1,
+                "steps_used": 2
+              },
+              "traj_metrics": {
+                "success": false
+              }
+            },
+            "success": false
+          }
+        }
+      ],
+      "tag_id": "search_test",
+      "env_name": "SearchR1",
+      "split": "default",
+      "max_turns": 5
+    }
+  ],
+  "per_tag": {
+    "tag_search_test": {
+      "created_at": "2026-03-01T18:30:08.340334",
+      "n_episodes": 32,
+      "success_rate": 0.09375,
+      "avg_cumulative_reward": 0.1037499999999999,
+      "avg_turns": 2.25,
+      "error_rollouts": [],
+      "episodes": [
+        {
+          "rollout_id": "20260228-230424-f06c376d",
+          "seed": 20,
+          "num_turns": 3,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "Which other Mexican Formula One race car driver has held the podium besides the Force India driver born in 1990?",
+                "answer": null,
+                "raw": "<search>Which other Mexican Formula One race car driver has held the podium besides the Force India driver born in 1990?</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 1,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 2,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "Which other Mexican Formula One race car driver has held the podium besides the Force India driver born in 1990?",
+                "answer": null,
+                "raw": "<search>Which other Mexican Formula One race car driver has held the podium besides the Force India driver born in 1990?</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 2,
+                    "steps_used": 2
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 3,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "Another Mexican Formula One race car driver besides the Force India driver Sergio Pérez who has held the podium is Pedro Rodríguez.",
+                "raw": "<final>Another Mexican Formula One race car driver besides the Force India driver Sergio Pérez who has held the podium is Pedro Rodríguez.</final>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 2,
+                    "steps_used": 3
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-030042-57b3b681",
+          "seed": 11,
+          "num_turns": 1,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "Frank Darabont",
+                "raw": "<answer> Frank Darabont </answer>\n",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 0,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-030043-ec416f05",
+          "seed": 17,
+          "num_turns": 1,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "Yes, both Giuseppe Verdi and Ambroise Thomas were opera composers.",
+                "raw": "<answer>Yes, both Giuseppe Verdi and Ambroise Thomas were opera composers.</answer>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 0,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-030048-644f6930",
+          "seed": 29,
+          "num_turns": 1,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "Cavern Quest",
+                "raw": "<answer> Cavern Quest </answer>\n",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 0,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182822-481f2321",
+          "seed": 0,
+          "num_turns": 4,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "Scott Derrickson nationality, Ed Wood nationality",
+                "answer": null,
+                "raw": "Scott Derrickson and Ed Wood were not from the same nationality. To verify this, let's search for their nationalities.\n\n<search>Scott Derrickson nationality, Ed Wood nationality</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 1,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 2,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "Scott Derrickson nationality, Ed Wood nationality",
+                "answer": null,
+                "raw": "Based on the snippets provided, Scott Derrickson is from the United States, having been born and raised in the United States. Ed Wood, on the other hand, appears to be of Scottish origin, though it's not explicitly stated. However, given the lack of specific nationality details for Ed Wood, we should proceed cautiously without definitive proof.\n\n<search>Scott Derrickson nationality, Ed Wood nationality</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 2,
+                    "steps_used": 2
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 3,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "Scott Derrickson nationality, Ed Wood nationality",
+                "answer": null,
+                "raw": "Based on the snippets provided, Scott Derrickson is from the United States, having been born and raised there. However, there is no specific nationality mentioned for Ed Wood. Given the lack of definitive information about Ed Wood's nationality, we cannot conclusively state whether Scott Derrickson and Ed Wood share the same nationality.\n\n<search>Scott Derrickson nationality, Ed Wood nationality</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 3,
+                    "steps_used": 3
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 4,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "Based on the available information, we cannot definitively determine whether Scott Derrickson and Ed Wood are of the same nationality. Scott Derrickson is from the United States, but specific nationality information for Ed Wood is not provided.",
+                "raw": "Based on the snippets provided, Scott Derrickson is from the United States. However, there is no specific nationality mentioned for Ed Wood. Given the lack of definitive information about Ed Wood's nationality, we cannot conclusively state whether Scott Derrickson and Ed Wood share the same nationality.\n\n<answer>Based on the available information, we cannot definitively determine whether Scott Derrickson and Ed Wood are of the same nationality. Scott Derrickson is from the United States, but specific nationality information for Ed Wood is not provided.</answer>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 3,
+                    "steps_used": 4
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182823-01ce4a94",
+          "seed": 1,
+          "num_turns": 3,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "Corliss Archer actress government position in film",
+                "answer": null,
+                "raw": "<search> Corliss Archer actress government position in film </search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 1,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 2,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "Corliss Archer actress government position in film",
+                "answer": null,
+                "raw": "<search> Corliss Archer actress government position in film </search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 2,
+                    "steps_used": 2
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 3,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "The woman who portrayed Corliss Archer in the film \"A Kiss for Corliss\" (1949) was Shirley Temple.",
+                "raw": "<answer> The woman who portrayed Corliss Archer in the film \"A Kiss for Corliss\" (1949) was Shirley Temple. </answer>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 2,
+                    "steps_used": 3
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182824-e3f9372a",
+          "seed": 5,
+          "num_turns": 2,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "Who formed the South Korean boy group that debuted with the album 2014 S/S?",
+                "answer": null,
+                "raw": "<search>Who formed the South Korean boy group that debuted with the album 2014 S/S?</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 1,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 2,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "MarblePop Entertainment",
+                "raw": "<answer>MarblePop Entertainment</answer>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 1,
+                    "steps_used": 2
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182825-522833e8",
+          "seed": 18,
+          "num_turns": 3,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "president terms of office",
+                "answer": null,
+                "raw": "To answer the question, we need to identify the president who served when Roger O. Egeberg was Assistant Secretary for Health and Scientific Affairs. This involves searching for lists of U.S. presidents along with their terms of office.\n\n<search>president terms of office</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 1,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 2,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "years of service of Roger O. Egeberg as Assistant Secretary for Health and Scientific Affairs",
+                "answer": null,
+                "raw": "Based on the information provided, it seems that the search results are not directly related to the president and the years he served. We need more specific details about Roger O. Egeberg and his role to accurately answer the question.\n\n<search>years of service of Roger O. Egeberg as Assistant Secretary for Health and Scientific Affairs</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 2,
+                    "steps_used": 2
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 3,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "1969 to 1974",
+                "raw": "Based on the information provided, Roger O. Egeberg served as Assistant Secretary for Health and Scientific Affairs in the Department of Health, Education, and Welfare (now the United States Department of Health and Human Services) during the Nixon administration. The Nixon administration lasted from January 20, 1969, to August 9, 1974.\n\n<answer>1969 to 1974</answer>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 2,
+                    "steps_used": 3
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182826-52fd1f1a",
+          "seed": 9,
+          "num_turns": 4,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "Local H and For Against origin",
+                "answer": null,
+                "raw": "<search>Local H and For Against origin</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 1,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 2,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "Local H and For Against origin United States",
+                "answer": null,
+                "raw": "Based on the information gathered, there is no evidence that suggests \"Local H and For Against\" are from the United States. The search terms did not provide any direct answer. I need to refine the search query.\n\n<search>Local H and For Against origin United States</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 2,
+                    "steps_used": 2
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 3,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "Local H and For Against from the United States origin",
+                "answer": null,
+                "raw": "Based on the available information, there is no direct evidence to conclude whether \"Local H and For Against\" are from the United States. The search results do not reference these terms directly.\n\n<search>Local H and For Against from the United States origin</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 3,
+                    "steps_used": 3
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 4,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "Local H might not be from the United States.",
+                "raw": "Based on the information gathered, \"For Against\" appears to be from the United States, as it is referenced as a United States-based post-punk/dream pop band from Lincoln, Nebraska. However, there is no direct information about \"Local H\". Since \"For Against\" is confirmed to be from the United States, but \"Local H\" lacks definitive information from the snippets, we cannot conclusively state that both are from the United States.\n\n<answer>Local H might not be from the United States.</answer>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 3,
+                    "steps_used": 4
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182826-7df1aef2",
+          "seed": 26,
+          "num_turns": 2,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "Virginia Commonwealth University founded year",
+                "answer": null,
+                "raw": "<search>Virginia Commonwealth University founded year</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 1,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 2,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "Virginia Commonwealth University was founded in 1838.",
+                "raw": "<answer>Virginia Commonwealth University was founded in 1838.</answer>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 1,
+                    "steps_used": 2
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182828-9a457e65",
+          "seed": 10,
+          "num_turns": 3,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "university in Lawrence, Kansas with branch campuses in Kansas City metropolitan area",
+                "answer": null,
+                "raw": "To answer the question, we need to identify the university with a main campus in Lawrence, Kansas, and with branch campuses in the Kansas City metropolitan area. Then, we need to determine the fight song of this university.\n\nLet's start by identifying the university in question.\n\n<search>university in Lawrence, Kansas with branch campuses in Kansas City metropolitan area</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 1,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 2,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "fight song of the university of kansas",
+                "answer": null,
+                "raw": "Based on the information provided, the university in question is the University of Kansas, which has a main campus in Lawrence, Kansas, and branch campuses in the Kansas City metropolitan area.\n\nTo find the fight song of the University of Kansas, we need to search for the fight song related to the university.\n\n<search>fight song of the university of kansas</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 2,
+                    "steps_used": 2
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 3,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "I'm a Jayhawk",
+                "raw": "The fight song of the University of Kansas is \"I'm a Jayhawk\". \n\n<answer>I'm a Jayhawk</answer>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 2,
+                    "steps_used": 3
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182828-fcfd07c4",
+          "seed": 4,
+          "num_turns": 4,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "the director of the romantic comedy \"Big Stone Gap\" and their location in New York City",
+                "answer": null,
+                "raw": "The movie \"Big Stone Gap\" is a romantic comedy, but the information about the director's location in New York City is not provided in the evidence. To answer this question accurately, we need to find out who the director is and their location.\n\nGiven that we don't have any specific information about the movie or its director, it's likely we will need to search for this information.\n\n<search>the director of the romantic comedy \"Big Stone Gap\" and their location in New York City</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 1,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 2,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "the director of the romantic comedy \"Big Stone Gap\" and their location in New York City",
+                "answer": null,
+                "raw": "Based on the information provided, the movie \"Big Stone Gap\" is a 2014 American drama romantic comedy film based on a novel by Adriana Trigiani. While the evidence gives us basic information about the film's genre and plot, it does not specify the director or their location in New York City. To answer this question, we would need to find out the director of the film and their address or contact information.\n\n<search>the director of the romantic comedy \"Big Stone Gap\" and their location in New York City</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 2,
+                    "steps_used": 2
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 3,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "Adriana Trigiani's location in New York City",
+                "answer": null,
+                "raw": "Based on the information provided, Adriana Trigiani is the director of the romantic comedy \"Big Stone Gap.\" The evidence states that Adriana Trigiani directed the film in 2014. However, it does not explicitly mention her location in New York City. Without a specific location given, we cannot definitively answer that she is based in a particular New York city.\n\nGiven the available information, we cannot determine the location of Adriana Trigiani with certainty. To find this out, we would likely need to search for her personal details or further biographical information.\n\n<search>Adriana Trigiani's location in New York City</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 3,
+                    "steps_used": 3
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 4,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "Adriana Trigiani is based in New York City.",
+                "raw": "Based on the evidence provided, Adriana Trigiani, the director of the romantic comedy \"Big Stone Gap,\" is based in New York City. The snippets indicate that Adriana Trigiani is an Italian American writer, film director, and entrepreneur based in New York City since 1985.\n\n<answer>Adriana Trigiani is based in New York City.</answer>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 3,
+                    "steps_used": 4
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182829-0931a6e5",
+          "seed": 28,
+          "num_turns": 1,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": true,
+          "cumulative_reward": 1.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 1.01,
+              "success": true,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "Henry J. Kaiser",
+                "raw": "<think> To answer the question, we need to identify an American industrialist famous for becoming a pioneer in modern American shipbuilding. Kaiser Ventures, which was founded by Henry J. Kaiser, fits this description as he was a prominent industrialist known for his contributions to the shipbuilding industry.\n\nHenry J. Kaiser was indeed an influential figure in the American shipbuilding industry, helping to pioneer the use of prefabrication, mass production, and the use of steel in shipbuilding, key innovations that made the modern shipbuilding industry viable.\n\nGiven this reasoning, we should conclude that the industrialist in question is Henry J. Kaiser.\n\n</think>\n<answer> Henry J. Kaiser </answer>",
+                "correct": true,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 0,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": true
+                  }
+                },
+                "success": true
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182830-af788893",
+          "seed": 15,
+          "num_turns": 2,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "Brown State Fishing Lake identification and location",
+                "answer": null,
+                "raw": "To answer the question, I need to identify the country in which Brown State Fishing Lake is located. Without this information, I cannot determine the population of the country. \n\nLet's proceed by searching for information about Brown State Fishing Lake to identify the country associated with it.\n\n<search>Brown State Fishing Lake identification and location</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 1,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 2,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "10,724 people",
+                "raw": "Based on the information provided, Brown State Fishing Lake is associated with Brown County, Kansas. According to the U.S. Census Bureau, the population of Brown County, Kansas, as of the 2000 census, was 10,724 people.\n\n<answer>10,724 people</answer>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 1,
+                    "steps_used": 2
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182831-34e5b590",
+          "seed": 21,
+          "num_turns": 2,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "singer of \"A Rather Blustery Day\" and their voice acting roles",
+                "answer": null,
+                "raw": "<search> singer of \"A Rather Blustery Day\" and their voice acting roles </search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 1,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 2,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "Jim Cummings",
+                "raw": "<answer>Jim Cummings</answer>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 1,
+                    "steps_used": 2
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182832-b9c4c525",
+          "seed": 24,
+          "num_turns": 2,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "father of Kasper Schmeichel voted to be by the IFFHS in 1992",
+                "answer": null,
+                "raw": "<search> father of Kasper Schmeichel voted to be by the IFFHS in 1992 </search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 1,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 2,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "Peter Schmeichel",
+                "raw": "<answer> Peter Schmeichel </answer>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 1,
+                    "steps_used": 2
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182833-fd191877",
+          "seed": 2,
+          "num_turns": 2,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": true,
+          "cumulative_reward": 1.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "science fantasy young adult series, told in first person, companion books, enslaved worlds, alien species",
+                "answer": null,
+                "raw": "<search>science fantasy young adult series, told in first person, companion books, enslaved worlds, alien species</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 1,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 2,
+              "reward": 1.01,
+              "success": true,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "Animorphs",
+                "raw": "<answer>Animorphs</answer>",
+                "correct": true,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 1,
+                    "steps_used": 2
+                  },
+                  "traj_metrics": {
+                    "success": true
+                  }
+                },
+                "success": true
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182834-a60f287c",
+          "seed": 32,
+          "num_turns": 2,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "French ace pilot and adventurer fly L'Oiseau Blanc",
+                "answer": null,
+                "raw": "<search>French ace pilot and adventurer fly L'Oiseau Blanc</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 1,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 2,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "Charles Nungesser and François Coli",
+                "raw": "<answer>Charles Nungesser and François Coli</answer>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 1,
+                    "steps_used": 2
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182835-c9362d08",
+          "seed": 27,
+          "num_turns": 3,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "Dickyosperma, Huernia genus",
+                "answer": null,
+                "raw": "<search>Dickyosperma, Huernia genus</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 1,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 2,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "Dictyosperma, Huernia genus description",
+                "answer": null,
+                "raw": "<search>Dictyosperma, Huernia genus description</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 2,
+                    "steps_used": 2
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 3,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "Yes, both Dictyosperma and Huernia are described as genera.",
+                "raw": "<answer>Yes, both Dictyosperma and Huernia are described as genera.</answer>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 2,
+                    "steps_used": 3
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182836-e7c3f99e",
+          "seed": 30,
+          "num_turns": 2,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "Release date of Poison's album \"Shut Up, Make Love\"",
+                "answer": null,
+                "raw": "<search>Release date of Poison's album \"Shut Up, Make Love\"</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 1,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 2,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "On March 14, 2000, \"Shut Up, Make Love\" was released by Poison.",
+                "raw": "<answer>On March 14, 2000, \"Shut Up, Make Love\" was released by Poison.</answer>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 1,
+                    "steps_used": 2
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182837-091b0e16",
+          "seed": 7,
+          "num_turns": 2,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "the seating capacity of the arena where the Lewiston Maineiacs played their home games",
+                "answer": null,
+                "raw": "<search>the seating capacity of the arena where the Lewiston Maineiacs played their home games</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 1,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 2,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "The arena where the Lewiston Maineiacs played their home games can seat 3,677 people.",
+                "raw": "<answer>The arena where the Lewiston Maineiacs played their home games can seat 3,677 people.</answer>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 1,
+                    "steps_used": 2
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182837-482d4c53",
+          "seed": 6,
+          "num_turns": 2,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": true,
+          "cumulative_reward": 1.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "Aladin as a consultant who helped organizations",
+                "answer": null,
+                "raw": "To address the question, I need to find out who was known by the stage name Aladin and was a consultant who helped organizations improve their performance. However, I currently lack any specific evidence or links to directly answer the question. Given this, I would need to search for this information to find the answer.\n<search>Aladin as a consultant who helped organizations</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 1,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 2,
+              "reward": 1.01,
+              "success": true,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "Eenasul Fateh",
+                "raw": "Based on the retrieved information, the person known by his stage name Aladin and who helped organizations improve their performance as a consultant is Eenasul Fateh. He worked in various capacities including as a cultural practitioner, magician, and consultant, and contributed to various organizations, particularly in the cultural and management sectors.\n\n<answer>Eenasul Fateh</answer>",
+                "correct": true,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 1,
+                    "steps_used": 2
+                  },
+                  "traj_metrics": {
+                    "success": true
+                  }
+                },
+                "success": true
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182838-dc90223a",
+          "seed": 14,
+          "num_turns": 2,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "David Beckham's career timeline and the Manchester United managerial tenure timeframe of the football manager who recruited him",
+                "answer": null,
+                "raw": "<search>David Beckham's career timeline and the Manchester United managerial tenure timeframe of the football manager who recruited him</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 1,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 2,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "2003",
+                "raw": "<answer>2003</answer>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 1,
+                    "steps_used": 2
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182839-8299e16c",
+          "seed": 8,
+          "num_turns": 2,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "Age comparison between Annie Morton and Terry Richardson",
+                "answer": null,
+                "raw": "<search>Age comparison between Annie Morton and Terry Richardson</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 1,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 2,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "Annie Morton is older than Terry Richardson. Annie Morton was born on October 8, 1970, while Terry Richardson is mentioned but does not specify his birth year directly. However, based on the general knowledge, Terry Richardson, who is known as a photographer and artist, typically works in the late 20th and early 21st centuries, suggesting he is likely younger than Annie Morton, who was born in October 1970.",
+                "raw": "<answer>Annie Morton is older than Terry Richardson. Annie Morton was born on October 8, 1970, while Terry Richardson is mentioned but does not specify his birth year directly. However, based on the general knowledge, Terry Richardson, who is known as a photographer and artist, typically works in the late 20th and early 21st centuries, suggesting he is likely younger than Annie Morton, who was born in October 1970. </answer>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 1,
+                    "steps_used": 2
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182840-868b6659",
+          "seed": 19,
+          "num_turns": 1,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "Neither Henry Roth nor Robert Erskine Childers was from England.",
+                "raw": "<answer> Neither Henry Roth nor Robert Erskine Childers was from England. </answer>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 0,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182841-c4f01612",
+          "seed": 16,
+          "num_turns": 2,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "What was the former name of a conference that hosted the Vermont Catamounts men's soccer team from 1988 to 1996?",
+                "answer": null,
+                "raw": "<search>What was the former name of a conference that hosted the Vermont Catamounts men's soccer team from 1988 to 1996?</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 1,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 2,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "America East Conference (AEC)",
+                "raw": "<answer>America East Conference (AEC)</answer>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 1,
+                    "steps_used": 2
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182842-4c8428fb",
+          "seed": 3,
+          "num_turns": 2,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "Are the Laleli Mosque and Esma Sultan Mansion located in the same neighborhood?",
+                "answer": null,
+                "raw": "<search> Are the Laleli Mosque and Esma Sultan Mansion located in the same neighborhood? </search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 1,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 2,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "Yes, the Laleli Mosque and Esma Sultan Mansion are not necessarily located in the same neighborhood. The Laleli Mosque is located in Laleli, Fatih, Istanbul, Turkey. The Esma Sultan Mansion, also known as the Esma Sultan Palace, is located in Ortaköy neighborhood of Istanbul, Turkey.",
+                "raw": "<answer>Yes, the Laleli Mosque and Esma Sultan Mansion are not necessarily located in the same neighborhood. The Laleli Mosque is located in Laleli, Fatih, Istanbul, Turkey. The Esma Sultan Mansion, also known as the Esma Sultan Palace, is located in Ortaköy neighborhood of Istanbul, Turkey.</answer>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 1,
+                    "steps_used": 2
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182843-0510667b",
+          "seed": 23,
+          "num_turns": 2,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "Badly Drawn Boy instrument to person ratio",
+                "answer": null,
+                "raw": "<search>Badly Drawn Boy instrument to person ratio</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 1,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 2,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "Without further information about the specific musical instruments used by Badly Drawn Boy and Wolf Alice, it's not possible to determine which band has a higher instrument to person ratio. The provided snippets are unrelated to musical acts or their instrument-to-person ratios.",
+                "raw": "<answer>Without further information about the specific musical instruments used by Badly Drawn Boy and Wolf Alice, it's not possible to determine which band has a higher instrument to person ratio. The provided snippets are unrelated to musical acts or their instrument-to-person ratios.</answer>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 1,
+                    "steps_used": 2
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182844-a37c63a2",
+          "seed": 12,
+          "num_turns": 5,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "Arnold Schwarzenegger movies as a New York Police detective",
+                "answer": null,
+                "raw": "<think> To answer this question, I need to identify the movie Arnold Schwarzenegger starred in, where he portrayed a character who was a New York Police detective. Then, I should check the promotional activities of Guns N' Roses related to that movie. However, I don't have any direct information from the snippets so far, so I'll need to search.\n\n<search>Arnold Schwarzenegger movies as a New York Police detective</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 1,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 2,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "Arnold Schwarzenegger movie where he was a New York Police detective",
+                "answer": null,
+                "raw": "<think> Based on the snippets, Arnold Schwarzenegger starred in multiple films, including \"Commando\", \"The Running Man\", \"Predator\", and \"Total Recall\". However, I need to find the specific film where he portrayed a New York Police detective. There seems to be a gap in the information provided for this specific detail.\n\n<information>Arnold Schwarzenegger starred in multiple films but this does not provide specific information about the film where he portrayed a New York Police detective.</information>\n\nI need to search for more specific information to answer the question accurately.\n\n<search>Arnold Schwarzenegger movie where he was a New York Police detective</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 2,
+                    "steps_used": 2
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 3,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "Arnold Schwarzenegger movies as a detective in New York Police",
+                "answer": null,
+                "raw": "<think> The information provided is fragmented and does not include the specific movie starring Arnold Schwarzenegger in the role of a former New York Police detective, nor does it mention any promo performances by Guns N Roses. I need to look for more specific details about the movie and the promo performances for it.\n\n<search>Arnold Schwarzenegger movies as a detective in New York Police</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 3,
+                    "steps_used": 3
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 4,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "Arnold Schwarzenegger movie as a New York City Police detective",
+                "answer": null,
+                "raw": "<think> From the snippets, Arnold Schwarzenegger starred in many films in the 1980s and early 1990s. However, the specific film where he portrayed a New York Police detective is not mentioned. To find this out, I would need to research more specifically related to Schwarzenegger's films and Guns N' Roses' promo activities.\n\n<search>Arnold Schwarzenegger movie as a New York City Police detective</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 4,
+                    "steps_used": 4
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 5,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "There is insufficient information in the snippets to determine the specific year when Guns N' Roses performed a promo for a movie starring Arnold Schwarzenegger as a former New York Police detective. Further research would be needed to find this information.",
+                "raw": "<answer>There is insufficient information in the snippets to determine the specific year when Guns N' Roses performed a promo for a movie starring Arnold Schwarzenegger as a former New York Police detective. Further research would be needed to find this information.</answer>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 4,
+                    "steps_used": 5
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182845-728069c2",
+          "seed": 31,
+          "num_turns": 1,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "Buck-Tick hailed from Japan.",
+                "raw": "<answer> Buck-Tick hailed from Japan. </answer>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 0,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182845-a18f9965",
+          "seed": 13,
+          "num_turns": 2,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "Random House Tower and 888 7th Avenue usage in property investments",
+                "answer": null,
+                "raw": "<search>Random House Tower and 888 7th Avenue usage in property investments</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 1,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 2,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "Yes, both Random House Tower and 888 7th Avenue are used for properties. Random House Tower, also known as the Park Imperial Apartments, serves as the American headquarters of Penguin Random House and acts as a luxury apartment complex. 888 7th Avenue, on the other hand, is a modern-style office skyscraper in New York City. Both structures are primarily associated with real estate, with Random House Tower specifically housing apartments and a corporate office, and 888 7th Avenue serving as an office building.",
+                "raw": "<answer>Yes, both Random House Tower and 888 7th Avenue are used for properties. Random House Tower, also known as the Park Imperial Apartments, serves as the American headquarters of Penguin Random House and acts as a luxury apartment complex. 888 7th Avenue, on the other hand, is a modern-style office skyscraper in New York City. Both structures are primarily associated with real estate, with Random House Tower specifically housing apartments and a corporate office, and 888 7th Avenue serving as an office building.</answer>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 1,
+                    "steps_used": 2
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        },
+        {
+          "rollout_id": "20260301-182846-306b0f73",
+          "seed": 22,
+          "num_turns": 2,
+          "terminated": true,
+          "finish_reason": "done",
+          "success": false,
+          "cumulative_reward": 0.01,
+          "per_turn": [
+            {
+              "turn": 0,
+              "reward": null,
+              "success": false,
+              "info": {}
+            },
+            {
+              "turn": 1,
+              "reward": 0.0,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "search",
+                "query": "devices that control Apple TV aside from the Apple Remote",
+                "answer": null,
+                "raw": "<search>devices that control Apple TV aside from the Apple Remote</search>",
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "search",
+                    "searches_used": 1,
+                    "steps_used": 1
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            },
+            {
+              "turn": 2,
+              "reward": 0.01,
+              "success": false,
+              "info": {
+                "format_correct": true,
+                "action_type": "final",
+                "query": null,
+                "answer": "Siri Remote",
+                "raw": "<answer>Siri Remote</answer>",
+                "correct": false,
+                "metrics": {
+                  "turn_metrics": {
+                    "format_correct": true,
+                    "action_type": "final",
+                    "searches_used": 1,
+                    "steps_used": 2
+                  },
+                  "traj_metrics": {
+                    "success": false
+                  }
+                },
+                "success": false
+              }
+            }
+          ],
+          "tag_id": "search_test",
+          "env_name": "SearchR1",
+          "split": "default",
+          "max_turns": 5
+        }
+      ]
+    }
+  }
+}

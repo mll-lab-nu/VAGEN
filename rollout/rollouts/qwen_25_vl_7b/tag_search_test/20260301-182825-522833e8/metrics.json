@@ -1,0 +1,85 @@
+{
+  "rollout_id": "20260301-182825-522833e8",
+  "seed": 18,
+  "terminated": true,
+  "finish_reason": "done",
+  "success": false,
+  "cumulative_reward": 0.01,
+  "rewards": [
+    0.0,
+    0.0,
+    0.01
+  ],
+  "num_turns": 3,
+  "infos": [
+    {},
+    {
+      "format_correct": true,
+      "action_type": "search",
+      "query": "president terms of office",
+      "answer": null,
+      "raw": "To answer the question, we need to identify the president who served when Roger O. Egeberg was Assistant Secretary for Health and Scientific Affairs. This involves searching for lists of U.S. presidents along with their terms of office.\n\n<search>president terms of office</search>",
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": true,
+          "action_type": "search",
+          "searches_used": 1,
+          "steps_used": 1
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    },
+    {
+      "format_correct": true,
+      "action_type": "search",
+      "query": "years of service of Roger O. Egeberg as Assistant Secretary for Health and Scientific Affairs",
+      "answer": null,
+      "raw": "Based on the information provided, it seems that the search results are not directly related to the president and the years he served. We need more specific details about Roger O. Egeberg and his role to accurately answer the question.\n\n<search>years of service of Roger O. Egeberg as Assistant Secretary for Health and Scientific Affairs</search>",
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": true,
+          "action_type": "search",
+          "searches_used": 2,
+          "steps_used": 2
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    },
+    {
+      "format_correct": true,
+      "action_type": "final",
+      "query": null,
+      "answer": "1969 to 1974",
+      "raw": "Based on the information provided, Roger O. Egeberg served as Assistant Secretary for Health and Scientific Affairs in the Department of Health, Education, and Welfare (now the United States Department of Health and Human Services) during the Nixon administration. The Nixon administration lasted from January 20, 1969, to August 9, 1974.\n\n<answer>1969 to 1974</answer>",
+      "correct": false,
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": true,
+          "action_type": "final",
+          "searches_used": 2,
+          "steps_used": 3
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    }
+  ],
+  "env_config": {
+    "dataset": "hotpotqa",
+    "retrieval_server_url": "http://127.0.0.1:8000",
+    "top_k": 5,
+    "max_evidence_items": 15
+  },
+  "max_turns": 5,
+  "tag_id": "search_test",
+  "split": "default",
+  "env_name": "SearchR1"
+}

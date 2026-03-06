@@ -1,0 +1,74 @@
+SYSTEM: Answer the given question. You must conduct reasoning inside <think> and </think> first every time you get new information. After reasoning, if you find you lack some knowledge, you can call a search engine by <search> query </search> and it will return the top searched results between <information> and </information>. You can search as many times as your want. If you find no further external knowledge needed, you can directly provide the answer inside <answer> and </answer>, without detailed illustrations. For example, <answer> Beijing </answer>.
+
+USER: Question:
+The arena where the Lewiston Maineiacs played their home games can seat how many people?
+
+Budgets: remaining_searches=4 remaining_steps=8
+
+Retrieved evidence (top snippets so far):
+(none yet)
+
+Respond with either <search>...</search> or <answer>...</answer>.
+
+ASSISTANT: <think>Since there is no information given about the Lewiston Maineiacs or their arena capacity, I need to conduct a search to find the answer.
+</think>
+<search>lewisnton maineiacs arena capacity</search>
+
+USER: Question:
+The arena where the Lewiston Maineiacs played their home games can seat how many people?
+
+Budgets: remaining_searches=3 remaining_steps=7
+
+Retrieved evidence (top snippets so far):
+[1] id=7554531 score=0.832
+"Androscoggin Bank Colisée"
+Androscoggin Bank Colisée The Androscoggin Bank Colisée (formerly Central Maine Youth Center, Central Maine Civic Center and Lewiston Colisee) is a 4,000 capacity (3,677 seated) multi-purpose arena, in Lewiston, Maine, that opened in 1958. The Androscoggin Bank Colisée was built to replace St. Dominics Regional High School Arena, and initially constructed and operated by the Catholic parish of SS. Peter and Paul. Currently, it is the home of the Lewiston/Auburn Nordiques, of the NA3HL. The Colisee is also used for concerts, conventions and trade shows. There is 17,000 square feet (1600 m²) of exhibit space. For conventions, the Colisee can
+
+[2] id=8543905 score=0.823
+"Androscoggin Bank Colisée"
+accommodate up to 4,800 patrons. The Maine Nordiques of the old North American Hockey League were the primary tenant at the Civic Center from 1973 to 1977. The Boston Celtics of the National Basketball Association played exhibition games at the Civic Center. In 2003, The Lewiston Maineiacs came to the Central Maine Civic Center, and it was renamed the Lewiston Colisee. In 2007, the Lewiston Maineiacs won the Presidents Cup, the QMJHL league championship. The Federal Hockey League held five home games at the arena in 2011–12. Due to renovations to the Cumberland County Civic Center, the Portland Pirates at
+
+[3] id=14835708 score=0.820
+"Androscoggin Bank Colisée"
+with New Japan Pro Wrestling, it will also mark the Japanese promotion's first event ever held in New England. Androscoggin Bank Colisée The Androscoggin Bank Colisée (formerly Central Maine Youth Center, Central Maine Civic Center and Lewiston Colisee) is a 4,000 capacity (3,677 seated) multi-purpose arena, in Lewiston, Maine, that opened in 1958. The Androscoggin Bank Colisée was built to replace St. Dominics Regional High School Arena, and initially constructed and operated by the Catholic parish of SS. Peter and Paul. Currently, it is the home of the Lewiston/Auburn Nordiques, of the NA3HL. The Colisee is also used for concerts,
+
+[4] id=9712180 score=0.820
+"L. C. Walker Arena"
+is also used for concerts, trade shows, conventions and other events. The arena measures from the arena floor to the ceiling. The arena contains of arena floor space, and can seat up to 4,900 for basketball, up to 5,200 for concerts, and 4,000 for ice shows and wrestling. The Arena has gone through several renovations, with the most recent two occurring in 2010-2011 and another in 2017-2018. Both renovations included removing seats from the arena, which once had more than 5,000 seats. The most recent renovation, which is still ongoing as of January 11, 2018, includes the addition of Rad
+
+[5] id=11929238 score=0.817
+"Alfond Arena"
+Alfond Arena Alfond Arena is a 5,124-seat multi-purpose arena in Orono, Maine, USA. The arena opened in 1977. It is home to the University of Maine Black Bears ice hockey teams. It is recognizable for its distinctive hyperbolic paraboloid architecture. The multi-angular roof design can also be found at Pavilion at Villanova University, the Brown University Smith Swim Center and the Flynn Recreation Complex at Boston College. It was expanded from its original capacity of 3,800 in 1992 in order to accommodate more spectators and bring the basketball team back from its temporary home at the Bangor Auditorium. More skyboxes
+
+Respond with either <search>...</search> or <answer>...</answer>.
+
+ASSISTANT: <think>Based on the search, the Lewiston Maineiacs used the Androscoggin Bank Colisée, which has a seating capacity of 4,000. </think>
+<answer>4,000</answer>
+
+USER: Question:
+The arena where the Lewiston Maineiacs played their home games can seat how many people?
+
+Budgets: remaining_searches=3 remaining_steps=6
+
+Retrieved evidence (top snippets so far):
+[1] id=7554531 score=0.832
+"Androscoggin Bank Colisée"
+Androscoggin Bank Colisée The Androscoggin Bank Colisée (formerly Central Maine Youth Center, Central Maine Civic Center and Lewiston Colisee) is a 4,000 capacity (3,677 seated) multi-purpose arena, in Lewiston, Maine, that opened in 1958. The Androscoggin Bank Colisée was built to replace St. Dominics Regional High School Arena, and initially constructed and operated by the Catholic parish of SS. Peter and Paul. Currently, it is the home of the Lewiston/Auburn Nordiques, of the NA3HL. The Colisee is also used for concerts, conventions and trade shows. There is 17,000 square feet (1600 m²) of exhibit space. For conventions, the Colisee can
+
+[2] id=8543905 score=0.823
+"Androscoggin Bank Colisée"
+accommodate up to 4,800 patrons. The Maine Nordiques of the old North American Hockey League were the primary tenant at the Civic Center from 1973 to 1977. The Boston Celtics of the National Basketball Association played exhibition games at the Civic Center. In 2003, The Lewiston Maineiacs came to the Central Maine Civic Center, and it was renamed the Lewiston Colisee. In 2007, the Lewiston Maineiacs won the Presidents Cup, the QMJHL league championship. The Federal Hockey League held five home games at the arena in 2011–12. Due to renovations to the Cumberland County Civic Center, the Portland Pirates at
+
+[3] id=14835708 score=0.820
+"Androscoggin Bank Colisée"
+with New Japan Pro Wrestling, it will also mark the Japanese promotion's first event ever held in New England. Androscoggin Bank Colisée The Androscoggin Bank Colisée (formerly Central Maine Youth Center, Central Maine Civic Center and Lewiston Colisee) is a 4,000 capacity (3,677 seated) multi-purpose arena, in Lewiston, Maine, that opened in 1958. The Androscoggin Bank Colisée was built to replace St. Dominics Regional High School Arena, and initially constructed and operated by the Catholic parish of SS. Peter and Paul. Currently, it is the home of the Lewiston/Auburn Nordiques, of the NA3HL. The Colisee is also used for concerts,
+
+[4] id=9712180 score=0.820
+"L. C. Walker Arena"
+is also used for concerts, trade shows, conventions and other events. The arena measures from the arena floor to the ceiling. The arena contains of arena floor space, and can seat up to 4,900 for basketball, up to 5,200 for concerts, and 4,000 for ice shows and wrestling. The Arena has gone through several renovations, with the most recent two occurring in 2010-2011 and another in 2017-2018. Both renovations included removing seats from the arena, which once had more than 5,000 seats. The most recent renovation, which is still ongoing as of January 11, 2018, includes the addition of Rad
+
+[5] id=11929238 score=0.817
+"Alfond Arena"
+Alfond Arena Alfond Arena is a 5,124-seat multi-purpose arena in Orono, Maine, USA. The arena opened in 1977. It is home to the University of Maine Black Bears ice hockey teams. It is recognizable for its distinctive hyperbolic paraboloid architecture. The multi-angular roof design can also be found at Pavilion at Villanova University, the Brown University Smith Swim Center and the Flynn Recreation Complex at Boston College. It was expanded from its original capacity of 3,800 in 1992 in order to accommodate more spectators and bring the basketball team back from its temporary home at the Bangor Auditorium. More skyboxes
+
+Respond with either <search>...</search> or <answer>...</answer>.

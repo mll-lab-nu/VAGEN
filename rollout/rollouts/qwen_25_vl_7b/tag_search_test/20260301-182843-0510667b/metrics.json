@@ -1,0 +1,65 @@
+{
+  "rollout_id": "20260301-182843-0510667b",
+  "seed": 23,
+  "terminated": true,
+  "finish_reason": "done",
+  "success": false,
+  "cumulative_reward": 0.01,
+  "rewards": [
+    0.0,
+    0.01
+  ],
+  "num_turns": 2,
+  "infos": [
+    {},
+    {
+      "format_correct": true,
+      "action_type": "search",
+      "query": "Badly Drawn Boy instrument to person ratio",
+      "answer": null,
+      "raw": "<search>Badly Drawn Boy instrument to person ratio</search>",
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": true,
+          "action_type": "search",
+          "searches_used": 1,
+          "steps_used": 1
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    },
+    {
+      "format_correct": true,
+      "action_type": "final",
+      "query": null,
+      "answer": "Without further information about the specific musical instruments used by Badly Drawn Boy and Wolf Alice, it's not possible to determine which band has a higher instrument to person ratio. The provided snippets are unrelated to musical acts or their instrument-to-person ratios.",
+      "raw": "<answer>Without further information about the specific musical instruments used by Badly Drawn Boy and Wolf Alice, it's not possible to determine which band has a higher instrument to person ratio. The provided snippets are unrelated to musical acts or their instrument-to-person ratios.</answer>",
+      "correct": false,
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": true,
+          "action_type": "final",
+          "searches_used": 1,
+          "steps_used": 2
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    }
+  ],
+  "env_config": {
+    "dataset": "hotpotqa",
+    "retrieval_server_url": "http://127.0.0.1:8000",
+    "top_k": 5,
+    "max_evidence_items": 15
+  },
+  "max_turns": 5,
+  "tag_id": "search_test",
+  "split": "default",
+  "env_name": "SearchR1"
+}

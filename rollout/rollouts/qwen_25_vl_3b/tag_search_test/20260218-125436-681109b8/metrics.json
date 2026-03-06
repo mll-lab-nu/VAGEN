@@ -1,0 +1,129 @@
+{
+  "rollout_id": "20260218-125436-681109b8",
+  "seed": 20,
+  "terminated": false,
+  "finish_reason": "max_turns",
+  "success": false,
+  "cumulative_reward": 0.0,
+  "rewards": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "num_turns": 5,
+  "infos": [
+    {},
+    {
+      "format_correct": false,
+      "action_type": null,
+      "query": null,
+      "answer": null,
+      "raw": "(search)",
+      "error": "format_invalid",
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": false,
+          "action_type": null,
+          "searches_used": 0,
+          "steps_used": 1
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    },
+    {
+      "format_correct": false,
+      "action_type": null,
+      "query": null,
+      "answer": null,
+      "raw": "(search)",
+      "error": "format_invalid",
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": false,
+          "action_type": null,
+          "searches_used": 0,
+          "steps_used": 2
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    },
+    {
+      "format_correct": false,
+      "action_type": null,
+      "query": null,
+      "answer": null,
+      "raw": "(search)",
+      "error": "format_invalid",
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": false,
+          "action_type": null,
+          "searches_used": 0,
+          "steps_used": 3
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    },
+    {
+      "format_correct": false,
+      "action_type": null,
+      "query": null,
+      "answer": null,
+      "raw": "(search)",
+      "error": "format_invalid",
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": false,
+          "action_type": null,
+          "searches_used": 0,
+          "steps_used": 4
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    },
+    {
+      "format_correct": false,
+      "action_type": null,
+      "query": null,
+      "answer": null,
+      "raw": "(search)",
+      "error": "format_invalid",
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": false,
+          "action_type": null,
+          "searches_used": 0,
+          "steps_used": 5
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    }
+  ],
+  "env_config": {
+    "dataset": "hotpotqa",
+    "retrieval_server_url": "http://127.0.0.1:8000",
+    "top_k": 5,
+    "max_evidence_items": 15
+  },
+  "max_turns": 5,
+  "tag_id": "search_test",
+  "split": "default",
+  "env_name": "SearchR1"
+}

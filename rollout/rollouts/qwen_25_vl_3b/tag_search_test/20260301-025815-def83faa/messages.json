@@ -1,0 +1,56 @@
+[
+  {
+    "role": "system",
+    "content": [
+      {
+        "type": "text",
+        "text": "Answer the given question. You must conduct reasoning inside <think> and </think> first every time you get new information. After reasoning, if you find you lack some knowledge, you can call a search engine by <search> query </search> and it will return the top searched results between <information> and </information>. You can search as many times as your want. If you find no further external knowledge needed, you can directly provide the answer inside <answer> and </answer>, without detailed illustrations. For example, <answer> Beijing </answer>.\n"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "type": "text",
+        "text": "Question:\nWhat was the father of Kasper Schmeichel voted to be by the IFFHS in 1992?\n\nBudgets: remaining_searches=4 remaining_steps=8\n\nRetrieved evidence (top snippets so far):\n(none yet)\n\nRespond with either <search>...</search> or <answer>...</answer>.\n"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "<search> Who were the top goalkeepers in the IFFHS in 1992 and what was the father of Kasper Schmeichel? </search>"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "type": "text",
+        "text": "Question:\nWhat was the father of Kasper Schmeichel voted to be by the IFFHS in 1992?\n\nBudgets: remaining_searches=3 remaining_steps=7\n\nRetrieved evidence (top snippets so far):\n[1] id=16142574 score=0.874\n\"Peter Schmeichel\"\nDenmark Source: Peter Schmeichel Peter Bolesław Schmeichel, MBE (; born 18 November 1963) is a Danish former professional footballer who played as a goalkeeper, and was voted the IFFHS World's Best Goalkeeper in 1992 and 1993. He is best remembered for his most successful years at English club Manchester United, whom he captained in the 1999 UEFA Champions League to complete the Treble, and for winning UEFA Euro 1992 with Denmark. Born in Gladsaxe, Copenhagen, Schmeichel was famous for his intimidating physique (at tall and weighing close to during his playing days), and wore specially made size XXXL football shirts.\n\n[2] id=10671455 score=0.860\n\"Peter Schmeichel\"\nPeter Schmeichel Peter Bolesław Schmeichel, MBE (; born 18 November 1963) is a Danish former professional footballer who played as a goalkeeper, and was voted the IFFHS World's Best Goalkeeper in 1992 and 1993. He is best remembered for his most successful years at English club Manchester United, whom he captained in the 1999 UEFA Champions League to complete the Treble, and for winning UEFA Euro 1992 with Denmark. Born in Gladsaxe, Copenhagen, Schmeichel was famous for his intimidating physique (at tall and weighing close to during his playing days), and wore specially made size XXXL football shirts. A fierce\n\n[3] id=614239 score=0.850\n\"Kasper Schmeichel\"\nsurpassing his father's record. During the Round of 16 match against Croatia, Schmeichel was named Man of the Match after saving a penalty-kick taken by Luka Modrić in extra-time and two penalties during the subsequent shootout, although his opposing counterpart Danijel Subašić saved three penalties in that shootout to eliminate Denmark. Schmeichel is the son of former Denmark international goalkeeper Peter Schmeichel. Having spent most of his childhood living in England due to his father's playing career, Kasper is a native speaker of both Danish and English, the latter of which he speaks with a Northern-English accent. He attended Hulme\n\n[4] id=10671458 score=0.844\n\"Peter Schmeichel\"\n\"\"125 greatest living footballers\"\", at the FIFA 100 celebrations. His son, Kasper, is also a professional football goalkeeper, currently playing for Premier League side Leicester City and the Danish national team. Peter Schmeichel was born in the Søborggård parish of Gladsaxe, Denmark, to Inger, a Danish nurse, and Antoni Schmeichel, a Polish jazz musician. He held Polish citizenship until 1970 when he, his father, and his three sisters became Danish citizens. Schmeichel inherited his middle name – Bolesław – from his great-grandfather. He spent his early years in the town of Buddinge, Copenhagen, and began his football career playing for\n\n[5] id=18446452 score=0.839\n\"Kasper Schmeichel\"\nKasper Schmeichel Kasper Peter Schmeichel (; born 5 November 1986) is a Danish professional footballer who plays as a goalkeeper for club Leicester City and the Denmark national team. He is the son of former Manchester United and Danish international goalkeeper Peter Schmeichel. Schmeichel began his career with Manchester City, but he had loan spells with Darlington, Bury and Falkirk before he made his Manchester City debut. Although Schmeichel appeared to have made the City number 1 jersey his own at the start of the 2007–08 season, the emergence of Joe Hart resulted in Schmeichel being loaned to Cardiff City.\n\nRespond with either <search>...</search> or <answer>...</answer>.\n"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "<answer>Peter Schmeichel</answer>"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "type": "text",
+        "text": "Question:\nWhat was the father of Kasper Schmeichel voted to be by the IFFHS in 1992?\n\nBudgets: remaining_searches=3 remaining_steps=6\n\nRetrieved evidence (top snippets so far):\n[1] id=16142574 score=0.874\n\"Peter Schmeichel\"\nDenmark Source: Peter Schmeichel Peter Bolesław Schmeichel, MBE (; born 18 November 1963) is a Danish former professional footballer who played as a goalkeeper, and was voted the IFFHS World's Best Goalkeeper in 1992 and 1993. He is best remembered for his most successful years at English club Manchester United, whom he captained in the 1999 UEFA Champions League to complete the Treble, and for winning UEFA Euro 1992 with Denmark. Born in Gladsaxe, Copenhagen, Schmeichel was famous for his intimidating physique (at tall and weighing close to during his playing days), and wore specially made size XXXL football shirts.\n\n[2] id=10671455 score=0.860\n\"Peter Schmeichel\"\nPeter Schmeichel Peter Bolesław Schmeichel, MBE (; born 18 November 1963) is a Danish former professional footballer who played as a goalkeeper, and was voted the IFFHS World's Best Goalkeeper in 1992 and 1993. He is best remembered for his most successful years at English club Manchester United, whom he captained in the 1999 UEFA Champions League to complete the Treble, and for winning UEFA Euro 1992 with Denmark. Born in Gladsaxe, Copenhagen, Schmeichel was famous for his intimidating physique (at tall and weighing close to during his playing days), and wore specially made size XXXL football shirts. A fierce\n\n[3] id=614239 score=0.850\n\"Kasper Schmeichel\"\nsurpassing his father's record. During the Round of 16 match against Croatia, Schmeichel was named Man of the Match after saving a penalty-kick taken by Luka Modrić in extra-time and two penalties during the subsequent shootout, although his opposing counterpart Danijel Subašić saved three penalties in that shootout to eliminate Denmark. Schmeichel is the son of former Denmark international goalkeeper Peter Schmeichel. Having spent most of his childhood living in England due to his father's playing career, Kasper is a native speaker of both Danish and English, the latter of which he speaks with a Northern-English accent. He attended Hulme\n\n[4] id=10671458 score=0.844\n\"Peter Schmeichel\"\n\"\"125 greatest living footballers\"\", at the FIFA 100 celebrations. His son, Kasper, is also a professional football goalkeeper, currently playing for Premier League side Leicester City and the Danish national team. Peter Schmeichel was born in the Søborggård parish of Gladsaxe, Denmark, to Inger, a Danish nurse, and Antoni Schmeichel, a Polish jazz musician. He held Polish citizenship until 1970 when he, his father, and his three sisters became Danish citizens. Schmeichel inherited his middle name – Bolesław – from his great-grandfather. He spent his early years in the town of Buddinge, Copenhagen, and began his football career playing for\n\n[5] id=18446452 score=0.839\n\"Kasper Schmeichel\"\nKasper Schmeichel Kasper Peter Schmeichel (; born 5 November 1986) is a Danish professional footballer who plays as a goalkeeper for club Leicester City and the Denmark national team. He is the son of former Manchester United and Danish international goalkeeper Peter Schmeichel. Schmeichel began his career with Manchester City, but he had loan spells with Darlington, Bury and Falkirk before he made his Manchester City debut. Although Schmeichel appeared to have made the City number 1 jersey his own at the start of the 2007–08 season, the emergence of Joe Hart resulted in Schmeichel being loaned to Cardiff City.\n\nRespond with either <search>...</search> or <answer>...</answer>.\n"
+      }
+    ]
+  }
+]

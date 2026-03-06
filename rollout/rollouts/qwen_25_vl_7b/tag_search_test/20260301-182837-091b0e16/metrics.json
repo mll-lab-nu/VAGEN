@@ -1,0 +1,65 @@
+{
+  "rollout_id": "20260301-182837-091b0e16",
+  "seed": 7,
+  "terminated": true,
+  "finish_reason": "done",
+  "success": false,
+  "cumulative_reward": 0.01,
+  "rewards": [
+    0.0,
+    0.01
+  ],
+  "num_turns": 2,
+  "infos": [
+    {},
+    {
+      "format_correct": true,
+      "action_type": "search",
+      "query": "the seating capacity of the arena where the Lewiston Maineiacs played their home games",
+      "answer": null,
+      "raw": "<search>the seating capacity of the arena where the Lewiston Maineiacs played their home games</search>",
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": true,
+          "action_type": "search",
+          "searches_used": 1,
+          "steps_used": 1
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    },
+    {
+      "format_correct": true,
+      "action_type": "final",
+      "query": null,
+      "answer": "The arena where the Lewiston Maineiacs played their home games can seat 3,677 people.",
+      "raw": "<answer>The arena where the Lewiston Maineiacs played their home games can seat 3,677 people.</answer>",
+      "correct": false,
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": true,
+          "action_type": "final",
+          "searches_used": 1,
+          "steps_used": 2
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    }
+  ],
+  "env_config": {
+    "dataset": "hotpotqa",
+    "retrieval_server_url": "http://127.0.0.1:8000",
+    "top_k": 5,
+    "max_evidence_items": 15
+  },
+  "max_turns": 5,
+  "tag_id": "search_test",
+  "split": "default",
+  "env_name": "SearchR1"
+}

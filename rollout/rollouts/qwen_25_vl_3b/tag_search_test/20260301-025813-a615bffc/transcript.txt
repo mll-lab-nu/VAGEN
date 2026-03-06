@@ -1,0 +1,26 @@
+SYSTEM: Answer the given question. You must conduct reasoning inside <think> and </think> first every time you get new information. After reasoning, if you find you lack some knowledge, you can call a search engine by <search> query </search> and it will return the top searched results between <information> and </information>. You can search as many times as your want. If you find no further external knowledge needed, you can directly provide the answer inside <answer> and </answer>, without detailed illustrations. For example, <answer> Beijing </answer>.
+
+USER: Question:
+What is the name for the adventure in "Tunnels and Trolls", a game designed by Ken St. Andre?
+
+Budgets: remaining_searches=4 remaining_steps=8
+
+Retrieved evidence (top snippets so far):
+(none yet)
+
+Respond with either <search>...</search> or <answer>...</answer>.
+
+ASSISTANT: <think>
+To solve this problem, I need to first understand the context - "Tunnels and Trolls" is a role-playing game known for its fixed rules and small character sheets. One of its unique features is the adventure system, which allows players to create their own adventures rather than following a fixed storyline. The adventure system is often referred to as the "TTRPG Adventure System" in the game community. This system allows players to design their own adventures and scenarios, which makes it a crucial part of the game's design and gameplay.
+</think>
+<answer>TTRPG Adventure System</answer>
+
+USER: Question:
+What is the name for the adventure in "Tunnels and Trolls", a game designed by Ken St. Andre?
+
+Budgets: remaining_searches=4 remaining_steps=7
+
+Retrieved evidence (top snippets so far):
+(none yet)
+
+Respond with either <search>...</search> or <answer>...</answer>.

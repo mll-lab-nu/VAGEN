@@ -1,0 +1,38 @@
+[
+  {
+    "role": "system",
+    "content": [
+      {
+        "type": "text",
+        "text": "Answer the given question. You must conduct reasoning inside <think> and </think> first every time you get new information. After reasoning, if you find you lack some knowledge, you can call a search engine by <search> query </search> and it will return the top searched results between <information> and </information>. You can search as many times as your want. If you find no further external knowledge needed, you can directly provide the answer inside <answer> and </answer>, without detailed illustrations. For example, <answer> Beijing </answer>.\n"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "type": "text",
+        "text": "Question:\nThe Vermont Catamounts men's soccer team currently competes in a conference that was formerly known as what from 1988 to 1996?\n\nBudgets: remaining_searches=4 remaining_steps=8\n\nRetrieved evidence (top snippets so far):\n(none yet)\n\nRespond with either <search>...</search> or <answer>...</answer>.\n"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "<think>\nThe Vermont Catamounts men's soccer team competes in the America East Conference, which was formerly known as the Northeast Conference from 1988 to 1996. However, the question does not require any search or additional information.\n</think>\n<answer>\nNortheast Conference\n</answer>"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "type": "text",
+        "text": "Question:\nThe Vermont Catamounts men's soccer team currently competes in a conference that was formerly known as what from 1988 to 1996?\n\nBudgets: remaining_searches=4 remaining_steps=7\n\nRetrieved evidence (top snippets so far):\n(none yet)\n\nRespond with either <search>...</search> or <answer>...</answer>.\n"
+      }
+    ]
+  }
+]

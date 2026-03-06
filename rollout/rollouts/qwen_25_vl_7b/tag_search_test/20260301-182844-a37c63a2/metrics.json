@@ -1,0 +1,125 @@
+{
+  "rollout_id": "20260301-182844-a37c63a2",
+  "seed": 12,
+  "terminated": true,
+  "finish_reason": "done",
+  "success": false,
+  "cumulative_reward": 0.01,
+  "rewards": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.01
+  ],
+  "num_turns": 5,
+  "infos": [
+    {},
+    {
+      "format_correct": true,
+      "action_type": "search",
+      "query": "Arnold Schwarzenegger movies as a New York Police detective",
+      "answer": null,
+      "raw": "<think> To answer this question, I need to identify the movie Arnold Schwarzenegger starred in, where he portrayed a character who was a New York Police detective. Then, I should check the promotional activities of Guns N' Roses related to that movie. However, I don't have any direct information from the snippets so far, so I'll need to search.\n\n<search>Arnold Schwarzenegger movies as a New York Police detective</search>",
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": true,
+          "action_type": "search",
+          "searches_used": 1,
+          "steps_used": 1
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    },
+    {
+      "format_correct": true,
+      "action_type": "search",
+      "query": "Arnold Schwarzenegger movie where he was a New York Police detective",
+      "answer": null,
+      "raw": "<think> Based on the snippets, Arnold Schwarzenegger starred in multiple films, including \"Commando\", \"The Running Man\", \"Predator\", and \"Total Recall\". However, I need to find the specific film where he portrayed a New York Police detective. There seems to be a gap in the information provided for this specific detail.\n\n<information>Arnold Schwarzenegger starred in multiple films but this does not provide specific information about the film where he portrayed a New York Police detective.</information>\n\nI need to search for more specific information to answer the question accurately.\n\n<search>Arnold Schwarzenegger movie where he was a New York Police detective</search>",
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": true,
+          "action_type": "search",
+          "searches_used": 2,
+          "steps_used": 2
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    },
+    {
+      "format_correct": true,
+      "action_type": "search",
+      "query": "Arnold Schwarzenegger movies as a detective in New York Police",
+      "answer": null,
+      "raw": "<think> The information provided is fragmented and does not include the specific movie starring Arnold Schwarzenegger in the role of a former New York Police detective, nor does it mention any promo performances by Guns N Roses. I need to look for more specific details about the movie and the promo performances for it.\n\n<search>Arnold Schwarzenegger movies as a detective in New York Police</search>",
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": true,
+          "action_type": "search",
+          "searches_used": 3,
+          "steps_used": 3
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    },
+    {
+      "format_correct": true,
+      "action_type": "search",
+      "query": "Arnold Schwarzenegger movie as a New York City Police detective",
+      "answer": null,
+      "raw": "<think> From the snippets, Arnold Schwarzenegger starred in many films in the 1980s and early 1990s. However, the specific film where he portrayed a New York Police detective is not mentioned. To find this out, I would need to research more specifically related to Schwarzenegger's films and Guns N' Roses' promo activities.\n\n<search>Arnold Schwarzenegger movie as a New York City Police detective</search>",
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": true,
+          "action_type": "search",
+          "searches_used": 4,
+          "steps_used": 4
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    },
+    {
+      "format_correct": true,
+      "action_type": "final",
+      "query": null,
+      "answer": "There is insufficient information in the snippets to determine the specific year when Guns N' Roses performed a promo for a movie starring Arnold Schwarzenegger as a former New York Police detective. Further research would be needed to find this information.",
+      "raw": "<answer>There is insufficient information in the snippets to determine the specific year when Guns N' Roses performed a promo for a movie starring Arnold Schwarzenegger as a former New York Police detective. Further research would be needed to find this information.</answer>",
+      "correct": false,
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": true,
+          "action_type": "final",
+          "searches_used": 4,
+          "steps_used": 5
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    }
+  ],
+  "env_config": {
+    "dataset": "hotpotqa",
+    "retrieval_server_url": "http://127.0.0.1:8000",
+    "top_k": 5,
+    "max_evidence_items": 15
+  },
+  "max_turns": 5,
+  "tag_id": "search_test",
+  "split": "default",
+  "env_name": "SearchR1"
+}

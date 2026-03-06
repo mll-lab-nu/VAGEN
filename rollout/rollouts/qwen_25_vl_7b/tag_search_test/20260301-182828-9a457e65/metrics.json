@@ -1,0 +1,85 @@
+{
+  "rollout_id": "20260301-182828-9a457e65",
+  "seed": 10,
+  "terminated": true,
+  "finish_reason": "done",
+  "success": false,
+  "cumulative_reward": 0.01,
+  "rewards": [
+    0.0,
+    0.0,
+    0.01
+  ],
+  "num_turns": 3,
+  "infos": [
+    {},
+    {
+      "format_correct": true,
+      "action_type": "search",
+      "query": "university in Lawrence, Kansas with branch campuses in Kansas City metropolitan area",
+      "answer": null,
+      "raw": "To answer the question, we need to identify the university with a main campus in Lawrence, Kansas, and with branch campuses in the Kansas City metropolitan area. Then, we need to determine the fight song of this university.\n\nLet's start by identifying the university in question.\n\n<search>university in Lawrence, Kansas with branch campuses in Kansas City metropolitan area</search>",
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": true,
+          "action_type": "search",
+          "searches_used": 1,
+          "steps_used": 1
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    },
+    {
+      "format_correct": true,
+      "action_type": "search",
+      "query": "fight song of the university of kansas",
+      "answer": null,
+      "raw": "Based on the information provided, the university in question is the University of Kansas, which has a main campus in Lawrence, Kansas, and branch campuses in the Kansas City metropolitan area.\n\nTo find the fight song of the University of Kansas, we need to search for the fight song related to the university.\n\n<search>fight song of the university of kansas</search>",
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": true,
+          "action_type": "search",
+          "searches_used": 2,
+          "steps_used": 2
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    },
+    {
+      "format_correct": true,
+      "action_type": "final",
+      "query": null,
+      "answer": "I'm a Jayhawk",
+      "raw": "The fight song of the University of Kansas is \"I'm a Jayhawk\". \n\n<answer>I'm a Jayhawk</answer>",
+      "correct": false,
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": true,
+          "action_type": "final",
+          "searches_used": 2,
+          "steps_used": 3
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    }
+  ],
+  "env_config": {
+    "dataset": "hotpotqa",
+    "retrieval_server_url": "http://127.0.0.1:8000",
+    "top_k": 5,
+    "max_evidence_items": 15
+  },
+  "max_turns": 5,
+  "tag_id": "search_test",
+  "split": "default",
+  "env_name": "SearchR1"
+}

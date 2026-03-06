@@ -1,0 +1,56 @@
+[
+  {
+    "role": "system",
+    "content": [
+      {
+        "type": "text",
+        "text": "Answer the given question. You must conduct reasoning inside <think> and </think> first every time you get new information. After reasoning, if you find you lack some knowledge, you can call a search engine by <search> query </search> and it will return the top searched results between <information> and </information>. You can search as many times as your want. If you find no further external knowledge needed, you can directly provide the answer inside <answer> and </answer>, without detailed illustrations. For example, <answer> Beijing </answer>.\n"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "type": "text",
+        "text": "Question:\nAside from the Apple Remote, what other device can control the program Apple Remote was originally designed to interact with?\n\nBudgets: remaining_searches=4 remaining_steps=8\n\nRetrieved evidence (top snippets so far):\n(none yet)\n\nRespond with either <search>...</search> or <answer>...</answer>.\n"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "<search>Apple Remote alternative controllers</search>"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "type": "text",
+        "text": "Question:\nAside from the Apple Remote, what other device can control the program Apple Remote was originally designed to interact with?\n\nBudgets: remaining_searches=3 remaining_steps=7\n\nRetrieved evidence (top snippets so far):\n[1] id=8591739 score=0.865\n\"Apple Remote\"\nfrom a third party. Using Remote Buddy (from IOSPIRIT GmbH) or mira (from Twisted Melon), it is possible to connect an external USB receiver such as the Windows Media Center Edition eHome receiver, and use the Apple Remote on these machines with full support for sleep, pairing, low battery detection and controlling a variety of Apple and third party software. In addition, Remote Buddy is able to emulate events of an Apple Remote on these systems, enabling users to use software written for the Apple Remote in exactly the same way as with Macs that have a built-in infrared receiver.\n\n[2] id=8591738 score=0.853\n\"Apple Remote\"\nallows the remote to be used as a gaming controller for tvOS apps and games. The remote (unlike previous generations) uses a built-in rechargeable Lithium Polymer Battery that is charged through the lightning port at the bottom of the remote. The Siri Remote is known as the Apple TV Remote in places that don't support Siri. Earlier models of the iMac (Polycarbonate iMac) featured a magnetic rest for the remote, which was later removed. Using the Apple Remote with new MacBook Airs, Retina MacBooks or old Macs without a built-in IR Receiver requires a USB-based infrared receiver and additional software\n\n[3] id=8591730 score=0.852\n\"Apple Remote\"\nApple Remote The Apple Remote is a remote control device released in or after October 2005 by Apple Inc. for use with a number of its products which use infrared capabilities. The device was originally designed to interact with the Front Row media program on the iSight iMac G5 and is compatible with some later desktop and portable Macintosh computers. The first three generations of Apple TV used the Apple Remote as their primary control mechanism. It has now been replaced with the Siri Remote in the fourth generation. Prior to the Apple Remote, Apple produced several nameless IR remotes\n\n[4] id=8591731 score=0.850\n\"Apple Remote\"\nfor products such as the Macintosh TV, TV tuner expansion boards, and the PowerCD drive. The original Apple Remote was designed with six buttons and made of white plastic. Its shape and layout resembled the first-generation iPod Shuffle. A circular Play/Pause/Select button sat in the center of a larger four-button circle of (clockwise): Volume Up, Next/Fast-forward, Volume Down and Previous/Rewind. A separate Menu button was positioned below. The price was set at US$29.00. In October 2009, the remote was redesigned as a thinner and longer aluminum version. The new remote was released along with the 27 inch aluminum iMacs and\n\n[5] id=8591732 score=0.839\n\"Apple Remote\"\nmulti-touch Magic Mouse. The Play/Pause button was moved out of the center of the directional buttons and put beside the Menu button (under the directional buttons). The symbols for the Volume Up/Down and Next/Fast-forward buttons were replaced with small dots, to make it clear that the buttons were also used to move up, down, left, and right within menus. All of the buttons became black and embossed within aluminum. Along with the new design, the price was dropped to US$19.99. The newer design also underwent a slight revision with the navigation ring. In a small percentage of older remotes, this\n\nRespond with either <search>...</search> or <answer>...</answer>.\n"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "<answer>Remote Buddy (from IOSPIRIT GmbH) or mira (from Twisted Melon)</answer>"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "type": "text",
+        "text": "Question:\nAside from the Apple Remote, what other device can control the program Apple Remote was originally designed to interact with?\n\nBudgets: remaining_searches=3 remaining_steps=6\n\nRetrieved evidence (top snippets so far):\n[1] id=8591739 score=0.865\n\"Apple Remote\"\nfrom a third party. Using Remote Buddy (from IOSPIRIT GmbH) or mira (from Twisted Melon), it is possible to connect an external USB receiver such as the Windows Media Center Edition eHome receiver, and use the Apple Remote on these machines with full support for sleep, pairing, low battery detection and controlling a variety of Apple and third party software. In addition, Remote Buddy is able to emulate events of an Apple Remote on these systems, enabling users to use software written for the Apple Remote in exactly the same way as with Macs that have a built-in infrared receiver.\n\n[2] id=8591738 score=0.853\n\"Apple Remote\"\nallows the remote to be used as a gaming controller for tvOS apps and games. The remote (unlike previous generations) uses a built-in rechargeable Lithium Polymer Battery that is charged through the lightning port at the bottom of the remote. The Siri Remote is known as the Apple TV Remote in places that don't support Siri. Earlier models of the iMac (Polycarbonate iMac) featured a magnetic rest for the remote, which was later removed. Using the Apple Remote with new MacBook Airs, Retina MacBooks or old Macs without a built-in IR Receiver requires a USB-based infrared receiver and additional software\n\n[3] id=8591730 score=0.852\n\"Apple Remote\"\nApple Remote The Apple Remote is a remote control device released in or after October 2005 by Apple Inc. for use with a number of its products which use infrared capabilities. The device was originally designed to interact with the Front Row media program on the iSight iMac G5 and is compatible with some later desktop and portable Macintosh computers. The first three generations of Apple TV used the Apple Remote as their primary control mechanism. It has now been replaced with the Siri Remote in the fourth generation. Prior to the Apple Remote, Apple produced several nameless IR remotes\n\n[4] id=8591731 score=0.850\n\"Apple Remote\"\nfor products such as the Macintosh TV, TV tuner expansion boards, and the PowerCD drive. The original Apple Remote was designed with six buttons and made of white plastic. Its shape and layout resembled the first-generation iPod Shuffle. A circular Play/Pause/Select button sat in the center of a larger four-button circle of (clockwise): Volume Up, Next/Fast-forward, Volume Down and Previous/Rewind. A separate Menu button was positioned below. The price was set at US$29.00. In October 2009, the remote was redesigned as a thinner and longer aluminum version. The new remote was released along with the 27 inch aluminum iMacs and\n\n[5] id=8591732 score=0.839\n\"Apple Remote\"\nmulti-touch Magic Mouse. The Play/Pause button was moved out of the center of the directional buttons and put beside the Menu button (under the directional buttons). The symbols for the Volume Up/Down and Next/Fast-forward buttons were replaced with small dots, to make it clear that the buttons were also used to move up, down, left, and right within menus. All of the buttons became black and embossed within aluminum. Along with the new design, the price was dropped to US$19.99. The newer design also underwent a slight revision with the navigation ring. In a small percentage of older remotes, this\n\nRespond with either <search>...</search> or <answer>...</answer>.\n"
+      }
+    ]
+  }
+]

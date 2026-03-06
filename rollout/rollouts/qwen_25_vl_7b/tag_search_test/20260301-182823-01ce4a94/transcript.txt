@@ -1,0 +1,101 @@
+SYSTEM: Answer the given question. You must conduct reasoning inside <think> and </think> first every time you get new information. After reasoning, if you find you lack some knowledge, you can call a search engine by <search> query </search> and it will return the top searched results between <information> and </information>. You can search as many times as your want. If you find no further external knowledge needed, you can directly provide the answer inside <answer> and </answer>, without detailed illustrations. For example, <answer> Beijing </answer>.
+
+USER: Question:
+What government position was held by the woman who portrayed Corliss Archer in the film Kiss and Tell?
+
+Budgets: remaining_searches=4 remaining_steps=8
+
+Retrieved evidence (top snippets so far):
+(none yet)
+
+Respond with either <search>...</search> or <answer>...</answer>.
+
+ASSISTANT: <search> Corliss Archer actress government position in film </search>
+
+USER: Question:
+What government position was held by the woman who portrayed Corliss Archer in the film Kiss and Tell?
+
+Budgets: remaining_searches=3 remaining_steps=7
+
+Retrieved evidence (top snippets so far):
+[1] id=2952755 score=0.828
+"A Kiss for Corliss"
+A Kiss for Corliss A Kiss for Corliss is a 1949 American comedy film directed by Richard Wallace and written by Howard Dimsdale. It stars Shirley Temple in her final starring role as well as her final film appearance. It is a sequel to the 1945 film ""Kiss and Tell"". ""A Kiss for Corliss"" was retitled ""Almost a Bride"" before release and this title appears in the title sequence. The film was released on November 25, 1949, by United Artists. Corliss Archer (Shirley Temple) is an impulsive teenager excited by notorious playboy Kenneth Marquis (David Niven), who has already been
+
+[2] id=17052191 score=0.825
+"Government Girl"
+turned down the role of Elizabeth, and Olivia de Havilland was cast. David Hempstead was initially scheduled to produce the film, but when he had to bow out because of scheduling conflicts, Dudley Nichols stepped in, in his first film where he was both director and producer. Sonny Tufts, borrowed from Paramount to star, was paired with Olivia de Havilland, who had run into studio politics at Warner Bros. on her last feature, ""Princess O'Rourke"" (1943) that had resulted in first, her suspension, and subsequent ""assignment"" by studio boss Jack L. Warner to producer David O. Selznick in return for
+
+[3] id=3311169 score=0.824
+"Irene Tedrow"
+Irene Tedrow Irene Tedrow (August 3, 1907 – March 10, 1995) was an American character actress in stage, film, television and radio. Among her most notable roles are Janet Archer in the radio series ""Meet Corliss Archer"", Mrs. Lucy Elkins on the TV sitcom ""Dennis the Menace"" and Mrs. Webb in the stage production ""Our Town"" at the Plumstead Playhouse. Tedrow was born in Denver, Colorado. She earned a BA degree in drama from Carnegie Tech in Pittsburgh, Pennsylvania in 1929. Tedrow studied with Ben Iden Payne, who directed the Memorial Theater at Stratford-on-Avon, in England. She also had three
+
+[4] id=14667471 score=0.823
+"Meet Corliss Archer"
+Bob Bailey, Fred Shields and Frank Martin. Janet Archer, Corliss's mother, was played by, successively, Irene Tedrow, Monty Margetts and Gloria Holden. She is calm and understanding with her daughter and her husband, both of whom sometimes try her patience. Other frequent characters include Mildred Ames, a good friend of Corliss (played by Bebe Young and Barbara Whiting); Mildred's irritating younger brother Raymond (Tommy Bernard, Kenny Godkin); and Corliss's rival, Betty Cameron (Delores Crane). ""Meet Corliss Archer"" was written by F. Hugh Herbert, who first introduced the character and her friends in the magazine story ""A Private Affair,"" the first
+
+[5] id=17052185 score=0.820
+"Government Girl"
+Government Girl Government Girl is a 1943 American comedy film produced and directed by Dudley Nichols and starring Olivia de Havilland and Sonny Tufts. Based on a story by Adela Rogers St. Johns, and written by Dudley Nichols and Budd Schulberg, the film is about a secretary working in a factory during World War II who helps her boss navigate the complex political machinations of government in an effort to build bomber aircraft for the war effort. Automobile engineer Ed Browne (Sonny Tufts) comes to Washington to appear in front of the War Construction Board. His mission is to supervise
+
+Respond with either <search>...</search> or <answer>...</answer>.
+
+ASSISTANT: <search> Corliss Archer actress government position in film </search>
+
+USER: Question:
+What government position was held by the woman who portrayed Corliss Archer in the film Kiss and Tell?
+
+Budgets: remaining_searches=2 remaining_steps=6
+
+Retrieved evidence (top snippets so far):
+[1] id=2952755 score=0.828
+"A Kiss for Corliss"
+A Kiss for Corliss A Kiss for Corliss is a 1949 American comedy film directed by Richard Wallace and written by Howard Dimsdale. It stars Shirley Temple in her final starring role as well as her final film appearance. It is a sequel to the 1945 film ""Kiss and Tell"". ""A Kiss for Corliss"" was retitled ""Almost a Bride"" before release and this title appears in the title sequence. The film was released on November 25, 1949, by United Artists. Corliss Archer (Shirley Temple) is an impulsive teenager excited by notorious playboy Kenneth Marquis (David Niven), who has already been
+
+[2] id=17052191 score=0.825
+"Government Girl"
+turned down the role of Elizabeth, and Olivia de Havilland was cast. David Hempstead was initially scheduled to produce the film, but when he had to bow out because of scheduling conflicts, Dudley Nichols stepped in, in his first film where he was both director and producer. Sonny Tufts, borrowed from Paramount to star, was paired with Olivia de Havilland, who had run into studio politics at Warner Bros. on her last feature, ""Princess O'Rourke"" (1943) that had resulted in first, her suspension, and subsequent ""assignment"" by studio boss Jack L. Warner to producer David O. Selznick in return for
+
+[3] id=3311169 score=0.824
+"Irene Tedrow"
+Irene Tedrow Irene Tedrow (August 3, 1907 – March 10, 1995) was an American character actress in stage, film, television and radio. Among her most notable roles are Janet Archer in the radio series ""Meet Corliss Archer"", Mrs. Lucy Elkins on the TV sitcom ""Dennis the Menace"" and Mrs. Webb in the stage production ""Our Town"" at the Plumstead Playhouse. Tedrow was born in Denver, Colorado. She earned a BA degree in drama from Carnegie Tech in Pittsburgh, Pennsylvania in 1929. Tedrow studied with Ben Iden Payne, who directed the Memorial Theater at Stratford-on-Avon, in England. She also had three
+
+[4] id=14667471 score=0.823
+"Meet Corliss Archer"
+Bob Bailey, Fred Shields and Frank Martin. Janet Archer, Corliss's mother, was played by, successively, Irene Tedrow, Monty Margetts and Gloria Holden. She is calm and understanding with her daughter and her husband, both of whom sometimes try her patience. Other frequent characters include Mildred Ames, a good friend of Corliss (played by Bebe Young and Barbara Whiting); Mildred's irritating younger brother Raymond (Tommy Bernard, Kenny Godkin); and Corliss's rival, Betty Cameron (Delores Crane). ""Meet Corliss Archer"" was written by F. Hugh Herbert, who first introduced the character and her friends in the magazine story ""A Private Affair,"" the first
+
+[5] id=17052185 score=0.820
+"Government Girl"
+Government Girl Government Girl is a 1943 American comedy film produced and directed by Dudley Nichols and starring Olivia de Havilland and Sonny Tufts. Based on a story by Adela Rogers St. Johns, and written by Dudley Nichols and Budd Schulberg, the film is about a secretary working in a factory during World War II who helps her boss navigate the complex political machinations of government in an effort to build bomber aircraft for the war effort. Automobile engineer Ed Browne (Sonny Tufts) comes to Washington to appear in front of the War Construction Board. His mission is to supervise
+
+Respond with either <search>...</search> or <answer>...</answer>.
+
+ASSISTANT: <answer> The woman who portrayed Corliss Archer in the film "A Kiss for Corliss" (1949) was Shirley Temple. </answer>
+
+USER: Question:
+What government position was held by the woman who portrayed Corliss Archer in the film Kiss and Tell?
+
+Budgets: remaining_searches=2 remaining_steps=5
+
+Retrieved evidence (top snippets so far):
+[1] id=2952755 score=0.828
+"A Kiss for Corliss"
+A Kiss for Corliss A Kiss for Corliss is a 1949 American comedy film directed by Richard Wallace and written by Howard Dimsdale. It stars Shirley Temple in her final starring role as well as her final film appearance. It is a sequel to the 1945 film ""Kiss and Tell"". ""A Kiss for Corliss"" was retitled ""Almost a Bride"" before release and this title appears in the title sequence. The film was released on November 25, 1949, by United Artists. Corliss Archer (Shirley Temple) is an impulsive teenager excited by notorious playboy Kenneth Marquis (David Niven), who has already been
+
+[2] id=17052191 score=0.825
+"Government Girl"
+turned down the role of Elizabeth, and Olivia de Havilland was cast. David Hempstead was initially scheduled to produce the film, but when he had to bow out because of scheduling conflicts, Dudley Nichols stepped in, in his first film where he was both director and producer. Sonny Tufts, borrowed from Paramount to star, was paired with Olivia de Havilland, who had run into studio politics at Warner Bros. on her last feature, ""Princess O'Rourke"" (1943) that had resulted in first, her suspension, and subsequent ""assignment"" by studio boss Jack L. Warner to producer David O. Selznick in return for
+
+[3] id=3311169 score=0.824
+"Irene Tedrow"
+Irene Tedrow Irene Tedrow (August 3, 1907 – March 10, 1995) was an American character actress in stage, film, television and radio. Among her most notable roles are Janet Archer in the radio series ""Meet Corliss Archer"", Mrs. Lucy Elkins on the TV sitcom ""Dennis the Menace"" and Mrs. Webb in the stage production ""Our Town"" at the Plumstead Playhouse. Tedrow was born in Denver, Colorado. She earned a BA degree in drama from Carnegie Tech in Pittsburgh, Pennsylvania in 1929. Tedrow studied with Ben Iden Payne, who directed the Memorial Theater at Stratford-on-Avon, in England. She also had three
+
+[4] id=14667471 score=0.823
+"Meet Corliss Archer"
+Bob Bailey, Fred Shields and Frank Martin. Janet Archer, Corliss's mother, was played by, successively, Irene Tedrow, Monty Margetts and Gloria Holden. She is calm and understanding with her daughter and her husband, both of whom sometimes try her patience. Other frequent characters include Mildred Ames, a good friend of Corliss (played by Bebe Young and Barbara Whiting); Mildred's irritating younger brother Raymond (Tommy Bernard, Kenny Godkin); and Corliss's rival, Betty Cameron (Delores Crane). ""Meet Corliss Archer"" was written by F. Hugh Herbert, who first introduced the character and her friends in the magazine story ""A Private Affair,"" the first
+
+[5] id=17052185 score=0.820
+"Government Girl"
+Government Girl Government Girl is a 1943 American comedy film produced and directed by Dudley Nichols and starring Olivia de Havilland and Sonny Tufts. Based on a story by Adela Rogers St. Johns, and written by Dudley Nichols and Budd Schulberg, the film is about a secretary working in a factory during World War II who helps her boss navigate the complex political machinations of government in an effort to build bomber aircraft for the war effort. Automobile engineer Ed Browne (Sonny Tufts) comes to Washington to appear in front of the War Construction Board. His mission is to supervise
+
+Respond with either <search>...</search> or <answer>...</answer>.

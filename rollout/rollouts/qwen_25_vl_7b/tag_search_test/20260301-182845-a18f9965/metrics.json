@@ -1,0 +1,65 @@
+{
+  "rollout_id": "20260301-182845-a18f9965",
+  "seed": 13,
+  "terminated": true,
+  "finish_reason": "done",
+  "success": false,
+  "cumulative_reward": 0.01,
+  "rewards": [
+    0.0,
+    0.01
+  ],
+  "num_turns": 2,
+  "infos": [
+    {},
+    {
+      "format_correct": true,
+      "action_type": "search",
+      "query": "Random House Tower and 888 7th Avenue usage in property investments",
+      "answer": null,
+      "raw": "<search>Random House Tower and 888 7th Avenue usage in property investments</search>",
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": true,
+          "action_type": "search",
+          "searches_used": 1,
+          "steps_used": 1
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    },
+    {
+      "format_correct": true,
+      "action_type": "final",
+      "query": null,
+      "answer": "Yes, both Random House Tower and 888 7th Avenue are used for properties. Random House Tower, also known as the Park Imperial Apartments, serves as the American headquarters of Penguin Random House and acts as a luxury apartment complex. 888 7th Avenue, on the other hand, is a modern-style office skyscraper in New York City. Both structures are primarily associated with real estate, with Random House Tower specifically housing apartments and a corporate office, and 888 7th Avenue serving as an office building.",
+      "raw": "<answer>Yes, both Random House Tower and 888 7th Avenue are used for properties. Random House Tower, also known as the Park Imperial Apartments, serves as the American headquarters of Penguin Random House and acts as a luxury apartment complex. 888 7th Avenue, on the other hand, is a modern-style office skyscraper in New York City. Both structures are primarily associated with real estate, with Random House Tower specifically housing apartments and a corporate office, and 888 7th Avenue serving as an office building.</answer>",
+      "correct": false,
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": true,
+          "action_type": "final",
+          "searches_used": 1,
+          "steps_used": 2
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    }
+  ],
+  "env_config": {
+    "dataset": "hotpotqa",
+    "retrieval_server_url": "http://127.0.0.1:8000",
+    "top_k": 5,
+    "max_evidence_items": 15
+  },
+  "max_turns": 5,
+  "tag_id": "search_test",
+  "split": "default",
+  "env_name": "SearchR1"
+}

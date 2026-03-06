@@ -1,0 +1,71 @@
+SYSTEM: Answer the given question. You must conduct reasoning inside <think> and </think> first every time you get new information. After reasoning, if you find you lack some knowledge, you can call a search engine by <search> query </search> and it will return the top searched results between <information> and </information>. You can search as many times as your want. If you find no further external knowledge needed, you can directly provide the answer inside <answer> and </answer>, without detailed illustrations. For example, <answer> Beijing </answer>.
+
+USER: Question:
+Who is older, Annie Morton or Terry Richardson?
+
+Budgets: remaining_searches=4 remaining_steps=8
+
+Retrieved evidence (top snippets so far):
+(none yet)
+
+Respond with either <search>...</search> or <answer>...</answer>.
+
+ASSISTANT: <search>Age comparison between Annie Morton and Terry Richardson</search>
+
+USER: Question:
+Who is older, Annie Morton or Terry Richardson?
+
+Budgets: remaining_searches=3 remaining_steps=7
+
+Retrieved evidence (top snippets so far):
+[1] id=15004329 score=0.818
+"Annie Morton"
+She has appeared on many magazine covers and has been featured in several professional photobooks, Peter Lindbergh Selected Work, the cover of Juergen Teller By Juergen Teller, Helmut Newton Pages From The Glossies, and Donna Karan's book ""A Journey Of A Woman 20 Years"" by Donna Karen. In 1997 she posed for the Pirelli Calendar with Richard Avedon. Morton has also appeared in several music videos. Death in Vegas' ""Aisha"" directed by Terry Richardson and The Rolling Stones' ""Love So Strong"" directed by David Fincher. Morton Co-founded Tsi-La Organics with her sister-in-law Natalie Morton in 2006. Tsi-La Organics, an award-winning
+
+[2] id=15843174 score=0.815
+"Annie Morton"
+Annie Morton Annie Morton (born October 8, 1970) is an American model born in Pennsylvania. She has appeared on the covers of ""British Vogue"", ""ID"", ""Marie Claire"", and other magazines. She has been photographed by Helmut Newton; Peter Lindbergh; Annie Leibovitz; Richard Avedon; Juergen Teller; Paul Jasmin, Mary Ellen Mark and Terry Richardson, and modeled for Donna Karan, Givenchy, Guerlain, Chanel, ""Harper's Bazaar"", ""Sports Illustrated"" and Victoria's Secret. A long time vegetarian, an advocate for organic lifestyle choices and natural healthcare. She co-founded Tsi-La Organics, a ""Green Luxury"" company that creates and sells vegan, organic perfume and skin care products.
+
+[3] id=11242576 score=0.806
+"Annie Morton"
+and her husband Michael Morpurgo of Dandelion live in Pennsylvania. Annie Morton Annie Morton (born October 8, 1970) is an American model born in Pennsylvania. She has appeared on the covers of ""British Vogue"", ""ID"", ""Marie Claire"", and other magazines. She has been photographed by Helmut Newton; Peter Lindbergh; Annie Leibovitz; Richard Avedon; Juergen Teller; Paul Jasmin, Mary Ellen Mark and Terry Richardson, and modeled for Donna Karan, Givenchy, Guerlain, Chanel, ""Harper's Bazaar"", ""Sports Illustrated"" and Victoria's Secret. A long time vegetarian, an advocate for organic lifestyle choices and natural healthcare. She co-founded Tsi-La Organics, a ""Green Luxury"" company that
+
+[4] id=11465172 score=0.805
+"Terry Richardson"
+it was reported that Richardson is under investigation by the NYPD's Special Victims Squad in relation to multiple sexual assault allegations; this investigation is ongoing. Richardson was born in New York City, the son of Norma Kessler, an actress, and Bob Richardson, a fashion photographer who struggled with schizophrenia and drug abuse. Richardson's father was Irish Catholic and his mother is Jewish. Following the divorce of his parents, Richardson moved to Woodstock, New York, with his mother and stepfather, English guitarist Jackie Lomax. Richardson later moved to the Hollywood neighborhood of Los Angeles, where he attended Hollywood High School. He
+
+[5] id=8777174 score=0.803
+"Terry Farrell (actress)"
+August 2017, it was reported that she was in a relationship with Adam Nimoy and Farrell confirmed on Twitter that they were engaged. Farrell and Nimoy were married in San Francisco on March 26, 2018, on what would have been Leonard Nimoy’s eighty-seventh birthday. Farrell and her """" co-star, Nana Visitor, were honoured in 2001 when William Kwong Yu Yeung named two Small Solar System bodies he had discovered in their names – asteroid 26734 Terryfarrell and asteroid 26733 Nanavisitor. Terry Farrell (actress) Theresa Lee ""Terry"" Farrell (born November 19, 1963) is an American actress and fashion model. She is
+
+Respond with either <search>...</search> or <answer>...</answer>.
+
+ASSISTANT: <answer>Annie Morton is older than Terry Richardson. Annie Morton was born on October 8, 1970, while Terry Richardson is mentioned but does not specify his birth year directly. However, based on the general knowledge, Terry Richardson, who is known as a photographer and artist, typically works in the late 20th and early 21st centuries, suggesting he is likely younger than Annie Morton, who was born in October 1970. </answer>
+
+USER: Question:
+Who is older, Annie Morton or Terry Richardson?
+
+Budgets: remaining_searches=3 remaining_steps=6
+
+Retrieved evidence (top snippets so far):
+[1] id=15004329 score=0.818
+"Annie Morton"
+She has appeared on many magazine covers and has been featured in several professional photobooks, Peter Lindbergh Selected Work, the cover of Juergen Teller By Juergen Teller, Helmut Newton Pages From The Glossies, and Donna Karan's book ""A Journey Of A Woman 20 Years"" by Donna Karen. In 1997 she posed for the Pirelli Calendar with Richard Avedon. Morton has also appeared in several music videos. Death in Vegas' ""Aisha"" directed by Terry Richardson and The Rolling Stones' ""Love So Strong"" directed by David Fincher. Morton Co-founded Tsi-La Organics with her sister-in-law Natalie Morton in 2006. Tsi-La Organics, an award-winning
+
+[2] id=15843174 score=0.815
+"Annie Morton"
+Annie Morton Annie Morton (born October 8, 1970) is an American model born in Pennsylvania. She has appeared on the covers of ""British Vogue"", ""ID"", ""Marie Claire"", and other magazines. She has been photographed by Helmut Newton; Peter Lindbergh; Annie Leibovitz; Richard Avedon; Juergen Teller; Paul Jasmin, Mary Ellen Mark and Terry Richardson, and modeled for Donna Karan, Givenchy, Guerlain, Chanel, ""Harper's Bazaar"", ""Sports Illustrated"" and Victoria's Secret. A long time vegetarian, an advocate for organic lifestyle choices and natural healthcare. She co-founded Tsi-La Organics, a ""Green Luxury"" company that creates and sells vegan, organic perfume and skin care products.
+
+[3] id=11242576 score=0.806
+"Annie Morton"
+and her husband Michael Morpurgo of Dandelion live in Pennsylvania. Annie Morton Annie Morton (born October 8, 1970) is an American model born in Pennsylvania. She has appeared on the covers of ""British Vogue"", ""ID"", ""Marie Claire"", and other magazines. She has been photographed by Helmut Newton; Peter Lindbergh; Annie Leibovitz; Richard Avedon; Juergen Teller; Paul Jasmin, Mary Ellen Mark and Terry Richardson, and modeled for Donna Karan, Givenchy, Guerlain, Chanel, ""Harper's Bazaar"", ""Sports Illustrated"" and Victoria's Secret. A long time vegetarian, an advocate for organic lifestyle choices and natural healthcare. She co-founded Tsi-La Organics, a ""Green Luxury"" company that
+
+[4] id=11465172 score=0.805
+"Terry Richardson"
+it was reported that Richardson is under investigation by the NYPD's Special Victims Squad in relation to multiple sexual assault allegations; this investigation is ongoing. Richardson was born in New York City, the son of Norma Kessler, an actress, and Bob Richardson, a fashion photographer who struggled with schizophrenia and drug abuse. Richardson's father was Irish Catholic and his mother is Jewish. Following the divorce of his parents, Richardson moved to Woodstock, New York, with his mother and stepfather, English guitarist Jackie Lomax. Richardson later moved to the Hollywood neighborhood of Los Angeles, where he attended Hollywood High School. He
+
+[5] id=8777174 score=0.803
+"Terry Farrell (actress)"
+August 2017, it was reported that she was in a relationship with Adam Nimoy and Farrell confirmed on Twitter that they were engaged. Farrell and Nimoy were married in San Francisco on March 26, 2018, on what would have been Leonard Nimoy’s eighty-seventh birthday. Farrell and her """" co-star, Nana Visitor, were honoured in 2001 when William Kwong Yu Yeung named two Small Solar System bodies he had discovered in their names – asteroid 26734 Terryfarrell and asteroid 26733 Nanavisitor. Terry Farrell (actress) Theresa Lee ""Terry"" Farrell (born November 19, 1963) is an American actress and fashion model. She is
+
+Respond with either <search>...</search> or <answer>...</answer>.

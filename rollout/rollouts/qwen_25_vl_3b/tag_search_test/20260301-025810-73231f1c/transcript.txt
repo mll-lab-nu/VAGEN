@@ -1,0 +1,28 @@
+SYSTEM: Answer the given question. You must conduct reasoning inside <think> and </think> first every time you get new information. After reasoning, if you find you lack some knowledge, you can call a search engine by <search> query </search> and it will return the top searched results between <information> and </information>. You can search as many times as your want. If you find no further external knowledge needed, you can directly provide the answer inside <answer> and </answer>, without detailed illustrations. For example, <answer> Beijing </answer>.
+
+USER: Question:
+What is the name of the fight song of the university whose main campus is in Lawrence, Kansas and whose branch campuses are in the Kansas City metropolitan area?
+
+Budgets: remaining_searches=4 remaining_steps=8
+
+Retrieved evidence (top snippets so far):
+(none yet)
+
+Respond with either <search>...</search> or <answer>...</answer>.
+
+ASSISTANT: <think>
+The university being referred to is most likely Kansas City University, as it has campuses in Lawrence, Kansas, and the Kansas City metropolitan area. The fight song of this university is "The Kansas City Fight Song."
+</think>
+<answer>
+The fight song of the university whose main campus is in Lawrence, Kansas and whose branch campuses are in the Kansas City metropolitan area is "The Kansas City Fight Song."
+</answer>
+
+USER: Question:
+What is the name of the fight song of the university whose main campus is in Lawrence, Kansas and whose branch campuses are in the Kansas City metropolitan area?
+
+Budgets: remaining_searches=4 remaining_steps=7
+
+Retrieved evidence (top snippets so far):
+(none yet)
+
+Respond with either <search>...</search> or <answer>...</answer>.

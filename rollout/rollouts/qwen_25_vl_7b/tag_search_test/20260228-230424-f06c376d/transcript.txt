@@ -1,0 +1,113 @@
+SYSTEM: You are a Search-R1 style agent. You can iteratively SEARCH a local corpus and then produce a FINAL answer.
+
+## Action format (choose ONE each step)
+1) Search:
+   <search>your query</search>
+2) Final answer:
+   <final>your answer</final>
+
+## Rules
+- Use SEARCH when you lack evidence.
+- Use FINAL only when you are confident.
+- Keep queries short and specific.
+- Do NOT hallucinate: rely on retrieved snippets.
+
+USER: Question:
+Which other Mexican Formula One race car driver has held the podium besides the Force India driver born in 1990?
+
+Budgets: remaining_searches=4 remaining_steps=8
+
+Retrieved evidence (top snippets so far):
+(none yet)
+
+Respond with either <search>...</search> or <final>...</final>.
+
+ASSISTANT: <search>Which other Mexican Formula One race car driver has held the podium besides the Force India driver born in 1990?</search>
+
+USER: Question:
+Which other Mexican Formula One race car driver has held the podium besides the Force India driver born in 1990?
+
+Budgets: remaining_searches=3 remaining_steps=7
+
+Retrieved evidence (top snippets so far):
+[1] id=12507055 score=0.865
+"Formula One drivers from Mexico"
+Formula One drivers from Mexico There have been six Formula One drivers from Mexico who have taken part in races since the championship began in 1950. Pedro Rodríguez is the most successful Mexican driver being the only one to have won a Grand Prix. Sergio Pérez, the only other Mexican to finish on the podium, currently races with Racing Point Force India F1 Team. Pedro Rodríguez won 2 races out of the 54 he started and is the only Mexican driver to finish in first position. Sergio Pérez began his career in with Sauber before moving to McLaren in and
+
+[2] id=8006696 score=0.848
+"Sergio Pérez"
+grid. He finished third at the Azerbaijan Grand Prix after an incident-strewn race. He passed the then championship leader Sebastian Vettel for third with a few laps to go, making him the first driver to finish on the podium twice at the Baku City Circuit (in 2016 and 2018). † Includes points scored by other drivers. Driver failed to finish the race, but was classified as they had completed >90% of the race distance. Sergio Pérez Sergio Pérez Mendoza ( ; born 26 January 1990) also known as ""Checo"" Pérez, is a Mexican racing driver, currently driving in Formula One
+
+[3] id=8006663 score=0.840
+"Sergio Pérez"
+Sergio Pérez Sergio Pérez Mendoza ( ; born 26 January 1990) also known as ""Checo"" Pérez, is a Mexican racing driver, currently driving in Formula One for Racing Point F1. Pérez was a member of the Ferrari Driver Academy until 2012. He took his first Formula One podium at the 2012 Malaysian Grand Prix with Sauber, a drive which won him plaudits and fuelled speculation of a move to Ferrari in the near future. However, Pérez later told reporters that he expected to stay with Sauber until at least the end of the 2012 season. Due to his young age
+
+[4] id=9364195 score=0.828
+"2018 Mexican Grand Prix"
+World Drivers' Championship. Vettel's team-mate, Kimi Räikkönen, sits third, a further 55 points behind. In the World Constructors' Championship, Mercedes held a lead of 66 points over Ferrari, with Red Bull Racing a further 160 points behind in third place. The race was won by Max Verstappen (his second win this season), while Lewis Hamilton finished in fourth position, thereby clinching his fifth driver's World Championship. Daniel Ricciardo took pole position from team mate Verstappen and with Hamilton in third. Max Verstappen won the race after taking the lead on lap 1. The two Ferrari's of Vettel and Räikkönen completed
+
+[5] id=13129143 score=0.827
+"1992 Mexican Grand Prix"
+1992 Mexican Grand Prix The 1992 Mexican Grand Prix was a Formula One motor race held at Autódromo Hermanos Rodríguez in Mexico City on 22 March 1992. It was the second race of the 1992 FIA Formula One World Championship. The 69-lap race was won from pole position by British driver Nigel Mansell, driving a Williams-Renault. Italian teammate Riccardo Patrese finished second, with Michael Schumacher third in a Benetton-Ford, the first of an eventual 155 podiums for the German driver. This was the final Formula One race in Mexico until 2015, when the Grand Prix was revived on a revised
+
+Respond with either <search>...</search> or <final>...</final>.
+
+ASSISTANT: <search>Which other Mexican Formula One race car driver has held the podium besides the Force India driver born in 1990?</search>
+
+USER: Question:
+Which other Mexican Formula One race car driver has held the podium besides the Force India driver born in 1990?
+
+Budgets: remaining_searches=2 remaining_steps=6
+
+Retrieved evidence (top snippets so far):
+[1] id=12507055 score=0.865
+"Formula One drivers from Mexico"
+Formula One drivers from Mexico There have been six Formula One drivers from Mexico who have taken part in races since the championship began in 1950. Pedro Rodríguez is the most successful Mexican driver being the only one to have won a Grand Prix. Sergio Pérez, the only other Mexican to finish on the podium, currently races with Racing Point Force India F1 Team. Pedro Rodríguez won 2 races out of the 54 he started and is the only Mexican driver to finish in first position. Sergio Pérez began his career in with Sauber before moving to McLaren in and
+
+[2] id=8006696 score=0.848
+"Sergio Pérez"
+grid. He finished third at the Azerbaijan Grand Prix after an incident-strewn race. He passed the then championship leader Sebastian Vettel for third with a few laps to go, making him the first driver to finish on the podium twice at the Baku City Circuit (in 2016 and 2018). † Includes points scored by other drivers. Driver failed to finish the race, but was classified as they had completed >90% of the race distance. Sergio Pérez Sergio Pérez Mendoza ( ; born 26 January 1990) also known as ""Checo"" Pérez, is a Mexican racing driver, currently driving in Formula One
+
+[3] id=8006663 score=0.840
+"Sergio Pérez"
+Sergio Pérez Sergio Pérez Mendoza ( ; born 26 January 1990) also known as ""Checo"" Pérez, is a Mexican racing driver, currently driving in Formula One for Racing Point F1. Pérez was a member of the Ferrari Driver Academy until 2012. He took his first Formula One podium at the 2012 Malaysian Grand Prix with Sauber, a drive which won him plaudits and fuelled speculation of a move to Ferrari in the near future. However, Pérez later told reporters that he expected to stay with Sauber until at least the end of the 2012 season. Due to his young age
+
+[4] id=9364195 score=0.828
+"2018 Mexican Grand Prix"
+World Drivers' Championship. Vettel's team-mate, Kimi Räikkönen, sits third, a further 55 points behind. In the World Constructors' Championship, Mercedes held a lead of 66 points over Ferrari, with Red Bull Racing a further 160 points behind in third place. The race was won by Max Verstappen (his second win this season), while Lewis Hamilton finished in fourth position, thereby clinching his fifth driver's World Championship. Daniel Ricciardo took pole position from team mate Verstappen and with Hamilton in third. Max Verstappen won the race after taking the lead on lap 1. The two Ferrari's of Vettel and Räikkönen completed
+
+[5] id=13129143 score=0.827
+"1992 Mexican Grand Prix"
+1992 Mexican Grand Prix The 1992 Mexican Grand Prix was a Formula One motor race held at Autódromo Hermanos Rodríguez in Mexico City on 22 March 1992. It was the second race of the 1992 FIA Formula One World Championship. The 69-lap race was won from pole position by British driver Nigel Mansell, driving a Williams-Renault. Italian teammate Riccardo Patrese finished second, with Michael Schumacher third in a Benetton-Ford, the first of an eventual 155 podiums for the German driver. This was the final Formula One race in Mexico until 2015, when the Grand Prix was revived on a revised
+
+Respond with either <search>...</search> or <final>...</final>.
+
+ASSISTANT: <final>Another Mexican Formula One race car driver besides the Force India driver Sergio Pérez who has held the podium is Pedro Rodríguez.</final>
+
+USER: Question:
+Which other Mexican Formula One race car driver has held the podium besides the Force India driver born in 1990?
+
+Budgets: remaining_searches=2 remaining_steps=5
+
+Retrieved evidence (top snippets so far):
+[1] id=12507055 score=0.865
+"Formula One drivers from Mexico"
+Formula One drivers from Mexico There have been six Formula One drivers from Mexico who have taken part in races since the championship began in 1950. Pedro Rodríguez is the most successful Mexican driver being the only one to have won a Grand Prix. Sergio Pérez, the only other Mexican to finish on the podium, currently races with Racing Point Force India F1 Team. Pedro Rodríguez won 2 races out of the 54 he started and is the only Mexican driver to finish in first position. Sergio Pérez began his career in with Sauber before moving to McLaren in and
+
+[2] id=8006696 score=0.848
+"Sergio Pérez"
+grid. He finished third at the Azerbaijan Grand Prix after an incident-strewn race. He passed the then championship leader Sebastian Vettel for third with a few laps to go, making him the first driver to finish on the podium twice at the Baku City Circuit (in 2016 and 2018). † Includes points scored by other drivers. Driver failed to finish the race, but was classified as they had completed >90% of the race distance. Sergio Pérez Sergio Pérez Mendoza ( ; born 26 January 1990) also known as ""Checo"" Pérez, is a Mexican racing driver, currently driving in Formula One
+
+[3] id=8006663 score=0.840
+"Sergio Pérez"
+Sergio Pérez Sergio Pérez Mendoza ( ; born 26 January 1990) also known as ""Checo"" Pérez, is a Mexican racing driver, currently driving in Formula One for Racing Point F1. Pérez was a member of the Ferrari Driver Academy until 2012. He took his first Formula One podium at the 2012 Malaysian Grand Prix with Sauber, a drive which won him plaudits and fuelled speculation of a move to Ferrari in the near future. However, Pérez later told reporters that he expected to stay with Sauber until at least the end of the 2012 season. Due to his young age
+
+[4] id=9364195 score=0.828
+"2018 Mexican Grand Prix"
+World Drivers' Championship. Vettel's team-mate, Kimi Räikkönen, sits third, a further 55 points behind. In the World Constructors' Championship, Mercedes held a lead of 66 points over Ferrari, with Red Bull Racing a further 160 points behind in third place. The race was won by Max Verstappen (his second win this season), while Lewis Hamilton finished in fourth position, thereby clinching his fifth driver's World Championship. Daniel Ricciardo took pole position from team mate Verstappen and with Hamilton in third. Max Verstappen won the race after taking the lead on lap 1. The two Ferrari's of Vettel and Räikkönen completed
+
+[5] id=13129143 score=0.827
+"1992 Mexican Grand Prix"
+1992 Mexican Grand Prix The 1992 Mexican Grand Prix was a Formula One motor race held at Autódromo Hermanos Rodríguez in Mexico City on 22 March 1992. It was the second race of the 1992 FIA Formula One World Championship. The 69-lap race was won from pole position by British driver Nigel Mansell, driving a Williams-Renault. Italian teammate Riccardo Patrese finished second, with Michael Schumacher third in a Benetton-Ford, the first of an eventual 155 podiums for the German driver. This was the final Formula One race in Mexico until 2015, when the Grand Prix was revived on a revised
+
+Respond with either <search>...</search> or <final>...</final>.

@@ -1,0 +1,45 @@
+{
+  "rollout_id": "20260301-025813-a615bffc",
+  "seed": 29,
+  "terminated": true,
+  "finish_reason": "done",
+  "success": false,
+  "cumulative_reward": 0.01,
+  "rewards": [
+    0.01
+  ],
+  "num_turns": 1,
+  "infos": [
+    {},
+    {
+      "format_correct": true,
+      "action_type": "final",
+      "query": null,
+      "answer": "TTRPG Adventure System",
+      "raw": "<think>\nTo solve this problem, I need to first understand the context - \"Tunnels and Trolls\" is a role-playing game known for its fixed rules and small character sheets. One of its unique features is the adventure system, which allows players to create their own adventures rather than following a fixed storyline. The adventure system is often referred to as the \"TTRPG Adventure System\" in the game community. This system allows players to design their own adventures and scenarios, which makes it a crucial part of the game's design and gameplay.\n</think>\n<answer>TTRPG Adventure System</answer>",
+      "correct": false,
+      "metrics": {
+        "turn_metrics": {
+          "format_correct": true,
+          "action_type": "final",
+          "searches_used": 0,
+          "steps_used": 1
+        },
+        "traj_metrics": {
+          "success": false
+        }
+      },
+      "success": false
+    }
+  ],
+  "env_config": {
+    "dataset": "hotpotqa",
+    "retrieval_server_url": "http://127.0.0.1:8000",
+    "top_k": 5,
+    "max_evidence_items": 15
+  },
+  "max_turns": 5,
+  "tag_id": "search_test",
+  "split": "default",
+  "env_name": "SearchR1"
+}
