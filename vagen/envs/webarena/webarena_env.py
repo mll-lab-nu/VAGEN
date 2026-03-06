@@ -125,6 +125,7 @@ class WebArenaEnv(GymImageEnv):
         self._steps_used: int = 0
         self.total_reward: float = 0.0
         self._task_intent: str = ""
+        self._current_config_file: str = ""
 
     # ------------------------------------------------------------------
     # GymImageEnv abstract methods
@@ -149,6 +150,7 @@ class WebArenaEnv(GymImageEnv):
 
         self._steps_used = 0
         self.total_reward = 0.0
+        self._current_config_file = config_file
 
         # Load task intent from config
         with open(config_file) as f:
@@ -161,6 +163,34 @@ class WebArenaEnv(GymImageEnv):
             f"Current page accessibility tree:\n{obs_text}\n"
         )
         return {"obs_str": obs_str}, info
+
+    async def _evaluate_success(self, info: Dict[str, Any]) -> float:
+        """Run WebArena evaluator to check task success."""
+        from evaluation_harness import evaluator_router
+
+        def _eval():
+            evaluator = evaluator_router(self._current_config_file)
+            # Build a minimal trajectory: evaluator only needs last_action["answer"]
+            last_action = {"answer": info.get("answer", "")}
+            trajectory = [last_action]
+
+            # Get the live Playwright page and CDP session from browser env
+            page = self.browser_env.page
+            client = self.browser_env.page.context.new_cdp_session(
+                self.browser_env.page
+            )
+            try:
+                score = evaluator(
+                    trajectory=trajectory,
+                    config_file=self._current_config_file,
+                    page=page,
+                    client=client,
+                )
+            finally:
+                client.detach()
+            return score
+
+        return await self._run_sync(_eval)
 
     async def step(
         self, action_str: str
@@ -176,18 +206,27 @@ class WebArenaEnv(GymImageEnv):
         if parsed["format_correct"]:
             reward += self.config.format_reward
 
-            from browser_env import create_id_based_action
+            action_text = parsed["action"]
 
-            try:
-                action = create_id_based_action(parsed["action"])
-                obs, _, terminated, _, step_info = await self._run_sync(
-                    lambda: self.browser_env.step(action)
-                )
-                info.update(step_info)
-                done = terminated
-            except Exception as e:
-                info["error"] = str(e)
-                obs = {"text": f"Action failed: {e}"}
+            # Handle stop action — agent wants to submit answer and end
+            if action_text.startswith("stop"):
+                done = True
+                answer = action_text[len("stop"):].strip().strip("[]")
+                info["answer"] = answer
+                obs = {"text": f"Agent submitted answer: {answer}"}
+            else:
+                from browser_env import create_id_based_action
+
+                try:
+                    action = create_id_based_action(action_text)
+                    obs, _, terminated, _, step_info = await self._run_sync(
+                        lambda: self.browser_env.step(action)
+                    )
+                    info.update(step_info)
+                    done = terminated
+                except Exception as e:
+                    info["error"] = str(e)
+                    obs = {"text": f"Action failed: {e}"}
         else:
             info["error"] = "format_invalid"
             obs = {"text": "Invalid action format. Use <action>...</action> tags."}
@@ -197,8 +236,15 @@ class WebArenaEnv(GymImageEnv):
             done = True
             info.setdefault("error", "max_steps_reached")
 
-        # Success detection
-        success = bool(done and info.get("success", False))
+        # Success detection via WebArena evaluator
+        success = False
+        if done and self._current_config_file:
+            try:
+                score = await self._evaluate_success(info)
+                success = score > 0
+                info["eval_score"] = score
+            except Exception as e:
+                info["eval_error"] = str(e)
         if success:
             reward += self.config.success_reward
 
@@ -227,7 +273,7 @@ if __name__ == "__main__":
     import fire
 
     async def main_async(
-        config_file: str = "/Users/yr/Documents/工作/NWU/webarena/config_files/0.json",
+        config_file: str = "config_files/0.json",
         headless: bool = False,
         max_steps: int = 30,
     ):
