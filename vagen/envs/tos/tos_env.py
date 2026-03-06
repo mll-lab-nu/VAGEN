@@ -154,11 +154,15 @@ class SpatialGym(GymImageEnv):
                 self.exploration_manager.agent,
                 list(self.exploration_manager.observed_items),
             )
+            n_total = len(self.exploration_manager.node_names)
+            n_observed = len(self.exploration_manager.observed_nodes)
+            exploration_coverage = n_observed / n_total if n_total > 0 else 1.0
             cogmap_score = (
                 max(0.0, cogmap_scores['dir'] - DIR_RANDOM_BASELINE) +
                 max(0.0, cogmap_scores['facing'] - FACING_RANDOM_BASELINE) +
-                cogmap_scores['pos']
-            ) / 3.0
+                cogmap_scores['pos'] +
+                exploration_coverage
+            ) / 4.0
             reward = cogmap_score * COGMAP_REWARD_SCALE
             if self.forced_term_occurred:
                 reward -= FORCED_TERM_PENALTY
@@ -170,6 +174,7 @@ class SpatialGym(GymImageEnv):
                 'cogmap_dir': cogmap_scores['dir'],
                 'cogmap_facing': cogmap_scores['facing'],
                 'cogmap_pos': cogmap_scores['pos'],
+                'cogmap_exploration_coverage': exploration_coverage,
                 'success': cogmap_score > 0.0,
                 'forced_term': self.forced_term_occurred,
             }
