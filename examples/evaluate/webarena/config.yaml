@@ -8,7 +8,7 @@ envs:
     max_turns: 15
     response_length_per_turn: 512
     config:
-      config_dir: "/work/nvme/bgig/ryu4/webarena/config_files"
+      config_dir: "/work/nvme/bgig/ryu4/VAGEN/vagen/envs/webarena/config_files"
       headless: true
       observation_type: "accessibility_tree"
       current_viewport_only: true
