@@ -1,0 +1,15 @@
+envs:
+  - name: WebArena # registered env name
+    n_envs: 16 # small set for testing
+    data_source: webarena # nickname for logging
+    seed: [0,15,1] # sample n_env seeds from seed[0] to seed[1] with each seed repeat at most seed[2] times
+    max_turns: 3 # max number of interaction turns per episode
+    response_length_per_turn: 512 # max response length per turn
+    config: # env-specific config
+      config_dir: "${WEBARENA_CONFIG_DIR:-config_files}"
+      headless: true
+      observation_type: "accessibility_tree"
+      current_viewport_only: true
+      max_steps: 10
+      format_reward: 0.01
+      success_reward: 1.0
