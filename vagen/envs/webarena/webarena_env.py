@@ -312,6 +312,9 @@ if __name__ == "__main__":
 
             if done:
                 print(f"Episode ended. Success: {info.get('success', False)}")
+                print(f"Eval score: {info.get('eval_score', 'N/A')}")
+                if "eval_error" in info:
+                    print(f"Eval error: {info['eval_error']}")
                 break
 
         print(f"\nTotal reward: {env.total_reward}")
