@@ -1,5 +1,4 @@
 import asyncio
-import concurrent.futures
 import re
 import json
 import os
@@ -94,19 +93,6 @@ class WebArenaEnv(GymImageEnv):
         super().__init__(env_config)
         self.config = WebArenaEnvConfig(**env_config)
 
-        from vagen.envs.webarena.browser_env import ScriptBrowserEnv
-
-        self.browser_env = ScriptBrowserEnv(
-            headless=self.config.headless,
-            observation_type=self.config.observation_type,
-            current_viewport_only=self.config.current_viewport_only,
-            viewport_size={
-                "width": self.config.viewport_width,
-                "height": self.config.viewport_height,
-            },
-        )
-        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-
         # Resolve config file list
         if self.config.config_files is not None:
             self._config_files = list(self.config.config_files)
@@ -138,31 +124,48 @@ class WebArenaEnv(GymImageEnv):
                 "No config files found. Provide 'config_files' or a valid 'config_dir'."
             )
 
+        # Browser env created lazily on first reset()
+        self.browser_env = None
+
         # Episode state
         self._steps_used: int = 0
         self.total_reward: float = 0.0
         self._task_intent: str = ""
         self._current_config_file: str = ""
 
+    def _ensure_browser_env(self):
+        """Lazily create ScriptBrowserEnv (lightweight — browser launches on reset)."""
+        if self.browser_env is None:
+            from vagen.envs.webarena.browser_env import ScriptBrowserEnv
+            self.browser_env = ScriptBrowserEnv(
+                headless=self.config.headless,
+                observation_type=self.config.observation_type,
+                current_viewport_only=self.config.current_viewport_only,
+                viewport_size={
+                    "width": self.config.viewport_width,
+                    "height": self.config.viewport_height,
+                },
+            )
+
     # ------------------------------------------------------------------
     # GymImageEnv abstract methods
     # ------------------------------------------------------------------
-    async def _run_sync(self, fn, *args):
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(self._executor, fn, *args)
-
     async def close(self) -> None:
-        await self._run_sync(self.browser_env.close)
+        if self.browser_env is not None:
+            await asyncio.to_thread(self.browser_env.close)
+            self.browser_env = None
 
     async def system_prompt(self) -> Dict[str, Any]:
         return {"obs_str": _system_prompt()}
 
     async def reset(self, seed: int) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        self._ensure_browser_env()
+
         idx = seed % len(self._config_files)
         config_file = self._config_files[idx]
 
-        obs, info = await self._run_sync(
-            lambda: self.browser_env.reset(options={"config_file": config_file})
+        obs, info = await asyncio.to_thread(
+            self.browser_env.reset, options={"config_file": config_file}
         )
 
         self._steps_used = 0
@@ -185,21 +188,21 @@ class WebArenaEnv(GymImageEnv):
         """Run WebArena evaluator to check task success."""
         from vagen.envs.webarena.evaluation_harness.evaluators import evaluator_router
 
+        config_file = self._current_config_file
+        answer = info.get("answer", "")
+        browser_env = self.browser_env
+
         def _eval():
-            evaluator = evaluator_router(self._current_config_file)
-            # Build a minimal trajectory: evaluator only needs last_action["answer"]
-            last_action = {"answer": info.get("answer", "")}
+            evaluator = evaluator_router(config_file)
+            last_action = {"answer": answer}
             trajectory = [last_action]
 
-            # Get the live Playwright page and CDP session from browser env
-            page = self.browser_env.page
-            client = self.browser_env.page.context.new_cdp_session(
-                self.browser_env.page
-            )
+            page = browser_env.page
+            client = page.context.new_cdp_session(page)
             try:
                 score = evaluator(
                     trajectory=trajectory,
-                    config_file=self._current_config_file,
+                    config_file=config_file,
                     page=page,
                     client=client,
                 )
@@ -207,7 +210,7 @@ class WebArenaEnv(GymImageEnv):
                 client.detach()
             return score
 
-        return await self._run_sync(_eval)
+        return await asyncio.to_thread(_eval)
 
     async def step(
         self, action_str: str
@@ -236,8 +239,8 @@ class WebArenaEnv(GymImageEnv):
 
                 try:
                     action = create_id_based_action(action_text)
-                    obs, _, terminated, _, step_info = await self._run_sync(
-                        lambda: self.browser_env.step(action)
+                    obs, _, terminated, _, step_info = await asyncio.to_thread(
+                        self.browser_env.step, action
                     )
                     info.update(step_info)
                     done = terminated
