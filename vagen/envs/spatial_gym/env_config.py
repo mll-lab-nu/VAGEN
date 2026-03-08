@@ -13,11 +13,11 @@ class SpatialGymConfig:
     Configuration for the SpatialGym environment.
     
     Parameters:
-        exp_type: Exploration type ('passive', 'active')
+        exp_type: Exploration type ('active')
         perspective: Perspective of exploration ('ego' or 'allo')
         eval_tasks: List of evaluation tasks with their configurations
         max_exp_steps: Maximum exploration steps for active exploration
-        render_mode: Rendering mode (currently only 'text' supported)
+        render_mode: Rendering mode ('vision')
     """
 
     # common configuration (Moved from BaseEnvConfig)
