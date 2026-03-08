@@ -2,6 +2,6 @@ env_registry:
   # Local environments
   Sokoban: vagen.envs.sokoban.sokoban_env.Sokoban
   FrozenLake: vagen.envs.frozenlake.frozenlake_env.FrozenLake
-  SpatialGym: vagen.envs.tos.tos_env.SpatialGym
+  SpatialGym: vagen.envs.spatial_gym.spatial_gym_env.SpatialGym
   # Remote environment client (generic, reusable for any remote env)
   RemoteEnv: vagen.envs_remote.GymImageEnvClient

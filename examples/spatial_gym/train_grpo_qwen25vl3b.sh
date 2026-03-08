@@ -2,15 +2,15 @@
 
 set -x
 
-PROJECT_NAME="vagen_tos"
+PROJECT_NAME="vagen_spatial_gym"
 EXPERIMENT_NAME="grpo_qwen25vl3b"
 
 BASEDIR=$(pwd)
 SCRIPTDIR=$(dirname "$0")
 EXPERIMENT_DIR=${BASEDIR}/exps/${PROJECT_NAME}/${EXPERIMENT_NAME}
 SAVE_CHECKPOINT_DIR=${EXPERIMENT_DIR}/verl_checkpoints
-DATASET_TRAIN=${SCRIPTDIR}/train_tos_vision.yaml
-DATASET_VAL=${SCRIPTDIR}/val_tos_vision.yaml
+DATASET_TRAIN=${SCRIPTDIR}/train_spatial_gym_vision.yaml
+DATASET_VAL=${SCRIPTDIR}/val_spatial_gym_vision.yaml
 agent_loop_config_path=${BASEDIR}/vagen/configs/agent.yaml
 REF_MODEL_PATH=Qwen/Qwen2.5-VL-3B-Instruct
 mkdir -p ${EXPERIMENT_DIR}

@@ -1,14 +1,14 @@
 envs:
   - name: SpatialGym
     n_envs: 20
-    tag_id: tos_1room
-    seed_list: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    tag_id: spatial_gym_1room
+    seed: [0, 19, 1]
     max_turns: 11
     config:
       exp_type: active
       render_mode: vision
       max_exp_steps: 10
-      data_dir: ../../../vagen/envs/tos/room_data/1-room
+      data_dir: ../../../vagen/envs/spatial_gym/room_data/1-room
       eval_tasks:
         - task_type: rot
           task_kwargs: {}
@@ -20,7 +20,7 @@ envs:
       top_p: 1.0
 
 experiment:
-  dump_dir: ./rollouts/tos_1room
+  dump_dir: ./rollouts/spatial_gym_1room
   default_max_turns: 11
 
 run:
