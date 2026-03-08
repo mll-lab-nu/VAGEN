@@ -19,6 +19,14 @@ class HFUploadActor:
             api_kwargs["endpoint"] = kwargs["endpoint"]
 
         self.api = HfApi(**api_kwargs)
+
+        # Auto-prefix with username if repo_id has no '/'
+        if "/" not in repo_id:
+            try:
+                username = self.api.whoami()["name"]
+                repo_id = f"{username}/{repo_id}"
+            except Exception:
+                pass
         self.repo_id = repo_id
 
         self.api.create_repo(
