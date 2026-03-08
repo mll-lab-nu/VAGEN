@@ -35,9 +35,11 @@ class GenericVisionInferenceWorkflow:
         success_keys: Optional[List[str]] = None,
         success_threshold: float = 0.99,
         chat_config: Optional[Dict[str, Any]] = None,
+        concat_multi_turn: bool = True,
     ):
         self.adapter = adapter
         self.dump_dir = dump_dir
+        self.concat_multi_turn = concat_multi_turn
         # IMPORTANT: dump_enabled is ignored; we always dump for executed episodes
         self.dump_enabled = True
         self.success_keys = success_keys or ["success", "is_success", "solved"]
@@ -182,7 +184,12 @@ class GenericVisionInferenceWorkflow:
             for t in range(turn_limit):
                 # Safeguard completion
                 try:
-                    reply = await self.adapter.acompletion(messages, **self.chat_config)
+                    # In non-concat mode, only send system prompt + current user message
+                    if self.concat_multi_turn:
+                        api_messages = messages
+                    else:
+                        api_messages = [messages[0], messages[-1]]
+                    reply = await self.adapter.acompletion(api_messages, **self.chat_config)
                 except OpenAIError as e:
                     error_info = {
                         "provider_error": repr(e),
