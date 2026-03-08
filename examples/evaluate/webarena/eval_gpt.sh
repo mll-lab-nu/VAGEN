@@ -9,10 +9,10 @@ LOG_DIR="${LOG_DIR:-"$SCRIPT_DIR/logs"}"
 mkdir -p "$LOG_DIR"
 
 # ---------- Model Config ----------
-MODEL_NAME="${MODEL_NAME:-"gpt-4o"}"
+MODEL_NAME="${MODEL_NAME:-"gpt-4.1"}"
 OPENAI_API_KEY="${OPENAI_API_KEY:?'Please set OPENAI_API_KEY'}"
 
-DUMP_DIR="${DUMP_DIR:-"$fileroot/rollouts/${MODEL_NAME}"}"
+DUMP_DIR="${DUMP_DIR:-"/work/nvme/bgig/ryu4/rollouts/${MODEL_NAME}"}"
 mkdir -p "$DUMP_DIR"
 
 EVAL_LOG="${LOG_DIR}/${MODEL_NAME}_eval.log"

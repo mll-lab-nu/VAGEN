@@ -73,6 +73,9 @@ class WebArenaEnvConfig:
     viewport_height: int = 720
     max_steps: int = 30
 
+    # Filtering
+    skip_sites: Optional[List[str]] = None  # Skip tasks involving these sites (e.g. ["map"])
+
     # Rewards
     format_reward: float = 0.01
     success_reward: float = 1.0
@@ -115,6 +118,20 @@ class WebArenaEnv(GymImageEnv):
             )
         else:
             self._config_files = []
+
+        # Filter out tasks involving skip_sites
+        if self.config.skip_sites:
+            skip = {s.lower() for s in self.config.skip_sites}
+            filtered = []
+            for cf in self._config_files:
+                with open(cf) as f:
+                    task = json.load(f)
+                if not isinstance(task, dict):
+                    continue
+                sites = [s.lower() for s in task.get("sites", [])]
+                if not any(s in skip for s in sites):
+                    filtered.append(cf)
+            self._config_files = filtered
 
         if not self._config_files:
             raise ValueError(

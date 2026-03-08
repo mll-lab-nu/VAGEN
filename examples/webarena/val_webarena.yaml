@@ -6,10 +6,11 @@ envs:
     max_turns: 3
     response_length_per_turn: 512
     config:
-      config_dir: "${WEBARENA_CONFIG_DIR:-config_files}"
+      config_dir: "${oc.env:WEBARENA_CONFIG_DIR,config_files}"
       headless: true
       observation_type: "accessibility_tree"
       current_viewport_only: true
       max_steps: 10
       format_reward: 0.01
       success_reward: 1.0
+      skip_sites: ["map"]

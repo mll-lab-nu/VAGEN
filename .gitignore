@@ -32,3 +32,8 @@ data/
 exps/
 wandb/
 outputs/
+
+
+vagen/envs/search/search_data
+vagen/envs/webarena/.auth
+vagen/envs/webarena/config_files

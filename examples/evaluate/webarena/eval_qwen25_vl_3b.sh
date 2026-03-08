@@ -16,7 +16,7 @@ DP_SIZE="${QWEN25_VL_7B_DP:-1}"
 TP_SIZE="${QWEN25_VL_7B_TP:-1}"
 MEM_FRACTION="${QWEN25_VL_7B_MEM:-0.80}"
 
-DUMP_DIR="${DUMP_DIR:-"$fileroot/rollouts/${MODEL_NAME}"}"
+DUMP_DIR="${DUMP_DIR:-"/work/nvme/bgig/ryu4/rollouts/${MODEL_NAME}"}"
 mkdir -p "$DUMP_DIR"
 
 SERVER_LOG="${LOG_DIR}/${MODEL_NAME}_server.log"

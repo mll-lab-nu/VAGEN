@@ -9,6 +9,7 @@ envs:
     response_length_per_turn: 512
     config:
       config_dir: "/work/nvme/bgig/ryu4/VAGEN/vagen/envs/webarena/config_files"
+      skip_sites: ["map"]
       headless: true
       observation_type: "accessibility_tree"
       current_viewport_only: true
@@ -18,13 +19,13 @@ envs:
 
 
 experiment:
-  dump_dir: ${fileroot}/rollouts/Qwen2.5-VL-3B-Instruct
+  dump_dir: /work/nvme/bgig/ryu4/rollouts/Qwen2.5-VL-3B-Instruct
   default_max_turns: 5
 
 run:
   backend: "sglang"           # choose one: openai | azure | sglang | vllm | together | claude | gemini
   base_seed: 0
-  max_concurrent_jobs: 1
+  max_concurrent_jobs: 8
   resume: skip_completed      # off | skip_completed | force_rerun
   live_summary: true          # write partial summary incrementally
 
