@@ -1,15 +1,15 @@
 envs:
   - name: SpatialGym
-    n_envs: 64
-    data_source: tos
-    seed: [9001, 9064, 1]
-    max_turns: 16
-    response_length_per_turn: 1024
+    n_envs: 50
+    data_source: spatial_gym
+    seed: [0, 49, 1]  
+    max_turns: 11
+    response_length_per_turn: 2048
     config:
       exp_type: active
       render_mode: vision
-      max_exp_steps: 15
-      data_dir: vagen/envs/tos/room_data/2-room
+      max_exp_steps: 10
+      data_dir: vagen/envs/spatial_gym/room_data/1-room
       eval_tasks:
         - task_type: rot
           task_kwargs: {}

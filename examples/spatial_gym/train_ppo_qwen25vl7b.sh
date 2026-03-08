@@ -2,15 +2,15 @@
 
 set -x
 
-PROJECT_NAME="vagen_tos"
+PROJECT_NAME="vagen_spatial_gym"
 EXPERIMENT_NAME="ppo_qwen25vl7b"
 
 BASEDIR=$(pwd)
 SCRIPTDIR=$(dirname "$0")
 EXPERIMENT_DIR=${BASEDIR}/exps/${PROJECT_NAME}/${EXPERIMENT_NAME}
 SAVE_CHECKPOINT_DIR=${EXPERIMENT_DIR}/verl_checkpoints
-DATASET_TRAIN=${SCRIPTDIR}/train_tos_vision.yaml
-DATASET_VAL=${SCRIPTDIR}/val_tos_vision.yaml
+DATASET_TRAIN=${SCRIPTDIR}/train_spatial_gym_vision.yaml
+DATASET_VAL=${SCRIPTDIR}/val_spatial_gym_vision.yaml
 agent_loop_config_path=${BASEDIR}/vagen/configs/agent.yaml
 REF_MODEL_PATH=Qwen/Qwen2.5-VL-7B-Instruct
 mkdir -p ${EXPERIMENT_DIR}
@@ -21,7 +21,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     --config-name='vagen_multiturn' \
     data.train_files=${DATASET_TRAIN} \
     data.val_files=${DATASET_VAL} \
-    data.train_batch_size=64 \
+    data.train_batch_size=128 \
     data.max_prompt_length=4000 \
     data.max_response_length=2000 \
     algorithm.adv_estimator=gae \
@@ -30,7 +30,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.model.use_fused_kernels=True \
     actor_rollout_ref.actor.optim.lr=1e-6 \
-    actor_rollout_ref.actor.ppo_mini_batch_size=16 \
+    actor_rollout_ref.actor.ppo_mini_batch_size=32 \
     actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=1 \
     actor_rollout_ref.actor.use_kl_loss=False \
     actor_rollout_ref.actor.kl_loss_coef=0.0 \
