@@ -1311,16 +1311,14 @@ class CognitiveMapManager:
             return out
 
         def _should_keep_key(key: str, keep_set: set) -> tuple[bool, str]:
-            """Check if key should be kept and return the preferred key name from keep_set"""
+            """Check if key should be kept and return the preferred key name from keep_set."""
             if key in keep_set:
                 return True, key
-            # Check if key with underscores matches any keep element without underscores
-            if '_' in key:
-                key_no_underscore = key.replace('_', '')
-                for keep_item in keep_set:
-                    if keep_item.replace('_', '') == key_no_underscore:
-                        return True, keep_item
-
+            # Normalize both underscores and spaces for fuzzy matching
+            key_norm = key.replace('_', '').replace(' ', '').lower()
+            for keep_item in keep_set:
+                if keep_item.replace('_', '').replace(' ', '').lower() == key_norm:
+                    return True, keep_item
             return False, key
 
         def _flatten_nested_json(jd: Dict[str, Any]) -> Dict[str, Any]:
@@ -1440,6 +1438,41 @@ class CognitiveMapManager:
         except Exception:
             pass
         return {'overall': 0.0, 'dir': 0.0, 'facing': 0.0, 'pos': 0.0}
+
+    @staticmethod
+    def compute_cogmap_reward(
+        cogmap_scores: dict,
+        exploration_coverage: float,
+        reward_scale: float = 10.0,
+        forced_term_penalty: float = 2.0,
+        forced_term: bool = False,
+        dir_baseline: float = 1.0 / 8.0,
+        facing_baseline: float = 1.0 / 4.0,
+    ) -> tuple:
+        """Combine raw cogmap metrics into a final score and reward.
+
+        Returns:
+            (cogmap_score, reward, info_dict)
+        """
+        cogmap_score = (
+            max(0.0, cogmap_scores['dir'] - dir_baseline) +
+            max(0.0, cogmap_scores['facing'] - facing_baseline) +
+            cogmap_scores['pos'] +
+            exploration_coverage
+        ) / 4.0
+        reward = cogmap_score * reward_scale
+        if forced_term:
+            reward -= forced_term_penalty
+        info = {
+            'cogmap_score': cogmap_score,
+            'cogmap_dir': cogmap_scores['dir'],
+            'cogmap_facing': cogmap_scores['facing'],
+            'cogmap_pos': cogmap_scores['pos'],
+            'cogmap_exploration_coverage': exploration_coverage,
+            'success': cogmap_score > 0.0,
+            'forced_term': forced_term,
+        }
+        return cogmap_score, reward, info
 
 
 def test_evaluate_cogmaps():

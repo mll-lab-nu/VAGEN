@@ -4,16 +4,10 @@ SpatialGym is a spatial reasoning environment built on top of the [Theory of Spa
 
 ## Installation
 
-Install the base VAGEN package first:
+Install the additional dependencies for SpatialGym:
 
 ```bash
-pip install -e .
-```
-
-Then install the additional dependencies required by SpatialGym:
-
-```bash
-pip install numpy matplotlib scipy pillow tqdm imageio omegaconf
+pip install -r vagen/envs/spatial_gym/requirements.txt
 ```
 
 ## Evaluation
@@ -41,8 +35,3 @@ PPO training
 bash examples/spatial_gym/train_ppo_qwen25vl3b.sh
 bash examples/spatial_gym/train_ppo_qwen25vl7b.sh
 ```
-
-## Reference
-
-This environment is based on:
-- [Theory of Space](https://github.com/mll-lab-nu/Theory-of-Space.git)
