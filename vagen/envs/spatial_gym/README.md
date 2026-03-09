@@ -4,7 +4,15 @@ SpatialGym is a spatial reasoning environment built on top of the [Theory of Spa
 
 ## Installation
 
-Install the additional dependencies for SpatialGym:
+1. Download the dataset:
+
+```bash
+huggingface-cli download yw12356/spatial_gym_dataset \
+  --repo-type dataset \
+  --local-dir VAGEN/vagen/envs/spatial_gym/room_data
+```
+
+2. Install the additional dependencies:
 
 ```bash
 pip install -r vagen/envs/spatial_gym/requirements.txt
