@@ -1222,10 +1222,18 @@ class CognitiveMapManager:
 
     # =============================== Room comparisons =============================== 
 
+    @staticmethod
+    def _exclude_agent(br: BaseRoom) -> BaseRoom:
+        """Return a copy of *br* with any object named 'agent' removed."""
+        filtered = [o for o in br.objects if o.name != "agent"]
+        return BaseRoom(objects=filtered, name=br.name)
+
     def _compare_baserooms(self, pred_room: BaseRoom, gt_room: BaseRoom) -> MapCogMetrics:
+        # Exclude agent from both sides so 8-direction agent facing
+        # does not interfere with the 4-direction cogmap evaluation.
         m = compute_map_metrics(
-            pred_room,
-            gt_room,
+            self._exclude_agent(pred_room),
+            self._exclude_agent(gt_room),
             allow_scale=bool(self.config.get('pos_allow_scale', False)),
             pos_norm_L=self._pos_norm_L,
         )
