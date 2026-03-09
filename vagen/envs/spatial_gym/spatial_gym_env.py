@@ -14,11 +14,6 @@ from .utils.image_handler import ImageHandler
 from .actions.actions import configure_actions
 from gymnasium.utils import seeding
 
-# Reward constants
-COGMAP_REWARD_SCALE = 10.0   # cogmap scores in [0,1] scaled to [0,10]
-FORCED_TERM_PENALTY = 2.0    # penalty for not calling Term() explicitly
-DIR_RANDOM_BASELINE = 1.0 / 8.0   # 8 equal cardinal bins → random accuracy = 1/8
-FACING_RANDOM_BASELINE = 1.0 / 4.0  # 4 cardinal orientations → random accuracy = 1/4
 
 
 class SpatialGym(GymImageEnv):
@@ -157,27 +152,12 @@ class SpatialGym(GymImageEnv):
             n_total = len(self.exploration_manager.node_names)
             n_observed = len(self.exploration_manager.observed_nodes)
             exploration_coverage = n_observed / n_total if n_total > 0 else 1.0
-            cogmap_score = (
-                max(0.0, cogmap_scores['dir'] - DIR_RANDOM_BASELINE) +
-                max(0.0, cogmap_scores['facing'] - FACING_RANDOM_BASELINE) +
-                cogmap_scores['pos'] +
-                exploration_coverage
-            ) / 4.0
-            reward = cogmap_score * COGMAP_REWARD_SCALE
-            if self.forced_term_occurred:
-                reward -= FORCED_TERM_PENALTY
+            _, reward, info = CognitiveMapManager.compute_cogmap_reward(
+                cogmap_scores, exploration_coverage, forced_term=self.forced_term_occurred,
+            )
             obs = {'obs_str': self.prompter.task_finished_message()}
             self.render_cache = obs
             self.awaiting_cogmap_output = False
-            info = {
-                'cogmap_score': cogmap_score,
-                'cogmap_dir': cogmap_scores['dir'],
-                'cogmap_facing': cogmap_scores['facing'],
-                'cogmap_pos': cogmap_scores['pos'],
-                'cogmap_exploration_coverage': exploration_coverage,
-                'success': cogmap_score > 0.0,
-                'forced_term': self.forced_term_occurred,
-            }
             return obs, reward, True, info
 
         _, action, _ = parse_llm_response(

@@ -5,9 +5,7 @@ from ..core.object import Agent
 from ..actions.actions import ActionSequence
 
 from ..utils.room_utils import get_room_description
-from .cogmap_prompts import (
-    BASE_COGMAP_PROMPT, COGMAP_INSTRUCTION_GLOBAL_ONLY,
-)
+from .cogmap_prompts import GLOBAL_COGMAP_PROMPT
 from ..utils.utils import THINK_LABEL, ANSWER_LABEL
 
 
@@ -71,7 +69,8 @@ class PromptManager:
         is_active = self.config.exp_type == 'active'
 
         goal_section = (
-            "**Goal**: Minimize total COST while building a complete and accurate map of the environment.\n\n"
+            "**Goal**: Minimize total COST while building a complete and accurate map of the environment.\n"
+            "- Exploration efficiency: maximize new information per step. Avoid revisiting observed areas.\n\n"
             if is_active else ""
         )
 
@@ -199,7 +198,7 @@ class PromptManager:
 
     def get_cogmap_output_prompt(self) -> str:
         """Full cogmap prompt including schema, given to the agent after Term()."""
-        cogmap_schema = BASE_COGMAP_PROMPT + "\n" + COGMAP_INSTRUCTION_GLOBAL_ONLY
+        cogmap_schema = GLOBAL_COGMAP_PROMPT
         prompt = (
             "Exploration complete. Now output your **global cognitive map** as JSON.\n"
             "Rules: integer positions only (never \"unknown\"); start=(0,0) north; include all observed objects.\n"
