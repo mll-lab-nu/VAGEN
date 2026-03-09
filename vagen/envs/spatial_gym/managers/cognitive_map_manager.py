@@ -69,7 +69,6 @@ class GlobalCogMapTurnLog(BaseCogMapTurnLog):
     gt_room_state_full: Optional['BaseRoom'] = None
     gt_json_full: Dict[str, Any] = field(default_factory=dict)
     metrics_full: BaseCogMetrics = field(default_factory=BaseCogMetrics)
-    metric_agent: BaseCogMetrics = field(default_factory=BaseCogMetrics)
 
     def to_dict(self) -> Dict[str, Any]:
         out = super().to_dict()
@@ -79,7 +78,6 @@ class GlobalCogMapTurnLog(BaseCogMapTurnLog):
             "gt_room_state_full": self.gt_room_state_full.to_dict() if self.gt_room_state_full else {},
             "gt_json_full": self.gt_json_full,
             "metrics_full": (self.metrics_full.to_dict() if self.metrics_full.valid else {}),
-            "metric_agent": (self.metric_agent.to_dict() if self.metric_agent.valid else {}),
         })
         return out
 
@@ -330,10 +328,9 @@ class CognitiveMapManager:
         if t == "global":
             pred_global_br = self._preprocess_predicted(json_dict, observed_set, visible_names, gt_room, gt_agent, map_type)
             gt_global_br = self._build_gt_global_baseroom(gt_room, gt_agent, observed_set)
-            full_global = transform_baseroom(self._baseroom_from_gt(gt_room, gt_agent), gt_agent.init_pos, gt_agent.init_ori)
-            agent_br = self._build_gt_global_agent_baseroom(gt_room, gt_agent)
+            full_global = transform_baseroom(self._baseroom_from_gt(gt_room), gt_agent.init_pos, gt_agent.init_ori)
             self._ensure_pos_norm_L(gt_room, gt_agent)
-            return self._eval_global(pred_global_br, gt_global_br, full_global, agent_br, assistant_response, json_dict)
+            return self._eval_global(pred_global_br, gt_global_br, full_global, assistant_response, json_dict)
         
         if t == "local":
             pred_local_br = self._preprocess_predicted(json_dict, observed_set, visible_names, gt_room, gt_agent, map_type)
@@ -396,12 +393,11 @@ class CognitiveMapManager:
             symbolic_map=symbolic_map,
         )
 
-    def _eval_global(self, pred_global_br: BaseRoom,  gt_global_br: BaseRoom, gt_room_state_full: BaseRoom, agent_br: BaseRoom, assistant_response: str, pred_json: Dict) -> GlobalCogMapTurnLog:
+    def _eval_global(self, pred_global_br: BaseRoom,  gt_global_br: BaseRoom, gt_room_state_full: BaseRoom, assistant_response: str, pred_json: Dict) -> GlobalCogMapTurnLog:
         gt_json = self.baseroom_to_json(gt_global_br, include_gates=True)
         metrics = self._compare_baserooms(pred_global_br, gt_global_br)
         gt_json_full = self.baseroom_to_json(gt_room_state_full, include_gates=True)
         metrics_full = self._compare_baserooms(pred_global_br, gt_room_state_full)
-        metric_agent = self._compare_baserooms(pred_global_br, agent_br)
         return GlobalCogMapTurnLog(
             type="global",
             extraction_success=True,
@@ -414,7 +410,6 @@ class CognitiveMapManager:
             gt_room_state_full=gt_room_state_full,
             gt_json_full=gt_json_full,
             metrics_full=metrics_full,
-            metric_agent=metric_agent,
         )
 
     def _eval_local(self, pred_local_br: BaseRoom, gt_local_br: BaseRoom, assistant_response: str, pred_json: Dict) -> LocalCogMapTurnLog:
@@ -920,7 +915,6 @@ class CognitiveMapManager:
         error = {
             'local_vs_gt_local_avg': _d(_avg_maps(cog_logs, ['local', 'metrics'])),
             'global_vs_gt_global_avg': _d(_avg_maps(cog_logs, ['global', 'metrics'])),
-            'agent_vs_gt_agent_avg': _d(_avg_maps(cog_logs, ['global', 'metric_agent'])),
             'newly_observed_vs_gt_local_avg': _d(_avg_maps(cog_logs, ['local_newly', 'metrics'])),
         }
 
@@ -1033,16 +1027,14 @@ class CognitiveMapManager:
         return result
 
     @staticmethod
-    def compute_per_turn_global_metrics(cog_logs: List[Dict[str, Any]]) -> Tuple[Dict[str, List[float]], Dict[str, List[float]], Dict[str, List[float]]]:
-        """Return (update, full, self_tracking) per-turn global metric lists."""
+    def compute_per_turn_global_metrics(cog_logs: List[Dict[str, Any]]) -> Tuple[Dict[str, List[float]], Dict[str, List[float]]]:
+        """Return (update, full) per-turn global metric lists."""
         per_turn_update = {'dir': [], 'facing': [], 'pos': [], 'overall': []}
         per_turn_full = {'dir': [], 'facing': [], 'pos': [], 'overall': []}
-        per_turn_self_tracking = {'dir': [], 'facing': [], 'pos': [], 'overall': []}
         for d in cog_logs:
             g = d.get('global') or {}
             mu = MapCogMetrics.from_dict(g.get('metrics') or {})
             mf = MapCogMetrics.from_dict(g.get('metrics_full') or {})
-            ma = MapCogMetrics.from_dict(g.get('metric_agent') or {})
             per_turn_update['dir'].append(float(mu.dir) if mu.valid else None)
             per_turn_update['facing'].append(float(mu.facing) if mu.valid else None)
             per_turn_update['pos'].append(float(mu.pos) if mu.valid else None)
@@ -1051,11 +1043,7 @@ class CognitiveMapManager:
             per_turn_full['facing'].append(float(mf.facing) if mf.valid else None)
             per_turn_full['pos'].append(float(mf.pos) if mf.valid else None)
             per_turn_full['overall'].append(float(mf.overall) if mf.valid else None)
-            per_turn_self_tracking['dir'].append(float(ma.dir) if ma.valid else None)
-            per_turn_self_tracking['facing'].append(float(ma.facing) if ma.valid else None)
-            per_turn_self_tracking['pos'].append(float(ma.pos) if ma.valid else None)
-            per_turn_self_tracking['overall'].append(float(ma.overall) if ma.valid else None)
-        return per_turn_update, per_turn_full, per_turn_self_tracking
+        return per_turn_update, per_turn_full
     
     # register entry gates for active exploratoin
     def _register_active_entry_gate(self, gt_room) -> None:
@@ -1126,7 +1114,6 @@ class CognitiveMapManager:
     
     def _parse_section_to_baseroom(self, mapping: Dict[str, Any], room_name: str) -> Optional[BaseRoom]:
         """Parse a single section (object_name -> attrs) to BaseRoom.
-        Keeps 'agent' as a regular object for evaluation symmetry.
         """
         direction_mapping = {
             "north": np.array([0, 1]),
@@ -1156,7 +1143,7 @@ class CognitiveMapManager:
 
     # =============================== GT constructors =============================== 
 
-    def _baseroom_from_gt(self, gt_room: Room, gt_agent: Agent) -> BaseRoom:
+    def _baseroom_from_gt(self, gt_room: Room) -> BaseRoom:
         objs: List[Object] = []
         # include all non-gate objects
         for o in gt_room.objects:
@@ -1164,19 +1151,12 @@ class CognitiveMapManager:
         # include gates
         for g in gt_room.gates:
             objs.append(Object(name=g.name, pos=g.pos.copy(), ori=g.ori.copy(), has_orientation=True))
-        # include agent
-        objs.append(Agent(name='agent', pos=gt_agent.pos.copy(), ori=gt_agent.ori.copy(), has_orientation=True))
         return BaseRoom(objects=objs, name='gt')
 
-    def _build_gt_global_agent_baseroom(self, gt_room: Room, gt_agent: Agent) -> BaseRoom:
-        raw = self._baseroom_from_gt(gt_room, gt_agent)
-        br = transform_baseroom(raw, gt_agent.init_pos, gt_agent.init_ori)
-        return self._filter_br_by_names(br, {"agent"})
-    
     def _build_gt_global_baseroom(self, gt_room: Room, gt_agent: Agent, observed_set: set[str]) -> BaseRoom:
-        raw = self._baseroom_from_gt(gt_room, gt_agent)
+        raw = self._baseroom_from_gt(gt_room)
         br = transform_baseroom(raw, gt_agent.init_pos, gt_agent.init_ori)
-        keep = set(observed_set) | {"agent"}
+        keep = set(observed_set)
         return self._filter_br_by_names(br, keep)
 
     def _build_gt_local_baseroom(self, gt_room: Room, gt_agent: Agent) -> BaseRoom:
@@ -1201,7 +1181,7 @@ class CognitiveMapManager:
         """
         ori_mapping = {(0, 1): "north", (0, -1): "south", (1, 0): "east", (-1, 0): "west"}
         out: Dict[str, Any]={}
-        # Objects (includes agent if present)
+        # Objects
         for obj in room.objects:
             facing = ori_mapping.get(tuple(obj.ori), "")
             out[obj.name] = {
@@ -1370,11 +1350,11 @@ class CognitiveMapManager:
             _add(jd.get("gates"))
             return flat or jd
 
-        # --- Global: keep observed + gates + agent; also handle list-based sections ---
+        # --- Global: keep observed + gates; also handle list-based sections ---
         if map_type == "global":
             # Flatten {"objects":[...], "gates":[...]} into {name: {position, facing, ...}}
             jd = _flatten_nested_json(jd)
-            keep = set(observed) | gate_names | {"agent"}
+            keep = set(observed) | gate_names
             jd = _norm_map(jd, keep, face_fn=_norm_face_global)
             return self._parse_section_to_baseroom(jd, "pred_global") or BaseRoom(objects=[], name="pred_global")
 
@@ -1393,7 +1373,7 @@ class CognitiveMapManager:
     def _ensure_pos_norm_L(self, gt_room: Room, gt_agent: Agent) -> None:
         if self._pos_norm_L is not None:
             return
-        raw = self._baseroom_from_gt(gt_room, gt_agent)
+        raw = self._baseroom_from_gt(gt_room)
         br = transform_baseroom(raw, gt_agent.init_pos, gt_agent.init_ori)
         keep = {o.name for o in gt_room.objects}
         br = self._filter_br_by_names(br, keep)
