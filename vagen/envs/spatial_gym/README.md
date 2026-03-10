@@ -7,9 +7,11 @@ SpatialGym is a spatial reasoning environment built on top of the [Theory of Spa
 1. Download the dataset:
 
 ```bash
+cd VAGEN
+
 huggingface-cli download yw12356/spatial_gym_dataset \
   --repo-type dataset \
-  --local-dir VAGEN/vagen/envs/spatial_gym/room_data
+  --local-dir vagen/envs/spatial_gym/room_data
 ```
 
 2. Install the additional dependencies:
