@@ -32,3 +32,5 @@ data/
 exps/
 wandb/
 outputs/
+room_data/
+rollouts/
