@@ -1,0 +1,817 @@
+  ID  Sites                      Eval Types                           Intent
+--------------------------------------------------------------------------------------------------------------------------------------------
+   0  shopping_admin             string_match                         What is the top-1 best-selling product in 2022
+   1  shopping_admin             string_match                         What is the top-1 best-selling brand in Quarter 1 2022
+   2  shopping_admin             string_match                         What is the top-1 best-selling product type in Quarter 1 2022
+   3  shopping_admin             string_match                         What are the top-2 best-selling product in 2022
+   4  shopping_admin             string_match                         What are the top-3 best-selling product in Jan 2023
+   5  shopping_admin             string_match                         What is the top-1 best-selling product type in Jan 2023
+   6  shopping_admin             string_match                         What are the top-5 best-selling product in 2023
+   7  map                        string_match                         Tell me the full address of all international airports that are within a driving distance of 50 km to Carnegie Mellon University
+   8  map                        string_match                         Tell me the full address of all international airports that are within a driving distance of 5 km to Carnegie Mellon University
+   9  map                        string_match                         Tell me the full address of all international airports that are within a driving distance of 30 km to Carnegie Art Museum
+  10  map                        string_match                         Tell me the full address of all US international airports that are within a driving distance of 60 km to Niagara Falls
+  11  shopping_admin             string_match                         Tell me the the number of reviews that our store received by far that mention term "disappointed"
+  12  shopping_admin             string_match                         Tell me the the number of reviews that our store received by far that mention term "satisfied"
+  13  shopping_admin             string_match                         Tell me the the number of reviews that our store received by far that mention term "decent"
+  14  shopping_admin             string_match                         Tell me the the number of reviews that our store received by far that mention term "not useful"
+  15  shopping_admin             string_match                         Tell me the the number of reviews that our store received by far that mention term "best"
+  16  map                        string_match                         Compare the time for walking and driving route from 5000 Fifth Avenue, Pittsburgh to UPMC family health center
+  17  map                        string_match                         Compare the time for walking and driving route from AMC Waterfront to Carnegie Mellon University
+  18  map                        string_match                         Compare the time for walking and driving route from AMC Waterfront to Univ of Pittsburgh
+  19  map                        string_match                         Compare the time for walking and driving route from Carnegie Science Center to Carnegie Mellon University
+  20  map                        string_match                         Compare the difference in time for walking and driving route from Randyland to Carnegie Mellon University
+  21  shopping                   string_match                         List out reviewers, if exist, who mention about ear cups being small
+  22  shopping                   string_match                         List out reviewers, if exist, who mention about under water photo
+  23  shopping                   string_match                         List out reviewers, if exist, who mention about good fingerprint resistant
+  24  shopping                   string_match                         List out reviewers, if exist, who mention about price being unfair
+  25  shopping                   string_match                         List out reviewers, if exist, who mention about average print quality
+  26  shopping                   string_match                         List out reviewers, if exist, who mention about complain of the customer service
+  27  reddit                     string_match                         Tell me the count of comments that have received more downvotes than upvotes for the user who made the latest post on the Showerthoughts forum.
+  28  reddit                     string_match                         Tell me the count of comments that have received more downvotes than upvotes for the user who made the latest post on the Worcester forum.
+  29  reddit                     string_match                         Tell me the count of comments that have received more downvotes than upvotes for the user who made the latest post on the DIY forum.
+  30  reddit                     string_match                         Tell me the count of comments that have received more downvotes than upvotes for the user who made the latest post on the space forum.
+  31  reddit                     string_match                         Tell me the count of comments that have received more downvotes than upvotes for the user who made the latest post on the photoshopbattles forum.
+  32  map                        string_match                         I will arrive Pittsburgh Airport soon. Provide the name of a Hilton hotel in the vicinity, if available. Then, tell me the the walking distance to the nearest supermarket own by a local company from the hotel.
+  33  map                        string_match                         I will arrive Pittsburgh Airport soon. Provide the name of a Hilton hotel in the vicinity, if available. Then, tell me the the shortest walking distance to a supermarket from the hotel.
+  34  map                        string_match                         I will arrive Pittsburgh Airport soon. Provide the name of a Hyatt hotel in the vicinity, if available. Then, tell me the the shortest walking time to a supermarket from the hotel.
+  35  map                        string_match                         I will arrive Pittsburgh Airport soon. Provide the name of a Hyatt hotel in the vicinity, if available. Then, tell me the the minimal driving time to a supermarket from the hotel.
+  36  map                        string_match                         Check if the social security administration in pittsburgh can be reached in one hour by car from Carnegie Mellon University
+  37  map                        string_match                         Check if the police station in pittsburgh can be reached in one hour by car from gates building at CMU
+  38  map                        string_match                         Check if the duquesne university in pittsburgh can be reached in one hour by car from pittsburgh airport
+  39  map                        string_match                         Check if the walmart in pittsburgh can be reached in one hour by car from 5600 fifth avenue
+  40  map                        string_match                         Check if the amc theatre in pittsburgh can be reached in one hour by car from hobart street
+  41  shopping_admin             string_match                         List the top 1 search terms in my store
+  42  shopping_admin             string_match                         List the top 2 search terms in my store
+  43  shopping_admin             string_match                         List the top 3 search terms in my store
+  44  gitlab                     url_match                            Check out my todos
+  45  gitlab                     url_match                            Check out the most recent open issues
+  46  gitlab                     url_match                            Check out the most recent open issues
+  47  shopping                   string_match                         Today is 6/12/2023. Tell me how many fulfilled orders I have over the past month, and the total amount of money I spent.
+  48  shopping                   string_match                         Today is 6/12/2023. Tell me how many fulfilled orders I have over the past three days, and the total amount of money I spent.
+  49  shopping                   string_match                         Today is 6/12/2023. Tell me how many fulfilled orders I have over the past four month, and the total amount of money I spent.
+  50  shopping                   string_match                         Today is 6/12/2023. Tell me how many fulfilled orders I have over the past year, and the total amount of money I spent.
+  51  shopping                   string_match                         Today is 6/12/2023. Tell me how many fulfilled orders I have over the past six month, and the total amount of money I spent.
+  52  map                        string_match                         How long does it take to walk from Carnegie Mellon University to starbucks on Craig Street?
+  53  map                        string_match                         How long does it take to walk from Univ of Pittsburgh to starbucks on Craig Street?
+  54  map                        string_match                         How long does it take to walk from Carnegie Mellon University to Univ of Pittsburgh?
+  55  map                        string_match                         How long does it take to walk from the starbuck near CMU to Chatham university?
+  56  map                        string_match                         How long does it take to walk from Carnegie Museum of Art to a library at CMU?
+  57  map                        string_match                         Tell me the closest restaurant(s) to university center at Carnegie Mellon University
+  58  map                        string_match                         Tell me the closest cafe(s) to CMU Hunt library
+  59  map                        string_match                         Tell me the closest restaurant(s) to CMU Hunt library
+  60  map                        string_match                         Tell me the closest restaurant(s) to CMU Posner Hall
+  61  map                        string_match                         Tell me the closest restaurant(s) to CMU Sorrells Library
+  62  shopping_admin             string_match                         Which customer has completed the most number of orders in the entire history?
+  63  shopping_admin             string_match                         Which customer(s) has completed the second most number of orders in the entire history?
+  64  shopping_admin             string_match                         Which customer has placed 2 orders in the entire history?
+  65  shopping_admin             string_match                         Which customer has completed the fifth most number of orders in the entire history?
+  66  reddit                     string_match                         Among the top 10 post in "books" forum, show me the post URLs that recommand a single book
+  67  reddit                     string_match                         Among the top 10 post in "books" forum, show me the book names from posts that recommand a single book
+  68  reddit                     string_match                         Among the top 10 post in "books" forum, show me the author name and the book name from posts that recommand a single book
+  69  reddit                     string_match                         Among the top 10 post in "books" forum, is there any post talks about supporting local book stores? If so, tell me the organizations involved
+  70  map                        string_match                         What is the zip code of Carnegie Mellon University?
+  71  map                        string_match                         What is the zip code of Chatham University?
+  72  map                        string_match                         What is the zip code of Yale University?
+  73  map                        string_match                         What is the zip code of Columbia University?
+  74  map                        string_match                         Given the following locations, ['Carnegie Mellon University', 'apple store shadyside', 'starbucks on craig street'], what would be the optimal route to travel through them all in order to minimize total travel time? Please note the journey begins at the first place listed.
+  75  map                        string_match                         Given the following locations, ['Massachusetts Institute of Technology', 'Harvard University', 'Boston Logan International Airport'], what would be the optimal route to travel through them all in order to minimize total travel time? Please note the journey begins at the first place listed.
+  76  map                        string_match                         Given the following locations, ['Princeton University', 'Yale University', 'Harvard University'], what would be the optimal route to travel through them all in order to minimize total travel time? Please note the journey begins at the first place listed.
+  77  shopping_admin             string_match                         What is the total count of Pending reviews amongst all the reviews?
+  78  shopping_admin             string_match                         What is the total count of Approved reviews amongst all the reviews?
+  79  shopping_admin             string_match                         What is the total count of Not Approved reviews amongst all the reviews?
+  80  map                        string_match                         What is the duration required to first walk from Carnegie Mellon University to Starbucks on Craig Street, and then drive to Pittsburgh International Airport?
+  81  map                        string_match                         What is the duration required to first walk from Univ of Pittsburgh to starbucks on Craig Street, and then drive to Pittsburgh International Airport?
+  82  map                        string_match                         What is the duration required to first walk from Massachusetts Institute of Technology to Harvard University, and then drive to Boston Logan International Airport?
+  83  map                        string_match                         What is the duration required to first walk from Carnegie Mellon University to apple store shadyside, and then drive to starbucks on craig street?
+  84  map                        string_match                         From my stay at DoubleTree by Hilton New York Downtown, what's the estimated driving time to reach Keens Steakhouse?
+  85  map                        string_match                         From my stay at La Quinta Inn near the airport, what's the estimated driving time to reach Carnegie Mellon University?
+  86  map                        string_match                         From my stay at La Quinta Inn near the airport, what's the estimated driving time to reach Upitt?
+  87  map                        string_match                         From my stay at red roof inn, what's the estimated driving time to reach Pittsburgh science museum?
+  88  map                        string_match                         From my stay at Homewood Suites Southpointe, what's the estimated driving time to reach PPG Paints Arena?
+  89  map                        string_match                         Which US states border Connecticut?
+  90  map                        string_match                         Which US states border Pennsylvania?
+  91  map                        string_match                         Which US states border Massachusetts?
+  92  map                        string_match                         Which US states border Vermont?
+  93  map                        string_match                         Which US states border New Hampshire?
+  94  shopping_admin             string_match                         Telll me the grand total of invoice 000000001.
+  95  shopping_admin             string_match                         Telll me the grand total of invoice 000000002.
+  96  shopping                   string_match                         Tell me the status of my latest order and when will it arrive
+  97  map,wikipedia              string_match                         Tell me the distance to drive from Carnegie Mellon University to the top computer science school in massachusetts
+  98  map                        string_match                         Where is the nearest tea cafe to University of Pittsburgh, and what is the walking distance to it?
+  99  map                        string_match                         Where is the nearest Five Guys to 5700 Penn Ave, and what is the walking distance to it?
+ 100  map                        string_match                         Where is the nearest Starbucks to Carnegie Mellon, and what is the walking distance to it?
+ 101  map                        string_match                         Where is the nearest In-N-Out to Upitts, and what is the walking distance to it?
+ 102  gitlab                     url_match                            Display the list of issues in the a11yproject/a11yproject.com repository that have labels related to help needed
+ 103  gitlab                     url_match                            Display the list of issues in the kkroening/ffmpeg-python repository that have labels related to questions
+ 104  gitlab                     url_match                            Display the list of issues in the keycloak/keycloak repository that have labels related to flaky-test
+ 105  gitlab                     url_match                            Display the list of issues in the OpenAPITools/openapi-generator repository that have labels related to OpenAPI Generator CLI
+ 106  gitlab                     url_match                            Display the list of issues in the umano/AndroidSlidingUpPanel repository that have labels related to BUG
+ 107  shopping_admin             string_match                         Presents the monthly count of successful orders from May to December 2022 in MM:COUNT format
+ 108  shopping_admin             string_match                         Presents the monthly count of successful orders 01/2023-05/2023 in MM:COUNT format
+ 109  shopping_admin             string_match                         Presents the monthly count of successful orders from Jan to December 2022 in MM:COUNT format
+ 110  shopping_admin             string_match                         Presents the monthly count of successful orders from Jan to Nov 2022 in MM:COUNT format
+ 111  shopping_admin             string_match                         Presents the monthly count of successful orders from Feb to Nov 2022 in MM:COUNT format
+ 112  shopping_admin             string_match                         Show me the customers who have expressed dissatisfaction with Circe fleece?
+ 113  shopping_admin             string_match                         Show me the customers who have expressed dissatisfaction with Olivia zip jacket?
+ 114  shopping_admin             string_match                         Show me the customers who have expressed dissatisfaction with Antonia racer tank?
+ 115  shopping_admin             string_match                         Show me the name of the customers who have expressed dissatisfaction with Chloe tank
+ 116  shopping_admin             string_match                         Show me the name of the customers who have expressed dissatisfaction with tanks products?
+ 117  shopping                   string_match                         What is the date when I made my first purchase on this site?
+ 118  shopping                   program_html                         I have jaw bruxism problem, show me something that could alleviate the problem.
+ 119  shopping_admin             string_match                         Tell me the reasons why customers like Antonia Racer Tank
+ 120  shopping_admin             string_match                         Tell me the reasons why customers like Ana Running Short
+ 121  shopping_admin             string_match                         Tell me the reasons why customers like Circe hooded fleece
+ 122  shopping_admin             string_match                         Tell me the reasons why customers like Olivia zip jacket
+ 123  shopping_admin             string_match                         Tell me the reasons why customers like Circe's products
+ 124  shopping                   string_match                         What is the price range of wireless earphone in the One Stop Market?
+ 125  shopping                   string_match                         What is the price range of teeth grinding mouth guard in the One Stop Market?
+ 126  shopping                   string_match                         What is the price range of Canon photo printer in the One Stop Market?
+ 127  shopping_admin             string_match                         What brands appear most frequently among the top search terms?
+ 128  shopping_admin             string_match                         What's the total number of items sold in the most recent 2 orders?
+ 129  shopping_admin             string_match                         What's the total number of items sold in the most recent 4 orders?
+ 130  shopping_admin             string_match                         What's the total number of items sold in the most recent 5 orders?
+ 131  shopping_admin             string_match                         What's the total number of items sold in the most recent 7 orders?
+ 132  gitlab                     string_match                         How many commits did kilian make to a11yproject on 3/5/2023?
+ 133  gitlab                     string_match                         How many commits did Eric make to a11yproject on 3/2?
+ 134  gitlab                     string_match                         How many commits did kilian make to a11yproject on 3/1/2023?
+ 135  gitlab                     string_match                         How many commits did Eric and Kilian make to a11yproject on 1/3/2023?
+ 136  gitlab                     string_match                         How many commits did Steven Woodson make to a11y-webring.club on 2/6/2023?
+ 137  map                        string_match                         What is the estimated driving time between the city where the Liberty Bell is located and the home city of Pirates?
+ 138  map                        string_match                         What is the estimated driving time between the big apple and the city with the most authentic Philly cheesesteaks?
+ 139  map                        string_match                         What is the estimated driving time between the hometown of Joe Biden and Bridgeport?
+ 140  map                        string_match                         What is the estimated driving time between the city of Niagara Falls and the city of Yale University?
+ 141  shopping                   string_match                         How much I spent on food-related shopping during March 2023
+ 142  shopping                   string_match                         How much I spent on hair care and hair style shopping during Jan 2023
+ 143  shopping                   string_match                         How much I spent on home decoration shopping during 1/29/2023
+ 144  shopping                   string_match                         How much I spent on food shopping during from mid Jan to the end Jan 2023
+ 145  shopping                   string_match                         How much I spent on cooking and food shopping during March 2022
+ 146  shopping                   string_match                         What is the size configuration of the picture frame I bought Sep 2022
+ 147  shopping                   string_match                         What is the size configuration of the picture frame I bought 2022
+ 148  shopping                   string_match                         What is the color configuration of the picture frame I bought Sep 2022
+ 149  shopping                   string_match                         What is the color configuration of the artifical plants I bought Feb 2023
+ 150  shopping                   string_match                         What is the price configuration of the fake tree I bought Jan 2023
+ 151  map                        string_match                         What is the minimum travel time by car from CMU to University of Pittsburgh?
+ 152  map                        string_match                         What is the minimum travel time by car from Schenley park to Upitt?
+ 153  map                        string_match                         What is the minimum travel time by car from REI to CMU?
+ 154  map                        string_match                         What is the minimum travel time by car from CMU gates building to Schenley park?
+ 155  map                        string_match                         What is the minimum travel time by car from Animal Rescue League of Pittsburgh to Schenley park?
+ 156  gitlab                     url_match                            Checkout merge requests assigned to me
+ 157  shopping_admin             url_match                            Show all customers
+ 158  shopping                   url_match                            I have a lot of Nintendo Switch game cards now, help me find the best storage option to fit all 11 cards
+ 159  shopping                   url_match                            I have a lot of Nintendo Switch game cards now, help me find the best storage option to fit all 31 cards
+ 160  shopping                   url_match                            I have a lot of Nintendo Switch game cards now, help me find the best storage option to fit all 6 cards
+ 161  shopping                   url_match                            I have a lot of Nintendo Switch game cards now, help me find the best storage option to fit all 23 cards
+ 162  shopping                   url_match                            I have a lot of Nintendo Switch game cards now, help me find the best storage option to fit all 40 cards
+ 163  shopping                   string_match                         What are the main criticisms of this product? Please extract the relevant sentences.
+ 164  shopping                   string_match                         What are the main criticisms of this product? Please extract the relevant sentences.
+ 165  shopping                   string_match                         What are the main criticisms of this product? Please extract the relevant sentences.
+ 166  shopping                   string_match                         What are the main criticisms of this product? Please extract the relevant sentences.
+ 167  shopping                   string_match                         What are the main criticisms of this product? Please extract the relevant sentences.
+ 168  gitlab                     string_match                         Tell me the full names of the repositories where I made contributions and they got more than 100 stars?
+ 169  gitlab                     string_match                         Tell me the full names of the repositories where I made contributions and they got the most stars?
+ 170  gitlab                     string_match                         Tell me the full names of the repositories where I made contributions and they got the least stars?
+ 171  gitlab                     string_match                         Tell me the full names of the repositories where I made contributions and they got less than 5 stars?
+ 172  gitlab                     string_match                         Tell me the full names of the repositories where I made contributions and they got no stars?
+ 173  gitlab                     string_match,url_match               Open my latest updated issue that has keyword "better" in its title to check if it is closed
+ 174  gitlab                     string_match,url_match               Open my latest updated issue that has keyword "feature" in its title to check if it is closed
+ 175  gitlab                     string_match,url_match               Open my latest updated issue that has keyword "dependency" in its title to check if it is closed
+ 176  gitlab                     string_match,url_match               Open my latest updated issue that has keyword "theme editor" in its title to check if it is closed
+ 177  gitlab                     string_match,url_match               Open my latest updated issue that has keyword "homepage content" in its title to check if it is closed
+ 178  gitlab                     string_match,url_match               Open my latest created issue that has better in its title to check if it is closed
+ 179  gitlab                     string_match,url_match               Open my latest created issue that has feature in its title to check if it is closed
+ 180  gitlab                     string_match,url_match               Open my latest created issue that has dependency in its title to check if it is closed
+ 181  gitlab                     string_match,url_match               Open my latest created issue that has theme editor in its title to check if it is closed
+ 182  gitlab                     string_match,url_match               Open my latest created issue that has homepage content in its title to check if it is closed
+ 183  shopping_admin             string_match                         Give me the SKU of the products that have 10 units left
+ 184  shopping_admin             string_match                         Give me the name of the products that have 0 units left
+ 185  shopping_admin             string_match                         Give me the brand of the products that have 3 units left
+ 186  shopping_admin             string_match                         Give me the product names and the sizes of the products that have 2-3 units left
+ 187  shopping_admin             string_match                         Give me the SKU of the products that have 1-3 units left
+ 188  shopping                   string_match                         Tell me the total cost of my latest cancelled order?
+ 189  shopping                   string_match                         Tell me the total cost of my latest pending order?
+ 190  shopping                   string_match                         Tell me the total cost of my latest complete order?
+ 191  shopping                   string_match                         Tell me the total cost of my latest processing order?
+ 192  shopping                   string_match                         Tell me the total cost of my latest non-cancelled order?
+ 193  shopping_admin             string_match                         Get the total payment amount of the last 2 completed orders
+ 194  shopping_admin             string_match                         Get the total payment amount of the last 5 completed orders
+ 195  shopping_admin             string_match                         Get the total payment amount of the last 5 pending orders
+ 196  shopping_admin             string_match                         Compare the payment difference of the last 4 cancelled orders and completed orders
+ 197  shopping_admin             string_match                         Get the total payment amount of the last 5 non-cancelled orders
+ 198  shopping_admin             string_match                         Get the customer name of the most recent cancelled order
+ 199  shopping_admin             string_match                         Get the order ID of the newest pending order
+ 200  shopping_admin             string_match                         Get the billing name of the oldest complete order
+ 201  shopping_admin             string_match                         Get the customer name of the earliest fraud suspect order
+ 202  shopping_admin             string_match                         Get the date of the most recent canlled order
+ 203  shopping_admin             string_match                         Get the purchase date and order id of the most recent pending order
+ 204  shopping_admin             string_match                         Get the product name and discounted price (low to high) of the most recent completed order
+ 205  gitlab                     string_match                         How many commits did kilian make on 3/5/2023?
+ 206  gitlab                     string_match                         How many commits did Eric make on 3/2?
+ 207  gitlab                     string_match                         How many commits did Eric and Kilian make on 1/3/2023 in total?
+ 208  shopping_admin             string_match                         Find the customer name and email with phone number +1 2058812302
+ 209  shopping_admin             string_match                         Find the customer name and email with phone number 2137418080
+ 210  shopping_admin             string_match                         Find the customer name and email with phone number 2065555555
+ 211  shopping_admin             string_match                         Find the customer name and email with phone number 8015551212
+ 212  shopping_admin             string_match                         Find the customer name and email with phone number 555-229-3326
+ 213  shopping_admin             string_match                         What are the key aspects that the customers don't like about Antonia Racer Tank
+ 214  shopping_admin             string_match                         What are the key aspects that the customers don't like about Zing Jump Rope
+ 215  shopping_admin             string_match                         What are the key aspects that the customers don't like about Circe ice fleece
+ 216  shopping_admin             string_match                         What are the key aspects that the customers don't like about Electra Bra Top
+ 217  shopping_admin             string_match                         What are the key aspects that the customers don't like about Pursuit Tone Band
+ 218  map                        string_match                         Show me the walking distance from nearby hotels to CMU, Pittsburgh that take at most 5 minutes?
+ 219  map                        string_match                         Show me the walking distance from nearby hotels to Pittsburgh airport that take at most 3 minutes?
+ 220  map                        string_match                         Show me the walking distance from nearby hotels to Gardner Steel Conference Center, that take at most 5 minutes?
+ 221  map                        string_match                         I am at CMU Pittsburgh, how long it takes to the nearest USPS postal office with different transportation methods?
+ 222  map                        string_match                         I am at CMU Pittsburgh, how long it takes to drive to the nearest cold stone ice cream
+ 223  map                        string_match                         I am at CMU Pittsburgh, how long it takes to drive to the nearest Mcdonald's
+ 224  map                        string_match                         I am at CMU Pittsburgh, how long it takes to drive to the nearest wendys
+ 225  shopping                   string_match                         What do customers say about brush from sephora
+ 226  shopping                   string_match                         What is the price range for products from Amazon basic?
+ 227  shopping                   string_match                         What is the price range for products from EYZUTAK?
+ 228  shopping                   string_match                         What is the price range for products from sephora?
+ 229  shopping                   string_match                         What is the price range for products from ugreen?
+ 230  shopping                   string_match                         What is the price range for products from Perricone MD?
+ 231  shopping                   string_match                         Get the order number of my most recent cancelled order 
+ 232  shopping                   string_match                         Get the order number of my most recent pending order 
+ 233  shopping                   string_match                         Get the order number of my most recent complete order 
+ 234  shopping                   string_match                         Get the order number of my most recent on hold order 
+ 235  shopping                   string_match                         Get the order number of my most recent under delivery order 
+ 236  map                        string_match                         Where is the nearest pharmacy from Carnegie Mellon I can walk within 20mins
+ 237  map                        string_match                         Where is the nearest gas station from CMU 
+ 238  shopping                   url_match                            I am doing a market survey for one stop market, show me the most expensive product from PS4 accessories category
+ 239  shopping                   url_match                            I am doing a market survey for one stop market, show me the most expensive product from nutrition bars and drinks category
+ 240  shopping                   url_match                            I am doing a market survey for one stop market, show me the most expensive product from competitive swimwear category
+ 241  shopping                   url_match                            I am doing a market survey for one stop market, show me the most expensive product from skin care tool category
+ 242  shopping                   url_match                            I am doing a market survey for one stop market, show me the most expensive product from Household Supplies category
+ 243  shopping_admin             string_match                         Show me the email address of the customer who is the most unhappy with Circe fleece
+ 244  shopping_admin             string_match                         Show me the email address of the customer who is the most unhappy with Olivia zip jacket
+ 245  shopping_admin             string_match                         Show me the name of the customer who is the most unhappy with Antonia racer tank
+ 246  shopping_admin             string_match                         Show me the name of the customer who is the most unhappy with Chloe tank
+ 247  shopping_admin             string_match                         Show me the email address of the customer who is the most unhappy with the style of Zoe products
+ 248  map                        string_match                         Tell me the coordinates of Carnegie Mellon Café in DD format
+ 249  map                        string_match                         Tell me the coordinates of Western Pennsylvania Hospital Heliport in DD format
+ 250  map                        string_match                         Tell me the coordinates of Apple Store near Pitt in DD format
+ 251  map                        string_match                         Tell me the coordinates of bus stop on the Carnegie art museum side of the street near CMU in DD format
+ 252  map                        string_match                         Tell me the coordinates of Tokyo Japanese Food Store in Pittsburgh in DD format
+ 253  map                        string_match                         What is the phone number of Carnegie Mellon Café
+ 254  map                        string_match                         What is the phone number of Western Pennsylvania Hospital
+ 255  map                        string_match                         Who is the operator of PIT airport
+ 256  map                        string_match                         What is the website of Carnegie art museum in pittsburgh
+ 257  map                        string_match                         What is the hours of operation of Tokyo Japanese Food Store in Pittsburgh
+ 258  gitlab                     url_match                            See all public projects
+ 259  gitlab                     string_match                         Get me my RSS feed token
+ 260  shopping                   url_match                            I want to browse the products in the Video Game category
+ 261  shopping                   url_match                            I want to browse the products in the Headphones category
+ 262  shopping                   url_match                            I want to browse the products in the Men shoes category
+ 263  shopping                   url_match                            I want to browse the products in the Woman clothing category
+ 264  shopping                   url_match                            I want to browse the products in the Cabinets, Racks & Shelves category
+ 265  wikipedia,map              string_match                         What's the closest national park to Boston? How far is it to drive there?
+ 266  wikipedia,map              string_match                         What's the closest national park to the largest city in Maine?
+ 267  wikipedia,map              string_match                         What's the closest national park to the hometown of Stephen King? How long it takes to drive there?
+ 268  wikipedia,map              string_match                         What's the closest national park to Vinalhaven, ME? How long does it take to bike there?
+ 269  shopping                   url_match                            Show me products under $25 in "women shoes" category
+ 270  shopping                   url_match                            Show me products under $30 in "men shoes" category
+ 271  shopping                   url_match                            Show me products under $46.99 in "makeup remover" category
+ 272  shopping                   url_match                            Show me products under $78 in "children dental care" category
+ 273  shopping                   url_match                            Show me products under $199 in "furtiture with accent" category
+ 274  shopping                   url_match                            Search for "usb wifi"
+ 275  shopping                   url_match                            Search for "xbox"
+ 276  shopping                   url_match                            Search for "switch accessories"
+ 277  shopping                   url_match                            Search for "batteries for iphone 13"
+ 278  shopping                   url_match                            Search for "green tea bag for weight loss"
+ 279  shopping                   string_match                         Provide me with the complete names of Bluetooth headphones from Sony, and also share the price range for the available models
+ 280  shopping                   string_match                         Provide me with the full names of chargers from Anker, and also share the price range for the available models
+ 281  shopping                   string_match                         Please provide me with the complete product names of Oral B brush heads designed for children, along with their corresponding price range per brush
+ 282  shopping                   string_match                         List the full product names of slide slippers from Nike and tell me the price range of the available products
+ 283  shopping                   url_match                            Look up the most recent models of XBox controllers released between 2020-2021?
+ 284  shopping                   url_match                            Show the least expensive shoe storage with a minimum storage capacity of 12 pairs.
+ 285  shopping                   url_match                            Show the least expensive switch card holder with a minimum storage capacity of 15 cards.
+ 286  shopping                   url_match                            Show the least expensive ssd hard drive with a minimum storage capacity of 1TB.
+ 287  map                        string_match                         How much time does it take from Pittsburgh to Philadelphia by car?
+ 288  shopping_admin             string_match                         Tell me the name of the customer who has the most cancellations in the history
+ 289  shopping_admin             string_match                         Tell me the email address, name, phone number of the customer who has the most cancellations in the history
+ 290  shopping_admin             string_match                         Tell me the product SKUs in the most recent cancelled orders of the customer who has the most cancellations in the history
+ 291  shopping_admin             string_match                         Tell me the total spend on products in the most recent cancelled orders of the customer who has the most cancellations in the history
+ 292  shopping_admin             string_match                         Tell me the total number of cancellations of the customer who has the most cancellations in the history
+ 293  gitlab                     string_match                         Show me the command to clone Super_Awesome_Robot with SSH.
+ 294  gitlab                     string_match                         Show me the command to clone ChatGPT with SSH.
+ 295  gitlab                     string_match                         Show me the command to clone metaseq with SSH.
+ 296  gitlab                     string_match                         Show me the command to clone the best GAN python implementation with SSH.
+ 297  gitlab                     string_match                         Show me the command to clone the most stared Covid location tracker with SSH.
+ 298  shopping                   url_match                            Show the most recent completed order
+ 299  shopping                   url_match                            Show the most recent cancelled order
+ 300  shopping                   url_match                            Show the most recent pending order
+ 301  shopping                   string_match                         Show the most recent processing order
+ 302  shopping                   string_match                         Show the most recent out of delivery order
+ 303  gitlab                     string_match                         How many commits did Kilian make durning 2023?
+ 304  gitlab                     string_match                         How many commits did Eric make between Feb 2023 and May 2023?
+ 305  gitlab                     string_match                         How many commits did Philip make in 2023/1?
+ 306  gitlab                     string_match                         How many commits did Anthony make between 08/2022-09/2022?
+ 307  gitlab                     string_match                         How many commits did Nic make in April 2021?
+ 308  gitlab                     string_match                         Tell me who has made the most contributions, in terms of number of commits, to the primer/design project
+ 309  gitlab                     string_match                         Tell me who has made the most contributions, in terms of number of commits, to the thoughtbot/administrate project
+ 310  gitlab                     string_match                         Tell me who has made the most contributions, in terms of number of commits, to the AndroidSlidingUpPanel project
+ 311  gitlab                     string_match                         Tell me who has made the most contributions, in terms of number of commits, to the Pytorch GAN project
+ 312  gitlab                     string_match                         Tell me who has made the most contributions, in terms of number of commits, to the csvkit project
+ 313  shopping                   string_match                         Which number to call for the customer service?
+ 314  gitlab                     string_match                         List the name of the top 3 contributors to prime/design repo, ranked by the number of commits?
+ 315  gitlab                     string_match                         List the email address of the top 3 contributors to Pytorch GAN repo, ranked by the number of commits?
+ 316  gitlab                     string_match                         List the name of the top 3 contributors to facebook's guide on building react apps repo, ranked by the number of commits?
+ 317  gitlab                     string_match                         List the name and number of commits of the top 3 contributors to metaseq repo, ranked by the number of commits?
+ 318  gitlab                     string_match                         List the last names of the top 3 contributors to 2019-nCov repo, ranked by the number of commits?
+ 319  shopping                   string_match                         How much refund I should expect from my order canlled in April 2022, including shipping fee
+ 320  shopping                   string_match                         How much refund I should expect from my order canlled in Feb 2023, including shipping fee
+ 321  shopping                   string_match                         How much refund I should expect from my order canlled in 2022, including shipping fee
+ 322  shopping                   string_match                         How much refund I should expect from my order canlled in May 2023 if I cannot get the shipping fee refunded?
+ 323  shopping                   string_match                         How much refund I should expect from my order canlled in 2022/03? I only kept the AC-DC Adapter and the shop told me that I cannot get the shipping fee back
+ 324  shopping                   url_match                            Show me the "chairs" listings by ascending price.
+ 325  shopping                   url_match                            Show me the "mouth night guard" listings by descending price.
+ 326  shopping                   url_match                            Show me the "Canon photo printer" listings by search relevance, from most to least.
+ 327  shopping                   url_match                            Show me the "iphone 12 phone case" listings by name alphabetically.
+ 328  shopping                   url_match                            Show me the "iphone 12 phone case" listings by price.
+ 329  shopping                   string_match                         How much I spend on 4/19/2023 on shopping at One Stop Market?
+ 330  shopping                   string_match                         How much I spend in March 2023 on shopping at One Stop Market?
+ 331  shopping                   string_match                         How much I spend in July 2022 on shopping at One Stop Market?
+ 332  shopping                   string_match                         How much I spend each month from Jan to the end of March 2023 on shopping at One Stop Market?
+ 333  shopping                   string_match                         How much did I spend on shopping at One Stop Market on November 2022? They gave me a 20% discount on the total amount for orders exceeding $200 in cash
+ 334  shopping                   string_match                         Tell me when I last ordered my muffin cornbread mix?
+ 335  shopping                   string_match                         Tell me when I last ordered my body butter?
+ 336  shopping                   string_match                         Tell me when I last ordered my conditioner?
+ 337  shopping                   string_match                         Tell me when I last ordered my bread olive?
+ 338  shopping                   string_match                         Tell me when I last ordered my toothpaste?
+ 339  gitlab                     url_match                            List all opened issues that report bugs
+ 340  gitlab                     url_match                            List all opened issues that report bugs
+ 341  gitlab                     url_match                            List all opened issues requesting new features
+ 342  gitlab                     url_match                            List all opened issues that ask about OPT model related questions
+ 343  gitlab                     url_match                            List all opened issues that don't have any labels
+ 344  shopping_admin             string_match                         How many reviews our shop received by far?
+ 345  shopping_admin             string_match                         How many reviews our shop received in Apr 2023?
+ 346  shopping_admin             string_match                         How many reviews our shop received during 2022?
+ 347  shopping_admin             string_match                         How many reviews our shop received from the beginning of the shop?
+ 348  shopping_admin             string_match                         How many reviews our shop received in May 2023?
+ 349  gitlab                     string_match                         Who else have access to my repo gimmiethat.space, show me their usernames
+ 350  gitlab                     string_match                         Who else have access to my repo prism-theme, show me their usernames
+ 351  shopping                   url_match                            List products from PS4 accessories category by ascending price
+ 352  shopping                   url_match                            List products from nutrition bars and drinks category by ascending price
+ 353  shopping                   url_match                            List products from competitive swimwear category by ascending price
+ 354  shopping                   url_match                            List products from living room furtniture category by descending price
+ 355  shopping                   url_match                            List products from kids' bedding category by descending price
+ 356  map                        program_html                         Show the route from SCS CMU in Pittsburgh to the location where the Declaration of Independence and Constitution were signed
+ 357  gitlab                     url_match                            Checkout merge requests requiring my review
+ 358  shopping                   string_match                         Show me the shipping method for order number 187.
+ 359  shopping                   string_match                         Show me the order date for order number 148.
+ 360  shopping                   string_match                         Show me the product names for order number 148.
+ 361  shopping                   string_match                         Show me the order statuses for order number 170 and 189.
+ 362  shopping                   string_match                         Show me the billing address for order number 00178.
+ 363  map                        string_match                         Measure distance between Carnegie Mellon University and Carnegie Music Hall by walking
+ 364  map                        string_match                         Measure distance between Carnegie Mellon University and UPMC Shadyside by walking
+ 365  map                        string_match                         Measure distance between Carnegie Music Hall and UPMC Shadyside by walking
+ 366  map                        string_match                         Measure distance between CVS (closet one) and UPMC Shadyside by walking
+ 367  map                        string_match                         Measure distance between Carnegie Mellon University and CVS (closet one) by walking
+ 368  shopping                   string_match                         find discounted items.
+ 369  map                        program_html                         Pull up the description page of Carnegie Music Hall on Map
+ 370  map                        program_html                         Pull up the description page of Carnegie Mellon University on Map
+ 371  map                        program_html                         Pull up the description page of Piada restaurant near Pitt on Map
+ 372  map                        program_html                         Pull up the description page of the Costco in Pittsburhg near a river on Map
+ 373  map                        program_html                         Pull up the description page of Whole Foods near Carnegie Mellon on Map
+ 374  shopping_admin             url_match                            Preview the Magento Blank theme for my shop
+ 375  shopping_admin             url_match                            Preview the Magento Luma theme for my shop
+ 376  shopping                   string_match                         Summarize customer reviews for Amazon Echo Dot 3rd generation.
+ 377  map                        url_match                            Find the resturants around CMU ArtPark Lab
+ 378  map                        url_match                            Find the parking around CMU main campus
+ 379  map                        url_match                            Find the hotel around CMU main campus
+ 380  map                        url_match                            Find the bar around Carnegie Music Hall
+ 381  map                        url_match                            Find the hotel around Carnegie Music Hall
+ 382  map                        string_match                         I am arriving at Carnegie Mellon University. Find the nearby US Citizenship and Immigration Services and the walking distance to the nearest Social Security Administration from US Citizenship and Immigration Services
+ 383  map                        string_match                         I am arriving at Pittsburgh Airport. Show me the name of a Hyatt hotel if there is any nearby. Tell me the names of supermarkets that are within 15mins driving from the hotel
+ 384  shopping                   string_match                         List the customer names who complain about the quality of EYZUTAK phone cases
+ 385  shopping                   string_match                         List the customer names who thinks EYZUTAK phone cases are of good looking
+ 386  shopping                   string_match                         What is the rating of Ugreen lightning to 3.5mm cable. Please round to the nearest whole number
+ 387  shopping                   string_match                         Who gave 4 or 5 stars for phone cases from EYZUTAK
+ 388  shopping                   string_match                         Who gave 1 or 2 stars for phone cases from EYZUTAK
+ 389  gitlab                     program_html                         Post "Thanks, working on reviews" for the merge request related to octovisuals page in primer/design project
+ 390  gitlab                     program_html                         Post "lgtm" for the merge request related to semantic HTML post in a11yproject/a11yproject.com project
+ 391  gitlab                     program_html                         Post "close because non reproducible" for the merge request related to focus edge cases in a11yproject/a11yproject.com project
+ 392  gitlab                     program_html                         Post "Good idea" for the merge request related to color ulitity in a11yproject.com project
+ 393  gitlab                     program_html                         Post "lgtm" for the merge request related to fixing the broken links in byteblaze/empathy-prompts project
+ 394  gitlab                     program_html                         Fork 2019-nCov.
+ 395  gitlab                     program_html                         Fork the Pytorch GAN repo with most stars.
+ 396  gitlab                     program_html                         Fork ChatGPT.
+ 397  gitlab                     program_html                         Fork MetaSeq.
+ 398  gitlab                     program_html                         Fork all source repos from Akilesh Kannan
+ 399  reddit                     program_html                         Change my reddit bio to "I am a robot"
+ 400  reddit                     program_html                         Change my reddit bio to "Pro Python Developer with 20 years of Experience"
+ 401  reddit                     program_html                         Change my reddit bio to "Seeking SDE positions"
+ 402  reddit                     program_html                         Change my reddit bio to "Freelance Web Developer"
+ 403  reddit                     program_html                         Change my reddit bio to "Awesome Prompt Artist"
+ 404  reddit                     program_html                         Upvote the newest post in books subreddit
+ 405  reddit                     program_html                         Upvote the newest post in DIY subreddit
+ 406  reddit                     program_html                         Upvote the newest post in future technology subreddit
+ 407  reddit                     program_html                         Upvote the newest post in deeplearning subreddit
+ 408  reddit                     program_html                         Upvote the newest post in explain like im 5 subreddit
+ 409  reddit                     program_html                         Reply to the manager of the website in this post with "thanks! I am a big fan of your website."
+ 410  reddit                     program_html                         Reply to the first reply in this post with "don't panic"
+ 411  gitlab                     program_html                         Make the LICENSE of byteblaze/cloud-to-butt to MIT license.
+ 412  gitlab                     program_html                         Make the LICENSE of byteblaze/accessible-html-content-patterns to Apache License
+ 413  gitlab                     program_html                         Make the LICENSE of byteblaze/a11y-syntax-highlighting to one that mandates all copies and derivative works to be under the same license
+ 414  gitlab                     program_html                         Make the LICENSE of byteblaze/dotfiles to MIT license.
+ 415  gitlab                     program_html                         Go to the merge request on verification functions I have to review, find if the author of the merge request responded at the end, and reply "Thank you" if he did. Otherwise remind him with a simple @.
+ 416  gitlab                     program_html                         Go to the merge request on wcag I have to review, find if the author of the merge request responded at the end, and reply "Thank you" if he did. Otherwise remind him with a simple @.
+ 417  gitlab                     program_html                         Go to the merge request on 404 link I have to review, find if the author of the merge request responded at the end, and reply "Thank you" if he did. Otherwise remind him with a simple @.
+ 418  gitlab                     program_html                         Set my gitlab status as Busy.
+ 419  gitlab                     program_html                         Set my gitlab status as Enjoying life.
+ 420  gitlab                     program_html                         Set my gitlab status as Playing Badminton.
+ 421  gitlab                     program_html                         Set my gitlab status as Resting due to leg injury.
+ 422  gitlab                     program_html                         Set my gitlab status as Out of Office.
+ 423  shopping_admin             program_html                         Mark all Hollister shirts on sale
+ 424  wikipedia,map              program_html                         Find the page of the place where Mr. Rogers was filmed on the map.
+ 425  wikipedia,map              program_html                         Find the page of the longest bridge in the Western hemisphere on the map.
+ 426  wikipedia,map              program_html                         Find the page of the place in Pennsylvania where a plane crashed during the September 11th attacks on the map.
+ 427  wikipedia,map              program_html                         Find the page of the university that has most Turning Award winners on the map.
+ 428  wikipedia,map              program_html                         Find the page of the undergrad college of the person who developed the Nash equilibrium on the map.
+ 429  wikipedia,map              program_html                         Find the page of the colleges where The Chair was filmed in Pittsburgh on the map.
+ 430  wikipedia,map              program_html                         Find the page of the college(s) where The Chair was filmed in Pennsylvania other than the ones in Pittsburgh on the map.
+ 431  shopping                   program_html                         Add the product with the lowest per unit price from my open tabs to the shopping cart
+ 432  shopping                   program_html                         Add the product with the lowest per unit price from my open tabs to the shopping cart
+ 433  shopping                   program_html                         Add the product with the lowest per unit price from my open tabs to the shopping cart
+ 434  shopping                   program_html                         Add the product with the lowest per unit price from my open tabs to the shopping cart
+ 435  shopping                   program_html                         Add the product with the lowest per unit price from my open tabs to the shopping cart
+ 436  shopping                   program_html                         I previously ordered some a mattress foundation around Feb or March 2023 and later cancelled. Can you reorder it for me?
+ 437  shopping                   program_html                         I previously ordered some a table lamp in May 2023 and later cancelled. Can you reorder it for me?
+ 438  shopping                   program_html                         I previously ordered some a TV stand sometime around sep 2022 and later cancelled. Can you reorder it for me?
+ 439  shopping                   program_html                         I previously ordered some a cat t-shirt during 2022 and later cancelled. Can you reorder it for me?
+ 440  shopping                   program_html                         I previously ordered some a make up removal kit during summer 2022 and later cancelled. Can you reorder it for me?
+ 441  gitlab                     program_html                         Update the project site's title to "GIVE ME SPACE"
+ 442  gitlab                     program_html                         Update the project site's title to "Welcome to my site"
+ 443  gitlab                     program_html                         Update the project site's title to "Not an interesting site"
+ 444  gitlab                     program_html                         Update the project site's title to "Title Wanted"
+ 445  gitlab                     program_html                         Update the project site's title to "Hello"
+ 446  gitlab                     program_html                         Assign the issue regarding 404 in a11yproject to Roshanjossey.
+ 447  gitlab                     program_html                         Assign the issue regarding linking to an accessibility statement in a11y-webring.club to Rohan.
+ 448  gitlab                     program_html                         set the homepage URL on my GitLab profile to https://egg.tart.com
+ 449  gitlab                     program_html                         set the homepage URL on my GitLab profile to https://helloworld.xyz
+ 450  gitlab                     program_html                         set the homepage URL on my GitLab profile to a11yproject.contributor.me
+ 451  gitlab                     program_html                         set the homepage URL on my GitLab profile to www.byteblaze.com
+ 452  gitlab                     program_html                         set the homepage URL on my GitLab profile to byteblaze.github.io
+ 453  shopping_admin             program_html                         Disable Teton pullover hoodie from the site, they are facing some quality issues.
+ 454  shopping_admin             program_html                         Disable Ryker Tee Crew Neck from the site, they are facing some quality issues.
+ 455  shopping_admin             program_html                         Disable lHelios Endurance Tank from the site, they are facing some quality issues.
+ 456  shopping_admin             program_html                         Disable Cora Pant from the site, they are facing some quality issues.
+ 457  shopping_admin             program_html                         Disable Karmen yoga pants from the site, they are facing some quality issues.
+ 458  shopping_admin             program_html                         Reduce the price of this product by $5
+ 459  shopping_admin             program_html                         Reduce the price of this product by 10%
+ 460  shopping_admin             program_html                         Reduce the price of this product by 15%
+ 461  shopping_admin             program_html                         Increase the price of this product by $11.5
+ 462  shopping_admin             program_html                         Increase the price of this product by 10%
+ 463  shopping_admin             program_html                         Increase the price of this product by 15%
+ 464  shopping_admin             program_html                         Update the product description of Antonia Racer Tank to highlight the real user positive reviews by quoting the comments
+ 465  shopping                   program_html                         Add Tide PODS Spring Meadow Scent HE Turbo Laundry Detergent Pacs, 81 Count to my wish list
+ 466  shopping                   program_html                         Add 2 Hawaiian Bamboo Orchid Roots #zc50 - by Discount Hawaiian Gifts to my wish list
+ 467  shopping                   program_html                         Add HONGJ Hawaiian Beach Outfits Set for Mens, Summer Tropical Tree Printed Relaxed-fit Hawaii Shirts Shorts 2 Piece Suits to my wish list
+ 468  shopping                   program_html                         Add DkRgVNY Lace Spcling Lingerie Womens Sexy Hollow Out Underwear Bodysuit One Piece Snap Crotch Clubwear Teddy Bodysuit to my wish list
+ 469  shopping                   program_html                         Add Light Blue Simple Summer New Low Heels Slippers for Women Fashion Chunky Heels Pointed Toe Wine Glasses Sandals Comfortable Walking Shoes Ladies All-Match Sexy Party Shoes to my wish list
+ 470  shopping_admin             program_html                         Cancel order 302
+ 471  shopping_admin             program_html                         Cancel order 307
+ 472  shopping_admin             program_html                         Cancel order 299
+ 473  shopping_admin             program_html                         Cancel order 301
+ 474  shopping_admin             program_html                         Cancel order 305
+ 475  gitlab                     program_html                         Set up a new, empty repository with the name chatgpt_plugin?
+ 476  gitlab                     program_html                         Set up a new, empty repository with the name awesome_llm_reading?
+ 477  gitlab                     program_html                         Set up a new, empty repository with the name awesome_program_aided_reasoning?
+ 478  gitlab                     program_html                         Set up a new, empty repository with the name webagent?
+ 479  gitlab                     program_html                         Set up a new, empty repository with the name awesome_webagent?
+ 480  gitlab                     program_html                         Invite yjlou as collaborator to solarized-prism-theme
+ 481  gitlab                     program_html                         Abishek wants to check my dotfile configurations. Please invite him to the repo as a guest.
+ 482  gitlab                     program_html                         yjlou wants to check my dotfile configurations. Please invite him to the repo as a guest.
+ 483  gitlab                     program_html                         Koushik wants to check my dotfile configurations. Please invite him to the repo as a guest.
+ 484  gitlab                     program_html                         Jakub Klinkovský wants to check my dotfile configurations. Please invite him to the repo as a guest.
+ 485  gitlab                     program_html                         Vinta wants to check my dotfile configurations. Please invite him to the repo as a guest.
+ 486  shopping_admin             program_html                         Change the page title of "404 Not Found" page on my site to "Bruh bro you clicked the wrong page".
+ 487  shopping_admin             program_html                         Change the page title of "Enable Cookies" page on my site to "Cookie monster coming to your place".
+ 488  shopping_admin             program_html                         Change the page title of "Home Page" page on my site to "This is the home page!! Leave here!!".
+ 489  shopping_admin             program_html                         Change the page title of "Privacy Policy" page on my site to "No privacy policy is needed is this dystopian world".
+ 490  shopping_admin             program_html                         Change the page title of "About us" page on my site to "Secret".
+ 491  shopping_admin             string_match                         Notify Sarah Miller in their most recent pending order with message "the order is ready to be shipped soon!"
+ 492  shopping_admin             program_html                         Notify Jane Doe in their most recent pending order with message "sorry we are out of stock, please reorder"
+ 493  shopping_admin             program_html                         Notify Grace Nguyen in their most recent pending order with message "sorry we are bankrupt, please contact our customer service for refund"
+ 494  shopping_admin             program_html                         Notify Alex Thomas in their most recent pending order with message "Yo, your order will be shipped soon!"
+ 495  shopping_admin             program_html                         Notify Lily Potter in their most recent pending order with message "Thanks, your order is ready to be shipped!"
+ 496  shopping_admin             program_html                         Update order #299 with the Federal Express tracking number 8974568499
+ 497  shopping_admin             program_html                         Update order #307 with the DHL tracking number 24353446464
+ 498  shopping_admin             program_html                         Update order #306 with the UPS tracking number 55591023930
+ 499  shopping_admin             program_html                         Update order #304 with the USPS tracking number 13849373987
+ 500  shopping_admin             program_html                         Update order #301 with the DHL tracking number 239028439840
+ 501  shopping_admin             program_html                         Make all Taurus Elements Shell as out of stock
+ 502  shopping_admin             program_html                         Make all Gobi HeatTec Tee as out of stock
+ 503  shopping_admin             program_html                         Make all rocco gym tank as out of stock
+ 504  shopping_admin             program_html                         Make all Selene yoga hoodie as out of stock
+ 505  shopping_admin             program_html                         Make all Aeno capri as out of stock
+ 506  shopping                   program_html                         Buy the highest rated product from the meat substitute category within a budget between 100 and 200.
+ 507  shopping                   program_html                         Buy the highest rated product from the Ceiling light category within a budget above 1000.
+ 508  shopping                   program_html                         Buy the highest rated product from the NS switch pouch category within a budget under 60.
+ 509  shopping                   program_html                         Buy the best rating product from "Men's shoe" category with at least 5 reviews and the product is least expensive
+ 510  shopping                   program_html                         Buy the best rating product from "Home Audio Speaker" category with at least 5 reviews and the product is least expensive
+ 511  shopping                   program_html                         Add a laundry detergent to my wish list.
+ 512  shopping                   program_html                         Add a toothpaste to my wish list.
+ 513  shopping                   program_html                         Add a chair to my wish list.
+ 514  shopping                   program_html                         Add a white desk to my wish list.
+ 515  shopping                   program_html                         Add a white computer desk to my wish list.
+ 516  shopping                   program_html                         Add this product to my wishlist
+ 517  shopping                   program_html                         Add this product to my wishlist
+ 518  shopping                   program_html                         Add this product to my wishlist
+ 519  shopping                   program_html                         Add this product to my wishlist
+ 520  shopping                   program_html                         Add this product to my wishlist
+ 521  shopping                   program_html                         Subscribe to the newsletter of OneStopMarket
+ 522  gitlab                     program_html                         Fork all repos from facebook.
+ 523  gitlab                     program_html                         Star the top five most stared repos in Gitlab
+ 524  gitlab                     program_html                         Star the top eight most stared repos in Gitlab
+ 525  gitlab                     program_html                         Star the top four most stared repos in Gitlab
+ 526  gitlab                     program_html                         Star the top three most stared repos in Gitlab
+ 527  gitlab                     program_html                         Star the top one most stared repos in Gitlab
+ 528  shopping                   program_html                         Draft a refund message via their "contact us" form for the phone screen protector I bought March 2023. It broke after three days of use. The shop requires the order id, the reason and the amount to refund in the message. Don't submit yet
+ 529  shopping                   program_html                         Draft a refund message via their "contact us" form for the bluetooth speaker I bought Feb 2023. It broke after three days of use. The shop requires the order id, the reason and the amount to refund in the message. Don't submit yet
+ 530  shopping                   program_html                         Draft a refund message via their "contact us" form for the kitchen organizer I bought around Feb 2023. It broke after three days of use. The shop requires the order id, the reason and the amount to refund in the message. Don't submit yet
+ 531  shopping                   program_html                         Draft a refund message via their "contact us" form for the phone case I bought March 2023. It broke after three days of use. The shop requires the order id, the reason and the amount to refund in the message. Don't submit yet
+ 532  shopping                   program_html                         Draft a refund message via their "contact us" form for the PS3 remote controller I bought early 2023. It broke after three days of use. The shop requires the order id, the reason and the amount to refund in the message. Don't submit yet
+ 533  gitlab                     program_html                         Follow ['convexegg', 'yjlou'] on Gitlab
+ 534  gitlab                     program_html                         Follow ['Jakub Klinkovský', 'Koushik', 'Vinta Chen'] on Gitlab
+ 535  gitlab                     program_html                         Follow ['Jakub K', 'ghost', 'Benoît Blanchon'] on Gitlab
+ 536  gitlab                     program_html                         Follow ['ghost', 'R1kk3r', 'Abishek'] on Gitlab
+ 537  gitlab                     program_html                         Follow ['Jakub Klinkovsk', 'convexegg', 'Vinta Chen', 'yjlou', 'Abishek S'] on Gitlab
+ 538  shopping_admin             program_html                         Modify the address of order #299 to 456 Oak Avenue, Apartment 5B, New York, NY, 10001
+ 539  shopping_admin             program_html                         Modify the address of order #65 to 789 Pine Lane, San Francisco, CA, 94102
+ 540  shopping_admin             program_html                         Modify the address of order #301 to 321 Birch Boulevard, Suite 200, Dallas, TX, 75201
+ 541  shopping_admin             program_html                         Modify the address of order #125 to 654 Elm Drive, Apartment 12, Miami, FL, 33101
+ 542  shopping_admin             program_html                         Modify the address of order #300 to 987 Cedar Court, Los Angeles, CA, 90012
+ 543  shopping_admin             program_html                         Update the product description of Bella Tank to highlight the real user positive reviews by quoting the comments
+ 544  shopping_admin             program_html                         Update the description of Selena Yoga Hoodie to highlight the real user positive reviews by quoting the comments
+ 545  shopping_admin             program_html                         Update the description of Radiant Tee to highlight the real user positive reviews by quoting the comments
+ 546  shopping_admin             program_html                         Update the description of Lucia Cross-Fit Bra to highlight the real user positive reviews by quoting the comments
+ 547  shopping_admin             program_html                         Add a new color option brown to the size S of Phoebe Zipper Sweatshirt
+ 548  shopping_admin             program_html                         Add a new color blue to size S and M of Frankie Sweatshirt
+ 549  shopping_admin             program_html                         Add a new size XXXL to green Minerva LumaTech V-Tee
+ 550  shopping_admin             program_html                         Add a new size XXS to blue and purple Nona Fitness Tank
+ 551  shopping_admin             program_html                         Add new size 30 and 31 to all color variants of Diana Tights
+ 552  gitlab,reddit              program_html                         Create a folder named real_space in gimmiethat.space repo. Within it, create a file named urls.txt that contains the URLs of the 5 most recent posts from the space?
+ 553  gitlab,reddit              program_html                         Create a folder named news in gimmiethat.space repo. Within it, create a file named urls.txt that contains the URLs of the 5 most recent posts from the news related subreddits?
+ 554  gitlab,reddit              program_html                         Create a folder named moive_space in gimmiethat.space repo. Within it, create a file named urls.txt that contains the URLs of the 5 most recent posts from the movies?
+ 555  gitlab,reddit              program_html                         Create a folder named funny_pic in gimmiethat.space repo. Within it, create a file named urls.txt that contains the URLs of the 5 most recent posts from the memes?
+ 556  gitlab,wikipedia           program_html                         Create a repo named nolan_honest_fans with movies directed by Christopher Nolan in a README file
+ 557  gitlab,wikipedia           program_html                         Create a repo named nolan_old_fans with movies directed by Christopher Nolan before 2010 in a README file
+ 558  gitlab,wikipedia           program_html                         Create a repo named nolan_young_fans with movies directed by Christopher Nolan after 2010 in a README file
+ 559  gitlab,wikipedia           program_html                         Create a repo named nolan_followers with career timeline of Christopher Nolan in a README file
+ 560  gitlab,wikipedia           program_html                         Create a repo named nolan_academy_awards with movies that won Academy Awards by Christopher Nolan in a README file
+ 561  gitlab,wikipedia           program_html                         Create a repo named bafta_awards_nolan with movies that are nominated BAFTA Awards by Christopher Nolan in a README file
+ 562  gitlab,reddit              program_html                         create a repository named Awesome_DIY_ideas that includes a README file with the links to the most active 6 DIY ideas on DIY subreddit?
+ 563  gitlab,reddit              program_html                         create a repository named fun_thing_to_do that includes a README file with the links to the most active 5 DIY ideas on DIY subreddit?
+ 564  gitlab,reddit              program_html                         create a repository named live_a_life that includes a README file with the links to the most active 3 DIY ideas on DIY subreddit?
+ 565  gitlab,reddit              program_html                         create a repository named TODO that includes a README file with the links to the most active 10 DIY ideas on DIY subreddit?
+ 566  gitlab,reddit              program_html                         create a repository named Do it myself that includes a README file with the links to the most active 8 DIY ideas on DIY subreddit?
+ 567  gitlab                     program_html                         Invite Jakub Klinkovský and Benoît Blanchon as collaborator to gimmiethat.space repo
+ 568  gitlab                     program_html                         Invite Abishek and Vinta as collaborator to a11yproject.com repo
+ 569  gitlab                     program_html                         Invite Benoît and Abishek as collaborator to my HTML5 markup extention repo
+ 570  gitlab                     program_html                         Invite Jakub K, Alex Dills, Alex Hutnik and Benoît Blanchon as collaborator to my time tracking tool project repo
+ 571  shopping                   program_html                         I recently moved, my address is 231 Willow Way, Suite 100, Chicago, IL, 60601, update my information on OneStopShopping accordingly
+ 572  shopping                   program_html                         I recently moved, my address is 654 Aspen Road, House #3, Boston, MA, 02110, update my information on OneStopShopping accordingly
+ 573  shopping                   program_html                         I recently moved, my address is 987 Sycamore Circle, Philadelphia, PA, 19102, update my information on OneStopShopping accordingly
+ 574  shopping                   program_html                         I recently moved, my address is 111 Magnolia Path, Atlanta, GA, 30303, update my information on OneStopShopping accordingly
+ 575  shopping                   program_html                         I recently moved, my address is 222 Redwood Rise, Suite 300, Seattle, WA, 98101, update my information on OneStopShopping accordingly
+ 576  gitlab                     program_html                         Add the following users to repo a11y-webring.club as developer: ['abisubramanya27', 'lahwaacz']
+ 577  gitlab                     program_html                         Add the following users to my GitHub timeline item management extension as maintainer: ['abisubramanya27', 'lahwaacz']
+ 578  gitlab                     program_html                         Add the following users to repo millennials-to-snake-people as reporter: ['yjlou', 'a11yproject']
+ 579  gitlab                     program_html                         Add the following users to my time tracking tool as guest: ['yjlou']
+ 580  reddit                     program_html                         Create a new forum named sci_fi, with a description of A wild place for sci-fi enthusiasts, and include ['New', 'Classic', 'Movies', 'Post my novel', 'Random'] in the sidebar?
+ 581  reddit                     program_html                         Create a new forum named cmu_lti, with a description of Language Technologies Institute at Carnegie Mellon University, and include ['announcement', 'paper', 'alumni'] in the sidebar?
+ 582  reddit                     program_html                         Create a new forum named Cyberpunk, with a description of Welcome to the future, and include ['Games', 'Books', 'Movies', 'Future'] in the sidebar?
+ 583  reddit                     program_html                         Create a new forum named PlantsForCatParents, with a description of Cat parents & plan lovers, and include ['Cat friendly', 'Local vendors', 'Promotion', 'Toxic plants!'] in the sidebar?
+ 584  reddit                     program_html                         Create a new forum named Karaoke, with a description of Place for Karaoke lovers, and include ['devices', 'setup'] in the sidebar?
+ 585  shopping                   program_html                         Rate my recent purchase of floor lamp with 5 stars, using my nickname Emma Lopez?
+ 586  shopping                   program_html                         Rate my recent purchase of Jiffy Corn Muffin Cornbread Mix with 4 stars, using my nickname ShoppingEmma?
+ 587  shopping                   program_html                         Rate my recent purchase of PS3 Remote Controllers with 3 stars, using my nickname GamingEmma?
+ 588  shopping                   program_html                         Rate my recent purchase of Foundation For Mattress With Frame Set with 1 stars, using my nickname ShoppingEmma?
+ 589  shopping                   program_html                         Rate my recent purchase of Mini Wireless Bluetooth Speaker with 2 stars, using my nickname SimpleEmma?
+ 590  gitlab                     url_match,program_html               Create a milestone for the upcoming event of product launch starting on 1/16/2023 and ending on 1/30/2023
+ 591  gitlab                     url_match,program_html               Create a milestone for the upcoming practice of collective code review starting on 1/16/2023 and ending on in 20 days
+ 592  gitlab                     url_match,program_html               Create a milestone for the upcoming task of cleaning sensitive information starting on 2/16/2023 and ending on in 20 days
+ 593  gitlab                     url_match,program_html               Create a milestone for the upcoming task of merging all branches to main starting on March 15, 2044 and ending on March 30, 2044
+ 594  gitlab                     url_match,program_html               Create a milestone for the upcoming task of adding a new branch for zsh comprehensive support starting on 5/1/2044 and ending on in 20 days
+ 595  reddit                     url_match,program_html               Open the thread of a trending post on the forum "space" and subscribe.
+ 596  reddit                     url_match,program_html               Open the thread of a trending post on the forum "books" and subscribe.
+ 597  reddit                     url_match,program_html               Open the thread of a trending post on the forum "consoles" and subscribe.
+ 598  reddit                     url_match,program_html               Open the thread of a trending post on the forum "pittsburgh" and subscribe.
+ 599  reddit                     url_match,program_html               Open the thread of a trending post on the forum "machine learning" and subscribe.
+ 600  reddit                     url_match,program_html               Post my question, "what is the recommended console to buy these days", in a subreddit where I'm likely to get an answer
+ 601  reddit                     url_match,program_html               Post my question, "is car necessary in NYC", in a subreddit where I'm likely to get an answer
+ 602  reddit                     url_match,program_html               Post my question, "places for new drivers to learn driving in pittsburgh", in a subreddit where I'm likely to get an answer
+ 603  reddit                     url_match,program_html               Post my question, "safe and budge apartment to live in nyc", in a subreddit where I'm likely to get an answer
+ 604  reddit                     url_match,program_html               Post my question, "what is the SOTA web navigation agent repo", in a subreddit where I'm likely to get an answer
+ 605  reddit                     url_match,program_html               Find a subreddit focused on topics related to gaming consoles, and post my question, "what is the recommended console to buy these days" there
+ 606  reddit                     url_match,program_html               Find a subreddit focused on topics related to NYC, and post my question, "is car necessary" there
+ 607  reddit                     url_match,program_html               Find a subreddit focused on topics related to city Pittsburgh, and post my question, "places for new drivers to learn driving" there
+ 608  reddit                     url_match,program_html               Find a subreddit focused on topics related to city lives in DMV area, and post my question, "safe and budge apartment to live" there
+ 609  reddit                     url_match,program_html               Find a subreddit focused on topics related to ML, DL, NLP, and post my question, "what is the SOTA web navigation agent repo" there
+ 610  reddit                     url_match,program_html               Post a review of my recent reading "To Kill a Mockingbird by Harper Lee" in the r/books with my comment "good book!".
+ 611  reddit                     url_match,program_html               Post a review of my recent reading "Harry Potter" in the r/books with my comment "Wonderful journey".
+ 612  reddit                     url_match,program_html               Post a review of my recent reading "big little lies" in the r/books with my comment "can't stop it".
+ 613  reddit                     url_match,program_html               Post a review of my recent reading "Love story" in the r/books with my comment "I cried".
+ 614  reddit                     url_match,program_html               Post a review of my recent reading "Gone with the wind" in the r/books with my comment "It's a book with history".
+ 615  reddit                     url_match,program_html               Re-post the image of Bald Eagle in this page to earthporn subreddit and note "from /f/pics"
+ 616  reddit                     url_match,program_html               Re-post the image of Thanksgiving turkey in this page to funny subreddit and note "from /f/pics"
+ 617  reddit                     url_match,program_html               Re-post the image of Firework in this page to earthporn subreddit and note "from /f/pics"
+ 618  reddit                     url_match,program_html               Re-post the image of Wife's costume in this page to funny subreddit and note "from /f/pics"
+ 619  reddit                     url_match,program_html               Re-post the image of costume contest in this page to funny subreddit and note "from /f/pics"
+ 620  reddit                     url_match,program_html               Ask for advice about deal with long-distance relationships in a subreddit for relations
+ 621  reddit                     url_match,program_html               Ask for advice about cheat in a subreddit for relations
+ 622  reddit                     url_match,program_html               Ask for advice about sexual harassment in a subreddit for relations
+ 623  reddit                     url_match,program_html               Ask for advice about gift for birthday in a subreddit for relations
+ 624  reddit                     url_match,program_html               Ask for advice about break-up remedy in a subreddit for relations
+ 625  reddit                     url_match,program_html               Create a discussion post about "the effectiveness of online learning" in a relevant subreddit and ask users for their opinions with the simple prompt, "your opinion"
+ 626  reddit                     url_match,program_html               Create a discussion post about "Iphone 14" in a relevant subreddit and ask users for their opinions with the simple prompt, "your opinion"
+ 627  reddit                     url_match,program_html               Create a discussion post about "Harry Potter movie series" in a relevant subreddit and ask users for their opinions with the simple prompt, "your opinion"
+ 628  reddit                     url_match,program_html               Create a discussion post about "long distance relationship" in a relevant subreddit and ask users for their opinions with the simple prompt, "your opinion"
+ 629  reddit                     url_match,program_html               Create a discussion post about "Fun thing to do in Pittsburgh" in a relevant subreddit and ask users for their opinions with the simple prompt, "your opinion"
+ 630  reddit                     url_match,program_html               Ask for product recommendations for noise-cancelling headphones within a budget of $200 in r/headphones
+ 631  reddit                     url_match,program_html               Ask for product recommendations for running shoes within a budget of $100 in r/sports
+ 632  reddit                     url_match,program_html               Ask for product recommendations for running shoes within a budget of $500 in r/sports
+ 633  reddit                     url_match,program_html               Ask for product recommendations for running pants within a budget of $500 in r/sports
+ 634  reddit                     url_match,program_html               Ask for product recommendations for used iphone within a budget of $1000 in r/iphone
+ 635  reddit                     url_match,program_html               Post in the most appropriate subreddit and ask for recommendations for noise-cancelling headphones products within a budget of $200
+ 636  reddit                     url_match,program_html               Post in the most appropriate subreddit and ask for recommendations for DIY toolkit products within a budget of $100
+ 637  reddit                     url_match,program_html               Post in the most appropriate subreddit and ask for recommendations for sony headphones products within a budget of $500
+ 638  reddit                     url_match,program_html               Post in the most appropriate subreddit and ask for recommendations for must-have product in my life products within a budget of $30
+ 639  reddit                     url_match,program_html               Post in the most appropriate subreddit and ask for recommendations for used iphone products within a budget of $1000
+ 640  reddit                     url_match,program_html               Post a notice on a virtual meetup for book reading enthusiasts on March 15th in the r/books subreddit
+ 641  reddit                     url_match,program_html               Post a notice on a virtual meetup for Harry Potter enthusiasts on July 8th in the books subreddit
+ 642  reddit                     url_match,program_html               Post a notice on a virtual meetup for Big little lies enthusiasts on Sep 10th in the books subreddit
+ 643  reddit                     url_match,program_html               Post a notice on a virtual meetup for racing cars enthusiasts on Oct 21st in the nyc subreddit
+ 644  reddit                     url_match,program_html               Post a notice on a virtual meetup for Tears of Kingdom enthusiasts on Dec 15th in the games subreddit
+ 645  reddit                     url_match,program_html               Post in books subreddit about what could machine learning help the correpong field.
+ 646  reddit                     url_match,program_html               Post in DIY subreddit about what could midjourney help the correpong field.
+ 647  reddit                     url_match,program_html               Post in technology forum about what could open-source LLMs help the correpong field.
+ 648  reddit                     url_match,program_html               Post in dataisbeautiful forum about what could large language models help the correpong field.
+ 649  reddit                     url_match,program_html               Post in history subreddit about what could diffusion model help the correpong field.
+ 650  reddit                     url_match,program_html               Reply to the post with my comment "I am a big fan of the bookorg"
+ 651  reddit                     url_match,program_html               Reply to the post with my comment "Yeah, pittsburgh traffic, you know..."
+ 652  reddit                     url_match,program_html               Reply to the post with my comment "???"
+ 653  shopping                   url_match,program_html               Fill the "contact us" form in the site for a refund on the phone screen protector I bought, stating that it broke after just three days of use. Also, ensure to include the order number #000000180 and the product SKU. Don't submit yet, I will check.
+ 654  shopping                   url_match,program_html               Fill the "contact us" form in the site for a refund on the bluetooth speaker I bought, stating that it broke after just three days of use. Also, ensure to include the order number #161 and the product SKU. Don't submit yet, I will check.
+ 655  shopping                   url_match,program_html               Fill the "contact us" form in the site for a refund on the iphone case I bought, stating that it broke after just three days of use. Also, ensure to include the order number #180 and the product SKU. Don't submit yet, I will check.
+ 656  shopping                   url_match,program_html               Fill the "contact us" form in the site for a refund on the remote controller I bought, stating that it broke after just three days of use. Also, ensure to include the order number #180 and the product SKU. Don't submit yet, I will check.
+ 657  shopping                   url_match,program_html               Fill the "contact us" form in the site for a refund on the speaker I bought, stating that it broke after just three days of use. Also, ensure to include the order number #148 and the product SKU. Don't submit yet, I will check.
+ 658  gitlab                     url_match,program_html               Create an issue in a11yproject repo with title "401 bad gateway". Assign the issue to Roshanjossey. Set due date to be the end of 2030
+ 659  gitlab                     url_match,program_html               Create an issue in empathy-prompts repo with title "Integrating LLMs for better prompts". Assign the issue to Roshanjossey. Set due date to be the beginning of Q2 2033
+ 660  gitlab                     url_match,program_html               Create an issue in dotfiles repo with title "add support for oh-my-zsh". Assign the issue to Abishek. Set due date to be July 18 2033
+ 661  gitlab                     url_match,program_html               Open an issue to report the issue of connection refused in ChatGPT.
+ 662  gitlab                     url_match,program_html               Open an issue to report experiencing "OSError: [Errno 98] Address already in use" during executions in aem-hacker.
+ 663  gitlab                     url_match,program_html               Open an issue to ask their plan on supporting Llama and other llama family models in metaseq.
+ 664  gitlab                     url_match,program_html               Open an issue to ask their plans on adding Python 3.11 related resources in awesome-python.
+ 665  gitlab                     url_match,program_html               Open an issue to request adding support for MT theme editor in a11y-syntax-highlighting.
+ 666  gitlab                     url_match,program_html               Submit a request to merge dialog-component branch into dialog branch, assign Carol as the reviewer
+ 667  gitlab                     url_match,program_html               Submit a merge request for dialog-component branch to be merged into bump-doctocat branch, assign primer as the reviewer
+ 668  gitlab                     url_match,program_html               Submit a merge request for a11yproject.com/redesign branch to be merged into master branch, assign Justin Armstrong as the reviewer
+ 669  gitlab                     url_match,program_html               Open a new issue to discuss the implementation of dark mode
+ 670  gitlab                     url_match,program_html               Open a new issue to discuss the implementation of default plugins for .zsh
+ 671  shopping,reddit            url_match,program_html               Gather the titles of Sony Computer Entertainment VR reviews with 2 stars and less rating from OneStopShop, and post them in the games subreddit under the title "real user feedback on Sony Computer Entertainment VR"
+ 672  shopping,reddit            url_match,program_html               Gather the titles of Nintendo Switch Fortnite Wildcat Console EU reviews with 3 stars and less rating from OneStopShop, and post them in the games subreddit under the title "real user feedback on Nintendo Switch Fortnite Wildcat Console EU"
+ 673  shopping,reddit            url_match,program_html               Gather the titles of Racing Wheel Overdrive for Xbox X reviews with 1 star rating from OneStopShop, and post them in the games subreddit under the title "real user feedback on Racing Wheel Overdrive for Xbox X"
+ 674  shopping,reddit            url_match,program_html               Gather the titles of Doc and Pies Arcade Factory Cocktail Arcade Machine reviews with 3 stars and less rating from OneStopShop, and post them in the games subreddit under the title "real user feedback on Doc and Pies Arcade Factory Cocktail Arcade Machine"
+ 675  shopping,reddit            url_match,program_html               Gather the titles of HORI 3D Surround Gaming Neckset reviews with 2 stars and less rating from OneStopShop, and post them in the games subreddit under the title "real user feedback on HORI 3D Surround Gaming Neckset"
+ 676  shopping_admin             url_match,program_html               Lookup orders that are suspected of being fraudulent
+ 677  shopping_admin             url_match,program_html               Lookup orders that are processing
+ 678  shopping_admin             url_match,program_html               Lookup orders that are canceled
+ 679  shopping_admin             url_match,program_html               Lookup orders that are completed
+ 680  shopping_admin             url_match,program_html               Lookup orders that are on hold
+ 681  reddit,gitlab              url_match,program_html               Find a GitLab repository related to gan implementation and make a Reddit post linking to it in a relevant subreddit
+ 682  reddit,gitlab              url_match,program_html               Find a GitLab repository related to chatGPT and make a Reddit post linking to it in a relevant subreddit
+ 683  reddit,gitlab              url_match,program_html               Find a GitLab repository related to metaseq and make a Reddit post linking to it in a relevant subreddit
+ 684  reddit,gitlab              url_match,program_html               Promote byteblaze/cloud-to-butt to subreddit LifeProTips with the description from the repo itself.
+ 685  reddit,gitlab              url_match,program_html               Promote byteblaze/dotfiles to subreddit aww with the description from the repo itself.
+ 686  reddit,gitlab              url_match,program_html               Promote auth0/angular-storage to subreddit technology with the description from the repo itself.
+ 687  reddit,gitlab              url_match,program_html               Promote koush/AndroidAsync to subreddit funny with the description from the repo itself.
+ 688  reddit,gitlab              url_match,program_html               Promote lahwaacz/arch-wiki-docs to subreddit science with the description from the repo itself.
+ 689  shopping                   url_match,program_html               Draft an email to the shop owner via their contact us function for a coupon as I am a loyal customer
+ 690  shopping                   url_match,program_html               Draft an email to the shop owner via their contact us function for a coupon as they promised me a coupon last time
+ 691  shopping                   url_match,program_html               Draft an email to the shop owner via their contact us function for a coupon as I plan to make a bulk purchase
+ 692  shopping                   url_match,program_html               Draft an email to the shop owner via their contact us function for a coupon as I am a student
+ 693  shopping                   url_match,program_html               Draft an email to the shop owner via their contact us function for a coupon as my refund is suppoed to be replaced by a coupon
+ 694  shopping_admin             url_match,program_html               Add a simple product named Energy-Bulk Women Shirt with 50 in stock, available in size S and color blue, priced at $60
+ 695  shopping_admin             url_match,program_html               Add a simple product named Energy-Bulk Man Yoga Pant with 50 in stock, available in size 38 and color yellow, priced at $69.99
+ 696  shopping_admin             url_match,program_html               Add a simple product named FancyBoy Man Causal Jeans with 42 in stock, available in size 34 and color Blue, priced at $169.99
+ 697  shopping_admin             url_match,program_html               Add a simple product named Swaatch Smart Watch with 42 in stock, available in size uni-size and color Blue, priced at $769.99
+ 698  shopping_admin             url_match,program_html               Add a simple product named Lelelumon Yoga Mat with 42 in stock, available in size uni-size and color black, priced at $769.99
+ 699  shopping_admin             url_match,program_html               Draft a new marketing price rule for spring sale that offers a 20 percent discount site-wide for all customers
+ 700  shopping_admin             url_match,program_html               Draft a new marketing price rule for fall discount that offers $10 discount on checkout for all customers
+ 701  shopping_admin             url_match,program_html               Draft a new marketing price rule for Mother's day sale that offers $15 discount on checkout for all customers
+ 702  shopping_admin             url_match,program_html               Draft a new marketing price rule for Pride Month that offers 45% off on all products for all customers
+ 703  shopping_admin             url_match,program_html               Draft a new marketing price rule for Thanks giving sale that offers $40 discount on checkout for all customers
+ 704  shopping_admin             url_match,program_html               Today is 3/15/2023, generate a sales order report for last month
+ 705  shopping_admin             url_match,program_html               Today is 3/15/2023, generate a sales order report over the last 45 days
+ 706  shopping_admin             url_match,program_html               Today is 3/15/2023, generate a refund report for Q1
+ 707  shopping_admin             url_match,program_html               Today is 3/15/2023, generate a sales order report for last year
+ 708  shopping_admin             url_match,program_html               Today is 3/15/2023, generate a tax report for this year
+ 709  shopping_admin             url_match,program_html               Create an orders report from beginning of May 2021 to end of March 2022
+ 710  shopping_admin             url_match,program_html               Create a shipping report from 08/05/2022 to 03/01/2023
+ 711  shopping_admin             url_match,program_html               Create a product view report from 07/05/2021 to 05/31/2023
+ 712  shopping_admin             url_match,program_html               Create a coupons report from 05/01/2021 to 05/15/2023
+ 713  shopping_admin             url_match,program_html               Create a best sellers report from 05/01/2022 to 05/31/2023
+ 714  reddit                     program_html                         Thumbs down the top 1 post ever in gadgets.
+ 715  reddit                     program_html                         Thumbs down the top 2 post ever in history.
+ 716  reddit                     program_html                         Thumbs down the top 3 post ever in books.
+ 717  reddit                     program_html                         Thumbs down the top 4 post ever in movies.
+ 718  reddit                     program_html                         Thumbs down the top 5 post ever in technology.
+ 719  reddit                     program_html                         Like all submissions created by ThetaGang_wsb in subreddit wallstreetbets
+ 720  reddit                     program_html                         Like all submissions created by CameronKelsey in subreddit earthporn
+ 721  reddit                     program_html                         Like all submissions created by UniversityofBath in subreddit IAmA
+ 722  reddit                     program_html                         Like all submissions created by Don_Gato1 in subreddit new york
+ 723  reddit                     string_match                         Like all submissions created by FTorrez81 in subreddit iphone13
+ 724  reddit                     program_html                         Like all submissions created by Hrekires in subreddit news
+ 725  reddit                     program_html                         DisLike all submissions created by RickyDontLoseThat in subreddit massachusetts
+ 726  reddit                     string_match                         DisLike all submissions created by jacyanthis in subreddit earthporn
+ 727  reddit                     program_html                         DisLike all submissions created by PatientBuilder499 in subreddit videos
+ 728  reddit                     program_html                         DisLike all submissions created by sirbarani in subreddit sports
+ 729  reddit                     program_html                         DisLike all submissions created by AdamCannon in subreddit UpliftingNews
+ 730  reddit                     program_html                         DisLike all submissions created by Hrekires in subreddit news
+ 731  reddit                     program_html                         Edit my post on Nvidia RTX 4090 by adding a line to the body that says "EDIT: This news aged well"
+ 732  reddit                     program_html                         Edit my post on The Night Agent by adding a line to the body that says "Done watching, pretty cool!"
+ 733  reddit                     program_html                         Edit my post on Star Trek Starfleet Academy series by adding a line to the body that says "Every watch makes me feel like a kid again"
+ 734  reddit                     program_html                         Edit my post on Ted Lasso by adding a line to the body that says "Done watching. I love the renew!"
+ 735  reddit                     program_html                         Edit my post on Lord of the Rings by adding a line to the body that says "The cast is amazing!"
+ 736  gitlab                     program_html                         Make the LICENSE of gimmiethat.space and dotfiles to MIT license.
+ 737  wikipedia,map              program_html                         Show me the way from Carnegie Mellon University to the home stadium of Philadelphia 76ers 
+ 738  wikipedia,map              program_html                         Show me the way from Carnegie Mellon University to the home stadium of Philadelphia 76ers in the 70th
+ 739  wikipedia,map              program_html                         Show me the way from Carnegie Mellon University to the home stadium of Yankees in the 80th
+ 740  wikipedia,map              program_html                         Show me the way from Carnegie Mellon University to the home stadium of NYC NBA team 
+ 741  wikipedia,map              program_html                         Show me the way from Carnegie Mellon University to the home stadium of Boston home NBA team 
+ 742  gitlab                     program_html                         Create a new private project "planner" and add Abishek, Vinta as members
+ 743  gitlab                     program_html                         Create a new public project "web_arena" and add Abishek, Vinta as members
+ 744  gitlab                     program_html                         Create a new public project "AutoAGI" and add primer as members
+ 745  gitlab                     program_html                         Create a new public project "awesome-llms" and add primer, convexegg, abishek as members
+ 746  gitlab                     program_html                         Create a new private project "llm_bulk_inference" and add primer, convexegg, abishek as members
+ 747  gitlab                     program_html                         Start a private project awesome_web_agents with blank template and add Abishek, Vinta as members
+ 748  gitlab                     program_html                         Start a private project web_agent_android_xl with Android template and add primer, convexegg, abishek as members
+ 749  gitlab                     program_html                         Start a private project project_site with NodeJS template and add primer, convexegg, vinta as members
+ 750  gitlab                     program_html                         Start a private project agi_index with HTML template and add Vinta Chen as members
+ 751  gitlab                     program_html                         Start a private project AGISite with JEKYLL template and add Rohan and Vinta as members
+ 752  gitlab                     program_html                         Create a private blank repository called "web_agent" using the right template to speed up development.
+ 753  gitlab                     program_html                         Create a private Android repository called "web_agent_android_xs" using the right template to speed up development.
+ 754  gitlab                     program_html                         Create a private NodeJS repository called "web_agent_nodejs" using the right template to speed up development.
+ 755  gitlab                     program_html                         Create a private HTML repository called "web_agent_index" using the right template to speed up development.
+ 756  gitlab                     program_html                         Create a private JEKYLL repository called "11711_gitlab" using the right template to speed up development.
+ 757  map                        program_html                         Show me the path and travel time from home of the 1980 Super Bowl champions to home of the 1991 Super Bowl champions.
+ 758  map                        program_html                         Show me the path and travel time from the big apple to biggest city in Maine.
+ 759  map,shopping_admin         program_html                         Show me the route and driving time from the city where my E-commerce customer Sophia Young lives to New York City
+ 760  map,shopping_admin         program_html                         Show me the route and driving time from Allentown, PA to the city where my E-commerce customer Amanda Kim lives
+ 761  map                        program_html                         Get directions from Carnegie Science Museum to Hunt library CMU using walk options.
+ 762  map                        program_html                         Get directions from Carnegie Music Hall in NYC to Carnegie Mellon University using driving options.
+ 763  map                        program_html                         Find the walkway to the closest Trader Joe's from 401 Shady Ave, Pittsburgh.
+ 764  map                        program_html                         Find the walkway to the closest Target from 401 Shady Ave, Pittsburgh.
+ 765  map                        program_html                         Find the walkway to the closest Japanese food market from 401 Shady Ave, Pittsburgh.
+ 766  map                        program_html                         Find the walkway to the closest grocessory owned by Amazon from 401 Shady Ave, Pittsburgh.
+ 767  map                        program_html                         Find the walkway to the closest chain grocessory owned by a local business from 401 Shady Ave, Pittsburgh.
+ 768  shopping_admin             program_html                         5 blue Cronus yoga pants with size 33 arrived, update the stock
+ 769  shopping_admin             program_html                         We've received 378 brown Aero daily fitness tee in every size, please update the inventory.
+ 770  shopping_admin             program_html                         We've received 12 white Cora parachute pant of size 28 and 56 blue of size 29, update the inventory.
+ 771  shopping_admin             program_html                         Approve the positive reviews to display in our store.
+ 772  shopping_admin             program_html                         Delete all pending negative reviews for Circe fleece
+ 773  shopping_admin             program_html                         Delete all pending negative reviews
+ 774  shopping_admin             program_html                         Delete all pending reviews with less than 4 stars
+ 775  shopping_admin             program_html                         Delete all reviews from the scammer Arden
+ 776  shopping_admin             program_html                         Delete all reviews from the scammer Carlo
+ 777  shopping_admin             program_html                         Reduce the price of green Hollister backyard sweater in all size by $5
+ 778  shopping_admin             program_html                         Reduce the price of size 28 Sahara leggings by 13.5%
+ 779  shopping_admin             program_html                         Reduce the price of yellow shirts from Gwyn Endurance in all size below L by 15%
+ 780  shopping_admin             program_html                         Increase the price of white Ingrid Running with size L and above by $17
+ 781  shopping_admin             program_html                         Increase the price of black fitness tshirts from Desiree with size XS by 37%
+ 782  shopping_admin             program_html                         Increase the price of all blue running tshirts in extra small and small sizes by 23%
+ 783  gitlab                     string_match                         Add the following users to repo kkroening/ffmpeg-python as maintainer: ['yjlou', 'a11yproject']
+ 784  gitlab                     string_match                         Tell me the email address of the contributor who has the most commits to branch main
+ 785  gitlab                     string_match                         Tell me the email address of the contributor who has the most commits to branch gh-page
+ 786  gitlab                     string_match                         Tell me the number of commits of the contributor who has the most commits to branch main
+ 787  gitlab                     string_match                         Tell me the number of followers of the contributor who has the most commits to branch main
+ 788  gitlab                     string_match                         Tell me the full name, gitlab account name, location and email address of the contributor who has the most commits to branch php52
+ 789  gitlab                     string_match                         Create an issue asking about do they have any plan on supporting Webagent in the next quater in huggingface dataset.
+ 790  shopping_admin             string_match                         Delete all negative reviews for Sybil running short
+ 791  gitlab,reddit              string_match                         Make a folder named car on the gimmiethat.space repo and include a file called urls.txt that consists of the links to the 5 most recent posts from cars.
+ 792  shopping                   string_match                         Buy the highest rated product from the Beauty & Personal Care category within a budget under 20.
+ 793  shopping                   string_match                         Buy the highest rated product from the Men clothing category within a budget above 50 but under 129.99.
+ 794  shopping                   string_match                         Change the delivery address for my most recent order to 4000 Forbes Ave, Pittsburgh, PA.
+ 795  shopping                   string_match                         Change the delivery address for my most recent order to 6726 McPherson Blvd, Pittsburgh, PA.
+ 796  shopping                   string_match                         Change the delivery address for my most recent order to 155 5th Street, San Francisco, CA.
+ 797  shopping                   string_match                         Change the delivery address for my most recent order to 3 Oxford St, Cambridge, MA.
+ 798  shopping                   string_match                         Change the delivery address for my most recent order to 77 Massachusetts Ave, Cambridge, MA.
+ 799  gitlab                     program_html                         create a new group "n-lab" with members patou, egpast, westurner, jontutcher
+ 800  gitlab                     program_html                         create a new group "x-lab" with members JonasVautherin, dilipchandima, dawiss1337, bmyun, DCMJY
+ 801  gitlab                     program_html                         create a new group "crew" with members ASWATFZLLC, patrickhlauke, westurner, linkmatrix
+ 802  gitlab                     program_html                         create a new group "coding_friends" with members qhduan, Agnes-U
+ 803  gitlab                     program_html                         create a new group "webagent" with members pandey2000, sayakpaul, sayakpaul
+ 804  gitlab                     program_html                         Assign the issue regarding flash alerts to myself and primer.
+ 805  gitlab                     url_match,program_html               Submit a merge request for the branch that implements the support of template strings to be merged into master branch, assign myself and Roshan as the reviewer
+ 806  gitlab                     url_match,program_html               Submit a merge request for a11yproject.com/redesign branch to be merged into markdown-figure-block branch, assign myself as the reviewer
+ 807  gitlab                     url_match,program_html               Submit a merge request for build time debug branch to be merged into main branch, assign myself as the reviewer
+ 808  gitlab                     url_match,program_html               Create an issue in cloud-to-butt repo with title "Let's keep the project alive". Assign the issue to myself. Set due date to be the end of Q1 2033
+ 809  gitlab                     url_match,program_html               Create an issue in a11yproject repo with title "404 for many URLs". Assign the issue to myself. Set due date to be 2030-1-3
+ 810  gitlab                     program_html                         Assign the issue regarding flash alert in primer design guide repo to myself.
+ 811  gitlab                     program_html                         Assign the issue regarding 404 in a11yproject to myself.
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+Total: 812

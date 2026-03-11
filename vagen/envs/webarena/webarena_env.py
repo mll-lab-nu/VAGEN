@@ -1,4 +1,5 @@
 import asyncio
+import concurrent.futures
 import re
 import json
 import os
@@ -127,11 +128,29 @@ class WebArenaEnv(GymImageEnv):
         # Browser env created lazily on first reset()
         self.browser_env = None
 
+        # Dedicated single-thread executor for Playwright sync API.
+        # Using executor.submit() instead of asyncio.to_thread() avoids
+        # Python 3.12's contextvars propagation which leaks the asyncio
+        # running loop into the thread, causing Playwright to raise
+        # "Playwright Sync API inside the asyncio loop".
+        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+
         # Episode state
         self._steps_used: int = 0
         self.total_reward: float = 0.0
         self._task_intent: str = ""
         self._current_config_file: str = ""
+
+    async def _run_sync(self, fn, *args, **kwargs):
+        """Run a sync function in a dedicated thread WITHOUT asyncio context propagation.
+
+        asyncio.to_thread() copies contextvars (including the running loop) to the
+        worker thread, causing Playwright sync API to fail with 'Sync API inside
+        asyncio loop'. executor.submit() + wrap_future bypasses this.
+        """
+        loop = asyncio.get_running_loop()
+        future = self._executor.submit(fn, *args, **kwargs)
+        return await asyncio.wrap_future(future, loop=loop)
 
     def _ensure_browser_env(self):
         """Lazily create ScriptBrowserEnv (lightweight — browser launches on reset)."""
@@ -152,8 +171,9 @@ class WebArenaEnv(GymImageEnv):
     # ------------------------------------------------------------------
     async def close(self) -> None:
         if self.browser_env is not None:
-            await asyncio.to_thread(self.browser_env.close)
+            await self._run_sync(self.browser_env.close)
             self.browser_env = None
+        self._executor.shutdown(wait=False)
 
     async def system_prompt(self) -> Dict[str, Any]:
         return {"obs_str": _system_prompt()}
@@ -164,7 +184,7 @@ class WebArenaEnv(GymImageEnv):
         idx = seed % len(self._config_files)
         config_file = self._config_files[idx]
 
-        obs, info = await asyncio.to_thread(
+        obs, info = await self._run_sync(
             self.browser_env.reset, options={"config_file": config_file}
         )
 
@@ -210,7 +230,7 @@ class WebArenaEnv(GymImageEnv):
                 client.detach()
             return score
 
-        return await asyncio.to_thread(_eval)
+        return await self._run_sync(_eval)
 
     async def step(
         self, action_str: str
@@ -239,7 +259,7 @@ class WebArenaEnv(GymImageEnv):
 
                 try:
                     action = create_id_based_action(action_text)
-                    obs, _, terminated, _, step_info = await asyncio.to_thread(
+                    obs, _, terminated, _, step_info = await self._run_sync(
                         self.browser_env.step, action
                     )
                     info.update(step_info)

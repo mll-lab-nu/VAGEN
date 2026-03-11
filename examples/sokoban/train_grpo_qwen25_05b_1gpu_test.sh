@@ -3,16 +3,16 @@
 set -x
 
 PROJECT_NAME="verl_vagen"
-EXPERIMENT_NAME="grpo_qwen25vl3b_test"
+EXPERIMENT_NAME="grpo_qwen25_05b_1gpu_test"
 
 BASEDIR=$(pwd)
 SCRIPTDIR=$(dirname "$0")
 EXPERIMENT_DIR=${BASEDIR}/exps/${PROJECT_NAME}/${EXPERIMENT_NAME}
 SAVE_CHECKPOINT_DIR=${EXPERIMENT_DIR}/verl_checkpoints
-DATASET_TRAIN=${SCRIPTDIR}/train_sokoban_vision.yaml
-DATASET_VAL=${SCRIPTDIR}/val_sokoban_vision.yaml
+DATASET_TRAIN=${SCRIPTDIR}/train_sokoban_text.yaml
+DATASET_VAL=${SCRIPTDIR}/val_sokoban_text.yaml
 agent_loop_config_path=${BASEDIR}/vagen/configs/agent.yaml
-REF_MODEL_PATH=/u/ryu4/.cache/huggingface/hub/models--Qwen--Qwen2.5-VL-3B-Instruct/snapshots/66285546d2b821cf421d4f5eb2576359d3770cd3
+REF_MODEL_PATH=Qwen/Qwen2.5-0.5B-Instruct
 mkdir -p ${EXPERIMENT_DIR}
 
 
@@ -28,7 +28,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.model.use_fused_kernels=True \
     actor_rollout_ref.actor.optim.lr=1e-6 \
-    actor_rollout_ref.actor.ppo_mini_batch_size=16 \
+    actor_rollout_ref.actor.ppo_mini_batch_size=4 \
     actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=1 \
     actor_rollout_ref.actor.use_kl_loss=False \
     actor_rollout_ref.actor.kl_loss_coef=0.0 \
@@ -37,18 +37,18 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     actor_rollout_ref.actor.checkpoint.save_contents=['model','hf_model','optimizer','extra'] \
     actor_rollout_ref.actor.ulysses_sequence_parallel_size=1 \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \
-    actor_rollout_ref.rollout.tensor_model_parallel_size=4 \
+    actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.name=sglang \
     actor_rollout_ref.rollout.mode=async \
     actor_rollout_ref.rollout.n=4 \
-    actor_rollout_ref.rollout.max_num_batched_tokens=512 \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.4 \
+    actor_rollout_ref.rollout.max_num_batched_tokens=10000 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
     actor_rollout_ref.rollout.enforce_eager=True \
     actor_rollout_ref.rollout.free_cache_engine=True \
     actor_rollout_ref.rollout.enable_chunked_prefill=True \
     actor_rollout_ref.actor.fsdp_config.param_offload=True \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=True \
-    actor_rollout_ref.actor.fsdp_config.model_dtype=torch.bfloat16 \
+    actor_rollout_ref.actor.fsdp_config.model_dtype=bf16 \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
     actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=1 \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
@@ -58,7 +58,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
     trainer.val_before_train=True \
-    trainer.n_gpus_per_node=4 \
+    trainer.n_gpus_per_node=1 \
     trainer.nnodes=1 \
     trainer.save_freq=50 \
     trainer.test_freq=10 \
@@ -67,9 +67,9 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     trainer.default_local_dir=${SAVE_CHECKPOINT_DIR} \
     trainer.validation_data_dir=${EXPERIMENT_DIR}/validation \
     trainer.rollout_data_dir=${EXPERIMENT_DIR}/rollout_data \
-    trainer.log_val_generations=16 \
-    data.max_prompt_length=512 \
-    data.max_response_length=2048 \
+    trainer.log_val_generations=4 \
+    data.max_prompt_length=1000 \
+    data.max_response_length=4000 \
     critic.optim.lr=1e-5 \
     critic.model.use_remove_padding=True \
     critic.model.path=${REF_MODEL_PATH} \
@@ -77,5 +77,6 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     critic.ppo_micro_batch_size_per_gpu=1 \
     critic.model.fsdp_config.param_offload=True \
     critic.model.fsdp_config.optimizer_offload=True \
+    data.dataloader_num_workers=0 \
     trainer.total_training_steps=100 2>&1 | \
     tee ${EXPERIMENT_DIR}/${PROJECT_NAME}_${EXPERIMENT_NAME}.log >(tee ${BASEDIR}/${PROJECT_NAME}_${EXPERIMENT_NAME}.log >/dev/null)

@@ -190,7 +190,7 @@ class GymAgentLoop(AgentLoopBase):
             except TypeError as e:
                 logger.warning(f"TypeError Warning in apply_chat_template in AgentLoop: {e}, switching to flattened text-only content.")
                 # Fallback for text-only tokenizer
-                flat_messages = [_flatten_text_only_content([agent_data.sys_msg, agent_data.cur_msg])]
+                flat_messages = [_flatten_text_only_content(m) for m in [agent_data.sys_msg, agent_data.cur_msg]]
                 agent_data.turn_prompt_ids = await self.loop.run_in_executor(
                     None,
                     lambda: self.tokenizer.apply_chat_template(
