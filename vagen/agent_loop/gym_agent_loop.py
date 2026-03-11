@@ -163,12 +163,9 @@ class GymAgentLoop(AgentLoopBase):
         cls.processor = processor
         cls.multi_turn_cfg = config.actor_rollout_ref.rollout.multi_turn
         
+        # Store module paths for lazy loading; environments are imported on first use
+        cls.env_registry_paths = dict(config.env_registry.items())
         cls.env_registry = {}
-
-        for k, v in config.env_registry.items():
-            module_path, class_name = v.rsplit(".", 1)
-            module = importlib.import_module(module_path)
-            cls.env_registry[k] = getattr(module, class_name)
             
         cls.apply_chat_template_kwargs = config.data.get("apply_chat_template_kwargs", {})
         cls.prompt_length = config.actor_rollout_ref.rollout.prompt_length
@@ -182,8 +179,15 @@ class GymAgentLoop(AgentLoopBase):
         metrics: Dict[str, Any] = {}
         request_id = uuid4().hex
 
-        # Build env
-        env_cls = self.env_registry[kwargs["env_name"]]
+        # Build env (lazy import on first use)
+        env_name = kwargs["env_name"]
+        if env_name not in self.env_registry:
+            if env_name not in self.env_registry_paths:
+                raise KeyError(f"Unknown env: {env_name}. Available: {list(self.env_registry_paths.keys())}")
+            module_path, class_name = self.env_registry_paths[env_name].rsplit(".", 1)
+            module = importlib.import_module(module_path)
+            self.env_registry[env_name] = getattr(module, class_name)
+        env_cls = self.env_registry[env_name]
         env_config = kwargs["config"]
         seed = kwargs["seed"]
         self.env_max_turns = kwargs.get("max_turns", None)
@@ -294,7 +298,7 @@ class GymAgentLoop(AgentLoopBase):
                     ),
                 )
             except TypeError as e:
-                logger.warning(f"TypeError Warning in apply_chat_template in AgentLoop: {e}, switching to flattened text-only content.")
+                #logger.warning(f"TypeError Warning in apply_chat_template in AgentLoop: {e}, switching to flattened text-only content.")
                 # Fallback for text-only tokenizer
                 flat_messages = [_flatten_text_only_content(msg) for msg in agent_data.messages]
                 agent_data.prompt_ids = await self.loop.run_in_executor(
