@@ -44,6 +44,7 @@ trainer:
   replace_image_tokens_for_logging: True    # By default, we want to convert a sequence of image tokens with readable placeholders in logs
   max_actor_ckpt_to_keep: 1                # Max number of actor checkpoints to keep (saves disk space)
   max_critic_ckpt_to_keep: 1               # Max number of critic checkpoints to keep
+  concat_multi_turn: True                 # Concatenate multi-turn messages for rollout and training
   log_image:
     enable: false           # Whether to log environment-rendered images to logger (e.g. wandb)
     max_pending: 2          # Max pending async image dump tasks (prevents IO from blocking training)
@@ -60,9 +61,9 @@ algorithm:
 # Data Filter Configuration
 # ============================================================================
 filter:
-  name: reward_variance_top_p   # Filter strategy: select top-p samples by reward variance (keeps high-variance groups for stronger learning signal)
+  name: reward_variance_top_p   
   filter_kwargs:
-    top_p: 0.9                  # Keep sample groups with the top 90% highest reward variance
+    top_p: 0.9                 
   enable: False                 
 
 # ============================================================================
