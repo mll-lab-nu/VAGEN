@@ -5,7 +5,7 @@
 set -x
 
 PROJECT_NAME="vagen_experiments"
-EXPERIMENT_NAME="sokoban_grpo_qwen3_06b_lora_text"
+EXPERIMENT_NAME="sokoban_grpo_qwen3_06b_topp_filter_lora_text"
 
 BASEDIR=$(pwd)
 SCRIPTDIR=$(dirname "$0")
