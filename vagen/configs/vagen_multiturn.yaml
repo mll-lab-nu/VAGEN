@@ -20,7 +20,9 @@ data:
   max_response_length: 8000        # Max token length for first assiastant turn response + subsequent multi-turn messages
   train_batch_size: 128            
   return_raw_chat: True            
-  return_multi_modal_inputs: True 
+  return_multi_modal_inputs: True
+  apply_chat_template_kwargs:
+    enable_thinking: False                # Whether to apply a chat template that encourages chain-of-thought style reasoning in the assistant's responses
   custom_cls:
     path: "vagen/gym_agent_dataset.py"  
     name: AgenticDataset                
