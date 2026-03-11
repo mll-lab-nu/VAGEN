@@ -2,7 +2,7 @@
 
 ## 1. B200 / RTX 6000 Pro: Attention backend error
 
-When running on NVIDIA B200 or RTX 6000 Pro GPUs, the default attention backend may fail. Add the following flags to your training command:
+When running on NVIDIA B200 or RTX 6000 Pro GPUs with sglang, the default attention backend may fail. Add the following flags to your training command:
 
 ```bash
 +actor_rollout_ref.rollout.engine_kwargs.sglang.attention_backend=flashinfer \
