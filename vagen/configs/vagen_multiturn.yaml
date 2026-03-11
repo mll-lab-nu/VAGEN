@@ -1,57 +1,74 @@
+# ============================================================================
+# VAGEN Multi-Turn PPO Training Configuration
+# Overrides defaults from ppo_trainer.yaml and env_registry.yaml
+# ============================================================================
+
 hydra:
   searchpath:
-    - file:../../verl/verl/trainer/config
+    - file:../../verl/verl/trainer/config  # Hydra search path pointing to verl's default config directory
+
 defaults:
-  - ppo_trainer
-  - env_registry
-  - _self_
+  - ppo_trainer    # Base PPO trainer config (actor/critic/rollout/algorithm defaults)
+  - env_registry   # Environment registry (maps env names -> impl classes, e.g. Sokoban, FrozenLake)
+  - _self_         # This file's values override the above defaults
 
+# ============================================================================
+# Data Configuration
+# ============================================================================
 data:
-  max_prompt_length: 9000
-  max_response_length: 8000
-  train_batch_size: 256
-  return_raw_chat: True
-  return_multi_modal_inputs: True
+  max_prompt_length: 9000          # Max token length for input prompts (system prompt + first user turn message)
+  max_response_length: 8000        # Max token length for first assiastant turn response + subsequent multi-turn messages
+  train_batch_size: 128            
+  return_raw_chat: True            
+  return_multi_modal_inputs: True 
   custom_cls:
-    path: "vagen/gym_agent_dataset.py"
-    name: AgenticDataset
+    path: "vagen/gym_agent_dataset.py"  
+    name: AgenticDataset                
 
+# ============================================================================
+# Actor / Rollout / Reference Model Configuration
+# ============================================================================
 actor_rollout_ref:
-  hybrid_engine: True
+  hybrid_engine: True   
   rollout:
-    name: sglang
+    name: sglang        
     multi_turn:
-      enable: True
-      
+      enable: True       
 
+# ============================================================================
+# Trainer Configuration
+# ============================================================================
 trainer:
-  val_before_train: True
-  skip_special_tokens_val: False
-  skip_special_tokens_train: False
-  replace_image_tokens_for_logging: True
-  max_actor_ckpt_to_keep: 1
-  max_critic_ckpt_to_keep: 1
+  val_before_train: True                    
+  skip_pad_tokens: True                      # Strip pad tokens when decoding for logging 
+  replace_image_tokens_for_logging: True    # By default, we want to convert a sequence of image tokens with readable placeholders in logs
+  max_actor_ckpt_to_keep: 1                # Max number of actor checkpoints to keep (saves disk space)
+  max_critic_ckpt_to_keep: 1               # Max number of critic checkpoints to keep
   log_image:
-    enable: false
-    max_pending: 2
-    png_compress_level: 0
+    enable: false           # Whether to log environment-rendered images to logger (e.g. wandb)
+    max_pending: 2          # Max pending async image dump tasks (prevents IO from blocking training)
+    png_compress_level: 0   # PNG compression level (0 = no compression, fastest)
 
+# ============================================================================
+# Algorithm Configuration
+# ============================================================================
 algorithm:
-  reward_scaling: 10.0
-  reward_bias: -0.5
-  reward_clip: 20.0
-  gamma: 1.0
-  lam: 1.0
-  reward_norm: True
-  reward_mean_level: group
-  reward_std_level: group
-  
-filter:
-  name: reward_variance
-  filter_kwargs: {}
-  enable: False
+  gamma: 1.0                 
+  lam: 1.0                   
 
+# ============================================================================
+# Data Filter Configuration
+# ============================================================================
+filter:
+  name: reward_variance_top_p   # Filter strategy: select top-p samples by reward variance (keeps high-variance groups for stronger learning signal)
+  filter_kwargs:
+    top_p: 0.9                  # Keep sample groups with the top 90% highest reward variance
+  enable: False                 
+
+# ============================================================================
+# HuggingFace Hub Upload Configuration
+# ============================================================================
 huggingface_hub:
-  hf_save_freq: null
-  repo_id: null
-  private: false
+  hf_save_freq: null            # null = no auto-upload
+  repo_id: vagen-training       
+  private: false                

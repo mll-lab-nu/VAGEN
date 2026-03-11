@@ -1,25 +1,8 @@
-from verl.trainer.ppo.core_algos import register_adv_est,compute_grpo_outcome_advantage
-from collections import defaultdict
-from enum import Enum
-from typing import Any, Callable, Optional
-
 import numpy as np
 import torch
-from omegaconf import DictConfig
 
 import verl.utils.torch_functional as verl_F
-from verl.trainer.config import AlgoConfig
-from verl.utils import as_torch_index, group_mean_std
-from verl.utils.import_utils import deprecated
-from verl.workers.config import ActorConfig
-from verl.trainer.ppo import core_algos
-
-
-
 from verl.trainer.ppo.core_algos import register_adv_est
-import numpy as np
-import torch
-import verl.utils.torch_functional as verl_F
 
 
 def _to_numpy_int64(x, factorize_if_non_numeric: bool = False):
@@ -62,21 +45,23 @@ def _to_numpy_int64(x, factorize_if_non_numeric: bool = False):
 
 @register_adv_est("no_concat_gae_last")
 def compute_gae_no_concat_advantage_return(
-    token_level_scores: torch.Tensor,    # (bs, L)
-    token_level_rewards: torch.Tensor,   # (bs, L)  # not used
-    values: torch.Tensor,                # (bs, L)
-    response_mask: torch.Tensor,         # (bs, L)
-    gamma: torch.Tensor,
-    lam: torch.Tensor,
-    group_idx,                           # (bs,) may be UUID strings
-    turn_idx,                            # (bs,)
-    traj_idx,                            # (bs,)
-    ignore_value: float = -100.0,        # NEW: float sentinel for invalid returns (CE-like ignore)
+    data,
+    gamma,
+    lam,
+    config=None,
+    ignore_value: float = -100.0,
     **kwargs,
 ):
     """
     Compute token-level advantages and returns for no-concat GAE.
     """
+    token_level_scores = data.batch["token_level_scores"]
+    values = data.batch.get("values", torch.zeros_like(token_level_scores))
+    response_mask = data.batch["response_mask"]
+    group_idx = data.non_tensor_batch["group_idx"]
+    turn_idx = data.non_tensor_batch["turn_idx"]
+    traj_idx = data.non_tensor_batch["traj_idx"]
+
     with torch.no_grad():
         device = token_level_scores.device
         bs, L = token_level_scores.shape
@@ -205,24 +190,19 @@ def compute_gae_no_concat_advantage_return(
     return advantages_full, returns_full
 
 
-@register_adv_est("no_concat_gae_first")
+@register_adv_est("no_concat_gae")
 def compute_gae_no_concat_advantage_return_firsttok(
-    token_level_scores: torch.Tensor,    # (bs, L)
-    token_level_rewards: torch.Tensor,   # (bs, L)  # not used
-    values: torch.Tensor,                # (bs, L)
-    response_mask: torch.Tensor,         # (bs, L)
-    gamma: torch.Tensor,
-    lam: torch.Tensor,
-    group_idx,                           # (bs,) may be UUID strings
-    turn_idx,                            # (bs,)
-    traj_idx,                            # (bs,)
-    ignore_value: float = -100.0,        # float sentinel for invalid returns (CE-like ignore)
+    data,
+    gamma,
+    lam,
+    config=None,
+    ignore_value: float = -100.0,
     **kwargs,
 ):
     """
     no-concat GAE variant that uses the FIRST valid response token as the per-turn value anchor.
 
-    Differences vs "no_concat_gae":
+    Differences vs "no_concat_gae_last":
     - Turn value v_t is taken from the FIRST valid response token (not the last).
     - The computed return for the turn is written to the FIRST valid response token position.
     - Advantages are still broadcast across all valid response tokens in the turn (same as before).
@@ -233,6 +213,13 @@ def compute_gae_no_concat_advantage_return_firsttok(
       - token_level_scores, values, response_mask: (bs, L)
       - returns_full: (bs, L) filled with ignore_value except first valid token positions
     """
+    token_level_scores = data.batch["token_level_scores"]
+    values = data.batch.get("values", torch.zeros_like(token_level_scores))
+    response_mask = data.batch["response_mask"]
+    group_idx = data.non_tensor_batch["group_idx"]
+    turn_idx = data.non_tensor_batch["turn_idx"]
+    traj_idx = data.non_tensor_batch["traj_idx"]
+
     with torch.no_grad():
         device = token_level_scores.device
         bs, L = token_level_scores.shape

@@ -319,28 +319,13 @@ def compute_advantage(
         # handle all other adv estimator type other than GAE and GRPO
         adv_estimator_fn = core_algos.get_adv_estimator_fn(adv_estimator)
         adv_kwargs = {
-            "token_level_rewards": data.batch["token_level_rewards"],
-            "token_level_scores": data.batch["token_level_scores"],
-            "token_level_kl_penalty": data.batch.get("token_level_kl_penalty", torch.zeros_like(data.batch["token_level_rewards"])),
-            "response_mask": data.batch["response_mask"],
-            "values": data.batch.get("values", torch.zeros_like(data.batch["token_level_rewards"])),
+            "data": data,
             "config": config,
             "gamma": gamma,
             "lam": lam,
             "num_repeat": num_repeat,
             "norm_adv_by_std_in_grpo": norm_adv_by_std_in_grpo,
         }
-        if "uid" in data.non_tensor_batch:  # optional
-            adv_kwargs["index"] = data.non_tensor_batch["uid"]
-        if "reward_baselines" in data.batch:  # optional
-            adv_kwargs["reward_baselines"] = data.batch["reward_baselines"]
-        if "group_idx" in data.non_tensor_batch:  # optional
-            adv_kwargs["group_idx"] = data.non_tensor_batch["group_idx"]
-        if "turn_idx" in data.non_tensor_batch:  # optional
-            adv_kwargs["turn_idx"] = data.non_tensor_batch["turn_idx"]
-        if "traj_idx" in data.non_tensor_batch:  # optional
-            adv_kwargs["traj_idx"] = data.non_tensor_batch["traj_idx"]
-
         # calculate advantage estimator
         advantages, returns = adv_estimator_fn(**adv_kwargs)
         data.batch["advantages"] = advantages
@@ -591,18 +576,22 @@ class RayPPOTrainer:
             inputs = batch.batch["prompts"]
             outputs = batch.batch["responses"]
             
-            # remove pad token
-            pad = self.tokenizer.pad_token_id
-            skip_special_tokens_train = self.config.trainer.get("skip_special_tokens_train", True)
-            inputs = self.tokenizer.batch_decode(
-                [s[-l:] if l else [] for s, l in zip(inputs.tolist(),  (inputs  != pad).sum(1).tolist())], 
-                skip_special_tokens=skip_special_tokens_train)
-            
-            outputs = self.tokenizer.batch_decode(
-                [s[:l]  if l else [] for s, l in zip(outputs.tolist(), (outputs != pad).sum(1).tolist())], 
-                skip_special_tokens=skip_special_tokens_train)
-            
-            if not skip_special_tokens_train and self.config.trainer.get("replace_image_tokens_for_logging", False):
+            # remove pad tokens for logging (keeps other special tokens like <|endoftext|>
+            # visible so we can spot degenerate model outputs)
+            pad_token_id = self.tokenizer.pad_token_id
+            skip_pad_tokens = self.config.trainer.get("skip_pad_tokens", True)
+            if skip_pad_tokens:
+                inputs = self.tokenizer.batch_decode(
+                    [s[-l:] if l else [] for s, l in zip(inputs.tolist(),  (inputs  != pad_token_id).sum(1).tolist())],
+                    skip_special_tokens=False)
+                outputs = self.tokenizer.batch_decode(
+                    [s[:l]  if l else [] for s, l in zip(outputs.tolist(), (outputs != pad_token_id).sum(1).tolist())],
+                    skip_special_tokens=False)
+            else:
+                inputs = self.tokenizer.batch_decode(inputs.tolist(), skip_special_tokens=False)
+                outputs = self.tokenizer.batch_decode(outputs.tolist(), skip_special_tokens=False)
+
+            if self.config.trainer.get("replace_image_tokens_for_logging", False):
                 inputs = replace_image_tokens_for_logging(inputs, processor=self.processor, tokenizer=self.tokenizer)
                 outputs = replace_image_tokens_for_logging(outputs, processor=self.processor, tokenizer=self.tokenizer)
             scores = batch.batch["token_level_scores"].sum(-1).cpu().tolist()
@@ -777,8 +766,9 @@ class RayPPOTrainer:
         sample_uids = []
         sample_images = []
 
-        pad = self.tokenizer.pad_token_id
-        skip_special_tokens_val = self.config.trainer.get("skip_special_tokens_val", True)
+        pad_token_id = self.tokenizer.pad_token_id
+        skip_pad_tokens = self.config.trainer.get("skip_pad_tokens", True)
+
         for test_data in self.val_dataloader:
             test_batch = DataProto.from_single_dict(test_data)
 
@@ -861,13 +851,16 @@ class RayPPOTrainer:
             
             inputs = test_batch.batch["prompts"]
             outputs = test_batch.batch["responses"]
-        
-            inputs = self.tokenizer.batch_decode(
-                [s[-l:] if l else [] for s, l in zip(inputs.tolist(),  (inputs  != pad).sum(1).tolist())], 
-                skip_special_tokens=skip_special_tokens_val)
-            outputs = self.tokenizer.batch_decode(
-                [s[:l]  if l else [] for s, l in zip(outputs.tolist(), (outputs != pad).sum(1).tolist())], 
-                skip_special_tokens=skip_special_tokens_val)
+            if skip_pad_tokens:
+                inputs = self.tokenizer.batch_decode(
+                    [s[-l:] if l else [] for s, l in zip(inputs.tolist(),  (inputs  != pad_token_id).sum(1).tolist())],
+                    skip_special_tokens=False)
+                outputs = self.tokenizer.batch_decode(
+                    [s[:l]  if l else [] for s, l in zip(outputs.tolist(), (outputs != pad_token_id).sum(1).tolist())],
+                    skip_special_tokens=False)
+            else:
+                inputs = self.tokenizer.batch_decode(inputs.tolist(), skip_special_tokens=False)
+                outputs = self.tokenizer.batch_decode(outputs.tolist(), skip_special_tokens=False)
            
             sample_inputs.extend(inputs)
             sample_outputs.extend(outputs)
@@ -910,7 +903,7 @@ class RayPPOTrainer:
 
             data_source_lst.append(test_batch.non_tensor_batch.get("data_source", ["unknown"] * reward_tensor.shape[0]))
         
-        if not skip_special_tokens_val and self.config.trainer.get("replace_image_tokens_for_logging", False):
+        if self.config.trainer.get("replace_image_tokens_for_logging", False):
             sample_inputs = replace_image_tokens_for_logging(sample_inputs, processor=self.processor, tokenizer=self.tokenizer)
             sample_outputs = replace_image_tokens_for_logging(sample_outputs, processor=self.processor, tokenizer=self.tokenizer)
             
@@ -946,7 +939,7 @@ class RayPPOTrainer:
                         and (f"@{n_max}" in metric_name)
                     ):
                         metric_sec = "val-core"
-                    else:
+                    else: 
                         metric_sec = "val-aux"
                     pfx = f"{metric_sec}/{data_source}/{var_name}/{metric_name}"
                     metric_dict[pfx] = metric_val
