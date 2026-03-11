@@ -202,6 +202,15 @@ See the [Documentation](https://vagen.readthedocs.io/) for more customization op
 ## Useful Configs
 refer to `vagen/configs/vagen_multiturn.yaml`
 
+### No Concat Mode
+```yaml
+# Enable no concat mode: input is system prompt + current step observation
+trainer:
+  concat_multi_turn: False
+# Currently only supported with algorithm.adv_estimator=no_concat_gae
+
+```
+
 ### Image Logging
 ```yaml
 # Warning:
@@ -219,16 +228,16 @@ trainer:
 # export HF_TOKEN=xxx
 huggingface_hub:
   hf_save_freq: null   # upload every N steps (must be a multiple of trainer.save_freq); null = disabled
-  repo_id: null         # HuggingFace repo id, e.g. "user/my-model"
-  private: false        # whether the repo is private
+  repo_id: null        
+  private: false        
 ```
 
 ### Training Data Filtering
 ```yaml
 
 filter:
-  name: reward_variance_top_p # Registered in FILTER_REGISTRY
-  filter_kwargs: # extra kwargs passed to the filter function
+  name: reward_variance_top_p # refer to vagen/custom_filter
+  filter_kwargs: 
     top_p: 0.9 
   enable: False # set to true to enable filtering, recommended for grpo trainining
 ```
