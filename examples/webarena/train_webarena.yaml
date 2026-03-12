@@ -13,4 +13,4 @@ envs:
       max_steps: 30
       format_reward: 0.01
       success_reward: 1.0
-      skip_sites: ["map"]
+      skip_sites: ["map", "gitlab"]

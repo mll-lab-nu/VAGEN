@@ -313,7 +313,7 @@ if __name__ == "__main__":
     import fire
 
     async def main_async(
-        config_file: str = "config_files/0.json",
+        config_file: str = "vagen/envs/webarena/config_files/0.json",
         headless: bool = False,
         max_steps: int = 30,
     ):
