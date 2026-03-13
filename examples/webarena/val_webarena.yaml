@@ -11,4 +11,4 @@ envs:
       observation_type: "accessibility_tree"
       current_viewport_only: true
       max_steps: 30
-      skip_sites: ["map", "gitlab"]
+      skip_sites: ["map"]

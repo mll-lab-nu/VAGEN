@@ -85,7 +85,7 @@ class WebArenaEnvConfig:
     nav_timeout: int = 60000                 # Playwright navigation timeout (ms)
     step_timeout: float = 120.0              # _run_sync timeout for step (seconds)
     reset_timeout: float = 120.0             # _run_sync timeout for reset (seconds)
-    max_reset_retries: int = 3               # Max retries for reset on failure
+    max_reset_retries: int = 1               # Max retries for reset on failure
 
     # Rewards
     format_reward: float = 0.02
@@ -272,30 +272,21 @@ class WebArenaEnv(GymImageEnv):
         config_file = self._config_files[idx]
         last_err: Optional[Exception] = None
 
-        for attempt in range(1, self.config.max_reset_retries + 1):
-            self._ensure_browser_env()
-            try:
-                obs, info = await self._run_sync(
-                    self.browser_env.reset,
-                    options={"config_file": config_file},
-                    timeout=self.config.reset_timeout,
-                )
-                # Set Playwright timeouts after successful reset
-                self._set_playwright_timeouts()
-                break
-            except Exception as e:
-                last_err = e
-                logger.warning(
-                    "reset failed (attempt %d/%d, seed=%d): %s",
-                    attempt, self.config.max_reset_retries, seed, e,
-                )
-                # Destroy and rebuild browser for next attempt
-                self._destroy_browser_env()
-        else:
+        self._ensure_browser_env()
+        try:
+            obs, info = await self._run_sync(
+                self.browser_env.reset,
+                options={"config_file": config_file},
+                timeout=self.config.reset_timeout,
+            )
+            # Set Playwright timeouts after successful reset
+            self._set_playwright_timeouts()
+        except Exception as e:
+            logger.error("reset failed (seed=%d): %s", seed, e)
+            self._destroy_browser_env()
             raise RuntimeError(
-                f"reset failed after {self.config.max_reset_retries} retries "
-                f"(seed={seed}): {last_err}"
-            ) from last_err
+                f"reset failed (seed={seed}): {e}"
+            ) from e
 
         self._steps_used = 0
         self.total_reward = 0.0
