@@ -81,5 +81,5 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     critic.model.fsdp_config.param_offload=True \
     critic.model.fsdp_config.optimizer_offload=True \
     filter.enable=False \
-    trainer.total_training_steps=10 2>&1 | \
+    trainer.total_epoch 2>&1 | \
     tee ${EXPERIMENT_DIR}/${PROJECT_NAME}_${EXPERIMENT_NAME}.log >(tee ${BASEDIR}/${PROJECT_NAME}_${EXPERIMENT_NAME}.log >/dev/null)
