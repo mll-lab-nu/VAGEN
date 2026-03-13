@@ -1,10 +1,13 @@
 import asyncio
 import concurrent.futures
+import logging
 import re
 import json
 import os
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 from vagen.envs.gym_image_env import GymImageEnv
 
@@ -66,6 +69,7 @@ class WebArenaEnvConfig:
     """Configuration for WebArena environment."""
     config_files: Optional[List[str]] = None   # List of task config file paths
     config_dir: str = "config_files"           # Directory to auto-discover configs from
+    task_config_file: Optional[str] = None     # Aggregate JSON file (array of task configs)
     headless: bool = True
     observation_type: str = "accessibility_tree"
     current_viewport_only: bool = True
@@ -76,9 +80,20 @@ class WebArenaEnvConfig:
     # Filtering
     skip_sites: Optional[List[str]] = None  # Skip tasks involving these sites (e.g. ["map"])
 
+    # Timeouts & fault tolerance
+    playwright_timeout: int = 60000          # Playwright default timeout (ms)
+    nav_timeout: int = 60000                 # Playwright navigation timeout (ms)
+    step_timeout: float = 120.0              # _run_sync timeout for step (seconds)
+    reset_timeout: float = 120.0             # _run_sync timeout for reset (seconds)
+    max_reset_retries: int = 3               # Max retries for reset on failure
+
     # Rewards
-    format_reward: float = 0.01
+    format_reward: float = 0.02
+    format_penalty: float = -0.05
+    effective_action_reward: float = 0.02
     success_reward: float = 1.0
+    step_penalty: float = -0.001
+    timeout_penalty: float = -0.1
 
 
 # ------------------------------
@@ -95,7 +110,11 @@ class WebArenaEnv(GymImageEnv):
         self.config = WebArenaEnvConfig(**env_config)
 
         # Resolve config file list
-        if self.config.config_files is not None:
+        if self.config.task_config_file is not None:
+            self._config_files = self._load_aggregate_config(
+                self.config.task_config_file
+            )
+        elif self.config.config_files is not None:
             self._config_files = list(self.config.config_files)
         elif os.path.isdir(self.config.config_dir):
             self._config_files = sorted(
@@ -140,17 +159,64 @@ class WebArenaEnv(GymImageEnv):
         self.total_reward: float = 0.0
         self._task_intent: str = ""
         self._current_config_file: str = ""
+        self._prev_obs_text: str = ""  # Track previous observation for change detection
 
-    async def _run_sync(self, fn, *args, **kwargs):
+    @staticmethod
+    def _load_aggregate_config(task_config_file: str) -> List[str]:
+        """Load an aggregate JSON (array of task configs) and split into individual files.
+
+        Individual files are written to a cache directory next to config_dir so that
+        relative paths (e.g. storage_state) resolve correctly via the existing
+        ``webarena_root = dirname(dirname(config_file))`` convention.
+        """
+        task_config_file = os.path.abspath(task_config_file)
+        with open(task_config_file) as f:
+            tasks = json.load(f)
+        if not isinstance(tasks, list):
+            raise ValueError(
+                f"task_config_file must contain a JSON array, got {type(tasks).__name__}"
+            )
+
+        # Cache dir: placed as a direct child of the webarena root so that
+        # storage_state path resolution works correctly:
+        #   dirname(dirname(cache_dir/0.json)) == webarena root (where .auth/ lives)
+        # The webarena root is grandparent of the aggregate file:
+        # e.g. config_files/wa/train.json -> webarena root = dirname(config_files/)
+        parent = os.path.dirname(task_config_file)   # e.g. config_files/wa/
+        config_dir = os.path.dirname(parent)          # e.g. config_files/
+        webarena_root = os.path.dirname(config_dir)   # e.g. webarena/
+        stem = os.path.splitext(os.path.basename(task_config_file))[0]
+        cache_dir = os.path.join(webarena_root, f"_cache_{stem}")
+        os.makedirs(cache_dir, exist_ok=True)
+
+        config_files = []
+        for i, task in enumerate(tasks):
+            if not isinstance(task, dict):
+                continue
+            path = os.path.join(cache_dir, f"{i}.json")
+            # Only write if file doesn't exist or content changed
+            if not os.path.exists(path):
+                with open(path, "w") as f:
+                    json.dump(task, f, indent=2)
+            config_files.append(path)
+        return config_files
+
+    async def _run_sync(self, fn, *args, timeout: Optional[float] = None, **kwargs):
         """Run a sync function in a dedicated thread WITHOUT asyncio context propagation.
 
         asyncio.to_thread() copies contextvars (including the running loop) to the
         worker thread, causing Playwright sync API to fail with 'Sync API inside
         asyncio loop'. executor.submit() + wrap_future bypasses this.
+
+        Args:
+            timeout: Maximum seconds to wait. Raises asyncio.TimeoutError on expiry.
         """
         loop = asyncio.get_running_loop()
         future = self._executor.submit(fn, *args, **kwargs)
-        return await asyncio.wrap_future(future, loop=loop)
+        awaitable = asyncio.wrap_future(future, loop=loop)
+        if timeout is not None:
+            return await asyncio.wait_for(awaitable, timeout=timeout)
+        return await awaitable
 
     def _ensure_browser_env(self):
         """Lazily create ScriptBrowserEnv (lightweight — browser launches on reset)."""
@@ -166,12 +232,35 @@ class WebArenaEnv(GymImageEnv):
                 },
             )
 
+    def _set_playwright_timeouts(self):
+        """Set Playwright default timeouts on the current page after reset."""
+        if self.browser_env is not None and hasattr(self.browser_env, "page"):
+            page = self.browser_env.page
+            if page is not None:
+                page.set_default_timeout(self.config.playwright_timeout)
+                page.set_default_navigation_timeout(self.config.nav_timeout)
+
+    def _destroy_browser_env(self):
+        """Forcefully tear down the browser env so it can be recreated."""
+        if self.browser_env is not None:
+            try:
+                self.browser_env.close()
+            except Exception:
+                pass
+            self.browser_env = None
+            # Replace the executor to discard any stuck thread
+            self._executor.shutdown(wait=False)
+            self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+
     # ------------------------------------------------------------------
     # GymImageEnv abstract methods
     # ------------------------------------------------------------------
     async def close(self) -> None:
         if self.browser_env is not None:
-            await self._run_sync(self.browser_env.close)
+            try:
+                await self._run_sync(self.browser_env.close, timeout=30.0)
+            except Exception:
+                pass
             self.browser_env = None
         self._executor.shutdown(wait=False)
 
@@ -179,18 +268,39 @@ class WebArenaEnv(GymImageEnv):
         return {"obs_str": _system_prompt()}
 
     async def reset(self, seed: int) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-        self._ensure_browser_env()
-
         idx = seed % len(self._config_files)
         config_file = self._config_files[idx]
+        last_err: Optional[Exception] = None
 
-        obs, info = await self._run_sync(
-            self.browser_env.reset, options={"config_file": config_file}
-        )
+        for attempt in range(1, self.config.max_reset_retries + 1):
+            self._ensure_browser_env()
+            try:
+                obs, info = await self._run_sync(
+                    self.browser_env.reset,
+                    options={"config_file": config_file},
+                    timeout=self.config.reset_timeout,
+                )
+                # Set Playwright timeouts after successful reset
+                self._set_playwright_timeouts()
+                break
+            except Exception as e:
+                last_err = e
+                logger.warning(
+                    "reset failed (attempt %d/%d, seed=%d): %s",
+                    attempt, self.config.max_reset_retries, seed, e,
+                )
+                # Destroy and rebuild browser for next attempt
+                self._destroy_browser_env()
+        else:
+            raise RuntimeError(
+                f"reset failed after {self.config.max_reset_retries} retries "
+                f"(seed={seed}): {last_err}"
+            ) from last_err
 
         self._steps_used = 0
         self.total_reward = 0.0
         self._current_config_file = config_file
+        self._prev_obs_text = ""
 
         # Load task intent from config
         with open(config_file) as f:
@@ -198,6 +308,7 @@ class WebArenaEnv(GymImageEnv):
         self._task_intent = task_config.get("intent", "")
 
         obs_text = obs.get("text", str(obs)) if isinstance(obs, dict) else str(obs)
+        self._prev_obs_text = obs_text
         obs_str = (
             f"Task: {self._task_intent}\n\n"
             f"Current page accessibility tree:\n{obs_text}\n"
@@ -230,14 +341,28 @@ class WebArenaEnv(GymImageEnv):
                 client.detach()
             return score
 
-        return await self._run_sync(_eval)
+        return await self._run_sync(_eval, timeout=self.config.step_timeout)
+
+    @staticmethod
+    def _classify_action(action_text: str) -> str:
+        """Classify action string into a category for metrics."""
+        if not action_text:
+            return "none"
+        first_word = action_text.strip().split()[0].lower()
+        known = {
+            "click", "type", "hover", "press", "scroll",
+            "new_tab", "tab_focus", "close_tab",
+            "goto", "go_back", "go_forward", "stop",
+        }
+        return first_word if first_word in known else "unknown"
 
     async def step(
         self, action_str: str
     ) -> Tuple[Dict[str, Any], float, bool, Dict[str, Any]]:
         self._steps_used += 1
-        reward = 0.0
+        reward = self.config.step_penalty  # Per-step cost to encourage efficiency
         done = False
+        action_is_effective = False
         info: Dict[str, Any] = {}
 
         parsed = _parse_action(action_str)
@@ -254,53 +379,78 @@ class WebArenaEnv(GymImageEnv):
                 answer = action_text[len("stop"):].strip().strip("[]")
                 info["answer"] = answer
                 obs = {"text": f"Agent submitted answer: {answer}"}
+                action_is_effective = True
             else:
                 from vagen.envs.webarena.browser_env import create_id_based_action
 
                 try:
                     action = create_id_based_action(action_text)
                     obs, _, terminated, _, step_info = await self._run_sync(
-                        self.browser_env.step, action
+                        self.browser_env.step, action,
+                        timeout=self.config.step_timeout,
                     )
                     info.update(step_info)
                     done = terminated
+
+                    # Check if action actually had an effect:
+                    # 1. No execution error from browser env
+                    # 2. Page state changed (observation differs from previous)
+                    obs_text_now = obs.get("text", str(obs)) if isinstance(obs, dict) else str(obs)
+                    no_exec_error = not step_info.get("fail_error", "")
+                    obs_changed = obs_text_now != self._prev_obs_text
+
+                    if no_exec_error and obs_changed:
+                        action_is_effective = True
+                        reward += self.config.effective_action_reward
+                except asyncio.TimeoutError:
+                    info["error"] = f"step timed out after {self.config.step_timeout}s"
+                    obs = {"text": f"Action timed out after {self.config.step_timeout}s."}
+                    done = True
                 except Exception as e:
                     info["error"] = str(e)
                     obs = {"text": f"Action failed: {e}"}
         else:
+            reward += self.config.format_penalty
             info["error"] = "format_invalid"
             obs = {"text": "Invalid action format. Use <action>...</action> tags."}
 
         # Max-step termination
         if not done and self._steps_used >= self.config.max_steps:
             done = True
+            reward += self.config.timeout_penalty
             info.setdefault("error", "max_steps_reached")
 
         # Success detection via WebArena evaluator
         success = False
+        eval_score = 0.0
         if done and self._current_config_file:
             try:
-                score = await self._evaluate_success(info)
-                success = score > 0
-                info["eval_score"] = score
+                eval_score = await self._evaluate_success(info)
+                success = eval_score > 0
+                info["eval_score"] = eval_score
             except Exception as e:
                 info["eval_error"] = str(e)
-        if success:
-            reward += self.config.success_reward
+        # Use continuous evaluator score instead of binary
+        reward += eval_score * self.config.success_reward
 
         info["metrics"] = {
             "turn_metrics": {
                 "action_is_valid": parsed["format_correct"],
+                "action_is_effective": action_is_effective,
+                "action_type": self._classify_action(parsed.get("action") or ""),
                 "steps_used": self._steps_used,
             },
             "traj_metrics": {
                 "success": success,
+                "eval_score": eval_score,
+                "total_steps": self._steps_used,
             },
         }
         info["success"] = success
         self.total_reward += reward
 
         obs_text = obs.get("text", str(obs)) if isinstance(obs, dict) else str(obs)
+        self._prev_obs_text = obs_text
         obs_str = f"Current page accessibility tree:\n{obs_text}\n"
 
         return {"obs_str": obs_str}, reward, done, info
@@ -342,9 +492,9 @@ if __name__ == "__main__":
             if action_input.lower() == "quit":
                 break
 
-            # Wrap in tags if not already
-            if "<action>" not in action_input:
-                action_input = f"<action>{action_input}</action>"
+            # Wrap in tags if user prefixed with '!' for convenience, otherwise pass raw
+            if action_input.startswith("!"):
+                action_input = f"<action>{action_input[1:]}</action>"
 
             obs, reward, done, info = await env.step(action_input)
             print(f"Reward: {reward}, Done: {done}")

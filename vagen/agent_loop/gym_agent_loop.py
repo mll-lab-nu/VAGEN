@@ -177,8 +177,41 @@ class GymAgentLoop(AgentLoopBase):
             [{}], add_generation_prompt=False, tokenize=True, **cls.apply_chat_template_kwargs
         )
 
+    def _make_failed_output(self, error_msg: str) -> AgentLoopOutput:
+        """Return a minimal valid AgentLoopOutput for a completely failed episode."""
+        from verl.experimental.agent_loop.agent_loop import AgentLoopMetrics
+        # Use a single padding token so that prompt/response are non-empty
+        pad_id = self.tokenizer.pad_token_id or 0
+        return AgentLoopOutput(
+            prompt_ids=[pad_id],
+            response_ids=[pad_id],
+            response_mask=[0],
+            response_logprobs=None,
+            multi_modal_data={},
+            reward_score=0.0,
+            num_turns=0,
+            metrics=AgentLoopMetrics(),
+            extra_fields={
+                "image_data": [],
+                "reward_extra_info": {"traj_success": 0.0},
+                "env_error": error_msg,
+            },
+        )
+
     @rollout_trace_op
     async def run(self, sampling_params: Dict[str, Any], **kwargs) -> AgentLoopOutput:
+        try:
+            return await self._run_impl(sampling_params, **kwargs)
+        except Exception as e:
+            seed = kwargs.get("seed", "?")
+            env_name = kwargs.get("env_name", "?")
+            logger.error(
+                "episode failed (env=%s, seed=%s): %s\n%s",
+                env_name, seed, e, traceback.format_exc(),
+            )
+            return self._make_failed_output(str(e))
+
+    async def _run_impl(self, sampling_params: Dict[str, Any], **kwargs) -> AgentLoopOutput:
         metrics: Dict[str, Any] = {}
         request_id = uuid4().hex
 
