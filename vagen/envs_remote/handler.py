@@ -325,12 +325,17 @@ class BaseGymHandler(ABC):
             except asyncio.CancelledError:
                 pass
 
-        # Close all remaining sessions
-        for session_id, ctx in list(self._sessions.items()):
+        # Close all remaining sessions in parallel for faster shutdown
+        async def _close_one(session_id: str, ctx: "SessionContext"):
             try:
                 await ctx.env.close()
             except Exception as e:
                 LOGGER.error(f"[Handler] Error closing session {session_id}: {e}")
+
+        if self._sessions:
+            await asyncio.gather(
+                *(_close_one(sid, ctx) for sid, ctx in self._sessions.items())
+            )
 
         self._sessions.clear()
         LOGGER.info("[Handler] All sessions closed")
