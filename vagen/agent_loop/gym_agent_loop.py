@@ -194,7 +194,6 @@ class GymAgentLoop(AgentLoopBase):
             extra_fields={
                 "image_data": [],
                 "reward_extra_info": {"traj_success": 0.0},
-                "env_error": error_msg,
             },
         )
 

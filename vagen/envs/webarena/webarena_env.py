@@ -84,7 +84,7 @@ class WebArenaEnvConfig:
     playwright_timeout: int = 60000          # Playwright default timeout (ms)
     nav_timeout: int = 60000                 # Playwright navigation timeout (ms)
     step_timeout: float = 120.0              # _run_sync timeout for step (seconds)
-    reset_timeout: float = 120.0             # _run_sync timeout for reset (seconds)
+    reset_timeout: float = 300.0             # _run_sync timeout for reset (seconds)
     max_reset_retries: int = 1               # Max retries for reset on failure
 
     # Concurrency
