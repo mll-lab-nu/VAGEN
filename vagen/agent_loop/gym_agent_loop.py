@@ -194,6 +194,7 @@ class GymAgentLoop(AgentLoopBase):
             extra_fields={
                 "image_data": [],
                 "reward_extra_info": {"traj_success": 0.0},
+                "reset_failed": True,
             },
         )
 
@@ -294,7 +295,7 @@ class GymAgentLoop(AgentLoopBase):
             reward_score=sum(agent_data.env_rewards) if agent_data.env_rewards else 0.0,
             num_turns=agent_data.env_turns,
             metrics=agent_data.metrics,
-            extra_fields={ "image_data": agent_data.image_data,"reward_extra_info": {"traj_success": float(agent_data.traj_success)}},
+            extra_fields={"image_data": agent_data.image_data, "reward_extra_info": {"traj_success": float(agent_data.traj_success)}, "reset_failed": False},
         )
         return output
 

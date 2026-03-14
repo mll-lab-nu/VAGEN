@@ -73,3 +73,20 @@ def reward_variance(data: DataProto,ddof = 0) -> float:
         return 0.0
 
     return float(np.mean(per_group_vars))
+
+
+@register_metric("success_rate")
+def success_rate(data: DataProto) -> float:
+    """Compute success rate from traj_success, excluding reset-failed episodes."""
+    import numpy as np
+
+    if "traj_success" not in data.non_tensor_batch:
+        return 0.0
+    vals = np.asarray(data.non_tensor_batch["traj_success"], dtype=float)
+    # Exclude reset-failed episodes
+    if "reset_failed" in data.non_tensor_batch:
+        mask = ~np.asarray(data.non_tensor_batch["reset_failed"], dtype=bool)
+        vals = vals[mask]
+    if len(vals) == 0:
+        return 0.0
+    return float(np.mean(vals))

@@ -929,6 +929,25 @@ class RayPPOTrainer:
 
         data_sources = np.concatenate(data_source_lst, axis=0)
 
+        # Filter out reset-failed episodes from validation metrics
+        reset_failed_flags = reward_extra_infos_dict.get("reset_failed", [])
+        if reset_failed_flags:
+            valid_mask = [not f for f in reset_failed_flags]
+            n_failed = sum(1 for f in reset_failed_flags if f)
+            if n_failed > 0:
+                print(f"Filtering out {n_failed}/{len(reset_failed_flags)} reset-failed episodes from validation metrics")
+                data_sources = data_sources[valid_mask]
+                sample_uids = [u for u, v in zip(sample_uids, valid_mask) if v]
+                filtered_infos_dict = {}
+                for k, lst in reward_extra_infos_dict.items():
+                    if k == "reset_failed":
+                        continue
+                    if lst:
+                        filtered_infos_dict[k] = [v for v, m in zip(lst, valid_mask) if m]
+                    else:
+                        filtered_infos_dict[k] = lst
+                reward_extra_infos_dict = filtered_infos_dict
+
         data_src2var2metric2val = process_validation_metrics(data_sources, sample_uids, reward_extra_infos_dict)
         metric_dict = {}
         for data_source, var2metric2val in data_src2var2metric2val.items():
