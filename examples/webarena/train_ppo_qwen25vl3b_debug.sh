@@ -2,6 +2,9 @@
 
 set -x
 
+export RAY_TMPDIR=/workspace/tmp
+mkdir -p $RAY_TMPDIR
+
 export SHOPPING="http://localhost:7770"
 export SHOPPING_ADMIN="http://localhost:7780/admin"
 export GITLAB="http://localhost:8023"
