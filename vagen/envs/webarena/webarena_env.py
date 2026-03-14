@@ -87,6 +87,9 @@ class WebArenaEnvConfig:
     reset_timeout: float = 120.0             # _run_sync timeout for reset (seconds)
     max_reset_retries: int = 1               # Max retries for reset on failure
 
+    # Concurrency
+    max_concurrent_resets: int = 4             # Max parallel browser resets
+
     # Rewards
     format_reward: float = 0.02
     format_penalty: float = -0.05
@@ -104,6 +107,18 @@ class WebArenaEnv(GymImageEnv):
     Minimal WebArena environment wrapper for VAGEN.
     Wraps browser_env.ScriptBrowserEnv with the async GymImageEnv interface.
     """
+
+    # Class-level semaphore to limit concurrent browser resets.
+    # Shared across all instances within the same process.
+    _reset_semaphore: Optional[asyncio.Semaphore] = None
+    _reset_max_concurrent: int = 4
+
+    @classmethod
+    def _get_reset_semaphore(cls, max_concurrent: int) -> asyncio.Semaphore:
+        if cls._reset_semaphore is None or cls._reset_max_concurrent != max_concurrent:
+            cls._reset_semaphore = asyncio.Semaphore(max_concurrent)
+            cls._reset_max_concurrent = max_concurrent
+        return cls._reset_semaphore
 
     def __init__(self, env_config: Dict[str, Any]):
         super().__init__(env_config)
@@ -272,21 +287,23 @@ class WebArenaEnv(GymImageEnv):
         config_file = self._config_files[idx]
         last_err: Optional[Exception] = None
 
-        self._ensure_browser_env()
-        try:
-            obs, info = await self._run_sync(
-                self.browser_env.reset,
-                options={"config_file": config_file},
-                timeout=self.config.reset_timeout,
-            )
-            # Set Playwright timeouts after successful reset
-            self._set_playwright_timeouts()
-        except Exception as e:
-            logger.error("reset failed (seed=%d): %s", seed, e)
-            self._destroy_browser_env()
-            raise RuntimeError(
-                f"reset failed (seed={seed}): {e}"
-            ) from e
+        sem = self._get_reset_semaphore(self.config.max_concurrent_resets)
+        async with sem:
+            self._ensure_browser_env()
+            try:
+                obs, info = await self._run_sync(
+                    self.browser_env.reset,
+                    options={"config_file": config_file},
+                    timeout=self.config.reset_timeout,
+                )
+                # Set Playwright timeouts after successful reset
+                self._set_playwright_timeouts()
+            except Exception as e:
+                logger.error("reset failed (seed=%d): %s", seed, e)
+                self._destroy_browser_env()
+                raise RuntimeError(
+                    f"reset failed (seed={seed}): {e}"
+                ) from e
 
         self._steps_used = 0
         self.total_reward = 0.0
