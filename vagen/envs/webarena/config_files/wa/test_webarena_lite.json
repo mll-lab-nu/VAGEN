@@ -6,7 +6,7 @@
         "task_id": 0,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "What are the top-{{n}} best-selling product in {{period}}",
         "instantiation_dict": {
@@ -41,7 +41,7 @@
         "task_id": 1,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "Tell me the full address of all {{airport_type}} that are within a driving distance of {{radius}} to {{start}}",
         "instantiation_dict": {
@@ -75,7 +75,7 @@
         "task_id": 2,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "Tell me the the number of reviews that our store received by far that mention term \"{{term}}\"",
         "instantiation_dict": {
@@ -107,7 +107,7 @@
         "task_id": 3,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "Compare the difference in time for walking and driving route from {{start}} to {{end}}",
         "instantiation_dict": {
@@ -141,7 +141,7 @@
         "task_id": 4,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082/3-pack-samsung-galaxy-s6-screen-protector-nearpow-tempered-glass-screen-protector-with-9h-hardness-crystal-clear-easy-bubble-free-installation-scratch-resist.html",
+        "start_url": "http://localhost:7770/3-pack-samsung-galaxy-s6-screen-protector-nearpow-tempered-glass-screen-protector-with-9h-hardness-crystal-clear-easy-bubble-free-installation-scratch-resist.html",
         "geolocation": null,
         "intent_template": "List out reviewers, if exist, who mention about {{description}}",
         "instantiation_dict": {
@@ -174,7 +174,7 @@
         "task_id": 5,
         "require_login": true,
         "storage_state": "./.auth/reddit_state.json",
-        "start_url": "http://localhost:8080",
+        "start_url": "http://localhost:9999",
         "geolocation": null,
         "intent_template": "Tell me the count of comments that have received more downvotes than upvotes for the user who made the latest post on the {{forum}} forum.",
         "instantiation_dict": {
@@ -206,7 +206,7 @@
         "task_id": 6,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "I will arrive {{place}} soon. Provide the name of a {{target1}} in the vicinity, if available. Then, tell me the {{information}} to {{target2}} from the hotel.",
         "instantiation_dict": {
@@ -242,7 +242,7 @@
         "task_id": 7,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "Check if the {{place}} in pittsburgh can be reached in one hour by car from {{location}}",
         "instantiation_dict": {
@@ -275,7 +275,7 @@
         "task_id": 8,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "List the top {{n}} search terms in my store",
         "instantiation_dict": {
@@ -309,7 +309,7 @@
         "task_id": 9,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "Check out my todos",
         "instantiation_dict": {},
@@ -320,7 +320,7 @@
                 "url_match"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:9001/dashboard/todos",
+            "reference_url": "http://localhost:8023/dashboard/todos",
             "program_html": [],
             "url_note": "GOLD in PRED"
         },
@@ -334,7 +334,7 @@
         "task_id": 10,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "Today is 6/12/2023. Tell me how many fulfilled orders I have {{period}}, and the total amount of money I spent.",
         "instantiation_dict": {
@@ -367,7 +367,7 @@
         "task_id": 11,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "How long does it take to walk from {{start}} to {{end}}?",
         "instantiation_dict": {
@@ -400,7 +400,7 @@
         "task_id": 12,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "Tell me the closest {{place1}}(s) to {{place2}}",
         "instantiation_dict": {
@@ -433,7 +433,7 @@
         "task_id": 13,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "Which customer has completed the {{quantifier}} number of orders in the entire history?",
         "instantiation_dict": {
@@ -465,7 +465,7 @@
         "task_id": 14,
         "require_login": true,
         "storage_state": "./.auth/reddit_state.json",
-        "start_url": "http://localhost:8080",
+        "start_url": "http://localhost:9999",
         "geolocation": null,
         "intent_template": "Among the top {{number}} post in \"{{subreddit}}\" forum, {{description}}",
         "instantiation_dict": {
@@ -499,7 +499,7 @@
         "task_id": 15,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "What is the zip code of {{place}}?",
         "instantiation_dict": {
@@ -531,7 +531,7 @@
         "task_id": 16,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "Given the following locations, {{place_list}}, what would be the optimal route to travel through them all in order to minimize total travel time? Please note the journey begins at the first place listed.",
         "instantiation_dict": {
@@ -567,7 +567,7 @@
         "task_id": 17,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "What is the total count of {{status}} reviews amongst all the reviews?",
         "instantiation_dict": {
@@ -599,7 +599,7 @@
         "task_id": 18,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "What is the duration required to first walk from {{place_A}} to {{place_B}}, and then drive to {{place_C}}?",
         "instantiation_dict": {
@@ -633,7 +633,7 @@
         "task_id": 19,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "From my stay at {{hotel}}, what's the estimated driving time to reach {{place}}?",
         "instantiation_dict": {
@@ -666,7 +666,7 @@
         "task_id": 20,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "Which US states border {{state}}?",
         "instantiation_dict": {
@@ -700,7 +700,7 @@
         "task_id": 21,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "Telll me the grand total of invoice {{id}}.",
         "instantiation_dict": {
@@ -732,7 +732,7 @@
         "task_id": 22,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "Tell me the status of my latest order and when will it arrive",
         "instantiation_dict": {},
@@ -763,7 +763,7 @@
         "task_id": 23,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "Tell me the distance to drive from Carnegie Mellon University to the top computer science school in massachusetts",
         "instantiation_dict": {},
@@ -793,7 +793,7 @@
         "task_id": 24,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "Where is the nearest {{places}} to {{start}}, and what is the walking distance to it?",
         "instantiation_dict": {
@@ -831,7 +831,7 @@
         "task_id": 25,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "Display the list of issues in the {{repo}} repository that have labels related to {{label}}",
         "instantiation_dict": {
@@ -845,7 +845,7 @@
                 "url_match"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:9001/kkroening/ffmpeg-python/-/issues/?sort=created_date&state=opened&label_name%5B%5D=question&first_page_size=20",
+            "reference_url": "http://localhost:8023/kkroening/ffmpeg-python/-/issues/?sort=created_date&state=opened&label_name%5B%5D=question&first_page_size=20",
             "program_html": [],
             "url_note": "GOLD in PRED"
         },
@@ -859,7 +859,7 @@
         "task_id": 26,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "Presents the monthly count of successful orders {{period}} in MM:COUNT format",
         "instantiation_dict": {
@@ -902,7 +902,7 @@
         "task_id": 27,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "Show me the name of the customers who have expressed dissatisfaction with {{product}}",
         "instantiation_dict": {
@@ -932,7 +932,7 @@
         "task_id": 28,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "What is the date when I made my first purchase on this site?",
         "instantiation_dict": {},
@@ -962,7 +962,7 @@
         "task_id": 29,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "I have jaw bruxism problem, show me something that could alleviate the problem.",
         "instantiation_dict": {},
@@ -997,7 +997,7 @@
         "task_id": 30,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "Tell me the reasons why customers like {{product}}",
         "instantiation_dict": {
@@ -1029,7 +1029,7 @@
         "task_id": 31,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "What is the price range of {{product}} in the One Stop Market?",
         "instantiation_dict": {
@@ -1062,7 +1062,7 @@
         "task_id": 32,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "What brands appear most frequently among the top search terms?",
         "instantiation_dict": {},
@@ -1092,7 +1092,7 @@
         "task_id": 33,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "What's the total number of items sold in the most recent {{k}} orders?",
         "instantiation_dict": {
@@ -1124,7 +1124,7 @@
         "task_id": 34,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "How many commits did {{user}} make to {{repo}} on {{date}}?",
         "instantiation_dict": {
@@ -1158,7 +1158,7 @@
         "task_id": 35,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "What is the estimated driving time between {{city1}} and {{city2}}?",
         "instantiation_dict": {
@@ -1191,7 +1191,7 @@
         "task_id": 36,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "How much I spent on {{category}} shopping during {{time}}",
         "instantiation_dict": {
@@ -1224,7 +1224,7 @@
         "task_id": 37,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "What is the {{option}} configuration of the {{product}} I bought {{time}}",
         "instantiation_dict": {
@@ -1258,7 +1258,7 @@
         "task_id": 38,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "What is the minimum travel time by car from {{location1}} to {{location2}}?",
         "instantiation_dict": {
@@ -1291,7 +1291,7 @@
         "task_id": 39,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "Checkout merge requests assigned to me",
         "instantiation_dict": {},
@@ -1302,7 +1302,7 @@
                 "url_match"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:9001/dashboard/merge_requests?assignee_username=byteblaze",
+            "reference_url": "http://localhost:8023/dashboard/merge_requests?assignee_username=byteblaze",
             "program_html": [],
             "url_note": "GOLD in PRED"
         },
@@ -1316,7 +1316,7 @@
         "task_id": 40,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "Show all customers",
         "instantiation_dict": {},
@@ -1327,7 +1327,7 @@
                 "url_match"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8083/admin/customer/index/",
+            "reference_url": "http://localhost:7780/admin/customer/index/",
             "program_html": [],
             "url_note": "GOLD in PRED"
         },
@@ -1341,7 +1341,7 @@
         "task_id": 41,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "I have a lot of Nintendo Switch game cards now, help me find the best storage option to fit all {{num}} cards",
         "instantiation_dict": {
@@ -1354,7 +1354,7 @@
                 "url_match"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8082/game-card-holder-storage-case-for-nintendo-switch-games-or-ps-vita-game-case-or-sd-memory-cards-black.html",
+            "reference_url": "http://localhost:7770/game-card-holder-storage-case-for-nintendo-switch-games-or-ps-vita-game-case-or-sd-memory-cards-black.html",
             "program_html": [],
             "url_note": "GOLD in PRED"
         },
@@ -1368,7 +1368,7 @@
         "task_id": 42,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082/photosmart-plus-b209-clr-inkjetfb-p-s-c-usb-wrls-1.html",
+        "start_url": "http://localhost:7770/photosmart-plus-b209-clr-inkjetfb-p-s-c-usb-wrls-1.html",
         "geolocation": null,
         "intent_template": "What are the main criticisms of this product? Please extract the relevant sentences.",
         "instantiation_dict": {},
@@ -1403,7 +1403,7 @@
         "task_id": 43,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "Tell me the full names of the repositories where I made contributions and they got {{description}} stars?",
         "instantiation_dict": {
@@ -1436,7 +1436,7 @@
         "task_id": 44,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "Open my latest updated issue that has keyword \"{{keyword}}\" in its title to check if it is closed",
         "instantiation_dict": {
@@ -1454,7 +1454,7 @@
                     "No, it is open"
                 ]
             },
-            "reference_url": "http://localhost:9001/byteblaze/empathy-prompts/-/issues/8",
+            "reference_url": "http://localhost:8023/byteblaze/empathy-prompts/-/issues/8",
             "program_html": [],
             "reference_answer_raw_annotation": "Not closed",
             "string_note": "",
@@ -1470,7 +1470,7 @@
         "task_id": 45,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "Open my latest created issue that has {{keyword}} in its title to check if it is closed",
         "instantiation_dict": {
@@ -1486,7 +1486,7 @@
             "reference_answers": {
                 "exact_match": "Yes"
             },
-            "reference_url": "http://localhost:9001/a11yproject/a11yproject.com/-/issues/719",
+            "reference_url": "http://localhost:8023/a11yproject/a11yproject.com/-/issues/719",
             "program_html": [],
             "reference_answer_raw_annotation": "closed",
             "string_note": ""
@@ -1501,7 +1501,7 @@
         "task_id": 46,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "Tell me the total cost of my latest {{status}} order?",
         "instantiation_dict": {
@@ -1533,7 +1533,7 @@
         "task_id": 47,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "Compare the payment difference of the last {{N}} {{status_1}} orders and {{status_2}} orders",
         "instantiation_dict": {
@@ -1567,7 +1567,7 @@
         "task_id": 48,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "Get the {{attribute}} of the {{status}} order",
         "instantiation_dict": {
@@ -1600,7 +1600,7 @@
         "task_id": 49,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001/a11yproject/a11yproject.com",
+        "start_url": "http://localhost:8023/a11yproject/a11yproject.com",
         "geolocation": null,
         "intent_template": "How many commits did {{user}} make on {{date}}?",
         "instantiation_dict": {
@@ -1633,7 +1633,7 @@
         "task_id": 50,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "Find the customer name and email with phone number {{PhoneNum}}",
         "instantiation_dict": {
@@ -1666,7 +1666,7 @@
         "task_id": 51,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "What are the key aspects that the customers don't like about {{product}}",
         "instantiation_dict": {
@@ -1696,7 +1696,7 @@
         "task_id": 52,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "Show me the walking distance from nearby hotels to {{location}} that take at most {{n}} minutes?",
         "instantiation_dict": {
@@ -1730,7 +1730,7 @@
         "task_id": 53,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "I am at CMU Pittsburgh, how long it takes to the nearest {{location}} with different transportation methods?",
         "instantiation_dict": {
@@ -1764,7 +1764,7 @@
         "task_id": 54,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "What do customers say about {{product_type}} from {{manufature}}",
         "instantiation_dict": {
@@ -1797,7 +1797,7 @@
         "task_id": 55,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "What is the price range for products from {{brand}}?",
         "instantiation_dict": {
@@ -1829,7 +1829,7 @@
         "task_id": 56,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "Get the order number of my most recent {{status}} order ",
         "instantiation_dict": {
@@ -1861,7 +1861,7 @@
         "task_id": 57,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "Where is the nearest {{location}} from {{location2}} {{condition}}",
         "instantiation_dict": {
@@ -1899,7 +1899,7 @@
         "task_id": 58,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "I am doing a market survey for one stop market, show me the most expensive product from {{product_category}} category",
         "instantiation_dict": {
@@ -1912,7 +1912,7 @@
                 "url_match"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8082/clothing-shoes-jewelry/sport-specific-clothing/competitive-swimwear.html?product_list_order=price&product_list_dir=desc",
+            "reference_url": "http://localhost:7770/clothing-shoes-jewelry/sport-specific-clothing/competitive-swimwear.html?product_list_order=price&product_list_dir=desc",
             "program_html": [],
             "url_note": "GOLD in PRED"
         },
@@ -1926,7 +1926,7 @@
         "task_id": 59,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "Show me the {{information}} of the customer who is the most unhappy with {{product}}",
         "instantiation_dict": {
@@ -1957,7 +1957,7 @@
         "task_id": 60,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "Tell me the coordinates of {{location}} in DD format",
         "instantiation_dict": {
@@ -1990,7 +1990,7 @@
         "task_id": 61,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "What is the {{information}} of {{location}}",
         "instantiation_dict": {
@@ -2023,7 +2023,7 @@
         "task_id": 62,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "See all public projects",
         "instantiation_dict": {},
@@ -2034,7 +2034,7 @@
                 "url_match"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:9001/explore",
+            "reference_url": "http://localhost:8023/explore",
             "program_html": [],
             "url_note": "GOLD in PRED"
         },
@@ -2048,7 +2048,7 @@
         "task_id": 63,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "Get me my RSS feed token",
         "instantiation_dict": {},
@@ -2079,7 +2079,7 @@
         "task_id": 64,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "What's the closest national park to {{city}}? How long does it take to bike there?",
         "instantiation_dict": {
@@ -2114,7 +2114,7 @@
         "task_id": 65,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "Show me products under ${{price}} in \"{{product_category}}\" category",
         "instantiation_dict": {
@@ -2128,7 +2128,7 @@
                 "url_match"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8082/clothing-shoes-jewelry/men/shoes.html?price=0-30",
+            "reference_url": "http://localhost:7770/clothing-shoes-jewelry/men/shoes.html?price=0-30",
             "program_html": [],
             "url_note": "GOLD in PRED"
         },
@@ -2142,7 +2142,7 @@
         "task_id": 66,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "Search for \"{{keyword}}\"",
         "instantiation_dict": {
@@ -2155,7 +2155,7 @@
                 "url_match"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8082/catalogsearch/result/?q=switch+accessories",
+            "reference_url": "http://localhost:7770/catalogsearch/result/?q=switch+accessories",
             "program_html": [],
             "url_note": "GOLD in PRED"
         },
@@ -2169,7 +2169,7 @@
         "task_id": 67,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "Look up the most recent models of XBox controllers released between 2020-2021?",
         "instantiation_dict": {},
@@ -2180,7 +2180,7 @@
                 "url_match"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8082/microsoft-xbox-controller-carbon-black-for-series-x-series-s-xbox-one-windows-10-android-ios-bundled-with-dual-port-charging-dock-xbox-controller-skin-voucher-premgear-cloth.html",
+            "reference_url": "http://localhost:7770/microsoft-xbox-controller-carbon-black-for-series-x-series-s-xbox-one-windows-10-android-ios-bundled-with-dual-port-charging-dock-xbox-controller-skin-voucher-premgear-cloth.html",
             "program_html": [],
             "url_note": "GOLD in PRED"
         },
@@ -2194,7 +2194,7 @@
         "task_id": 68,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "Show the least expensive {{product}} with a minimum storage capacity of {{min_storage}}.",
         "instantiation_dict": {
@@ -2208,7 +2208,7 @@
                 "url_match"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8082/game-card-holder-storage-case-for-nintendo-switch-games-or-ps-vita-game-case-or-sd-memory-cards-black.html",
+            "reference_url": "http://localhost:7770/game-card-holder-storage-case-for-nintendo-switch-games-or-ps-vita-game-case-or-sd-memory-cards-black.html",
             "program_html": [],
             "url_note": "GOLD in PRED"
         },
@@ -2222,7 +2222,7 @@
         "task_id": 69,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "How much time does it take from Pittsburgh to Philadelphia by car?",
         "instantiation_dict": {},
@@ -2252,7 +2252,7 @@
         "task_id": 70,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "Tell me the {{attribute}} of the customer who has the most cancellations in the history",
         "instantiation_dict": {
@@ -2284,7 +2284,7 @@
         "task_id": 71,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "Show me the command to clone {{repo}} with SSH.",
         "instantiation_dict": {
@@ -2314,7 +2314,7 @@
         "task_id": 72,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "Show the most recent {{status}} order",
         "instantiation_dict": {
@@ -2327,7 +2327,7 @@
                 "url_match"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8082/sales/order/view/order_id/189/",
+            "reference_url": "http://localhost:7770/sales/order/view/order_id/189/",
             "program_html": [],
             "url_note": "GOLD in PRED"
         },
@@ -2341,7 +2341,7 @@
         "task_id": 73,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "Tell me who has made the most contributions, in terms of number of commits, to the {{repo}} project",
         "instantiation_dict": {
@@ -2373,7 +2373,7 @@
         "task_id": 74,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "Which number to call for the customer service?",
         "instantiation_dict": {},
@@ -2401,7 +2401,7 @@
         "task_id": 75,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "List the {{attribute}} of the top 3 contributors to {{repo}} repo, ranked by the number of commits?",
         "instantiation_dict": {
@@ -2436,7 +2436,7 @@
         "task_id": 76,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "How much refund I should expect from my order canlled in {{time}}, including shipping fee",
         "instantiation_dict": {
@@ -2468,7 +2468,7 @@
         "task_id": 77,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "Show me the \"{{product}}\" listings by {{sorting_order}}.",
         "instantiation_dict": {
@@ -2482,7 +2482,7 @@
                 "url_match"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8082/catalogsearch/result/index/?product_list_order=price&q=chairs&product_list_dir=asc",
+            "reference_url": "http://localhost:7770/catalogsearch/result/index/?product_list_order=price&q=chairs&product_list_dir=asc",
             "program_html": [],
             "url_note": "GOLD in PRED"
         },
@@ -2496,7 +2496,7 @@
         "task_id": 78,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "How much did I spend on shopping at One Stop Market {{time}}? They gave me a 20% discount on the total amount for orders exceeding $200 in cash",
         "instantiation_dict": {
@@ -2528,7 +2528,7 @@
         "task_id": 79,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "Tell me when I last ordered my {{description}}?",
         "instantiation_dict": {
@@ -2560,7 +2560,7 @@
         "task_id": 80,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "How many reviews our shop received {{time}}?",
         "instantiation_dict": {
@@ -2592,7 +2592,7 @@
         "task_id": 81,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "Who else have access to my repo {{repo}}, show me their usernames",
         "instantiation_dict": {
@@ -2624,7 +2624,7 @@
         "task_id": 82,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "List products from {{product_category}} category by {{order}} price",
         "instantiation_dict": {
@@ -2638,7 +2638,7 @@
                 "url_match"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8082/home-kitchen/furniture/living-room-furniture.html?product_list_order=price&product_list_dir=desc",
+            "reference_url": "http://localhost:7770/home-kitchen/furniture/living-room-furniture.html?product_list_order=price&product_list_dir=desc",
             "program_html": [],
             "url_note": "GOLD in PRED"
         },
@@ -2652,7 +2652,7 @@
         "task_id": 83,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "Checkout merge requests requiring my review",
         "instantiation_dict": {},
@@ -2663,7 +2663,7 @@
                 "url_match"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:9001/dashboard/merge_requests?reviewer_username=byteblaze",
+            "reference_url": "http://localhost:8023/dashboard/merge_requests?reviewer_username=byteblaze",
             "program_html": [],
             "url_note": "GOLD in PRED"
         },
@@ -2677,7 +2677,7 @@
         "task_id": 84,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "Show me the {{info}} for order number {{order_number}}.",
         "instantiation_dict": {
@@ -2711,7 +2711,7 @@
         "task_id": 85,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "Measure distance between {{location/address_1}} and {{location/address_2}} by walking",
         "instantiation_dict": {
@@ -2744,7 +2744,7 @@
         "task_id": 86,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "find discounted items.",
         "instantiation_dict": {},
@@ -2772,7 +2772,7 @@
         "task_id": 87,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "Pull up the description page of {{location}} on Map",
         "instantiation_dict": {
@@ -2808,7 +2808,7 @@
         "task_id": 88,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "Preview the {{name}} theme for my shop",
         "instantiation_dict": {
@@ -2821,7 +2821,7 @@
                 "url_match"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8083/admin/admin/system_design_theme/edit/id/1",
+            "reference_url": "http://localhost:7780/admin/admin/system_design_theme/edit/id/1",
             "program_html": [],
             "url_note": "GOLD in PRED"
         },
@@ -2835,7 +2835,7 @@
         "task_id": 89,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "Summarize customer reviews for {{product}}.",
         "instantiation_dict": {
@@ -2874,7 +2874,7 @@
         "task_id": 90,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "Find the {{space}} around {{location}}",
         "instantiation_dict": {
@@ -2888,7 +2888,7 @@
                 "url_match"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:9003/search?query=hotels%20near%20Carnegie%20Music%20Hall",
+            "reference_url": "http://localhost:3000/search?query=hotels%20near%20Carnegie%20Music%20Hall",
             "program_html": [],
             "url_note": "GOLD in PRED"
         },
@@ -2902,7 +2902,7 @@
         "task_id": 91,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "I am arriving at Carnegie Mellon University. Find the nearby US Citizenship and Immigration Services and the walking distance to the nearest Social Security Administration from US Citizenship and Immigration Services",
         "instantiation_dict": {},
@@ -2932,7 +2932,7 @@
         "task_id": 92,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "I am arriving at Pittsburgh Airport. Show me the name of a Hyatt hotel if there is any nearby. Tell me the names of supermarkets that are within 15mins driving from the hotel",
         "instantiation_dict": {},
@@ -2964,7 +2964,7 @@
         "task_id": 93,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "List the customer names who complain about the quality of EYZUTAK phone cases",
         "instantiation_dict": {},
@@ -2997,7 +2997,7 @@
         "task_id": 94,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "What is the rating of {{product}}",
         "instantiation_dict": {
@@ -3029,7 +3029,7 @@
         "task_id": 95,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "Who gave {{stars}} for phone cases from EYZUTAK",
         "instantiation_dict": {
@@ -3066,7 +3066,7 @@
         "task_id": 96,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "Post \"{{content}}\" for the merge request related to {{mr}} in {{repo}} project",
         "instantiation_dict": {
@@ -3081,7 +3081,7 @@
                 "program_html"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:9001/a11yproject/a11yproject.com/-/merge_requests/1071",
+            "reference_url": "http://localhost:8023/a11yproject/a11yproject.com/-/merge_requests/1071",
             "program_html": [
                 {
                     "url": "last",
@@ -3102,7 +3102,7 @@
         "task_id": 97,
         "require_login": true,
         "storage_state": "./.auth/reddit_state.json",
-        "start_url": "http://localhost:8080",
+        "start_url": "http://localhost:9999",
         "geolocation": null,
         "intent_template": "Change my reddit bio to \"{{content}}\"",
         "instantiation_dict": {
@@ -3118,7 +3118,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:8080/user/MarvelsGrantMan136",
+                    "url": "http://localhost:9999/user/MarvelsGrantMan136",
                     "locator": "document.querySelector(\".user-bio__biography\").outerText",
                     "required_contents": {
                         "exact_match": "Seeking SDE positions"
@@ -3136,7 +3136,7 @@
         "task_id": 98,
         "require_login": true,
         "storage_state": "./.auth/reddit_state.json",
-        "start_url": "http://localhost:8080",
+        "start_url": "http://localhost:9999",
         "geolocation": null,
         "intent_template": "Upvote the newest post in {{subreddit}} subreddit",
         "instantiation_dict": {
@@ -3152,7 +3152,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:8080/f/books/124260/adults-reading-to-each-other-out-loud",
+                    "url": "http://localhost:9999/f/books/124260/adults-reading-to-each-other-out-loud",
                     "locator": "document.querySelector('div.submission__vote').querySelector('form').getAttribute('class')",
                     "required_contents": {
                         "must_include": [
@@ -3172,7 +3172,7 @@
         "task_id": 99,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "Go to the merge request on {{topic}} I have to review, find if the author of the merge request responded at the end, and reply \"Thank you\" if he did. Otherwise remind him with a simple @.",
         "instantiation_dict": {
@@ -3188,7 +3188,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:9001/byteblaze/a11y-webring.club/-/merge_requests/40",
+                    "url": "http://localhost:8023/byteblaze/a11y-webring.club/-/merge_requests/40",
                     "locator": "document.querySelector('[id=\"notes-list\"').lastElementChild.querySelector('.timeline-discussion-body').outerText",
                     "required_contents": {
                         "exact_match": "@davepgreene"
@@ -3206,7 +3206,7 @@
         "task_id": 100,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "Set my gitlab status as {{status}}.",
         "instantiation_dict": {
@@ -3222,7 +3222,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:9001/byteblaze",
+                    "url": "http://localhost:8023/byteblaze",
                     "locator": "document.querySelector('.cover-status').lastChild.textContent",
                     "required_contents": {
                         "exact_match": "Enjoying life"
@@ -3240,7 +3240,7 @@
         "task_id": 101,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "Mark all {{brand}} shirts on sale",
         "instantiation_dict": {
@@ -3256,7 +3256,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:8083/admin/catalog/product/edit/id/126/",
+                    "url": "http://localhost:7780/admin/catalog/product/edit/id/126/",
                     "locator": "document.querySelector('input[name=\"product[sale]\"]').value",
                     "required_contents": {
                         "exact_match": "1"
@@ -3275,7 +3275,7 @@
         "task_id": 102,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "Find the page of {{description}} on the map.",
         "instantiation_dict": {
@@ -3311,7 +3311,7 @@
         "task_id": 103,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082/tall-pink-taper-candles-4-piece-orange-colored-tapered-candles-gradient-candles-10-6-inches-tall-tie-dye-candle-set-large-dripless-long-burning-candlesticks-two-color-taper-candles-candlesticks.html |AND| http://localhost:8082/spaas-white-taper-candles-4-pack-10-inch-tall-candles-scent-free-premium-wax-candle-sticks-8-hour-long-burning-white-candlesticks-for-home-decoration-wedding-holiday-and-parties.html |AND| http://localhost:8082/white-starfish-wall-candle-sconces-set-of-2-beach-decor-ocean-themed-wall-mount-candleholders-nautical-style-beach-bathroom-decor-coastal-farmhouse-seashell-candle-holders.html",
+        "start_url": "http://localhost:7770/tall-pink-taper-candles-4-piece-orange-colored-tapered-candles-gradient-candles-10-6-inches-tall-tie-dye-candle-set-large-dripless-long-burning-candlesticks-two-color-taper-candles-candlesticks.html |AND| http://localhost:7770/spaas-white-taper-candles-4-pack-10-inch-tall-candles-scent-free-premium-wax-candle-sticks-8-hour-long-burning-white-candlesticks-for-home-decoration-wedding-holiday-and-parties.html |AND| http://localhost:7770/white-starfish-wall-candle-sconces-set-of-2-beach-decor-ocean-themed-wall-mount-candleholders-nautical-style-beach-bathroom-decor-coastal-farmhouse-seashell-candle-holders.html",
         "geolocation": null,
         "intent_template": "Add the product with the lowest per unit price from my open tabs to the shopping cart",
         "instantiation_dict": {},
@@ -3325,7 +3325,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:8082/checkout/cart",
+                    "url": "http://localhost:7770/checkout/cart",
                     "locator": "",
                     "required_contents": {
                         "must_include": [
@@ -3345,7 +3345,7 @@
         "task_id": 104,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "I previously ordered some {{product}} {{time}} and later cancelled. Can you reorder it for me?",
         "instantiation_dict": {
@@ -3382,7 +3382,7 @@
         "task_id": 105,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "set the homepage URL on my GitLab profile to {{url}}",
         "instantiation_dict": {
@@ -3398,7 +3398,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:9001/byteblaze",
+                    "url": "http://localhost:8023/byteblaze",
                     "locator": "document.querySelector('.profile-header [itemprop=\"url\"]').outerText",
                     "required_contents": {
                         "exact_match": "egg.tart.com"
@@ -3416,7 +3416,7 @@
         "task_id": 106,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "Disable {{product}} from the site, they are facing some quality issues.",
         "instantiation_dict": {
@@ -3432,7 +3432,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:8083/admin/catalog/product/edit/id/478/",
+                    "url": "http://localhost:7780/admin/catalog/product/edit/id/478/",
                     "locator": "document.querySelector('[name=\"product[status]\"').value",
                     "required_contents": {
                         "exact_match": "2"
@@ -3450,7 +3450,7 @@
         "task_id": 107,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin/catalog/product/edit/id/1481/",
+        "start_url": "http://localhost:7780/admin/catalog/product/edit/id/1481/",
         "geolocation": null,
         "intent_template": "{{action}} the price of this product by {{amount}}",
         "instantiation_dict": {
@@ -3467,7 +3467,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:8083/admin/catalog/product/edit/id/1481/",
+                    "url": "http://localhost:7780/admin/catalog/product/edit/id/1481/",
                     "locator": "document.querySelector('[name=\"product[price]\"').value",
                     "required_contents": {
                         "exact_match": "27.00"
@@ -3485,7 +3485,7 @@
         "task_id": 108,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "Update the product description of {{product}} to highlight the real user positive reviews by quoting the comments",
         "instantiation_dict": {
@@ -3501,7 +3501,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:8083/admin/../antonia-racer-tank.html",
+                    "url": "http://localhost:7780/admin/../antonia-racer-tank.html",
                     "locator": "document.querySelector('.data.item.content').outerText + (document.querySelector('.product.attribute.overview [itemprop=\"description\"]')?.outerText || '')",
                     "required_contents": {
                         "must_include": [
@@ -3523,7 +3523,7 @@
         "task_id": 109,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "Add {{product}} to my wish list",
         "instantiation_dict": {
@@ -3539,7 +3539,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:8082/wishlist/",
+                    "url": "http://localhost:7770/wishlist/",
                     "locator": "document.querySelector('.products-grid.wishlist').outerText",
                     "required_contents": {
                         "must_include": [
@@ -3559,7 +3559,7 @@
         "task_id": 110,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "Cancel order {{id}}",
         "instantiation_dict": {
@@ -3575,7 +3575,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:8083/admin/sales/order/view/order_id/302/",
+                    "url": "http://localhost:7780/admin/sales/order/view/order_id/302/",
                     "locator": "document.querySelector(\"#order_status\").outerText",
                     "required_contents": {
                         "exact_match": "Canceled"
@@ -3593,7 +3593,7 @@
         "task_id": 111,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "Set up a new, empty repository with the name {{project_name}}?",
         "instantiation_dict": {
@@ -3609,7 +3609,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:9001/byteblaze/awesome_llm_reading",
+                    "url": "http://localhost:8023/byteblaze/awesome_llm_reading",
                     "locator": "",
                     "required_contents": {
                         "must_include": [
@@ -3629,7 +3629,7 @@
         "task_id": 112,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "{{name}} wants to check my dotfile configurations. Please invite him to the repo as a guest.",
         "instantiation_dict": {
@@ -3645,7 +3645,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:9001/byteblaze/dotfiles/-/project_members",
+                    "url": "http://localhost:8023/byteblaze/dotfiles/-/project_members",
                     "locator": "func:gitlab_get_project_memeber_role(__page__, 'vinta')",
                     "required_contents": {
                         "must_include": [
@@ -3665,7 +3665,7 @@
         "task_id": 113,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "Change the page title of \"{{old-heading}}\" page on my site to \"{{heading}}\".",
         "instantiation_dict": {
@@ -3682,7 +3682,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:8083/admin/cms/page/edit/page_id/2/",
+                    "url": "http://localhost:7780/admin/cms/page/edit/page_id/2/",
                     "locator": "document.querySelector('input[name=\"title\"]').value",
                     "required_contents": {
                         "exact_match": "This is the home page!! Leave here!!"
@@ -3700,7 +3700,7 @@
         "task_id": 114,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "Notify {{name}} in their most recent pending order with message \"{{message}}\"",
         "instantiation_dict": {
@@ -3730,7 +3730,7 @@
         "task_id": 115,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "Update order #{{order}} with the {{service}} tracking number {{tracking}}",
         "instantiation_dict": {
@@ -3748,7 +3748,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:8083/admin/sales/order/commentsHistory/order_id/307/active_tab/order_shipments/",
+                    "url": "http://localhost:7780/admin/sales/order/commentsHistory/order_id/307/active_tab/order_shipments/",
                     "locator": "",
                     "required_contents": {
                         "must_include": [
@@ -3768,7 +3768,7 @@
         "task_id": 116,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "Make all {{product}} as out of stock",
         "instantiation_dict": {
@@ -3784,7 +3784,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:8083/admin/catalog/product/edit/id/1861/",
+                    "url": "http://localhost:7780/admin/catalog/product/edit/id/1861/",
                     "locator": "document.querySelector('[name=\"product[quantity_and_stock_status][is_in_stock]\"').value",
                     "required_contents": {
                         "exact_match": "0"
@@ -3802,7 +3802,7 @@
         "task_id": 117,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "Buy the highest rated product from the {{product_category}} category within a budget {{dollar_value}}.",
         "instantiation_dict": {
@@ -3839,7 +3839,7 @@
         "task_id": 118,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "Buy the best rating product from \"{{category}}\" category with at least 5 reviews and the product is least expensive",
         "instantiation_dict": {
@@ -3875,7 +3875,7 @@
         "task_id": 119,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "Add a {{product}} to my wish list.",
         "instantiation_dict": {
@@ -3891,7 +3891,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:8082/wishlist/",
+                    "url": "http://localhost:7770/wishlist/",
                     "locator": "document.querySelector('.products-grid.wishlist').outerText",
                     "required_contents": {
                         "must_include": [
@@ -3912,7 +3912,7 @@
         "task_id": 120,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082/elmwood-inn-fine-teas-orange-vanilla-caffeine-free-fruit-infusion-16-ounce-pouch.html",
+        "start_url": "http://localhost:7770/elmwood-inn-fine-teas-orange-vanilla-caffeine-free-fruit-infusion-16-ounce-pouch.html",
         "geolocation": null,
         "intent_template": "Add this product to my wishlist",
         "instantiation_dict": {},
@@ -3926,7 +3926,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:8082/wishlist/",
+                    "url": "http://localhost:7770/wishlist/",
                     "locator": "document.querySelector('.products-grid.wishlist').outerText",
                     "required_contents": {
                         "must_include": [
@@ -3946,7 +3946,7 @@
         "task_id": 121,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "Subscribe to the newsletter of OneStopMarket",
         "instantiation_dict": {},
@@ -3960,7 +3960,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:8082/newsletter/manage/",
+                    "url": "http://localhost:7770/newsletter/manage/",
                     "locator": "document.querySelector('[title=\"General Subscription\"').checked.toString()",
                     "required_contents": {
                         "exact_match": "true"
@@ -3978,7 +3978,7 @@
         "task_id": 122,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "Star the top {{number}} most stared repos in Gitlab",
         "instantiation_dict": {
@@ -3994,7 +3994,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:9001/users/byteblaze/starred",
+                    "url": "http://localhost:8023/users/byteblaze/starred",
                     "locator": "",
                     "required_contents": {
                         "must_include": [
@@ -4021,7 +4021,7 @@
         "task_id": 123,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "Draft a refund message via their \"contact us\" form for the {{product}} I bought {{time}}. It broke after three days of use. The shop requires the order id, the reason and the amount to refund in the message. Don't submit yet",
         "instantiation_dict": {
@@ -4061,7 +4061,7 @@
         "task_id": 124,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "Follow {{account_list}} on Gitlab",
         "instantiation_dict": {
@@ -4081,7 +4081,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:9001/users/byteblaze/following",
+                    "url": "http://localhost:8023/users/byteblaze/following",
                     "locator": "document.querySelector('.user-profile').outerText",
                     "required_contents": {
                         "must_include": [
@@ -4103,7 +4103,7 @@
         "task_id": 125,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "Modify the address of order #{{order_id}} to {{address}}",
         "instantiation_dict": {
@@ -4120,7 +4120,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:8083/admin/sales/order/view/order_id/299",
+                    "url": "http://localhost:7780/admin/sales/order/view/order_id/299",
                     "locator": "",
                     "required_contents": {
                         "must_include": [
@@ -4142,7 +4142,7 @@
         "task_id": 126,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "Add a new {{option}} {{value}} to {{base_setting}} of {{product}}",
         "instantiation_dict": {
@@ -4161,7 +4161,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:8083/admin/catalog/product/edit/id/110/",
+                    "url": "http://localhost:7780/admin/catalog/product/edit/id/110/",
                     "locator": "document.querySelector('[data-index=\"configurable\"').outerText",
                     "required_contents": {
                         "must_include": [
@@ -4183,7 +4183,7 @@
         "task_id": 127,
         "require_login": true,
         "storage_state": "./.auth/gitlab.reddit_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "create a repository named {{name}} that includes a README file with the links to the most active {{num}} DIY ideas on DIY subreddit?",
         "instantiation_dict": {
@@ -4200,18 +4200,18 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:9001/byteblaze/Do-it-myself/-/raw/main/README.md",
+                    "url": "http://localhost:8023/byteblaze/Do-it-myself/-/raw/main/README.md",
                     "locator": "",
                     "required_contents": {
                         "must_include": [
-                            "http://localhost:8080/f/DIY/118903/separate-glued-plastic-parts",
-                            "http://localhost:8080/f/DIY/118923/how-would-you-fix-this-dryer-vent-mess",
-                            "http://localhost:8080/f/DIY/118935/basement-bulkhead-soffit-wall-framing",
-                            "http://localhost:8080/f/DIY/118904/ge-water-heater-pilot-light-won-t-stay-lit",
-                            "http://localhost:8080/f/DIY/118960/attempting-to-move-a-wall-outlet-in-my-basement-a-few-inches",
-                            "http://localhost:8080/f/DIY/118931/afci-outlet-question",
-                            "http://localhost:8080/f/DIY/118824/teflon-tape-to-attach-washing-machine-drain-hose-to-pipe",
-                            "http://localhost:8080/f/DIY/118866/paver-base-for-shed"
+                            "http://localhost:9999/f/DIY/118903/separate-glued-plastic-parts",
+                            "http://localhost:9999/f/DIY/118923/how-would-you-fix-this-dryer-vent-mess",
+                            "http://localhost:9999/f/DIY/118935/basement-bulkhead-soffit-wall-framing",
+                            "http://localhost:9999/f/DIY/118904/ge-water-heater-pilot-light-won-t-stay-lit",
+                            "http://localhost:9999/f/DIY/118960/attempting-to-move-a-wall-outlet-in-my-basement-a-few-inches",
+                            "http://localhost:9999/f/DIY/118931/afci-outlet-question",
+                            "http://localhost:9999/f/DIY/118824/teflon-tape-to-attach-washing-machine-drain-hose-to-pipe",
+                            "http://localhost:9999/f/DIY/118866/paver-base-for-shed"
                         ]
                     }
                 }
@@ -4227,7 +4227,7 @@
         "task_id": 128,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "Invite {{collaborator_account_list}} as collaborator to {{repo}} repo",
         "instantiation_dict": {
@@ -4244,7 +4244,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:9001/byteblaze/gimmiethat.space/-/project_members",
+                    "url": "http://localhost:8023/byteblaze/gimmiethat.space/-/project_members",
                     "locator": "",
                     "required_contents": {
                         "must_include": [
@@ -4265,7 +4265,7 @@
         "task_id": 129,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "I recently moved, my address is {{address}}, update my information on OneStopShopping accordingly",
         "instantiation_dict": {
@@ -4281,7 +4281,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:8082/customer/address",
+                    "url": "http://localhost:7770/customer/address",
                     "locator": "document.querySelector(\".box.box-address-shipping > .box-content\").outerText",
                     "required_contents": {
                         "must_include": [
@@ -4291,7 +4291,7 @@
                     }
                 },
                 {
-                    "url": "http://localhost:8082/customer/address",
+                    "url": "http://localhost:7770/customer/address",
                     "locator": "document.querySelector(\".box.box-address-billing > .box-content\").outerText",
                     "required_contents": {
                         "must_include": [
@@ -4312,7 +4312,7 @@
         "task_id": 130,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "Add the following users to my {{repo}} as {{role}}: {{user_list}}",
         "instantiation_dict": {
@@ -4333,7 +4333,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:9001/byteblaze/remove-board-movement-events-from-the-github-issue-timeline/-/project_members",
+                    "url": "http://localhost:8023/byteblaze/remove-board-movement-events-from-the-github-issue-timeline/-/project_members",
                     "locator": "func:gitlab_get_project_memeber_role(__page__, 'abisubramanya27')",
                     "required_contents": {
                         "must_include": [
@@ -4342,7 +4342,7 @@
                     }
                 },
                 {
-                    "url": "http://localhost:9001/byteblaze/remove-board-movement-events-from-the-github-issue-timeline/-/project_members",
+                    "url": "http://localhost:8023/byteblaze/remove-board-movement-events-from-the-github-issue-timeline/-/project_members",
                     "locator": "func:gitlab_get_project_memeber_role(__page__, 'lahwaacz')",
                     "required_contents": {
                         "must_include": [
@@ -4362,7 +4362,7 @@
         "task_id": 131,
         "require_login": true,
         "storage_state": "./.auth/reddit_state.json",
-        "start_url": "http://localhost:8080",
+        "start_url": "http://localhost:9999",
         "geolocation": null,
         "intent_template": "Create a new forum named {{name}}, with a description of {{description}}, and include {{sidebar_list}} in the sidebar?",
         "instantiation_dict": {
@@ -4385,7 +4385,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:8080/f/Cyberpunk/edit",
+                    "url": "http://localhost:9999/f/Cyberpunk/edit",
                     "locator": "document.querySelector(\"#forum_description\").value",
                     "required_contents": {
                         "must_include": [
@@ -4394,7 +4394,7 @@
                     }
                 },
                 {
-                    "url": "http://localhost:8080/f/Cyberpunk/edit",
+                    "url": "http://localhost:9999/f/Cyberpunk/edit",
                     "locator": "document.querySelector(\"#forum_sidebar\").value",
                     "required_contents": {
                         "must_include": [
@@ -4417,7 +4417,7 @@
         "task_id": 132,
         "require_login": true,
         "storage_state": "./.auth/reddit_state.json",
-        "start_url": "http://localhost:8080",
+        "start_url": "http://localhost:9999",
         "geolocation": null,
         "intent_template": "Open the thread of a trending post on the forum \"{{subreddit}}\" and subscribe.",
         "instantiation_dict": {
@@ -4431,10 +4431,10 @@
                 "program_html"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8080/f/MachineLearning",
+            "reference_url": "http://localhost:9999/f/MachineLearning",
             "program_html": [
                 {
-                    "url": "http://localhost:8080/",
+                    "url": "http://localhost:9999/",
                     "locator": "document.querySelector(\"#sidebar > section\").outerText",
                     "required_contents": {
                         "must_include": [
@@ -4455,7 +4455,7 @@
         "task_id": 133,
         "require_login": true,
         "storage_state": "./.auth/reddit_state.json",
-        "start_url": "http://localhost:8080",
+        "start_url": "http://localhost:9999",
         "geolocation": null,
         "intent_template": "Post my question, \"{{question}}\", in a subreddit where I'm likely to get an answer",
         "instantiation_dict": {
@@ -4469,7 +4469,7 @@
                 "program_html"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8080/f/nyc",
+            "reference_url": "http://localhost:9999/f/nyc",
             "program_html": [
                 {
                     "url": "func:reddit_get_post_url('__last_url__')",
@@ -4493,7 +4493,7 @@
         "task_id": 134,
         "require_login": true,
         "storage_state": "./.auth/reddit_state.json",
-        "start_url": "http://localhost:8080",
+        "start_url": "http://localhost:9999",
         "geolocation": null,
         "intent_template": "Find a subreddit focused on topics related to {{topic}}, and post my question, \"{{question}}\" there",
         "instantiation_dict": {
@@ -4508,7 +4508,7 @@
                 "program_html"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8080/f/consoles",
+            "reference_url": "http://localhost:9999/f/consoles",
             "program_html": [
                 {
                     "url": "func:reddit_get_post_url('__last_url__')",
@@ -4532,7 +4532,7 @@
         "task_id": 135,
         "require_login": true,
         "storage_state": "./.auth/reddit_state.json",
-        "start_url": "http://localhost:8080",
+        "start_url": "http://localhost:9999",
         "geolocation": null,
         "intent_template": "Post a review of my recent reading \"{{book}}\" in the r/books with my comment \"{{content}}\".",
         "instantiation_dict": {
@@ -4547,7 +4547,7 @@
                 "program_html"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8080/f/books",
+            "reference_url": "http://localhost:9999/f/books",
             "program_html": [
                 {
                     "url": "func:reddit_get_post_url('__last_url__')",
@@ -4572,7 +4572,7 @@
         "task_id": 136,
         "require_login": true,
         "storage_state": "./.auth/reddit_state.json",
-        "start_url": "http://localhost:8080/f/pics",
+        "start_url": "http://localhost:9999/f/pics",
         "geolocation": null,
         "intent_template": "Re-post the image of {{content}} in this page to {{subreddit}} subreddit and note \"from /f/pics\"",
         "instantiation_dict": {
@@ -4587,7 +4587,7 @@
                 "program_html"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8080/f/funny",
+            "reference_url": "http://localhost:9999/f/funny",
             "program_html": [
                 {
                     "url": "func:reddit_get_post_url('__last_url__')",
@@ -4620,7 +4620,7 @@
         "task_id": 137,
         "require_login": true,
         "storage_state": "./.auth/reddit_state.json",
-        "start_url": "http://localhost:8080",
+        "start_url": "http://localhost:9999",
         "geolocation": null,
         "intent_template": "Create a discussion post about \"{{topic}}\" in a relevant subreddit and ask users for their opinions with the simple prompt, \"your opinion\"",
         "instantiation_dict": {
@@ -4634,7 +4634,7 @@
                 "program_html"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8080/f/iphone",
+            "reference_url": "http://localhost:9999/f/iphone",
             "program_html": [
                 {
                     "url": "func:reddit_get_post_url('__last_url__')",
@@ -4659,7 +4659,7 @@
         "task_id": 138,
         "require_login": true,
         "storage_state": "./.auth/reddit_state.json",
-        "start_url": "http://localhost:8080",
+        "start_url": "http://localhost:9999",
         "geolocation": null,
         "intent_template": "Ask for product recommendations for {{category}} within a budget of {{price}} in {{subreddit}}",
         "instantiation_dict": {
@@ -4675,7 +4675,7 @@
                 "program_html"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8080/f/sports",
+            "reference_url": "http://localhost:9999/f/sports",
             "program_html": [
                 {
                     "url": "func:reddit_get_post_url('__last_url__')",
@@ -4701,7 +4701,7 @@
         "task_id": 139,
         "require_login": true,
         "storage_state": "./.auth/reddit_state.json",
-        "start_url": "http://localhost:8080",
+        "start_url": "http://localhost:9999",
         "geolocation": null,
         "intent_template": "Post a notice on a virtual meetup for {{interest}} enthusiasts on {{date}} in the {{subreddit}} subreddit",
         "instantiation_dict": {
@@ -4717,7 +4717,7 @@
                 "program_html"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8080/f/books",
+            "reference_url": "http://localhost:9999/f/books",
             "program_html": [
                 {
                     "url": "func:reddit_get_post_url('__last_url__')",
@@ -4743,7 +4743,7 @@
         "task_id": 140,
         "require_login": true,
         "storage_state": "./.auth/reddit_state.json",
-        "start_url": "http://localhost:8080",
+        "start_url": "http://localhost:9999",
         "geolocation": null,
         "intent_template": "Post in {{subreddit}} subreddit about what could machine learning help the correpong field.",
         "instantiation_dict": {
@@ -4757,7 +4757,7 @@
                 "program_html"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8080/f/books",
+            "reference_url": "http://localhost:9999/f/books",
             "program_html": [
                 {
                     "url": "func:reddit_get_post_url('__last_url__')",
@@ -4782,7 +4782,7 @@
         "task_id": 141,
         "require_login": true,
         "storage_state": "./.auth/reddit_state.json",
-        "start_url": "http://localhost:8080/f/technology/134852/ai-experts-disown-musk-backed-campaign-citing-their-research",
+        "start_url": "http://localhost:9999/f/technology/134852/ai-experts-disown-musk-backed-campaign-citing-their-research",
         "geolocation": null,
         "intent_template": "Reply to {{position_description}} with my comment \"{{content_description}}\"",
         "instantiation_dict": {
@@ -4797,7 +4797,7 @@
                 "program_html"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8080/f/technology/134852/ai-experts-disown-musk-backed-campaign-citing-their-research",
+            "reference_url": "http://localhost:9999/f/technology/134852/ai-experts-disown-musk-backed-campaign-citing-their-research",
             "program_html": [
                 {
                     "url": "last",
@@ -4819,7 +4819,7 @@
         "task_id": 142,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "Fill the \"contact us\" form in the site for a refund on the {{product}} I bought, stating that it broke after just three days of use. Also, ensure to include the order number #{{order_id}} and the product SKU. Don't submit yet, I will check.",
         "instantiation_dict": {
@@ -4834,7 +4834,7 @@
                 "program_html"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8082/contact",
+            "reference_url": "http://localhost:7770/contact",
             "program_html": [
                 {
                     "url": "last",
@@ -4861,7 +4861,7 @@
         "task_id": 143,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "Submit a merge request for {{source_branch}} branch to be merged into {{target_branch}} branch, assign {{reviewer}} as the reviewer",
         "instantiation_dict": {
@@ -4877,7 +4877,7 @@
                 "program_html"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:9001/a11yproject/a11yproject.com/-/merge_requests",
+            "reference_url": "http://localhost:8023/a11yproject/a11yproject.com/-/merge_requests",
             "program_html": [
                 {
                     "url": "last",
@@ -4916,7 +4916,7 @@
         "task_id": 144,
         "require_login": true,
         "storage_state": "./.auth/reddit_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "Gather the titles of {{product}} reviews with {{rating}} rating from OneStopShop, and post them in the games subreddit under the title \"real user feedback on {{product}}\"",
         "instantiation_dict": {
@@ -4931,7 +4931,7 @@
                 "program_html"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8080/f/gaming",
+            "reference_url": "http://localhost:9999/f/gaming",
             "program_html": [
                 {
                     "url": "func:reddit_get_post_url('__last_url__')",
@@ -4966,7 +4966,7 @@
         "task_id": 145,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "Lookup orders that are {{status}}",
         "instantiation_dict": {
@@ -4980,7 +4980,7 @@
                 "program_html"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8083/admin/sales/order/",
+            "reference_url": "http://localhost:7780/admin/sales/order/",
             "program_html": [
                 {
                     "url": "last",
@@ -5005,7 +5005,7 @@
         "task_id": 146,
         "require_login": true,
         "storage_state": "./.auth/gitlab.reddit_state.json",
-        "start_url": "http://localhost:8080",
+        "start_url": "http://localhost:9999",
         "geolocation": null,
         "intent_template": "Find a GitLab repository related to {{topic}} and make a Reddit post linking to it in a relevant subreddit",
         "instantiation_dict": {
@@ -5019,7 +5019,7 @@
                 "program_html"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8080/f/machinelearning |OR| http://localhost:8080/f/singularity |OR| http://localhost:8080/f/deeplearning |OR| http://localhost:8080/f/technology",
+            "reference_url": "http://localhost:9999/f/machinelearning |OR| http://localhost:9999/f/singularity |OR| http://localhost:9999/f/deeplearning |OR| http://localhost:9999/f/technology",
             "program_html": [
                 {
                     "url": "last",
@@ -5027,7 +5027,7 @@
                     "required_contents": {
                         "must_include": [
                             "chatgpt",
-                            "http://localhost:9001/convexegg/chatgpt"
+                            "http://localhost:8023/convexegg/chatgpt"
                         ]
                     }
                 }
@@ -5045,7 +5045,7 @@
         "task_id": 147,
         "require_login": true,
         "storage_state": "./.auth/gitlab.reddit_state.json",
-        "start_url": "http://localhost:8080",
+        "start_url": "http://localhost:9999",
         "geolocation": null,
         "intent_template": "Promote {{repo}} to subreddit {{subreddit}} with the description from the repo itself.",
         "instantiation_dict": {
@@ -5060,7 +5060,7 @@
                 "program_html"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8080/f/technology",
+            "reference_url": "http://localhost:9999/f/technology",
             "program_html": [
                 {
                     "url": "last",
@@ -5068,7 +5068,7 @@
                     "required_contents": {
                         "must_include": [
                             "A storage library for AngularJS done right",
-                            "http://localhost:9001/auth0/angular-storage"
+                            "http://localhost:8023/auth0/angular-storage"
                         ]
                     }
                 }
@@ -5085,7 +5085,7 @@
         "task_id": 148,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "Draft an email to the shop owner via their contact us function for a coupon as {{reason}}",
         "instantiation_dict": {
@@ -5098,7 +5098,7 @@
                 "url_match"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8082/contact/index/",
+            "reference_url": "http://localhost:7770/contact/index/",
             "program_html": [],
             "url_note": "GOLD in PRED"
         },
@@ -5112,7 +5112,7 @@
         "task_id": 149,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "Today is 3/15/2023, generate a {{report}} {{time_span}}",
         "instantiation_dict": {
@@ -5127,7 +5127,7 @@
                 "program_html"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8083/admin/reports/report_sales/sales",
+            "reference_url": "http://localhost:7780/admin/reports/report_sales/sales",
             "program_html": [
                 {
                     "url": "last",
@@ -5156,7 +5156,7 @@
         "task_id": 150,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "Create a {{type}} report from {{start_date}} to {{end_date}}",
         "instantiation_dict": {
@@ -5172,7 +5172,7 @@
                 "program_html"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:8083/admin/reports/report_sales/shipping",
+            "reference_url": "http://localhost:7780/admin/reports/report_sales/shipping",
             "program_html": [
                 {
                     "url": "last",
@@ -5201,7 +5201,7 @@
         "task_id": 151,
         "require_login": true,
         "storage_state": "./.auth/reddit_state.json",
-        "start_url": "http://localhost:8080",
+        "start_url": "http://localhost:9999",
         "geolocation": null,
         "intent_template": "Thumbs down the top {{k}} post ever in {{subreddit}}.",
         "instantiation_dict": {
@@ -5218,7 +5218,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:8080/f/gadgets/19459/a-custom-gaming-pc-built-inside-a-vintage-1940s-motorola",
+                    "url": "http://localhost:9999/f/gadgets/19459/a-custom-gaming-pc-built-inside-a-vintage-1940s-motorola",
                     "locator": "document.querySelector('div.submission__vote').querySelector('form').getAttribute('class')",
                     "required_contents": {
                         "must_include": [
@@ -5238,7 +5238,7 @@
         "task_id": 152,
         "require_login": true,
         "storage_state": "./.auth/reddit_state.json",
-        "start_url": "http://localhost:8080",
+        "start_url": "http://localhost:9999",
         "geolocation": null,
         "intent_template": "Like all submissions created by {{user}} in subreddit {{subreddit}}",
         "instantiation_dict": {
@@ -5255,7 +5255,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:8080/f/EarthPorn/98332/my-favorite-place-on-the-planet-henry-s-fork-of-the-snake",
+                    "url": "http://localhost:9999/f/EarthPorn/98332/my-favorite-place-on-the-planet-henry-s-fork-of-the-snake",
                     "locator": "document.querySelector('div.submission__vote').querySelector('form').getAttribute('class')",
                     "required_contents": {
                         "must_include": [
@@ -5264,7 +5264,7 @@
                     }
                 },
                 {
-                    "url": "http://localhost:8080/f/EarthPorn/98297/2-years-later-this-is-still-one-of-the-most-incredible",
+                    "url": "http://localhost:9999/f/EarthPorn/98297/2-years-later-this-is-still-one-of-the-most-incredible",
                     "locator": "document.querySelector('div.submission__vote').querySelector('form').getAttribute('class')",
                     "required_contents": {
                         "must_include": [
@@ -5273,7 +5273,7 @@
                     }
                 },
                 {
-                    "url": "http://localhost:8080/f/EarthPorn/98256/i-can-t-wait-for-all-this-green-to-start-coming-back-little",
+                    "url": "http://localhost:9999/f/EarthPorn/98256/i-can-t-wait-for-all-this-green-to-start-coming-back-little",
                     "locator": "document.querySelector('div.submission__vote').querySelector('form').getAttribute('class')",
                     "required_contents": {
                         "must_include": [
@@ -5293,7 +5293,7 @@
         "task_id": 153,
         "require_login": true,
         "storage_state": "./.auth/reddit_state.json",
-        "start_url": "http://localhost:8080",
+        "start_url": "http://localhost:9999",
         "geolocation": null,
         "intent_template": "DisLike all submissions created by {{user}} in subreddit {{subreddit}}",
         "instantiation_dict": {
@@ -5310,7 +5310,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:8080/f/UpliftingNews/16087/same-sex-marriage-is-now-legal-in-all-of-mexico-s-states",
+                    "url": "http://localhost:9999/f/UpliftingNews/16087/same-sex-marriage-is-now-legal-in-all-of-mexico-s-states",
                     "locator": "document.querySelector('div.submission__vote').querySelector('form').getAttribute('class')",
                     "required_contents": {
                         "must_include": [
@@ -5330,7 +5330,7 @@
         "task_id": 154,
         "require_login": true,
         "storage_state": "./.auth/reddit_state.json",
-        "start_url": "http://localhost:8080",
+        "start_url": "http://localhost:9999",
         "geolocation": null,
         "intent_template": "Edit my post on {{post}} by adding a line to the body that says \"{{content}}\"",
         "instantiation_dict": {
@@ -5347,7 +5347,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:8080/f/television/135201/star-trek-starfleet-academy-series-from-alex-kurtzman-and",
+                    "url": "http://localhost:9999/f/television/135201/star-trek-starfleet-academy-series-from-alex-kurtzman-and",
                     "locator": "document.querySelector('.submission__body').outerText",
                     "required_contents": {
                         "exact_match": "Every watch makes me feel like a kid again"
@@ -5366,7 +5366,7 @@
         "task_id": 155,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "Show me the way from {{location}} to the home stadium of {{sport_team}} {{time}}",
         "instantiation_dict": {
@@ -5423,7 +5423,7 @@
         "task_id": 156,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "Create a new {{scope}} project \"awesome-llms\" and add {{account_list}} as members",
         "instantiation_dict": {
@@ -5440,7 +5440,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:9001/byteblaze/awesome-llms",
+                    "url": "http://localhost:8023/byteblaze/awesome-llms",
                     "locator": "document.querySelector('.visibility-icon').getAttribute('title')",
                     "required_contents": {
                         "must_include": [
@@ -5449,7 +5449,7 @@
                     }
                 },
                 {
-                    "url": "http://localhost:9001/byteblaze/awesome-llms/-/project_members",
+                    "url": "http://localhost:8023/byteblaze/awesome-llms/-/project_members",
                     "locator": "",
                     "required_contents": {
                         "must_include": [
@@ -5471,7 +5471,7 @@
         "task_id": 157,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "Start a private project {{project_name}} with {{template}} template and add {{account_list}} as members",
         "instantiation_dict": {
@@ -5489,7 +5489,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:9001/byteblaze/web_agent_android_xl",
+                    "url": "http://localhost:8023/byteblaze/web_agent_android_xl",
                     "locator": "document.querySelector('.visibility-icon').getAttribute('title')",
                     "required_contents": {
                         "must_include": [
@@ -5498,7 +5498,7 @@
                     }
                 },
                 {
-                    "url": "http://localhost:9001/byteblaze/web_agent_android_xl/-/commits",
+                    "url": "http://localhost:8023/byteblaze/web_agent_android_xl/-/commits",
                     "locator": "",
                     "required_contents": {
                         "must_include": [
@@ -5507,7 +5507,7 @@
                     }
                 },
                 {
-                    "url": "http://localhost:9001/byteblaze/web_agent_android_xl/-/project_members",
+                    "url": "http://localhost:8023/byteblaze/web_agent_android_xl/-/project_members",
                     "locator": "",
                     "required_contents": {
                         "must_include": [
@@ -5530,7 +5530,7 @@
         "task_id": 158,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "Show me the route and driving time from {{city1}} to {{city2}}",
         "instantiation_dict": {
@@ -5584,7 +5584,7 @@
         "task_id": 159,
         "require_login": true,
         "storage_state": null,
-        "start_url": "http://localhost:9003",
+        "start_url": "http://localhost:3000",
         "geolocation": null,
         "intent_template": "Get directions from {{location/address_1}} to {{location/address_2}} using {{transportation}} options.",
         "instantiation_dict": {
@@ -5642,7 +5642,7 @@
         "task_id": 160,
         "require_login": true,
         "storage_state": "./.auth/shopping_admin_state.json",
-        "start_url": "http://localhost:8083/admin",
+        "start_url": "http://localhost:7780/admin",
         "geolocation": null,
         "intent_template": "{{quantity}} {{product}} arrived, update the stock",
         "instantiation_dict": {
@@ -5659,14 +5659,14 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:8083/admin/catalog/product/edit/id/872/",
+                    "url": "http://localhost:7780/admin/catalog/product/edit/id/872/",
                     "locator": "document.querySelector('[name=\"product[quantity_and_stock_status][qty]\"').value",
                     "required_contents": {
                         "exact_match": "5"
                     }
                 },
                 {
-                    "url": "http://localhost:8083/admin/catalog/product/edit/id/872/",
+                    "url": "http://localhost:7780/admin/catalog/product/edit/id/872/",
                     "locator": "document.querySelector('[name=\"product[quantity_and_stock_status][is_in_stock]\"').value",
                     "required_contents": {
                         "exact_match": "1"
@@ -5685,7 +5685,7 @@
         "task_id": 161,
         "require_login": true,
         "storage_state": "./.auth/gitlab.reddit_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "Make a folder named {{directory}} on the {{gitlab_repo}} repo and include a file called urls.txt that consists of the links to the 5 most recent posts from {{subreddit}}.",
         "instantiation_dict": {
@@ -5717,7 +5717,7 @@
         "task_id": 162,
         "require_login": true,
         "storage_state": "./.auth/shopping_state.json",
-        "start_url": "http://localhost:8082",
+        "start_url": "http://localhost:7770",
         "geolocation": null,
         "intent_template": "Change the delivery address for my most recent order to {{address}}.",
         "instantiation_dict": {
@@ -5749,7 +5749,7 @@
         "task_id": 163,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "Create an issue in {{repo}} repo with title \"{{issue}}\". Assign the issue to {{account}}. Set due date to be {{due}}",
         "instantiation_dict": {
@@ -5766,7 +5766,7 @@
                 "program_html"
             ],
             "reference_answers": null,
-            "reference_url": "http://localhost:9001/a11yproject/a11yproject.com/-/issues",
+            "reference_url": "http://localhost:8023/a11yproject/a11yproject.com/-/issues",
             "program_html": [
                 {
                     "url": "last",
@@ -5806,7 +5806,7 @@
         "task_id": 164,
         "require_login": true,
         "storage_state": "./.auth/gitlab_state.json",
-        "start_url": "http://localhost:9001",
+        "start_url": "http://localhost:8023",
         "geolocation": null,
         "intent_template": "Assign the issue regarding {{issue}} in {{repo}} to {{account}}.",
         "instantiation_dict": {
@@ -5824,7 +5824,7 @@
             "reference_url": "",
             "program_html": [
                 {
-                    "url": "http://localhost:9001/dashboard/issues?scope=all&state=opened&assignee_username=byteblaze",
+                    "url": "http://localhost:8023/dashboard/issues?scope=all&state=opened&assignee_username=byteblaze",
                     "locator": "",
                     "required_contents": {
                         "must_include": [
