@@ -1,5 +1,4 @@
 import json
-import os
 import re
 import time
 from collections import defaultdict
@@ -124,18 +123,11 @@ class ScriptBrowserEnv(Env[dict[str, Observation], Action]):
 
     @beartype
     def setup(self, config_file: Path | None = None) -> None:
-        _debug = os.environ.get("WEBARENA_DEBUG_TIMING", "0") == "1"
-
-        # Reuse Playwright and browser across resets to save threads/resources
-        t0 = time.perf_counter()
-        if not hasattr(self, 'browser') or self.browser is None:
-            self.context_manager = sync_playwright()
-            self.playwright = self.context_manager.__enter__()
-            self.browser = self.playwright.chromium.launch(
-                headless=self.headless, slow_mo=self.slow_mo
-            )
-        if _debug:
-            print(f"    [setup] browser launch: {time.perf_counter() - t0:.3f}s", flush=True)
+        self.context_manager = sync_playwright()
+        self.playwright = self.context_manager.__enter__()
+        self.browser = self.playwright.chromium.launch(
+            headless=self.headless, slow_mo=self.slow_mo
+        )
 
         if config_file:
             with open(config_file, "r") as f:
@@ -144,22 +136,15 @@ class ScriptBrowserEnv(Env[dict[str, Observation], Action]):
             instance_config = {}
 
         storage_state = instance_config.get("storage_state", None)
-        if storage_state and config_file and not os.path.isabs(storage_state):
-            # Resolve relative to config_file's parent's parent (the webarena root)
-            webarena_root = os.path.dirname(os.path.dirname(config_file))
-            storage_state = os.path.join(webarena_root, storage_state)
         start_url = instance_config.get("start_url", None)
         geolocation = instance_config.get("geolocation", None)
 
-        t1 = time.perf_counter()
         self.context = self.browser.new_context(
             viewport=self.viewport_size,
             storage_state=storage_state,
             geolocation=geolocation,
             device_scale_factor=1,
         )
-        if _debug:
-            print(f"    [setup] new_context: {time.perf_counter() - t1:.3f}s", flush=True)
         if self.save_trace_enabled:
             self.context.tracing.start(screenshots=True, snapshots=True)
         if start_url:
@@ -172,10 +157,7 @@ class ScriptBrowserEnv(Env[dict[str, Observation], Action]):
                 if self.text_observation_type == "accessibility_tree":
                     client.send("Accessibility.enable")
                 page.client = client  # type: ignore # TODO[shuyanzh], fix this hackey client
-                t2 = time.perf_counter()
-                page.goto(url, wait_until="domcontentloaded")
-                if _debug:
-                    print(f"    [setup] page.goto({url}): {time.perf_counter() - t2:.3f}s", flush=True)
+                page.goto(url)
             # set the first page as the current page
             self.page = self.context.pages[0]
             self.page.bring_to_front()
@@ -213,11 +195,7 @@ class ScriptBrowserEnv(Env[dict[str, Observation], Action]):
         """
         super().reset(seed=seed, options=options)
         if self.reset_finished:
-            # Only close the context, keep browser alive for reuse
-            try:
-                self.context.close()
-            except Exception:
-                pass
+            self.context_manager.__exit__()
 
         if options is not None and "config_file" in options:
             config_file = Path(options["config_file"])
@@ -232,11 +210,7 @@ class ScriptBrowserEnv(Env[dict[str, Observation], Action]):
         if self.sleep_after_execution > 0:
             time.sleep(self.sleep_after_execution)
 
-        _debug = os.environ.get("WEBARENA_DEBUG_TIMING", "0") == "1"
-        t_obs = time.perf_counter()
         observation = self._get_obs()
-        if _debug:
-            print(f"    [reset] _get_obs: {time.perf_counter() - t_obs:.3f}s", flush=True)
         observation_metadata = self._get_obs_metadata()
         info = {
             "page": DetachedPage(self.page.url, ""),
@@ -252,19 +226,7 @@ class ScriptBrowserEnv(Env[dict[str, Observation], Action]):
 
     def close(self) -> None:
         if self.reset_finished:
-            try:
-                self.context.close()
-            except Exception:
-                pass
-            try:
-                self.browser.close()
-            except Exception:
-                pass
-            try:
-                self.context_manager.__exit__()
-            except Exception:
-                pass
-            self.browser = None
+            self.context_manager.__exit__()
 
     def step(
         self, action: Action
