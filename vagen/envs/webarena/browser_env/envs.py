@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import time
 from collections import defaultdict
@@ -136,6 +137,10 @@ class ScriptBrowserEnv(Env[dict[str, Observation], Action]):
             instance_config = {}
 
         storage_state = instance_config.get("storage_state", None)
+        if storage_state and config_file and not os.path.isabs(storage_state):
+            # Resolve relative to config_file's parent's parent (the webarena root)
+            webarena_root = os.path.dirname(os.path.dirname(config_file))
+            storage_state = os.path.join(webarena_root, storage_state)
         start_url = instance_config.get("start_url", None)
         geolocation = instance_config.get("geolocation", None)
 
