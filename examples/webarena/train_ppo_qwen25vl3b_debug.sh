@@ -30,7 +30,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     --config-name='vagen_multiturn' \
     data.train_files=${DATASET_TRAIN} \
     data.val_files=${DATASET_VAL} \
-    data.train_batch_size=32 \
+    data.train_batch_size=4 \
     algorithm.adv_estimator=gae \
     algorithm.kl_ctrl.kl_coef=0 \
     actor_rollout_ref.model.path=${REF_MODEL_PATH} \
@@ -89,5 +89,5 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     critic.model.fsdp_config.param_offload=True \
     critic.model.fsdp_config.optimizer_offload=True \
     filter.enable=False \
-    trainer.total_training_steps=400 2>&1 | \
+    trainer.total_training_steps=1000 2>&1 | \
     tee ${EXPERIMENT_DIR}/${PROJECT_NAME}_${EXPERIMENT_NAME}.log >(tee ${BASEDIR}/${PROJECT_NAME}_${EXPERIMENT_NAME}.log >/dev/null)
