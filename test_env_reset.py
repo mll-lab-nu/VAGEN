@@ -83,10 +83,10 @@ async def test_split(task_config_file: str, label: str, skip_sites=None):
             fail += 1
             failed_seeds.append((s, err))
         tag = f"[{done_count}/{n_tasks}]"
-        if status == "FAIL":
+        if status == "OK":
+            print(f"  {tag} seed={s:>4} {cfg}: OK")
+        else:
             print(f"  {tag} seed={s:>4} {cfg}: FAIL - {err}")
-        elif done_count % 20 == 0 or done_count == n_tasks:
-            print(f"  {tag} progress... ({ok} ok, {fail} fail)")
 
     tasks = [bounded_test(seed) for seed in range(n_tasks)]
     await asyncio.gather(*tasks)
