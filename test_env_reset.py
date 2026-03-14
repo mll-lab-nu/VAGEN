@@ -56,7 +56,9 @@ async def test_split(task_config_file: str, label: str, skip_sites=None):
         "current_viewport_only": True,
         "max_steps": 30,
         "skip_sites": skip_sites or ["map"],
-        "reset_timeout": 30.0,
+        "reset_timeout": 120.0,
+        "playwright_timeout": 120000,
+        "nav_timeout": 120000,
     }
 
     # Get task count
