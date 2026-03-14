@@ -2,8 +2,16 @@
 
 set -x
 
+# Use /workspace for all temp files to avoid filling up the 130GB root partition
+export TMPDIR=/workspace/tmp
+export TEMP=/workspace/tmp
+export TMP=/workspace/tmp
 export RAY_TMPDIR=/workspace/tmp
-mkdir -p $RAY_TMPDIR
+mkdir -p /workspace/tmp /workspace/ray_tmp
+
+# Stop any existing Ray and restart with temp dir on large disk
+ray stop --force 2>/dev/null
+ray start --head --temp-dir=/workspace/ray_tmp
 
 export SHOPPING="http://localhost:7770"
 export SHOPPING_ADMIN="http://localhost:7780/admin"
