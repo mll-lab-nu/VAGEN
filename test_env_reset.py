@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""Test WebArena environment reset for all train and test tasks."""
+"""Test WebArena environment reset for all train and test tasks via actual Env.reset()."""
+import asyncio
 import json
 import os
 import sys
-import time
-from playwright.sync_api import sync_playwright
+import logging
 
-# Ensure env vars are set
+logging.basicConfig(level=logging.WARNING)
+
+# Check env vars first
 required_vars = ["SHOPPING", "SHOPPING_ADMIN", "GITLAB", "REDDIT", "WIKIPEDIA", "MAP", "HOMEPAGE"]
+print("=== Environment Variables ===")
 for var in required_vars:
     val = os.environ.get(var, "")
     print(f"  {var}={val}")
@@ -15,75 +18,90 @@ for var in required_vars:
         print(f"ERROR: {var} not set!")
         sys.exit(1)
 
-def test_config_file(config_path, label):
-    """Load a config JSON and test connectivity to all start_urls."""
-    with open(config_path) as f:
-        tasks = json.load(f)
+from vagen.envs.webarena.webarena_env import WebArenaEnv
 
-    if not isinstance(tasks, list):
-        print(f"  {label}: not a JSON array, skipping")
-        return
 
-    # Collect unique start_urls
-    urls = set()
-    for task in tasks:
-        url = task.get("start_url", "")
-        if url:
-            # Extract base url (scheme + host + port)
-            from urllib.parse import urlparse
-            parsed = urlparse(url)
-            base = f"{parsed.scheme}://{parsed.netloc}"
-            urls.add(base)
-
+async def test_split(task_config_file: str, label: str, skip_sites=None):
+    """Test reset for all tasks in a config file."""
     print(f"\n{'='*60}")
-    print(f"{label}: {len(tasks)} tasks, {len(urls)} unique base URLs")
+    print(f"Testing: {label}")
+    print(f"Config:  {task_config_file}")
     print(f"{'='*60}")
 
-    # Test each unique URL with playwright
-    pw = sync_playwright().start()
-    browser = pw.chromium.launch(headless=True)
+    config = {
+        "task_config_file": task_config_file,
+        "headless": True,
+        "observation_type": "accessibility_tree",
+        "current_viewport_only": True,
+        "max_steps": 30,
+        "skip_sites": skip_sites or ["map"],
+        "reset_timeout": 30.0,
+    }
 
-    results = {"ok": 0, "fail": 0}
-    for url in sorted(urls):
-        page = browser.new_page()
+    env = WebArenaEnv(config)
+    n_tasks = len(env._config_files)
+    print(f"Tasks (after filtering): {n_tasks}")
+
+    ok, fail = 0, 0
+    failed_seeds = []
+
+    for seed in range(n_tasks):
         try:
-            page.goto(url, wait_until="domcontentloaded", timeout=10000)
+            obs, info = await env.reset(seed=seed)
+            ok += 1
             status = "OK"
-            results["ok"] += 1
         except Exception as e:
+            fail += 1
+            failed_seeds.append((seed, str(e)[:100]))
             status = f"FAIL: {e}"
-            results["fail"] += 1
-        finally:
-            page.close()
-        print(f"  [{status[:4]}] {url}")
 
-    browser.close()
-    pw.stop()
+        # Print progress every task
+        cfg_file = os.path.basename(env._config_files[seed % n_tasks])
+        print(f"  [{seed+1}/{n_tasks}] seed={seed} {cfg_file}: {status[:80]}")
 
-    print(f"\nResult: {results['ok']} OK, {results['fail']} FAIL out of {len(urls)} URLs")
-    return results["fail"]
+    # Cleanup
+    await env.close()
 
-if __name__ == "__main__":
+    print(f"\n--- {label} Results ---")
+    print(f"  OK:   {ok}/{n_tasks}")
+    print(f"  FAIL: {fail}/{n_tasks}")
+    if failed_seeds:
+        print(f"  Failed seeds:")
+        for s, err in failed_seeds:
+            print(f"    seed={s}: {err}")
+
+    return fail
+
+
+async def main():
     base = os.path.dirname(os.path.abspath(__file__))
     config_dir = os.path.join(base, "vagen/envs/webarena/config_files/wa")
+    skip_sites = ["map"]
 
     total_fails = 0
 
-    train_path = os.path.join(config_dir, "train_webarena_lite.json")
-    if os.path.exists(train_path):
-        total_fails += test_config_file(train_path, "TRAIN (train_webarena_lite)")
-    else:
-        print(f"Train config not found: {train_path}")
-
+    # Test validation split (smaller, test first)
     test_path = os.path.join(config_dir, "test_webarena_lite.json")
     if os.path.exists(test_path):
-        total_fails += test_config_file(test_path, "TEST (test_webarena_lite)")
+        total_fails += await test_split(test_path, "TEST (test_webarena_lite)", skip_sites)
     else:
         print(f"Test config not found: {test_path}")
 
+    # Test train split
+    train_path = os.path.join(config_dir, "train_webarena_lite.json")
+    if os.path.exists(train_path):
+        total_fails += await test_split(train_path, "TRAIN (train_webarena_lite)", skip_sites)
+    else:
+        print(f"Train config not found: {train_path}")
+
     print(f"\n{'='*60}")
     if total_fails == 0:
-        print("ALL URLs OK!")
+        print("ALL RESETS OK!")
     else:
         print(f"TOTAL FAILURES: {total_fails}")
-    sys.exit(total_fails)
+    return total_fails
+
+
+if __name__ == "__main__":
+    fails = asyncio.run(main())
+    sys.exit(min(fails, 1))
