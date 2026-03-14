@@ -10,7 +10,7 @@ import time
 
 logging.basicConfig(level=logging.WARNING)
 
-CONCURRENCY = 8  # number of parallel env instances
+CONCURRENCY = int(os.environ.get("CONCURRENCY", 8))
 
 # Check env vars first
 required_vars = ["SHOPPING", "SHOPPING_ADMIN", "GITLAB", "REDDIT", "WIKIPEDIA", "MAP", "HOMEPAGE"]
@@ -33,7 +33,9 @@ async def test_one_seed(config, seed, n_tasks):
         obs, info = await env.reset(seed=seed)
         result = ("OK", seed, cfg_file, None)
     except Exception as e:
-        result = ("FAIL", seed, cfg_file, str(e)[:120])
+        import traceback
+        tb = traceback.format_exc()
+        result = ("FAIL", seed, cfg_file, tb[-500:])
     finally:
         await env.close()
     return result
