@@ -162,7 +162,7 @@ class ScriptBrowserEnv(Env[dict[str, Observation], Action]):
                 if self.text_observation_type == "accessibility_tree":
                     client.send("Accessibility.enable")
                 page.client = client  # type: ignore # TODO[shuyanzh], fix this hackey client
-                page.goto(url)
+                page.goto(url, wait_until="domcontentloaded", timeout=120000)
             # set the first page as the current page
             self.page = self.context.pages[0]
             self.page.bring_to_front()
