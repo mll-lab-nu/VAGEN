@@ -11,6 +11,9 @@ import time
 logging.basicConfig(level=logging.WARNING)
 
 CONCURRENCY = int(os.environ.get("CONCURRENCY", 8))
+REMOTE_BROWSER_URL = os.environ.get("REMOTE_BROWSER_URL", "")
+# Specify seed range: SEEDS=0 (single), SEEDS=0-5 (range), SEEDS=0,3,7 (list)
+SEEDS_STR = os.environ.get("SEEDS", "")
 
 # Check env vars first
 required_vars = ["SHOPPING", "SHOPPING_ADMIN", "GITLAB", "REDDIT", "WIKIPEDIA", "MAP", "HOMEPAGE"]
@@ -21,6 +24,11 @@ for var in required_vars:
     if not val:
         print(f"ERROR: {var} not set!")
         sys.exit(1)
+if REMOTE_BROWSER_URL:
+    print(f"  REMOTE_BROWSER_URL={REMOTE_BROWSER_URL}")
+    print(f"  Mode: REMOTE")
+else:
+    print(f"  Mode: LOCAL (Playwright)")
 
 from vagen.envs.webarena.webarena_env import WebArenaEnv
 
@@ -83,6 +91,8 @@ async def test_split(task_config_file: str, label: str, skip_sites=None):
         "playwright_timeout": 30000,
         "nav_timeout": 30000,
     }
+    if REMOTE_BROWSER_URL:
+        config["remote_browser_url"] = REMOTE_BROWSER_URL
 
     # Get task count
     tmp_env = WebArenaEnv(config)
@@ -122,9 +132,26 @@ async def test_split(task_config_file: str, label: str, skip_sites=None):
         else:
             print(f"  {tag} seed={s:>4} [{site:20s}] {cfg}: FAIL ({elapsed:.1f}s) - {err}")
 
+    # Determine which seeds to test
+    if SEEDS_STR:
+        if "-" in SEEDS_STR:
+            lo, hi = SEEDS_STR.split("-", 1)
+            seed_list = list(range(int(lo), int(hi) + 1))
+        elif "," in SEEDS_STR:
+            seed_list = [int(s) for s in SEEDS_STR.split(",")]
+        else:
+            seed_list = [int(SEEDS_STR)]
+        # Clamp to valid range
+        seed_list = [s for s in seed_list if s < n_tasks]
+        n_tasks_display = len(seed_list)
+        print(f"Testing seeds: {seed_list[:20]}{'...' if len(seed_list) > 20 else ''}")
+    else:
+        seed_list = list(range(n_tasks))
+        n_tasks_display = n_tasks
+
     # Process seeds in batches of CONCURRENCY to avoid creating too many env instances
-    for batch_start in range(0, n_tasks, CONCURRENCY):
-        batch_seeds = range(batch_start, min(batch_start + CONCURRENCY, n_tasks))
+    for batch_start in range(0, len(seed_list), CONCURRENCY):
+        batch_seeds = seed_list[batch_start:batch_start + CONCURRENCY]
         await asyncio.gather(*[bounded_test(seed) for seed in batch_seeds])
 
     wall_time = time.time() - t0

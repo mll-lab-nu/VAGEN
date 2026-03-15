@@ -97,9 +97,14 @@ class SessionManager:
             self._cleanup_task.cancel()
         # Close all sessions
         for sid in list(self.sessions):
-            await self.close_session(sid)
+            session = self.sessions.pop(sid, None)
+            if session:
+                try:
+                    session.browser_env.close()
+                except Exception:
+                    pass
 
-    async def create_session(
+    def create_session_sync(
         self,
         config: dict,
         observation_type: str,
@@ -108,12 +113,17 @@ class SessionManager:
         viewport_height: int,
         storage_state: Optional[dict],
     ) -> BrowserSession:
-        async with self._lock:
-            if len(self.sessions) >= self.max_sessions:
-                # Evict oldest session
-                oldest_sid = min(self.sessions, key=lambda s: self.sessions[s].last_used)
-                logger.warning("Evicting session %s (max sessions reached)", oldest_sid)
-                await self._close_session_unlocked(oldest_sid)
+        """Synchronous session creation — must be called from a thread, not the event loop."""
+        # Evict if needed
+        if len(self.sessions) >= self.max_sessions:
+            oldest_sid = min(self.sessions, key=lambda s: self.sessions[s].last_used)
+            logger.warning("Evicting session %s (max sessions reached)", oldest_sid)
+            session = self.sessions.pop(oldest_sid, None)
+            if session:
+                try:
+                    session.browser_env.close()
+                except Exception:
+                    pass
 
         session_id = str(uuid.uuid4())[:8]
 
@@ -154,7 +164,6 @@ class SessionManager:
         obs, info = browser_env.reset(options={"config_file": config_path})
 
         obs_text = obs.get("text", str(obs)) if isinstance(obs, dict) else str(obs)
-        url = browser_env.page.url if browser_env.page else ""
 
         session = BrowserSession(
             session_id=session_id,
@@ -164,8 +173,7 @@ class SessionManager:
             prev_obs_text=obs_text,
         )
 
-        async with self._lock:
-            self.sessions[session_id] = session
+        self.sessions[session_id] = session
 
         # Clean up temp config (browser already loaded it)
         try:
@@ -183,18 +191,6 @@ class SessionManager:
         session.last_used = time.time()
         return session
 
-    async def close_session(self, session_id: str):
-        async with self._lock:
-            await self._close_session_unlocked(session_id)
-
-    async def _close_session_unlocked(self, session_id: str):
-        session = self.sessions.pop(session_id, None)
-        if session:
-            try:
-                session.browser_env.close()
-            except Exception:
-                pass
-
     async def _cleanup_loop(self):
         while True:
             await asyncio.sleep(60)
@@ -205,7 +201,12 @@ class SessionManager:
             ]
             for sid in expired:
                 logger.info("Cleaning up expired session %s", sid)
-                await self.close_session(sid)
+                session = self.sessions.pop(sid, None)
+                if session:
+                    try:
+                        session.browser_env.close()
+                    except Exception:
+                        pass
 
 
 # ── FastAPI app ────────────────────────────────────────────────────
@@ -223,29 +224,24 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="WebArena Remote Browser", lifespan=lifespan)
 
 
+_executor = None
+
+def _get_executor():
+    global _executor
+    if _executor is None:
+        import concurrent.futures
+        _executor = concurrent.futures.ThreadPoolExecutor(max_workers=32)
+    return _executor
+
+
 @app.post("/reset", response_model=ResetResponse)
 async def reset(req: ResetRequest):
     """Create a new browser session, navigate to start_url, return accessibility tree."""
     t0 = time.time()
     loop = asyncio.get_event_loop()
 
-    try:
-        session = await loop.run_in_executor(
-            None,
-            lambda: asyncio.run(
-                session_manager.create_session(
-                    config=req.config,
-                    observation_type=req.observation_type,
-                    current_viewport_only=req.current_viewport_only,
-                    viewport_width=req.viewport_width,
-                    viewport_height=req.viewport_height,
-                    storage_state=req.storage_state,
-                )
-            ),
-        )
-    except Exception:
-        # create_session is async but internally sync; call directly
-        session = await session_manager.create_session(
+    def _do_reset():
+        return session_manager.create_session_sync(
             config=req.config,
             observation_type=req.observation_type,
             current_viewport_only=req.current_viewport_only,
@@ -253,6 +249,8 @@ async def reset(req: ResetRequest):
             viewport_height=req.viewport_height,
             storage_state=req.storage_state,
         )
+
+    session = await loop.run_in_executor(_get_executor(), _do_reset)
 
     elapsed = time.time() - t0
     logger.info("reset session=%s in %.1fs", session.session_id, elapsed)
@@ -270,17 +268,21 @@ async def step(session_id: str, req: StepRequest):
     """Execute an action in the browser and return the new accessibility tree."""
     session = session_manager.get_session(session_id)
     t0 = time.time()
+    loop = asyncio.get_event_loop()
 
-    from vagen.envs.webarena.browser_env import create_id_based_action
+    def _do_step():
+        from vagen.envs.webarena.browser_env import create_id_based_action
+        try:
+            action = create_id_based_action(req.action)
+            obs, reward, terminated, truncated, info = session.browser_env.step(action)
+        except Exception as e:
+            obs = {"text": f"Action failed: {e}"}
+            reward = 0.0
+            terminated = False
+            info = {"fail_error": str(e)}
+        return obs, reward, terminated, info
 
-    try:
-        action = create_id_based_action(req.action)
-        obs, reward, terminated, truncated, info = session.browser_env.step(action)
-    except Exception as e:
-        obs = {"text": f"Action failed: {e}"}
-        reward = 0.0
-        terminated = False
-        info = {"fail_error": str(e)}
+    obs, reward, terminated, info = await loop.run_in_executor(_get_executor(), _do_step)
 
     obs_text = obs.get("text", str(obs)) if isinstance(obs, dict) else str(obs)
     obs_changed = obs_text != session.prev_obs_text
@@ -312,49 +314,62 @@ async def step(session_id: str, req: StepRequest):
 async def evaluate(session_id: str, req: EvalRequest):
     """Run WebArena evaluator on the current page state."""
     session = session_manager.get_session(session_id)
+    loop = asyncio.get_event_loop()
 
-    from vagen.envs.webarena.evaluation_harness.evaluators import evaluator_router
-    import tempfile
+    def _do_eval():
+        from vagen.envs.webarena.evaluation_harness.evaluators import evaluator_router
+        import tempfile
 
-    # Write config to temp file for evaluator
-    config_dir = tempfile.mkdtemp(prefix="webarena_eval_")
-    config_path = os.path.join(config_dir, "config.json")
-    with open(config_path, "w") as f:
-        json.dump(req.config, f)
+        config_dir = tempfile.mkdtemp(prefix="webarena_eval_")
+        config_path = os.path.join(config_dir, "config.json")
+        with open(config_path, "w") as f:
+            json.dump(req.config, f)
 
-    try:
-        evaluator = evaluator_router(config_path)
-        last_action = {"answer": req.answer}
-        trajectory = [last_action]
-
-        page = session.browser_env.page
-        client = page.context.new_cdp_session(page)
         try:
-            score = evaluator(
-                trajectory=trajectory,
-                config_file=config_path,
-                page=page,
-                client=client,
-            )
+            evaluator = evaluator_router(config_path)
+            last_action = {"answer": req.answer}
+            trajectory = [last_action]
+
+            page = session.browser_env.page
+            client = page.context.new_cdp_session(page)
+            try:
+                score = evaluator(
+                    trajectory=trajectory,
+                    config_file=config_path,
+                    page=page,
+                    client=client,
+                )
+            finally:
+                client.detach()
+        except Exception as e:
+            logger.error("Evaluation failed: %s", e)
+            score = 0.0
         finally:
-            client.detach()
-    except Exception as e:
-        logger.error("Evaluation failed: %s", e)
-        score = 0.0
-    finally:
-        try:
-            os.unlink(config_path)
-            os.rmdir(config_dir)
-        except OSError:
-            pass
+            try:
+                os.unlink(config_path)
+                os.rmdir(config_dir)
+            except OSError:
+                pass
+        return score
 
+    score = await loop.run_in_executor(_get_executor(), _do_eval)
     return EvalResponse(score=score)
 
 
 @app.delete("/session/{session_id}")
 async def close(session_id: str):
     """Close a browser session."""
-    await session_manager.close_session(session_id)
+    loop = asyncio.get_event_loop()
+
+    def _do_close():
+        session = session_manager.sessions.pop(session_id, None)
+        if session:
+            try:
+                session.browser_env.close()
+            except Exception:
+                pass
+
+    await loop.run_in_executor(_get_executor(), _do_close)
     return {"status": "ok"}
 
 
