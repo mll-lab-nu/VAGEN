@@ -74,6 +74,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     actor_rollout_ref.rollout.multi_turn.enable=True \
     actor_rollout_ref.rollout.agent.agent_loop_config_path=$agent_loop_config_path \
+    actor_rollout_ref.rollout.agent.num_workers=32 \
     actor_rollout_ref.rollout.disable_log_stats=False \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \

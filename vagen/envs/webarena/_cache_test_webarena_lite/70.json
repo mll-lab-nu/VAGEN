@@ -1,0 +1,32 @@
+{
+  "sites": [
+    "shopping_admin"
+  ],
+  "task_id": 70,
+  "require_login": true,
+  "storage_state": "./.auth/shopping_admin_state.json",
+  "start_url": "http://localhost:7780/admin",
+  "geolocation": null,
+  "intent_template": "Tell me the {{attribute}} of the customer who has the most cancellations in the history",
+  "instantiation_dict": {
+    "attribute": "name"
+  },
+  "intent": "Tell me the name of the customer who has the most cancellations in the history",
+  "require_reset": false,
+  "eval": {
+    "eval_types": [
+      "string_match"
+    ],
+    "reference_answers": {
+      "must_include": [
+        "Samantha Jones"
+      ]
+    },
+    "reference_url": "",
+    "program_html": [],
+    "string_note": "",
+    "reference_answer_raw_annotation": "Samantha Jones"
+  },
+  "intent_template_id": 234,
+  "old_task_id": 288
+}

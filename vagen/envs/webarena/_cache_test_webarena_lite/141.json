@@ -1,0 +1,37 @@
+{
+  "sites": [
+    "reddit"
+  ],
+  "task_id": 141,
+  "require_login": true,
+  "storage_state": "./.auth/reddit_state.json",
+  "start_url": "http://localhost:9999/f/technology/134852/ai-experts-disown-musk-backed-campaign-citing-their-research",
+  "geolocation": null,
+  "intent_template": "Reply to {{position_description}} with my comment \"{{content_description}}\"",
+  "instantiation_dict": {
+    "position_description": "the post",
+    "content_description": "???"
+  },
+  "intent": "Reply to the post with my comment \"???\"",
+  "require_reset": false,
+  "eval": {
+    "eval_types": [
+      "url_match",
+      "program_html"
+    ],
+    "reference_answers": null,
+    "reference_url": "http://localhost:9999/f/technology/134852/ai-experts-disown-musk-backed-campaign-citing-their-research",
+    "program_html": [
+      {
+        "url": "last",
+        "locator": "document.querySelector('.comment__body').outerText",
+        "required_contents": {
+          "exact_match": "???"
+        }
+      }
+    ],
+    "url_note": "GOLD in PRED"
+  },
+  "intent_template_id": 23,
+  "old_task_id": 652
+}

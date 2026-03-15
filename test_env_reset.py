@@ -25,17 +25,33 @@ for var in required_vars:
 from vagen.envs.webarena.webarena_env import WebArenaEnv
 
 
+N_TEST_STEPS = int(os.environ.get("TEST_STEPS", 0))
+
 async def test_one_seed(config, seed, n_tasks):
     """Test a single seed with its own env instance."""
     env = WebArenaEnv(config)
     cfg_file = os.path.basename(env._config_files[seed % n_tasks])
+    t0 = time.time()
+    step_times = []
     try:
         obs, info = await env.reset(seed=seed)
-        result = ("OK", seed, cfg_file, None)
+        reset_elapsed = time.time() - t0
+
+        # Run a few test steps if requested
+        for i in range(N_TEST_STEPS):
+            action = "<action>scroll [down]</action>"
+            st0 = time.time()
+            obs, reward, done, info = await env.step(action)
+            step_times.append(time.time() - st0)
+            if done:
+                break
+
+        result = ("OK", seed, cfg_file, None, reset_elapsed, step_times)
     except Exception as e:
+        elapsed = time.time() - t0
         import traceback
         tb = traceback.format_exc()
-        result = ("FAIL", seed, cfg_file, tb[-500:])
+        result = ("FAIL", seed, cfg_file, tb[-500:], elapsed, step_times)
     finally:
         await env.close()
     return result
@@ -56,9 +72,9 @@ async def test_split(task_config_file: str, label: str, skip_sites=None):
         "current_viewport_only": True,
         "max_steps": 30,
         "skip_sites": skip_sites or ["map"],
-        "reset_timeout": 120.0,
-        "playwright_timeout": 120000,
-        "nav_timeout": 120000,
+        "reset_timeout": 60.0,
+        "playwright_timeout": 30000,
+        "nav_timeout": 30000,
     }
 
     # Get task count
@@ -71,32 +87,50 @@ async def test_split(task_config_file: str, label: str, skip_sites=None):
     sem = asyncio.Semaphore(CONCURRENCY)
     ok, fail = 0, 0
     failed_seeds = []
+    reset_times: list[float] = []
     done_count = 0
+
+    all_step_times = []
 
     async def bounded_test(seed):
         nonlocal ok, fail, done_count
         async with sem:
             result = await test_one_seed(config, seed, n_tasks)
-        status, s, cfg, err = result
+        status, s, cfg, err, elapsed, step_times = result
         done_count += 1
+        reset_times.append(elapsed)
+        all_step_times.extend(step_times)
         if status == "OK":
             ok += 1
         else:
             fail += 1
             failed_seeds.append((s, err))
         tag = f"[{done_count}/{n_tasks}]"
+        step_info = ""
+        if step_times:
+            avg_st = sum(step_times) / len(step_times)
+            step_info = f" steps={len(step_times)} avg={avg_st:.2f}s"
         if status == "OK":
-            print(f"  {tag} seed={s:>4} {cfg}: OK")
+            print(f"  {tag} seed={s:>4} {cfg}: OK (reset={elapsed:.1f}s{step_info})")
         else:
-            print(f"  {tag} seed={s:>4} {cfg}: FAIL - {err}")
+            print(f"  {tag} seed={s:>4} {cfg}: FAIL ({elapsed:.1f}s) - {err}")
 
     tasks = [bounded_test(seed) for seed in range(n_tasks)]
     await asyncio.gather(*tasks)
 
-    elapsed = time.time() - t0
-    print(f"\n--- {label} Results ({elapsed:.1f}s) ---")
-    print(f"  OK:   {ok}/{n_tasks}")
-    print(f"  FAIL: {fail}/{n_tasks}")
+    wall_time = time.time() - t0
+    avg_reset = sum(reset_times) / len(reset_times) if reset_times else 0
+    print(f"\n--- {label} Results ---")
+    print(f"  Wall clock:     {wall_time:.1f}s")
+    print(f"  OK:             {ok}/{n_tasks}")
+    print(f"  FAIL:           {fail}/{n_tasks}")
+    print(f"  Avg reset time: {avg_reset:.2f}s")
+    if reset_times:
+        print(f"  Min/Max reset:  {min(reset_times):.2f}s / {max(reset_times):.2f}s")
+    if all_step_times:
+        avg_st = sum(all_step_times) / len(all_step_times)
+        print(f"  Avg step time:  {avg_st:.2f}s ({len(all_step_times)} steps)")
+        print(f"  Min/Max step:   {min(all_step_times):.2f}s / {max(all_step_times):.2f}s")
     if failed_seeds:
         print(f"  Failed seeds:")
         for s, err in sorted(failed_seeds):

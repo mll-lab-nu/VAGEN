@@ -126,8 +126,12 @@ class ScriptBrowserEnv(Env[dict[str, Observation], Action]):
     def setup(self, config_file: Path | None = None) -> None:
         self.context_manager = sync_playwright()
         self.playwright = self.context_manager.__enter__()
+        # Disable image loading via Chromium flags when using accessibility tree
+        launch_args = []
+        if self.text_observation_type == "accessibility_tree":
+            launch_args.append("--blink-settings=imagesEnabled=false")
         self.browser = self.playwright.chromium.launch(
-            headless=self.headless, slow_mo=self.slow_mo
+            headless=self.headless, slow_mo=self.slow_mo, args=launch_args
         )
 
         if config_file:
@@ -162,7 +166,7 @@ class ScriptBrowserEnv(Env[dict[str, Observation], Action]):
                 if self.text_observation_type == "accessibility_tree":
                     client.send("Accessibility.enable")
                 page.client = client  # type: ignore # TODO[shuyanzh], fix this hackey client
-                page.goto(url, wait_until="domcontentloaded", timeout=120000)
+                page.goto(url, wait_until="domcontentloaded", timeout=15000)
             # set the first page as the current page
             self.page = self.context.pages[0]
             self.page.bring_to_front()

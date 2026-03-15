@@ -1,0 +1,32 @@
+{
+  "sites": [
+    "shopping_admin"
+  ],
+  "task_id": 51,
+  "require_login": true,
+  "storage_state": "./.auth/shopping_admin_state.json",
+  "start_url": "http://localhost:7780/admin",
+  "geolocation": null,
+  "intent_template": "What are the key aspects that the customers don't like about {{product}}",
+  "instantiation_dict": {
+    "product": "Circe ice fleece"
+  },
+  "intent": "What are the key aspects that the customers don't like about Circe ice fleece",
+  "require_reset": false,
+  "eval": {
+    "eval_types": [
+      "string_match"
+    ],
+    "reference_answers": {
+      "fuzzy_match": [
+        "N/A"
+      ]
+    },
+    "reference_url": "",
+    "program_html": [],
+    "string_note": "",
+    "reference_answer_raw_annotation": "N/A"
+  },
+  "intent_template_id": 249,
+  "old_task_id": 215
+}

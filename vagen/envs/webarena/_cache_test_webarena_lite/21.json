@@ -1,0 +1,32 @@
+{
+  "sites": [
+    "shopping_admin"
+  ],
+  "task_id": 21,
+  "require_login": true,
+  "storage_state": "./.auth/shopping_admin_state.json",
+  "start_url": "http://localhost:7780/admin",
+  "geolocation": null,
+  "intent_template": "Telll me the grand total of invoice {{id}}.",
+  "instantiation_dict": {
+    "id": "000000002"
+  },
+  "intent": "Telll me the grand total of invoice 000000002.",
+  "require_reset": false,
+  "eval": {
+    "eval_types": [
+      "string_match"
+    ],
+    "reference_answers": {
+      "must_include": [
+        "39.64"
+      ]
+    },
+    "reference_url": "",
+    "program_html": [],
+    "string_note": "",
+    "reference_answer_raw_annotation": "$39.64"
+  },
+  "intent_template_id": 274,
+  "old_task_id": 95
+}

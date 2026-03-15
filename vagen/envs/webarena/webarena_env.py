@@ -4,7 +4,8 @@ import logging
 import re
 import json
 import os
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -81,10 +82,10 @@ class WebArenaEnvConfig:
     skip_sites: Optional[List[str]] = None  # Skip tasks involving these sites (e.g. ["map"])
 
     # Timeouts & fault tolerance
-    playwright_timeout: int = 60000          # Playwright default timeout (ms)
-    nav_timeout: int = 60000                 # Playwright navigation timeout (ms)
-    step_timeout: float = 120.0              # _run_sync timeout for step (seconds)
-    reset_timeout: float = 300.0             # _run_sync timeout for reset (seconds)
+    playwright_timeout: int = 15000          # Playwright default timeout (ms)
+    nav_timeout: int = 15000                 # Playwright navigation timeout (ms)
+    step_timeout: float = 15.0              # _run_sync timeout for step (seconds)
+    reset_timeout: float = 30.0             # _run_sync timeout for reset (seconds)
     max_reset_retries: int = 1               # Max retries for reset on failure
 
     # Concurrency
@@ -112,6 +113,18 @@ class WebArenaEnv(GymImageEnv):
     # Shared across all instances within the same process.
     _reset_semaphore: Optional[asyncio.Semaphore] = None
     _reset_max_concurrent: int = 4
+
+    # Class-level stats tracking (shared across all instances in this process)
+    _stats = {
+        "resets_total": 0,
+        "resets_ok": 0,
+        "resets_fail": 0,
+        "reset_time_total": 0.0,
+        "steps_total": 0,
+        "step_time_total": 0.0,
+        "episodes_done": 0,
+        "episodes_success": 0,
+    }
 
     @classmethod
     def _get_reset_semaphore(cls, max_concurrent: int) -> asyncio.Semaphore:
@@ -175,6 +188,10 @@ class WebArenaEnv(GymImageEnv):
         self._task_intent: str = ""
         self._current_config_file: str = ""
         self._prev_obs_text: str = ""  # Track previous observation for change detection
+        self._reset_time: float = 0.0  # Time taken for last reset
+        self._step_times: List[float] = []  # Time taken for each step in current episode
+        self._valid_actions: int = 0  # Count of valid actions in current episode
+        self._effective_actions: int = 0  # Count of effective actions in current episode
 
     @staticmethod
     def _load_aggregate_config(task_config_file: str) -> List[str]:
@@ -287,6 +304,10 @@ class WebArenaEnv(GymImageEnv):
         config_file = self._config_files[idx]
         last_err: Optional[Exception] = None
 
+        t0 = time.monotonic()
+        cls = type(self)
+        cls._stats["resets_total"] += 1
+
         sem = self._get_reset_semaphore(self.config.max_concurrent_resets)
         async with sem:
             self._ensure_browser_env()
@@ -299,16 +320,38 @@ class WebArenaEnv(GymImageEnv):
                 # Set Playwright timeouts after successful reset
                 self._set_playwright_timeouts()
             except Exception as e:
-                logger.error("reset failed (seed=%d): %s", seed, e)
+                elapsed = time.monotonic() - t0
+                cls._stats["resets_fail"] += 1
+                cls._stats["reset_time_total"] += elapsed
+                logger.error(
+                    "reset failed (seed=%d) after %.1fs: %s | stats: %d/%d ok, %d fail",
+                    seed, elapsed, e,
+                    cls._stats["resets_ok"], cls._stats["resets_total"], cls._stats["resets_fail"],
+                )
                 self._destroy_browser_env()
                 raise RuntimeError(
                     f"reset failed (seed={seed}): {e}"
                 ) from e
 
+        elapsed = time.monotonic() - t0
+        cls._stats["resets_ok"] += 1
+        cls._stats["reset_time_total"] += elapsed
+        avg_reset = cls._stats["reset_time_total"] / cls._stats["resets_total"]
+        logger.info(
+            "reset ok (seed=%d) in %.1fs | avg=%.1fs | %d/%d ok (%.0f%% success)",
+            seed, elapsed, avg_reset,
+            cls._stats["resets_ok"], cls._stats["resets_total"],
+            100.0 * cls._stats["resets_ok"] / cls._stats["resets_total"],
+        )
+
         self._steps_used = 0
         self.total_reward = 0.0
         self._current_config_file = config_file
         self._prev_obs_text = ""
+        self._reset_time = elapsed
+        self._step_times = []
+        self._valid_actions = 0
+        self._effective_actions = 0
 
         # Load task intent from config
         with open(config_file) as f:
@@ -367,6 +410,9 @@ class WebArenaEnv(GymImageEnv):
     async def step(
         self, action_str: str
     ) -> Tuple[Dict[str, Any], float, bool, Dict[str, Any]]:
+        step_t0 = time.monotonic()
+        cls = type(self)
+        cls._stats["steps_total"] += 1
         self._steps_used += 1
         reward = self.config.step_penalty  # Per-step cost to encourage efficiency
         done = False
@@ -417,6 +463,7 @@ class WebArenaEnv(GymImageEnv):
                 except Exception as e:
                     info["error"] = str(e)
                     obs = {"text": f"Action failed: {e}"}
+                    done = True
         else:
             reward += self.config.format_penalty
             info["error"] = "format_invalid"
@@ -441,6 +488,33 @@ class WebArenaEnv(GymImageEnv):
         # Use continuous evaluator score instead of binary
         reward += eval_score * self.config.success_reward
 
+        step_elapsed = time.monotonic() - step_t0
+        self._step_times.append(step_elapsed)
+        if parsed["format_correct"]:
+            self._valid_actions += 1
+        if action_is_effective:
+            self._effective_actions += 1
+
+        traj_metrics = {
+            "success": success,
+            "eval_score": eval_score,
+            "total_steps": self._steps_used,
+        }
+        # Add timing and env stats only when episode is done
+        if done:
+            cls._stats["episodes_done"] += 1
+            if success:
+                cls._stats["episodes_success"] += 1
+            traj_metrics.update({
+                "reset_time": self._reset_time,
+                "avg_step_time": sum(self._step_times) / len(self._step_times) if self._step_times else 0.0,
+                "total_episode_time": self._reset_time + sum(self._step_times),
+                "env_reset_success_rate": cls._stats["resets_ok"] / max(cls._stats["resets_total"], 1),
+                "env_episode_success_rate": cls._stats["episodes_success"] / max(cls._stats["episodes_done"], 1),
+                "valid_action_rate": self._valid_actions / max(self._steps_used, 1),
+                "effective_action_rate": self._effective_actions / max(self._steps_used, 1),
+            })
+
         info["metrics"] = {
             "turn_metrics": {
                 "action_is_valid": parsed["format_correct"],
@@ -448,11 +522,7 @@ class WebArenaEnv(GymImageEnv):
                 "action_type": self._classify_action(parsed.get("action") or ""),
                 "steps_used": self._steps_used,
             },
-            "traj_metrics": {
-                "success": success,
-                "eval_score": eval_score,
-                "total_steps": self._steps_used,
-            },
+            "traj_metrics": traj_metrics,
         }
         info["success"] = success
         self.total_reward += reward

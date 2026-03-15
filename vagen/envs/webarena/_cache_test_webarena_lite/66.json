@@ -1,0 +1,27 @@
+{
+  "sites": [
+    "shopping"
+  ],
+  "task_id": 66,
+  "require_login": true,
+  "storage_state": "./.auth/shopping_state.json",
+  "start_url": "http://localhost:7770",
+  "geolocation": null,
+  "intent_template": "Search for \"{{keyword}}\"",
+  "instantiation_dict": {
+    "keyword": "switch accessories"
+  },
+  "intent": "Search for \"switch accessories\"",
+  "require_reset": false,
+  "eval": {
+    "eval_types": [
+      "url_match"
+    ],
+    "reference_answers": null,
+    "reference_url": "http://localhost:7770/catalogsearch/result/?q=switch+accessories",
+    "program_html": [],
+    "url_note": "GOLD in PRED"
+  },
+  "intent_template_id": 212,
+  "old_task_id": 276
+}

@@ -1,0 +1,30 @@
+{
+  "sites": [
+    "gitlab"
+  ],
+  "task_id": 63,
+  "require_login": true,
+  "storage_state": "./.auth/gitlab_state.json",
+  "start_url": "http://localhost:8023",
+  "geolocation": null,
+  "intent_template": "Get me my RSS feed token",
+  "instantiation_dict": {},
+  "intent": "Get me my RSS feed token",
+  "require_reset": false,
+  "eval": {
+    "eval_types": [
+      "string_match"
+    ],
+    "reference_answers": {
+      "must_include": [
+        "TMN_bBn9Z48qVbUFZV45"
+      ]
+    },
+    "reference_url": "",
+    "program_html": [],
+    "string_note": "",
+    "reference_answer_raw_annotation": "TMN_bBn9Z48qVbUFZV45"
+  },
+  "intent_template_id": 312,
+  "old_task_id": 259
+}

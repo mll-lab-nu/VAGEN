@@ -1,0 +1,27 @@
+{
+  "sites": [
+    "shopping"
+  ],
+  "task_id": 58,
+  "require_login": true,
+  "storage_state": "./.auth/shopping_state.json",
+  "start_url": "http://localhost:7770",
+  "geolocation": null,
+  "intent_template": "I am doing a market survey for one stop market, show me the most expensive product from {{product_category}} category",
+  "instantiation_dict": {
+    "product_category": "competative swimwear"
+  },
+  "intent": "I am doing a market survey for one stop market, show me the most expensive product from competative swimwear category",
+  "require_reset": false,
+  "eval": {
+    "eval_types": [
+      "url_match"
+    ],
+    "reference_answers": null,
+    "reference_url": "http://localhost:7770/clothing-shoes-jewelry/sport-specific-clothing/competitive-swimwear.html?product_list_order=price&product_list_dir=desc",
+    "program_html": [],
+    "url_note": "GOLD in PRED"
+  },
+  "intent_template_id": 138,
+  "old_task_id": 240
+}

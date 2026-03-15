@@ -1,0 +1,34 @@
+{
+  "sites": [
+    "shopping_admin"
+  ],
+  "task_id": 8,
+  "require_login": true,
+  "storage_state": "./.auth/shopping_admin_state.json",
+  "start_url": "http://localhost:7780/admin",
+  "geolocation": null,
+  "intent_template": "List the top {{n}} search terms in my store",
+  "instantiation_dict": {
+    "n": "3"
+  },
+  "intent": "List the top 3 search terms in my store",
+  "require_reset": false,
+  "eval": {
+    "eval_types": [
+      "string_match"
+    ],
+    "reference_answers": {
+      "must_include": [
+        "hollister",
+        "Joust Bag",
+        "nike"
+      ]
+    },
+    "reference_url": "",
+    "program_html": [],
+    "string_note": "",
+    "reference_answer_raw_annotation": "hollister, Joust Bag, nike"
+  },
+  "intent_template_id": 285,
+  "old_task_id": 43
+}

@@ -1,0 +1,32 @@
+{
+  "sites": [
+    "shopping_admin"
+  ],
+  "task_id": 33,
+  "require_login": true,
+  "storage_state": "./.auth/shopping_admin_state.json",
+  "start_url": "http://localhost:7780/admin",
+  "geolocation": null,
+  "intent_template": "What's the total number of items sold in the most recent {{k}} orders?",
+  "instantiation_dict": {
+    "k": "7"
+  },
+  "intent": "What's the total number of items sold in the most recent 7 orders?",
+  "require_reset": false,
+  "eval": {
+    "eval_types": [
+      "string_match"
+    ],
+    "reference_answers": {
+      "must_include": [
+        "25"
+      ]
+    },
+    "reference_url": "",
+    "program_html": [],
+    "string_note": "",
+    "reference_answer_raw_annotation": "25"
+  },
+  "intent_template_id": 1002,
+  "old_task_id": 131
+}

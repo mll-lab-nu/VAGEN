@@ -1,0 +1,32 @@
+{
+  "sites": [
+    "shopping_admin"
+  ],
+  "task_id": 13,
+  "require_login": true,
+  "storage_state": "./.auth/shopping_admin_state.json",
+  "start_url": "http://localhost:7780/admin",
+  "geolocation": null,
+  "intent_template": "Which customer has completed the {{quantifier}} number of orders in the entire history?",
+  "instantiation_dict": {
+    "quantifier": "fifth most"
+  },
+  "intent": "Which customer has completed the fifth most number of orders in the entire history?",
+  "require_reset": false,
+  "eval": {
+    "eval_types": [
+      "string_match"
+    ],
+    "reference_answers": {
+      "must_include": [
+        "Matt Baker"
+      ]
+    },
+    "reference_url": "",
+    "program_html": [],
+    "string_note": "",
+    "reference_answer_raw_annotation": "Matt Baker"
+  },
+  "intent_template_id": 276,
+  "old_task_id": 65
+}

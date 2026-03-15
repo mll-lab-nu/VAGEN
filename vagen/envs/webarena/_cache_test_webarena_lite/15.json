@@ -1,0 +1,32 @@
+{
+  "sites": [
+    "map"
+  ],
+  "task_id": 15,
+  "require_login": true,
+  "storage_state": null,
+  "start_url": "http://localhost:3000",
+  "geolocation": null,
+  "intent_template": "What is the zip code of {{place}}?",
+  "instantiation_dict": {
+    "place": "Chatham University"
+  },
+  "intent": "What is the zip code of Chatham University?",
+  "require_reset": false,
+  "eval": {
+    "eval_types": [
+      "string_match"
+    ],
+    "reference_answers": {
+      "must_include": [
+        "15232"
+      ]
+    },
+    "reference_url": "",
+    "program_html": [],
+    "string_note": "",
+    "reference_answer_raw_annotation": "15232"
+  },
+  "intent_template_id": 70,
+  "old_task_id": 71
+}

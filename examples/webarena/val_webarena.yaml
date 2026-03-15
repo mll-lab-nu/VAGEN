@@ -12,4 +12,3 @@ envs:
       current_viewport_only: true
       max_steps: 30
       skip_sites: ["map"]
-      max_concurrent_resets: 4

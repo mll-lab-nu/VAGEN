@@ -1,0 +1,28 @@
+{
+  "sites": [
+    "shopping"
+  ],
+  "task_id": 77,
+  "require_login": true,
+  "storage_state": "./.auth/shopping_state.json",
+  "start_url": "http://localhost:7770",
+  "geolocation": null,
+  "intent_template": "Show me the \"{{product}}\" listings by {{sorting_order}}.",
+  "instantiation_dict": {
+    "product": "chairs",
+    "sorting_order": "ascending price"
+  },
+  "intent": "Show me the \"chairs\" listings by ascending price.",
+  "require_reset": false,
+  "eval": {
+    "eval_types": [
+      "url_match"
+    ],
+    "reference_answers": null,
+    "reference_url": "http://localhost:7770/catalogsearch/result/index/?product_list_order=price&q=chairs&product_list_dir=asc",
+    "program_html": [],
+    "url_note": "GOLD in PRED"
+  },
+  "intent_template_id": 208,
+  "old_task_id": 324
+}

@@ -1,0 +1,37 @@
+{
+  "sites": [
+    "wikipedia",
+    "map"
+  ],
+  "task_id": 102,
+  "require_login": true,
+  "storage_state": null,
+  "start_url": "http://localhost:3000",
+  "geolocation": null,
+  "intent_template": "Find the page of {{description}} on the map.",
+  "instantiation_dict": {
+    "description": "the place in Pennsylvania where a plane crashed during the September 11th attacks"
+  },
+  "intent": "Find the page of the place in Pennsylvania where a plane crashed during the September 11th attacks on the map.",
+  "require_reset": false,
+  "eval": {
+    "eval_types": [
+      "program_html"
+    ],
+    "reference_answers": null,
+    "reference_url": "",
+    "program_html": [
+      {
+        "url": "last",
+        "locator": "document.querySelector('[id=\"sidebar_content\"').outerText",
+        "required_contents": {
+          "must_include": [
+            "Somerset County"
+          ]
+        }
+      }
+    ]
+  },
+  "intent_template_id": 371,
+  "old_task_id": 426
+}

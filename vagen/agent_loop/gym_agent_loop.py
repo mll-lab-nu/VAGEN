@@ -88,6 +88,7 @@ class AgentData:
         self.env_rewards: List[float] = []
         self.traj_success: bool = False
         self.env_turns: int = 0
+        self.last_traj_metrics: Dict[str, Any] = {}  # traj_metrics from last step
 
 
         # Cached assistant text to step env
@@ -295,7 +296,14 @@ class GymAgentLoop(AgentLoopBase):
             reward_score=sum(agent_data.env_rewards) if agent_data.env_rewards else 0.0,
             num_turns=agent_data.env_turns,
             metrics=agent_data.metrics,
-            extra_fields={"image_data": agent_data.image_data, "reward_extra_info": {"traj_success": float(agent_data.traj_success)}, "reset_failed": False},
+            extra_fields={
+                "image_data": agent_data.image_data,
+                "reward_extra_info": {
+                    "traj_success": float(agent_data.traj_success),
+                    **{k: float(v) for k, v in agent_data.last_traj_metrics.items() if isinstance(v, (int, float, bool))},
+                },
+                "reset_failed": False,
+            },
         )
         return output
 
@@ -402,6 +410,9 @@ class GymAgentLoop(AgentLoopBase):
         agent_data.env_rewards.append(float(reward))
         agent_data.traj_success = extract_success(info)
         agent_data.env_turns += 1
+        # Capture traj_metrics for reward_extra_info
+        if "metrics" in info and "traj_metrics" in info["metrics"]:
+            agent_data.last_traj_metrics = info["metrics"]["traj_metrics"]
         # Termination rule #3: env done or success
         if done or agent_data.traj_success:
             return AgentState.TERMINATED

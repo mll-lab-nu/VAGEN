@@ -1,0 +1,34 @@
+{
+  "sites": [
+    "map"
+  ],
+  "task_id": 3,
+  "require_login": true,
+  "storage_state": null,
+  "start_url": "http://localhost:3000",
+  "geolocation": null,
+  "intent_template": "Compare the difference in time for walking and driving route from {{start}} to {{end}}",
+  "instantiation_dict": {
+    "start": "Randyland",
+    "end": "Carnegie Mellon University"
+  },
+  "intent": "Compare the difference in time for walking and driving route from Randyland to Carnegie Mellon University",
+  "require_reset": false,
+  "eval": {
+    "eval_types": [
+      "string_match"
+    ],
+    "reference_answers": {
+      "fuzzy_match": [
+        "driving: 13min",
+        "walking: 1h 45min"
+      ]
+    },
+    "reference_url": "",
+    "program_html": [],
+    "string_note": "",
+    "reference_answer_raw_annotation": "driving: 13min, walking: 1h 45min."
+  },
+  "intent_template_id": 73,
+  "old_task_id": 20
+}
