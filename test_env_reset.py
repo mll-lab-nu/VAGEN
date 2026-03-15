@@ -31,6 +31,13 @@ async def test_one_seed(config, seed, n_tasks):
     """Test a single seed with its own env instance."""
     env = WebArenaEnv(config)
     cfg_file = os.path.basename(env._config_files[seed % n_tasks])
+    # Read site info from config
+    config_path = env._config_files[seed % n_tasks]
+    with open(config_path) as f:
+        task_cfg = json.load(f)
+    sites = task_cfg.get("sites", ["unknown"])
+    site_str = ",".join(sites)
+
     t0 = time.time()
     step_times = []
     try:
@@ -46,12 +53,12 @@ async def test_one_seed(config, seed, n_tasks):
             if done:
                 break
 
-        result = ("OK", seed, cfg_file, None, reset_elapsed, step_times)
+        result = ("OK", seed, cfg_file, None, reset_elapsed, step_times, site_str)
     except Exception as e:
         elapsed = time.time() - t0
         import traceback
         tb = traceback.format_exc()
-        result = ("FAIL", seed, cfg_file, tb[-500:], elapsed, step_times)
+        result = ("FAIL", seed, cfg_file, tb[-500:], elapsed, step_times, site_str)
     finally:
         await env.close()
     return result
@@ -96,7 +103,7 @@ async def test_split(task_config_file: str, label: str, skip_sites=None):
         nonlocal ok, fail, done_count
         async with sem:
             result = await test_one_seed(config, seed, n_tasks)
-        status, s, cfg, err, elapsed, step_times = result
+        status, s, cfg, err, elapsed, step_times, site = result
         done_count += 1
         reset_times.append(elapsed)
         all_step_times.extend(step_times)
@@ -111,12 +118,14 @@ async def test_split(task_config_file: str, label: str, skip_sites=None):
             avg_st = sum(step_times) / len(step_times)
             step_info = f" steps={len(step_times)} avg={avg_st:.2f}s"
         if status == "OK":
-            print(f"  {tag} seed={s:>4} {cfg}: OK (reset={elapsed:.1f}s{step_info})")
+            print(f"  {tag} seed={s:>4} [{site:20s}] {cfg}: OK (reset={elapsed:.1f}s{step_info})")
         else:
-            print(f"  {tag} seed={s:>4} {cfg}: FAIL ({elapsed:.1f}s) - {err}")
+            print(f"  {tag} seed={s:>4} [{site:20s}] {cfg}: FAIL ({elapsed:.1f}s) - {err}")
 
-    tasks = [bounded_test(seed) for seed in range(n_tasks)]
-    await asyncio.gather(*tasks)
+    # Process seeds in batches of CONCURRENCY to avoid creating too many env instances
+    for batch_start in range(0, n_tasks, CONCURRENCY):
+        batch_seeds = range(batch_start, min(batch_start + CONCURRENCY, n_tasks))
+        await asyncio.gather(*[bounded_test(seed) for seed in batch_seeds])
 
     wall_time = time.time() - t0
     avg_reset = sum(reset_times) / len(reset_times) if reset_times else 0

@@ -86,7 +86,7 @@ class WebArenaEnvConfig:
     nav_timeout: int = 30000                 # Playwright navigation timeout (ms)
     step_timeout: float = 30.0              # _run_sync timeout for step (seconds)
     reset_timeout: float = 60.0             # _run_sync timeout for reset (seconds)
-    max_reset_retries: int = 1               # Max retries for reset on failure
+    max_reset_retries: int = 3               # Max retries for reset on failure
 
     # Concurrency
     max_concurrent_resets: int = 4             # Max parallel browser resets
@@ -309,29 +309,40 @@ class WebArenaEnv(GymImageEnv):
         cls._stats["resets_total"] += 1
 
         sem = self._get_reset_semaphore(self.config.max_concurrent_resets)
-        async with sem:
-            self._ensure_browser_env()
-            try:
-                obs, info = await self._run_sync(
-                    self.browser_env.reset,
-                    options={"config_file": config_file},
-                    timeout=self.config.reset_timeout,
-                )
-                # Set Playwright timeouts after successful reset
-                self._set_playwright_timeouts()
-            except Exception as e:
-                elapsed = time.monotonic() - t0
-                cls._stats["resets_fail"] += 1
-                cls._stats["reset_time_total"] += elapsed
-                logger.error(
-                    "reset failed (seed=%d) after %.1fs: %s | stats: %d/%d ok, %d fail",
-                    seed, elapsed, e,
-                    cls._stats["resets_ok"], cls._stats["resets_total"], cls._stats["resets_fail"],
-                )
-                self._destroy_browser_env()
-                raise RuntimeError(
-                    f"reset failed (seed={seed}): {e}"
-                ) from e
+        for attempt in range(1, self.config.max_reset_retries + 1):
+            async with sem:
+                self._ensure_browser_env()
+                try:
+                    obs, info = await self._run_sync(
+                        self.browser_env.reset,
+                        options={"config_file": config_file},
+                        timeout=self.config.reset_timeout,
+                    )
+                    # Set Playwright timeouts after successful reset
+                    self._set_playwright_timeouts()
+                    last_err = None
+                    break  # success
+                except Exception as e:
+                    last_err = e
+                    self._destroy_browser_env()
+                    if attempt < self.config.max_reset_retries:
+                        logger.warning(
+                            "reset failed (seed=%d) attempt %d/%d after %.1fs: %s — retrying",
+                            seed, attempt, self.config.max_reset_retries,
+                            time.monotonic() - t0, e,
+                        )
+                    else:
+                        elapsed = time.monotonic() - t0
+                        cls._stats["resets_fail"] += 1
+                        cls._stats["reset_time_total"] += elapsed
+                        logger.error(
+                            "reset failed (seed=%d) after %.1fs (%d attempts): %s | stats: %d/%d ok, %d fail",
+                            seed, elapsed, attempt, e,
+                            cls._stats["resets_ok"], cls._stats["resets_total"], cls._stats["resets_fail"],
+                        )
+                        raise RuntimeError(
+                            f"reset failed (seed={seed}): {e}"
+                        ) from e
 
         elapsed = time.monotonic() - t0
         cls._stats["resets_ok"] += 1
