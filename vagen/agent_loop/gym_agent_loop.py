@@ -206,6 +206,8 @@ class GymAgentLoop(AgentLoopBase):
                     "env_episode_success_rate": 0.0,
                     "valid_action_rate": 0.0,
                     "effective_action_rate": 0.0,
+                    "response_truncated": 0.0,
+                    "prompt_truncated": 0.0,
                 },
                 "reset_failed": True,
             },
@@ -292,7 +294,9 @@ class GymAgentLoop(AgentLoopBase):
             logger.warning(
                 f"In env:{agent_data.env_name}, prompt_ids length {len(prompt_ids)} exceeds prompt_length {self.prompt_length}",
             )
-        if len(response_ids) > self.response_length:
+        response_truncated = len(response_ids) > self.response_length
+        prompt_truncated = len(prompt_ids) > self.prompt_length
+        if response_truncated:
             logger.warning(
                 f"In env:{agent_data.env_name}, response_ids length {len(response_ids)} exceeds response_length {self.response_length}",
             )
@@ -320,6 +324,8 @@ class GymAgentLoop(AgentLoopBase):
                     "total_episode_time": 0.0,
                     "env_reset_success_rate": 0.0,
                     "env_episode_success_rate": 0.0,
+                    "response_truncated": float(response_truncated),
+                    "prompt_truncated": float(prompt_truncated),
                     "valid_action_rate": 0.0,
                     "effective_action_rate": 0.0,
                     **{k: float(v) for k, v in agent_data.last_traj_metrics.items() if isinstance(v, (int, float, bool))},

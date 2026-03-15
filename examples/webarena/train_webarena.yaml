@@ -3,12 +3,12 @@ envs:
     n_envs: 647 # train split (647 tasks)
     data_source: webarena # nickname for logging
     seed: [0,646,1] # sample n_env seeds from seed[0] to seed[1] with each seed repeat at most seed[2] times
-    max_turns: 30 # max number of interaction turns per episode
+    max_turns: 15 # max number of interaction turns per episode
     response_length_per_turn: 512 # max response length per turn
     config: # env-specific config
       task_config_file: "${oc.env:WEBARENA_CONFIG_DIR,config_files}/wa/train_webarena_lite.json"
       headless: true
       observation_type: "accessibility_tree"
       current_viewport_only: true
-      max_steps: 30
+      max_steps: 15
       skip_sites: ["map"]
