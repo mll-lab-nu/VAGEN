@@ -82,10 +82,10 @@ class WebArenaEnvConfig:
     skip_sites: Optional[List[str]] = None  # Skip tasks involving these sites (e.g. ["map"])
 
     # Timeouts & fault tolerance
-    playwright_timeout: int = 15000          # Playwright default timeout (ms)
-    nav_timeout: int = 15000                 # Playwright navigation timeout (ms)
-    step_timeout: float = 15.0              # _run_sync timeout for step (seconds)
-    reset_timeout: float = 30.0             # _run_sync timeout for reset (seconds)
+    playwright_timeout: int = 30000          # Playwright default timeout (ms)
+    nav_timeout: int = 30000                 # Playwright navigation timeout (ms)
+    step_timeout: float = 30.0              # _run_sync timeout for step (seconds)
+    reset_timeout: float = 60.0             # _run_sync timeout for reset (seconds)
     max_reset_retries: int = 1               # Max retries for reset on failure
 
     # Concurrency
