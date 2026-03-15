@@ -12,3 +12,4 @@ envs:
       current_viewport_only: true
       max_steps: 15
       skip_sites: ["map"]
+      remote_browser_url: "${oc.env:REMOTE_BROWSER_URL,}"

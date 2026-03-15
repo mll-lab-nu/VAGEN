@@ -91,6 +91,9 @@ class WebArenaEnvConfig:
     # Concurrency
     max_concurrent_resets: int = 4             # Max parallel browser resets
 
+    # Remote browser server (set to enable remote mode)
+    remote_browser_url: Optional[str] = None   # e.g. "http://webarena-server:5100"
+
     # Rewards
     format_reward: float = 0.02
     format_penalty: float = -0.05
@@ -251,18 +254,31 @@ class WebArenaEnv(GymImageEnv):
         return await awaitable
 
     def _ensure_browser_env(self):
-        """Lazily create ScriptBrowserEnv (lightweight — browser launches on reset)."""
+        """Lazily create ScriptBrowserEnv or RemoteBrowserEnv."""
         if self.browser_env is None:
-            from vagen.envs.webarena.browser_env import ScriptBrowserEnv
-            self.browser_env = ScriptBrowserEnv(
-                headless=self.config.headless,
-                observation_type=self.config.observation_type,
-                current_viewport_only=self.config.current_viewport_only,
-                viewport_size={
-                    "width": self.config.viewport_width,
-                    "height": self.config.viewport_height,
-                },
-            )
+            if self.config.remote_browser_url:
+                from vagen.envs.webarena.remote_browser_client import RemoteBrowserEnv
+                self.browser_env = RemoteBrowserEnv(
+                    server_url=self.config.remote_browser_url,
+                    observation_type=self.config.observation_type,
+                    current_viewport_only=self.config.current_viewport_only,
+                    viewport_size={
+                        "width": self.config.viewport_width,
+                        "height": self.config.viewport_height,
+                    },
+                    timeout=self.config.reset_timeout,
+                )
+            else:
+                from vagen.envs.webarena.browser_env import ScriptBrowserEnv
+                self.browser_env = ScriptBrowserEnv(
+                    headless=self.config.headless,
+                    observation_type=self.config.observation_type,
+                    current_viewport_only=self.config.current_viewport_only,
+                    viewport_size={
+                        "width": self.config.viewport_width,
+                        "height": self.config.viewport_height,
+                    },
+                )
 
     def _set_playwright_timeouts(self):
         """Set Playwright default timeouts on the current page after reset."""
@@ -379,11 +395,20 @@ class WebArenaEnv(GymImageEnv):
 
     async def _evaluate_success(self, info: Dict[str, Any]) -> float:
         """Run WebArena evaluator to check task success."""
-        from vagen.envs.webarena.evaluation_harness.evaluators import evaluator_router
-
         config_file = self._current_config_file
         answer = info.get("answer", "")
         browser_env = self.browser_env
+
+        # Remote mode: delegate evaluation to server
+        if self.config.remote_browser_url and hasattr(browser_env, "evaluate"):
+            with open(config_file) as f:
+                config = json.load(f)
+            def _remote_eval():
+                return browser_env.evaluate(config=config, answer=answer)
+            return await self._run_sync(_remote_eval, timeout=self.config.step_timeout)
+
+        # Local mode: run evaluator directly
+        from vagen.envs.webarena.evaluation_harness.evaluators import evaluator_router
 
         def _eval():
             evaluator = evaluator_router(config_file)
