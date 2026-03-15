@@ -21,6 +21,9 @@ export WIKIPEDIA="http://localhost:8888/wikipedia_en_all_maxi_2022-05/A/User:The
 export MAP="http://localhost:3000"
 export HOMEPAGE="http://localhost:4399"
 
+# Remote browser server (set to empty to use local Playwright)
+export REMOTE_BROWSER_URL="${REMOTE_BROWSER_URL:-http://localhost:5100}"
+
 PROJECT_NAME="verl_vagen"
 EXPERIMENT_NAME="webarena_ppo_qwen25vl3b"
 

@@ -96,6 +96,13 @@ class ScriptBrowserEnv(Env[dict[str, Observation], Action]):
         self.save_trace_enabled = save_trace_enabled
         self.sleep_after_execution = sleep_after_execution
 
+        # Browser reuse state
+        self._playwright = None
+        self._context_manager = None
+        self._browser = None
+        self._reset_count = 0
+        self._browser_reuse_limit = 50  # Force restart browser every N resets
+
         match observation_type:
             case "html" | "accessibility_tree":
                 self.text_observation_type = observation_type
@@ -122,17 +129,66 @@ class ScriptBrowserEnv(Env[dict[str, Observation], Action]):
             self.observation_handler.get_observation_space()
         )
 
-    @beartype
-    def setup(self, config_file: Path | None = None) -> None:
-        self.context_manager = sync_playwright()
-        self.playwright = self.context_manager.__enter__()
-        # Disable image loading via Chromium flags when using accessibility tree
+    def _ensure_browser(self) -> None:
+        """Launch Playwright + Chromium if not already running, or if reuse limit reached."""
+        needs_launch = (
+            self._browser is None
+            or not self._browser.is_connected()
+            or self._reset_count >= self._browser_reuse_limit
+        )
+        if not needs_launch:
+            return
+
+        # Tear down old browser if exists
+        self._teardown_browser()
+
+        self._context_manager = sync_playwright()
+        self._playwright = self._context_manager.__enter__()
         launch_args = []
         if self.text_observation_type == "accessibility_tree":
             launch_args.append("--blink-settings=imagesEnabled=false")
-        self.browser = self.playwright.chromium.launch(
+        self._browser = self._playwright.chromium.launch(
             headless=self.headless, slow_mo=self.slow_mo, args=launch_args
         )
+        self._reset_count = 0
+
+    def _teardown_browser(self) -> None:
+        """Close browser and playwright completely."""
+        if self._browser is not None:
+            try:
+                self._browser.close()
+            except Exception:
+                pass
+            self._browser = None
+        if self._context_manager is not None:
+            try:
+                self._context_manager.__exit__()
+            except Exception:
+                pass
+            self._context_manager = None
+            self._playwright = None
+
+    def _close_context(self) -> None:
+        """Close current browser context (pages + cookies), keep browser alive."""
+        if hasattr(self, "context") and self.context is not None:
+            try:
+                self.context.close()
+            except Exception:
+                pass
+            self.context = None
+
+    @beartype
+    def setup(self, config_file: Path | None = None) -> None:
+        # Close old context, keep browser alive
+        self._close_context()
+
+        # Launch browser if needed (first call or reuse limit reached)
+        try:
+            self._ensure_browser()
+        except Exception:
+            # If browser launch fails, tear down and retry once
+            self._teardown_browser()
+            self._ensure_browser()
 
         if config_file:
             with open(config_file, "r") as f:
@@ -148,7 +204,7 @@ class ScriptBrowserEnv(Env[dict[str, Observation], Action]):
         start_url = instance_config.get("start_url", None)
         geolocation = instance_config.get("geolocation", None)
 
-        self.context = self.browser.new_context(
+        self.context = self._browser.new_context(
             viewport=self.viewport_size,
             storage_state=storage_state,
             geolocation=geolocation,
@@ -177,6 +233,8 @@ class ScriptBrowserEnv(Env[dict[str, Observation], Action]):
                 client.send("Accessibility.enable")
             self.page.client = client  # type: ignore
 
+        self._reset_count += 1
+
     def get_page_client(self, page: Page) -> CDPSession:
         return page.client  # type: ignore
 
@@ -203,8 +261,6 @@ class ScriptBrowserEnv(Env[dict[str, Observation], Action]):
             - "storage_state": the storage state of the browser. It is a file path to a json file.
         """
         super().reset(seed=seed, options=options)
-        if self.reset_finished:
-            self.context_manager.__exit__()
 
         if options is not None and "config_file" in options:
             config_file = Path(options["config_file"])
@@ -234,8 +290,9 @@ class ScriptBrowserEnv(Env[dict[str, Observation], Action]):
             self.context.tracing.stop(path=trace_path)
 
     def close(self) -> None:
-        if self.reset_finished:
-            self.context_manager.__exit__()
+        self._close_context()
+        self._teardown_browser()
+        self.reset_finished = False
 
     def step(
         self, action: Action
