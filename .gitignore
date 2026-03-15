@@ -36,3 +36,4 @@ outputs/
 
 vagen/envs/search/search_data
 vagen/envs/webarena/.auth
+vagen/envs/webarena/_cache_test_webarena_lite
