@@ -48,6 +48,7 @@ class SessionManager:
         self.max_sessions = max_sessions
         self.session_timeout = session_timeout
         self._lock = threading.Lock()
+        self._reset_semaphore = threading.Semaphore(4)  # Max 4 concurrent resets
 
     def create_session(
         self,
@@ -64,61 +65,63 @@ class SessionManager:
                 logger.warning("Evicting session %s (max sessions reached)", oldest_sid)
                 self._close_session(oldest_sid)
 
-        session_id = str(uuid.uuid4())[:8]
+        # Limit concurrent resets to avoid resource exhaustion
+        with self._reset_semaphore:
+            session_id = str(uuid.uuid4())[:8]
 
-        # Write config to temp file (ScriptBrowserEnv expects file path)
-        config_dir = tempfile.mkdtemp(prefix="webarena_remote_")
-        config_path = os.path.join(config_dir, "config.json")
+            # Write config to temp file (ScriptBrowserEnv expects file path)
+            config_dir = tempfile.mkdtemp(prefix="webarena_remote_")
+            config_path = os.path.join(config_dir, "config.json")
 
-        # Handle storage_state
-        if storage_state:
-            state_path = os.path.join(config_dir, "storage_state.json")
-            with open(state_path, "w") as f:
-                json.dump(storage_state, f)
-            config["storage_state"] = state_path
-        elif "storage_state" in config:
-            ss = config["storage_state"]
-            if ss and not os.path.isabs(ss):
-                webarena_root = os.environ.get("WEBARENA_ROOT", "")
-                if webarena_root:
-                    config["storage_state"] = os.path.join(webarena_root, ss)
+            # Handle storage_state
+            if storage_state:
+                state_path = os.path.join(config_dir, "storage_state.json")
+                with open(state_path, "w") as f:
+                    json.dump(storage_state, f)
+                config["storage_state"] = state_path
+            elif "storage_state" in config:
+                ss = config["storage_state"]
+                if ss and not os.path.isabs(ss):
+                    webarena_root = os.environ.get("WEBARENA_ROOT", "")
+                    if webarena_root:
+                        config["storage_state"] = os.path.join(webarena_root, ss)
 
-        with open(config_path, "w") as f:
-            json.dump(config, f)
+            with open(config_path, "w") as f:
+                json.dump(config, f)
 
-        # Create and reset ScriptBrowserEnv
-        from vagen.envs.webarena.browser_env.envs import ScriptBrowserEnv
+            # Create and reset ScriptBrowserEnv
+            from vagen.envs.webarena.browser_env.envs import ScriptBrowserEnv
 
-        browser_env = ScriptBrowserEnv(
-            headless=True,
-            observation_type=observation_type,
-            current_viewport_only=current_viewport_only,
-            viewport_size={"width": viewport_width, "height": viewport_height},
-        )
+            browser_env = ScriptBrowserEnv(
+                headless=True,
+                observation_type=observation_type,
+                current_viewport_only=current_viewport_only,
+                viewport_size={"width": viewport_width, "height": viewport_height},
+            )
 
-        obs, info = browser_env.reset(options={"config_file": config_path})
+            obs, info = browser_env.reset(options={"config_file": config_path})
 
-        obs_text = obs.get("text", str(obs)) if isinstance(obs, dict) else str(obs)
+            obs_text = obs.get("text", str(obs)) if isinstance(obs, dict) else str(obs)
 
-        session = BrowserSession(
-            session_id=session_id,
-            browser_env=browser_env,
-            config=config,
-            observation_type=observation_type,
-            prev_obs_text=obs_text,
-        )
+            session = BrowserSession(
+                session_id=session_id,
+                browser_env=browser_env,
+                config=config,
+                observation_type=observation_type,
+                prev_obs_text=obs_text,
+            )
 
-        with self._lock:
-            self.sessions[session_id] = session
+            with self._lock:
+                self.sessions[session_id] = session
 
-        # Clean up temp config
-        try:
-            os.unlink(config_path)
-            os.rmdir(config_dir)
-        except OSError:
-            pass
+            # Clean up temp config
+            try:
+                os.unlink(config_path)
+                os.rmdir(config_dir)
+            except OSError:
+                pass
 
-        return session
+            return session
 
     def get_session(self, session_id: str) -> BrowserSession:
         session = self.sessions.get(session_id)

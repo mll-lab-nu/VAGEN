@@ -84,8 +84,8 @@ class WebArenaEnvConfig:
     # Timeouts & fault tolerance
     playwright_timeout: int = 30000          # Playwright default timeout (ms)
     nav_timeout: int = 30000                 # Playwright navigation timeout (ms)
-    step_timeout: float = 30.0              # _run_sync timeout for step (seconds)
-    reset_timeout: float = 60.0             # _run_sync timeout for reset (seconds)
+    step_timeout: float = 10.0              # _run_sync timeout for step (seconds)
+    reset_timeout: float = 120.0             # _run_sync timeout for reset (seconds)
     max_reset_retries: int = 3               # Max retries for reset on failure
 
     # Concurrency
