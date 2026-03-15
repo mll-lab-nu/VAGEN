@@ -76,7 +76,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     actor_rollout_ref.rollout.agent.agent_loop_config_path=$agent_loop_config_path \
     actor_rollout_ref.rollout.disable_log_stats=False \
     trainer.critic_warmup=0 \
-    trainer.logger=['console'] \
+    trainer.logger=['console','wandb'] \
     trainer.val_before_train=True \
     trainer.n_gpus_per_node=2 \
     trainer.nnodes=1 \
@@ -100,5 +100,6 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     critic.model.fsdp_config.param_offload=True \
     critic.model.fsdp_config.optimizer_offload=True \
     filter.enable=False \
+    +trainer.resume_checkpoint=${SAVE_CHECKPOINT_DIR}/global_step_100 \
     trainer.total_training_steps=400 2>&1 | \
     tee ${EXPERIMENT_DIR}/${PROJECT_NAME}_${EXPERIMENT_NAME}.log >(tee ${BASEDIR}/${PROJECT_NAME}_${EXPERIMENT_NAME}.log >/dev/null)
