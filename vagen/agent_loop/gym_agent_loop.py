@@ -194,7 +194,19 @@ class GymAgentLoop(AgentLoopBase):
             metrics=AgentLoopMetrics(),
             extra_fields={
                 "image_data": [],
-                "reward_extra_info": {"traj_success": 0.0},
+                "reward_extra_info": {
+                    "traj_success": 0.0,
+                    "success": 0.0,
+                    "eval_score": 0.0,
+                    "total_steps": 0.0,
+                    "reset_time": 0.0,
+                    "avg_step_time": 0.0,
+                    "total_episode_time": 0.0,
+                    "env_reset_success_rate": 0.0,
+                    "env_episode_success_rate": 0.0,
+                    "valid_action_rate": 0.0,
+                    "effective_action_rate": 0.0,
+                },
                 "reset_failed": True,
             },
         )
