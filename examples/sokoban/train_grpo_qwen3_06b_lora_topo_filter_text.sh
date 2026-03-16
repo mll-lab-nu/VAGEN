@@ -77,5 +77,5 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     trainer.max_actor_ckpt_to_keep=1 \
     trainer.max_critic_ckpt_to_keep=1 \
     filter.enable=True \
-    trainer.total_training_steps=400 2>&1 | \
+    trainer.total_training_steps=401 2>&1 | \
     tee ${EXPERIMENT_DIR}/${PROJECT_NAME}_${EXPERIMENT_NAME}.log >(tee ${BASEDIR}/${PROJECT_NAME}_${EXPERIMENT_NAME}.log >/dev/null)
