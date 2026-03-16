@@ -195,7 +195,9 @@ class EbAlfred(GymImageEnv):
         episode_idx = seed % self.env.number_of_episodes
         self.env._current_episode_num = episode_idx
 
-        await asyncio.to_thread(self.env.reset)
+        await asyncio.wait_for(
+            asyncio.to_thread(self.env.reset), timeout=300.0
+        )
 
         # Reset adapter state
         self._total_turns = 0
@@ -277,7 +279,9 @@ class EbAlfred(GymImageEnv):
                 # Execute in AI2-THOR
                 self._total_env_steps += 1
                 obs_raw, step_reward, step_done, step_info = (
-                    await asyncio.to_thread(self.env.step, matched)
+                    await asyncio.wait_for(
+                        asyncio.to_thread(self.env.step, matched), timeout=60.0
+                    )
                 )
 
                 self._last_action = matched
