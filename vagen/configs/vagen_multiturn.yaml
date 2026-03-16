@@ -74,4 +74,5 @@ filter:
 huggingface_hub:
   hf_save_freq: null            # null = no auto-upload
   repo_id: vagen-training       
-  private: false                
+  private: false
+  upload_contents: ['hf_model']            
