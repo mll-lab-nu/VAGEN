@@ -17,9 +17,8 @@ envs:
       timeout: 120
       retries: 3
       eval_set: base
-      prompt_format: free_think
+      prompt_format: eval_mode
       max_actions_per_step: 5
-      action_sep: ","
     chat_config:
       temperature: 0
       max_tokens: 1024

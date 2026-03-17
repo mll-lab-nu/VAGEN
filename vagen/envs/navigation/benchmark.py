@@ -41,13 +41,13 @@ VALID_ACTIONS = [
 ]
 
 
-def random_action_str(max_actions: int = 3, action_sep: str = ",") -> str:
+def random_action_str(max_actions: int = 3, action_sep: str = "|") -> str:
     """Generate a random valid free_think format action string."""
     n = random.randint(1, max_actions)
     actions = [random.choice(VALID_ACTIONS) for _ in range(n)]
-    answer = action_sep.join(actions)
+    action_text = action_sep.join(actions)
     think = f"I will {actions[0]} to explore the environment."
-    return f"<think>{think}</think><answer>{answer}</answer>"
+    return f"<think>{think}</think><action>{action_text}</action>"
 
 
 # ---------------------------------------------------------------------------
