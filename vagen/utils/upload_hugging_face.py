@@ -124,6 +124,11 @@ class HFUploadManager:
 
         # Validate upload_contents
         if self._upload_contents is not None:
+            if not isinstance(self._upload_contents, list) or not all(
+                isinstance(x, str) for x in self._upload_contents
+            ):
+                raise ValueError("upload_contents must be a list of strings.")
+
             invalid = set(self._upload_contents) - VALID_UPLOAD_CONTENTS
             if invalid:
                 raise ValueError(
