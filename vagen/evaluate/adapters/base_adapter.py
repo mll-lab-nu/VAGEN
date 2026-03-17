@@ -15,6 +15,10 @@ class ModelAdapter(ABC):
     def format_user_turn(self, text: str, images: List[Image.Image]) -> Dict[str, Any]:
         raise NotImplementedError
 
+    def format_assistant_turn(self, text: str) -> Dict[str, Any]:
+        """Format an assistant reply for the conversation history."""
+        return {"role": "assistant", "content": [{"type": "text", "text": text}]}
+
     @abstractmethod
     async def acompletion(self, messages: List[Dict[str, Any]], **chat_config: Any) -> str:
         raise NotImplementedError

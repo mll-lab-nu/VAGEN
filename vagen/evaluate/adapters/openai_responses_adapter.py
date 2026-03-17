@@ -36,6 +36,9 @@ class OpenAIResponsesAdapter(ModelAdapter):
         segs = compile_text_images_for_order(text, images)
         return {"role": "user", "content": self._segments_to_content(segs)}
 
+    def format_assistant_turn(self, text: str) -> Dict[str, Any]:
+        return {"role": "assistant", "content": [{"type": "output_text", "text": text}]}
+
     async def acompletion(self, messages: List[Dict[str, Any]], **chat_config: Any) -> str:
 
         resp = await self.client.responses.create(
