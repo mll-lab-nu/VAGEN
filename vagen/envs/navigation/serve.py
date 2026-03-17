@@ -52,7 +52,7 @@ def main(
     max_envs: int = 128,
     # Max concurrent HTTP requests being processed. 0 = unlimited.
     # Set to ~max_envs to avoid queuing more requests than envs can serve.
-    max_inflight: int = 0,
+    max_inflight: int = 128,
     # Thread pool for asyncio.to_thread(). Each AI2-THOR controller is a
     # separate Unity subprocess, so threads genuinely run in parallel (no GIL).
     # Should be >= max_envs so all envs can run blocking calls concurrently.

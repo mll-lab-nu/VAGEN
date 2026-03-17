@@ -2,8 +2,8 @@ import numpy as np
 from PIL import Image
 
 # from gym_sokoban.envs.sokoban_env import SokobanEnv
-from .patch_sokoban_env import PatchedSokobanEnv as SokobanEnv
-from .utils.prompt import (
+from vagen.envs.sokoban.patch_sokoban_env import PatchedSokobanEnv as SokobanEnv
+from vagen.envs.sokoban.utils.prompt import (
     action_template,
     format_prompt,
     init_observation_template,
@@ -12,7 +12,7 @@ from .utils.prompt import (
 from .utils.utils import parse_response, numpy_to_pil
 
 
-from ..gym_image_env import GymImageEnv
+from vagen.envs.gym_image_env import GymImageEnv
 
 import asyncio
 from dataclasses import dataclass

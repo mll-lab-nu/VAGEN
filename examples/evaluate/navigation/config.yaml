@@ -1,0 +1,48 @@
+fileroot: ${oc.env:HOME}/projects/vagen/VAGEN
+
+# ── Navigation env (runs via RemoteEnv → navigation server) ──────────
+# Before running eval, start the navigation server:
+#   python -m vagen.envs.navigation.serve --port 8000
+#
+# Each eval_set has 60 tasks. seed=[0,60,1] covers all tasks once.
+
+envs:
+  - name: RemoteEnv
+    n_envs: 60
+    tag_id: navigation_base
+    seed: [0, 60, 1]
+    max_turns: 10
+    config:
+      base_urls: "http://localhost:8000"
+      timeout: 120
+      retries: 3
+      eval_set: base
+      prompt_format: free_think
+      max_actions_per_step: 5
+      action_sep: ","
+    chat_config:
+      temperature: 0
+      max_tokens: 1024
+      top_p: 1.0
+
+experiment:
+  dump_dir: ${fileroot}/rollouts/eval_navigation
+  default_max_turns: 10
+
+run:
+  backend: "openai"
+  base_seed: 0
+  max_concurrent_jobs: 16
+  resume: skip_completed
+  live_summary: true
+
+backends:
+  openai:
+    api_key: ""               # or env OPENAI_API_KEY
+    base_url: null
+    model: "gpt-4.1-mini"
+    max_concurrency: 8
+    max_retries: 6
+    min_backoff: 0.5
+    max_backoff: 8.0
+
