@@ -1,0 +1,1270 @@
+{
+    "tasks": [
+        {
+            "targetObjectType": "Bread",
+            "targetObjectIds": "Bread|+01.30|+00.98|-01.53",
+            "target_position": {
+                "x": 1.2998923063278198,
+                "y": 0.9787495732307434,
+                "z": -1.5326441526412964
+            },
+            "agentPose": {
+                "position": {
+                    "x": -1.5,
+                    "y": 0.9009991884231567,
+                    "z": -0.9000000357627869
+                },
+                "rotation": 270.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan11",
+            "object_to_hide": [],
+            "instruction": "navigate to the Bread in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Pot",
+            "targetObjectIds": "Pot|-00.82|+00.93|+00.82",
+            "target_position": {
+                "x": -0.8179976940155029,
+                "y": 0.9287622570991516,
+                "z": 0.8159939646720886
+            },
+            "agentPose": {
+                "position": {
+                    "x": 0.6000000238418579,
+                    "y": 0.9799999594688416,
+                    "z": 2.9000000953674316
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan12",
+            "object_to_hide": [],
+            "instruction": "navigate to the Pot in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Toaster",
+            "targetObjectIds": "Toaster|-03.58|+00.91|+01.76",
+            "target_position": {
+                "x": -3.5786383152008057,
+                "y": 0.9123042225837708,
+                "z": 1.763442039489746
+            },
+            "agentPose": {
+                "position": {
+                    "x": -1.2999999523162842,
+                    "y": 0.8995019197463989,
+                    "z": 3.0
+                },
+                "rotation": 90.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan13",
+            "object_to_hide": [],
+            "instruction": "navigate to the Toaster in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Pot",
+            "targetObjectIds": "Pot|+01.53|+00.91|+00.06",
+            "target_position": {
+                "x": 1.5345737934112549,
+                "y": 0.9103997349739075,
+                "z": 0.058767713606357574
+            },
+            "agentPose": {
+                "position": {
+                    "x": -0.10000000149011612,
+                    "y": 0.9009991884231567,
+                    "z": 2.5
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan14",
+            "object_to_hide": [],
+            "instruction": "navigate to the Pot in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Pot",
+            "targetObjectIds": "Pot|-03.14|+00.96|+02.37",
+            "target_position": {
+                "x": -3.144001007080078,
+                "y": 0.9634929895401001,
+                "z": 2.3740131855010986
+            },
+            "agentPose": {
+                "position": {
+                    "x": -0.19999992847442627,
+                    "y": 0.914953351020813,
+                    "z": 2.799999952316284
+                },
+                "rotation": 90.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan15",
+            "object_to_hide": [],
+            "instruction": "navigate to the Pot in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Cup",
+            "targetObjectIds": "Cup|-00.46|+01.02|+00.42",
+            "target_position": {
+                "x": -0.46001094579696655,
+                "y": 1.0187097787857056,
+                "z": 0.4222820997238159
+            },
+            "agentPose": {
+                "position": {
+                    "x": 0.7000000476837158,
+                    "y": 0.9037266969680786,
+                    "z": 2.700000047683716
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan16",
+            "object_to_hide": [],
+            "instruction": "navigate to the Cup in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Tomato",
+            "targetObjectIds": "Tomato|-00.51|+00.95|-00.49",
+            "target_position": {
+                "x": -0.5129496455192566,
+                "y": 0.9499425888061523,
+                "z": -0.49397602677345276
+            },
+            "agentPose": {
+                "position": {
+                    "x": 0.0,
+                    "y": 0.9089995622634888,
+                    "z": 2.1000001430511475
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan17",
+            "object_to_hide": [],
+            "instruction": "navigate to the Tomato in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Toaster",
+            "targetObjectIds": "Toaster|+01.47|+00.98|+04.71",
+            "target_position": {
+                "x": 1.4739712476730347,
+                "y": 0.981684684753418,
+                "z": 4.7149977684021
+            },
+            "agentPose": {
+                "position": {
+                    "x": -1.2999999523162842,
+                    "y": 0.9009996652603149,
+                    "z": 3.5999999046325684
+                },
+                "rotation": 270.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan18",
+            "object_to_hide": [],
+            "instruction": "navigate to the Toaster in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Lettuce",
+            "targetObjectIds": "Lettuce|-01.32|+00.99|-03.75",
+            "target_position": {
+                "x": -1.3243786096572876,
+                "y": 0.9885435104370117,
+                "z": -3.7518551349639893
+            },
+            "agentPose": {
+                "position": {
+                    "x": -0.7999999523162842,
+                    "y": 0.9023619890213013,
+                    "z": -1.0
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan19",
+            "object_to_hide": [],
+            "instruction": "navigate to the Lettuce in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Toaster",
+            "targetObjectIds": "Toaster|+00.78|+00.90|-02.08",
+            "target_position": {
+                "x": 0.7800703644752502,
+                "y": 0.9000223278999329,
+                "z": -2.080893039703369
+            },
+            "agentPose": {
+                "position": {
+                    "x": -1.0,
+                    "y": 0.9009991884231567,
+                    "z": 0.20000004768371582
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan20",
+            "object_to_hide": [],
+            "instruction": "navigate to the Toaster in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "GarbageCan",
+            "targetObjectIds": "GarbageCan|-01.26|-00.03|-03.61",
+            "target_position": {
+                "x": -1.2610007524490356,
+                "y": -0.03129376471042633,
+                "z": -3.610995054244995
+            },
+            "agentPose": {
+                "position": {
+                    "x": -0.30000001192092896,
+                    "y": 0.8696960806846619,
+                    "z": -1.1999999284744263
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan21",
+            "object_to_hide": [],
+            "instruction": "navigate to the GarbageCan in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Kettle",
+            "targetObjectIds": "Kettle|-02.62|+00.93|-00.72",
+            "target_position": {
+                "x": -2.6201133728027344,
+                "y": 0.9268901944160461,
+                "z": -0.7242916226387024
+            },
+            "agentPose": {
+                "position": {
+                    "x": -0.19999992847442627,
+                    "y": 0.9009991884231567,
+                    "z": 0.9000000357627869
+                },
+                "rotation": 90.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan22",
+            "object_to_hide": [],
+            "instruction": "navigate to the Kettle in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "StoveBurner",
+            "targetObjectIds": "StoveBurner|-01.52|+00.93|-03.75",
+            "target_position": {
+                "x": -1.5154999494552612,
+                "y": 0.9282000064849854,
+                "z": -3.7523000240325928
+            },
+            "agentPose": {
+                "position": {
+                    "x": -1.100000023841858,
+                    "y": 0.9009994864463806,
+                    "z": -0.8999999761581421
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan23",
+            "object_to_hide": [
+                "StoveBurner|-01.13|+00.93|-03.50",
+                "StoveBurner|-01.52|+00.93|-03.50",
+                "StoveBurner|-01.13|+00.93|-03.75"
+            ],
+            "instruction": "navigate to the StoveBurner in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Pot",
+            "targetObjectIds": "Pot|+00.62|+00.85|+01.40",
+            "target_position": {
+                "x": 0.619452178478241,
+                "y": 0.8477782011032104,
+                "z": 1.3980013132095337
+            },
+            "agentPose": {
+                "position": {
+                    "x": -1.5,
+                    "y": 0.9009992480278015,
+                    "z": 2.9000000953674316
+                },
+                "rotation": 270.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan24",
+            "object_to_hide": [],
+            "instruction": "navigate to the Pot in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Cup",
+            "targetObjectIds": "Cup|-02.68|+00.81|+00.77",
+            "target_position": {
+                "x": -2.677137613296509,
+                "y": 0.812075674533844,
+                "z": 0.772007942199707
+            },
+            "agentPose": {
+                "position": {
+                    "x": -0.8999999761581421,
+                    "y": 0.9009992480278015,
+                    "z": 2.700000047683716
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan25",
+            "object_to_hide": [],
+            "instruction": "navigate to the Cup in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Pot",
+            "targetObjectIds": "Pot|-02.54|+00.72|+02.55",
+            "target_position": {
+                "x": -2.5409181118011475,
+                "y": 0.7228787541389465,
+                "z": 2.5529136657714844
+            },
+            "agentPose": {
+                "position": {
+                    "x": -0.3999999761581421,
+                    "y": 0.9015909433364868,
+                    "z": 1.2000000476837158
+                },
+                "rotation": 90.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan26",
+            "object_to_hide": [],
+            "instruction": "navigate to the Pot in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Pot",
+            "targetObjectIds": "Pot|+01.85|+00.93|+01.50",
+            "target_position": {
+                "x": 1.8544789552688599,
+                "y": 0.9329327344894409,
+                "z": 1.4970054626464844
+            },
+            "agentPose": {
+                "position": {
+                    "x": 0.19999998807907104,
+                    "y": 0.9010001420974731,
+                    "z": -0.7000000476837158
+                },
+                "rotation": 180.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan27",
+            "object_to_hide": [],
+            "instruction": "navigate to the Pot in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Lettuce",
+            "targetObjectIds": "Lettuce|-01.08|+01.01|-03.57",
+            "target_position": {
+                "x": -1.0843701362609863,
+                "y": 1.0107605457305908,
+                "z": -3.5721242427825928
+            },
+            "agentPose": {
+                "position": {
+                    "x": -2.8000001907348633,
+                    "y": 0.9009982347488403,
+                    "z": -1.7000000476837158
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan28",
+            "object_to_hide": [],
+            "instruction": "navigate to the Lettuce in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Kettle",
+            "targetObjectIds": "Kettle|+00.01|+01.06|-01.40",
+            "target_position": {
+                "x": 0.007346689701080322,
+                "y": 1.0550602674484253,
+                "z": -1.4009263515472412
+            },
+            "agentPose": {
+                "position": {
+                    "x": 0.0,
+                    "y": 0.9317981004714966,
+                    "z": 1.399999976158142
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan29",
+            "object_to_hide": [],
+            "instruction": "navigate to the Kettle in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "CoffeeMachine",
+            "targetObjectIds": "CoffeeMachine|+03.21|+00.89|+00.70",
+            "target_position": {
+                "x": 3.2149884700775146,
+                "y": 0.8902187347412109,
+                "z": 0.6979954242706299
+            },
+            "agentPose": {
+                "position": {
+                    "x": 0.800000011920929,
+                    "y": 0.9277887344360352,
+                    "z": 1.399999976158142
+                },
+                "rotation": 270.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan30",
+            "object_to_hide": [],
+            "instruction": "navigate to the CoffeeMachine in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "GarbageCan",
+            "targetObjectIds": "GarbageCan|-01.89|-00.03|-00.41",
+            "target_position": {
+                "x": -1.891257882118225,
+                "y": -0.02939411997795105,
+                "z": -0.4092106223106384
+            },
+            "agentPose": {
+                "position": {
+                    "x": -1.100000023841858,
+                    "y": 0.9009991884231567,
+                    "z": 2.0
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan211",
+            "object_to_hide": [],
+            "instruction": "navigate to the GarbageCan in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "TissueBox",
+            "targetObjectIds": "TissueBox|+03.92|+00.87|+00.68",
+            "target_position": {
+                "x": 3.917987108230591,
+                "y": 0.8691356182098389,
+                "z": 0.6810032725334167
+            },
+            "agentPose": {
+                "position": {
+                    "x": 1.2000000476837158,
+                    "y": 0.9009991884231567,
+                    "z": -0.10000000149011612
+                },
+                "rotation": 270.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan212",
+            "object_to_hide": [],
+            "instruction": "navigate to the TissueBox in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Laptop",
+            "targetObjectIds": "Laptop|+14.24|+00.73|+02.07",
+            "target_position": {
+                "x": 14.239668846130371,
+                "y": 0.7311163544654846,
+                "z": 2.0669896602630615
+            },
+            "agentPose": {
+                "position": {
+                    "x": 13.800000190734863,
+                    "y": 0.9028512835502625,
+                    "z": -0.699999988079071
+                },
+                "rotation": 180.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan213",
+            "object_to_hide": [],
+            "instruction": "navigate to the Laptop in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "DeskLamp",
+            "targetObjectIds": "DeskLamp|-00.48|+00.61|+00.69",
+            "target_position": {
+                "x": -0.48394647240638733,
+                "y": 0.6126072406768799,
+                "z": 0.6914483308792114
+            },
+            "agentPose": {
+                "position": {
+                    "x": -1.1999999284744263,
+                    "y": 0.9204407930374146,
+                    "z": 3.5999999046325684
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan214",
+            "object_to_hide": [],
+            "instruction": "navigate to the DeskLamp in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Pillow",
+            "targetObjectIds": "Pillow|-00.88|+00.55|+04.72",
+            "target_position": {
+                "x": -0.8750989437103271,
+                "y": 0.5495162010192871,
+                "z": 4.720698833465576
+            },
+            "agentPose": {
+                "position": {
+                    "x": -1.2999999523162842,
+                    "y": 0.910965085029602,
+                    "z": 7.199999809265137
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan215",
+            "object_to_hide": [],
+            "instruction": "navigate to the Pillow in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "FloorLamp",
+            "targetObjectIds": "FloorLamp|-04.57|+00.01|-01.62",
+            "target_position": {
+                "x": -4.56902551651001,
+                "y": 0.005961775779724121,
+                "z": -1.6160376071929932
+            },
+            "agentPose": {
+                "position": {
+                    "x": -2.9000000953674316,
+                    "y": 0.9009991884231567,
+                    "z": 0.5
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan216",
+            "object_to_hide": [],
+            "instruction": "navigate to the FloorLamp in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "DeskLamp",
+            "targetObjectIds": "DeskLamp|+00.02|+00.70|+04.68",
+            "target_position": {
+                "x": 0.015217547304928303,
+                "y": 0.7049700021743774,
+                "z": 4.677003383636475
+            },
+            "agentPose": {
+                "position": {
+                    "x": -2.3999998569488525,
+                    "y": 0.9011412858963013,
+                    "z": 3.700000047683716
+                },
+                "rotation": 270.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan217",
+            "object_to_hide": [],
+            "instruction": "navigate to the DeskLamp in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "GarbageCan",
+            "targetObjectIds": "GarbageCan|-07.10|-00.04|+02.30",
+            "target_position": {
+                "x": -7.102658271789551,
+                "y": -0.04435938596725464,
+                "z": 2.2950239181518555
+            },
+            "agentPose": {
+                "position": {
+                    "x": -4.700000286102295,
+                    "y": 0.9008399248123169,
+                    "z": 3.700000047683716
+                },
+                "rotation": 90.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan218",
+            "object_to_hide": [],
+            "instruction": "navigate to the GarbageCan in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Box",
+            "targetObjectIds": "Box|-02.31|+00.72|+00.35",
+            "target_position": {
+                "x": -2.3102729320526123,
+                "y": 0.7190231084823608,
+                "z": 0.3534267544746399
+            },
+            "agentPose": {
+                "position": {
+                    "x": -4.0,
+                    "y": 0.9010564088821411,
+                    "z": 2.799999952316284
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan219",
+            "object_to_hide": [],
+            "instruction": "navigate to the Box in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "GarbageCan",
+            "targetObjectIds": "GarbageCan|-05.17|-00.03|-00.38",
+            "target_position": {
+                "x": -5.166409015655518,
+                "y": -0.026059776544570923,
+                "z": -0.382913738489151
+            },
+            "agentPose": {
+                "position": {
+                    "x": -2.700000047683716,
+                    "y": 0.9096194505691528,
+                    "z": 0.6000000238418579
+                },
+                "rotation": 90.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan220",
+            "object_to_hide": [],
+            "instruction": "navigate to the GarbageCan in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Pillow",
+            "targetObjectIds": "Pillow|+00.45|+00.49|-01.64",
+            "target_position": {
+                "x": 0.4521377980709076,
+                "y": 0.48706337809562683,
+                "z": -1.642286777496338
+            },
+            "agentPose": {
+                "position": {
+                    "x": -1.7999999523162842,
+                    "y": 0.9984914064407349,
+                    "z": -0.30000001192092896
+                },
+                "rotation": 270.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan221",
+            "object_to_hide": [],
+            "instruction": "navigate to the Pillow in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "GarbageCan",
+            "targetObjectIds": "GarbageCan|+01.30|+00.00|-02.19",
+            "target_position": {
+                "x": 1.2963452339172363,
+                "y": 3.7550926208496094e-06,
+                "z": -2.1874260902404785
+            },
+            "agentPose": {
+                "position": {
+                    "x": 1.4000000953674316,
+                    "y": 0.9009992480278015,
+                    "z": 0.800000011920929
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan222",
+            "object_to_hide": [],
+            "instruction": "navigate to the GarbageCan in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Plate",
+            "targetObjectIds": "Plate|+01.36|+00.78|-00.62",
+            "target_position": {
+                "x": 1.359997272491455,
+                "y": 0.7819615006446838,
+                "z": -0.6242142915725708
+            },
+            "agentPose": {
+                "position": {
+                    "x": -1.2000000476837158,
+                    "y": 0.9009991884231567,
+                    "z": 0.5
+                },
+                "rotation": 270.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan223",
+            "object_to_hide": [],
+            "instruction": "navigate to the Plate in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "DeskLamp",
+            "targetObjectIds": "DeskLamp|+03.14|+00.59|+01.46",
+            "target_position": {
+                "x": 3.142817974090576,
+                "y": 0.5918936729431152,
+                "z": 1.4573057889938354
+            },
+            "agentPose": {
+                "position": {
+                    "x": 1.2000000476837158,
+                    "y": 0.9283229112625122,
+                    "z": -0.8000000715255737
+                },
+                "rotation": 180.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan224",
+            "object_to_hide": [],
+            "instruction": "navigate to the DeskLamp in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Vase",
+            "targetObjectIds": "Vase|-02.88|+01.52|+00.14",
+            "target_position": {
+                "x": -2.8804869651794434,
+                "y": 1.5179489850997925,
+                "z": 0.14486652612686157
+            },
+            "agentPose": {
+                "position": {
+                    "x": -1.399999976158142,
+                    "y": 0.906817615032196,
+                    "z": 2.700000047683716
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan225",
+            "object_to_hide": [],
+            "instruction": "navigate to the Vase in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Pillow",
+            "targetObjectIds": "Pillow|+00.18|+00.55|-01.67",
+            "target_position": {
+                "x": 0.1755053699016571,
+                "y": 0.5549741983413696,
+                "z": -1.6678383350372314
+            },
+            "agentPose": {
+                "position": {
+                    "x": -2.4000000953674316,
+                    "y": 0.9009991884231567,
+                    "z": -0.8000000715255737
+                },
+                "rotation": 270.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan226",
+            "object_to_hide": [],
+            "instruction": "navigate to the Pillow in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Box",
+            "targetObjectIds": "Box|-02.36|+00.66|+00.31",
+            "target_position": {
+                "x": -2.3619630336761475,
+                "y": 0.6550504565238953,
+                "z": 0.30596208572387695
+            },
+            "agentPose": {
+                "position": {
+                    "x": -4.199999809265137,
+                    "y": 0.9270526170730591,
+                    "z": 2.0999999046325684
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan227",
+            "object_to_hide": [],
+            "instruction": "navigate to the Box in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "GarbageCan",
+            "targetObjectIds": "GarbageCan|-00.26|-00.04|+04.73",
+            "target_position": {
+                "x": -0.2640339732170105,
+                "y": -0.04005049169063568,
+                "z": 4.728277683258057
+            },
+            "agentPose": {
+                "position": {
+                    "x": -2.0,
+                    "y": 0.8938637971878052,
+                    "z": 2.9000000953674316
+                },
+                "rotation": 180.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan228",
+            "object_to_hide": [],
+            "instruction": "navigate to the GarbageCan in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Statue",
+            "targetObjectIds": "Statue|-02.98|+00.42|+02.36",
+            "target_position": {
+                "x": -2.979987859725952,
+                "y": 0.41742026805877686,
+                "z": 2.36194109916687
+            },
+            "agentPose": {
+                "position": {
+                    "x": -4.5,
+                    "y": 0.9220515489578247,
+                    "z": 4.400000095367432
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan229",
+            "object_to_hide": [
+                "Statue|-00.18|+00.76|+01.55"
+            ],
+            "instruction": "navigate to the Statue in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "GarbageCan",
+            "targetObjectIds": "GarbageCan|-05.71|+00.01|+00.30",
+            "target_position": {
+                "x": -5.711935997009277,
+                "y": 0.005919516086578369,
+                "z": 0.30034899711608887
+            },
+            "agentPose": {
+                "position": {
+                    "x": -4.400000095367432,
+                    "y": 0.9082556962966919,
+                    "z": 2.5999999046325684
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan230",
+            "object_to_hide": [],
+            "instruction": "navigate to the GarbageCan in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Laptop",
+            "targetObjectIds": "Laptop|+02.58|+00.81|+02.42",
+            "target_position": {
+                "x": 2.5849783420562744,
+                "y": 0.8105512857437134,
+                "z": 2.4182705879211426
+            },
+            "agentPose": {
+                "position": {
+                    "x": 0.6000000238418579,
+                    "y": 0.9101201295852661,
+                    "z": 4.099999904632568
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan311",
+            "object_to_hide": [],
+            "instruction": "navigate to the Laptop in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "AlarmClock",
+            "targetObjectIds": "AlarmClock|+00.34|+00.67|-01.68",
+            "target_position": {
+                "x": 0.33674636483192444,
+                "y": 0.6687681078910828,
+                "z": -1.676675796508789
+            },
+            "agentPose": {
+                "position": {
+                    "x": 1.8000000715255737,
+                    "y": 0.9009992480278015,
+                    "z": 0.800000011920929
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan312",
+            "object_to_hide": [],
+            "instruction": "navigate to the AlarmClock in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Box",
+            "targetObjectIds": "Box|+01.54|+01.65|+00.69",
+            "target_position": {
+                "x": 1.5361363887786865,
+                "y": 1.6517648696899414,
+                "z": 0.691978394985199
+            },
+            "agentPose": {
+                "position": {
+                    "x": -0.5,
+                    "y": 0.9009991884231567,
+                    "z": -1.0
+                },
+                "rotation": 270.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan313",
+            "object_to_hide": [],
+            "instruction": "navigate to the Box in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "AlarmClock",
+            "targetObjectIds": "AlarmClock|+02.19|+00.83|-00.82",
+            "target_position": {
+                "x": 2.192049026489258,
+                "y": 0.8336142301559448,
+                "z": -0.8190637230873108
+            },
+            "agentPose": {
+                "position": {
+                    "x": 1.5,
+                    "y": 0.9009991884231567,
+                    "z": 2.1000001430511475
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan314",
+            "object_to_hide": [],
+            "instruction": "navigate to the AlarmClock in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Mug",
+            "targetObjectIds": "Mug|-00.21|+00.79|-03.88",
+            "target_position": {
+                "x": -0.2083614468574524,
+                "y": 0.7903317809104919,
+                "z": -3.8824853897094727
+            },
+            "agentPose": {
+                "position": {
+                    "x": -2.5999999046325684,
+                    "y": 0.9092894792556763,
+                    "z": -2.799999952316284
+                },
+                "rotation": 270.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan315",
+            "object_to_hide": [],
+            "instruction": "navigate to the Mug in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Book",
+            "targetObjectIds": "Book|+00.45|+00.69|-02.25",
+            "target_position": {
+                "x": 0.4525811970233917,
+                "y": 0.6873252391815186,
+                "z": -2.2466113567352295
+            },
+            "agentPose": {
+                "position": {
+                    "x": 1.4000000953674316,
+                    "y": 0.9019328355789185,
+                    "z": 0.10000000149011612
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan316",
+            "object_to_hide": [],
+            "instruction": "navigate to the Book in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "LaundryHamper",
+            "targetObjectIds": "LaundryHamper|-01.57|+00.00|-01.93",
+            "target_position": {
+                "x": -1.565004825592041,
+                "y": 0.0010171830654144287,
+                "z": -1.92799711227417
+            },
+            "agentPose": {
+                "position": {
+                    "x": -0.5,
+                    "y": 0.9019261598587036,
+                    "z": 0.5
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan317",
+            "object_to_hide": [],
+            "instruction": "navigate to the LaundryHamper in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Laptop",
+            "targetObjectIds": "Laptop|+01.80|+00.70|-00.63",
+            "target_position": {
+                "x": 1.7998236417770386,
+                "y": 0.7006639242172241,
+                "z": -0.6268681287765503
+            },
+            "agentPose": {
+                "position": {
+                    "x": 0.800000011920929,
+                    "y": 0.9017602205276489,
+                    "z": 2.200000047683716
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan318",
+            "object_to_hide": [],
+            "instruction": "navigate to the Laptop in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "DeskLamp",
+            "targetObjectIds": "DeskLamp|+02.68|+00.82|+00.88",
+            "target_position": {
+                "x": 2.6770365238189697,
+                "y": 0.8194464445114136,
+                "z": 0.8780131936073303
+            },
+            "agentPose": {
+                "position": {
+                    "x": 0.3999999761581421,
+                    "y": 0.9020015001296997,
+                    "z": -0.8999999761581421
+                },
+                "rotation": 270.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan319",
+            "object_to_hide": [],
+            "instruction": "navigate to the DeskLamp in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "GarbageCan",
+            "targetObjectIds": "GarbageCan|+01.68|-00.02|+01.67",
+            "target_position": {
+                "x": 1.683032751083374,
+                "y": -0.01840302348136902,
+                "z": 1.6709884405136108
+            },
+            "agentPose": {
+                "position": {
+                    "x": -0.8000000715255737,
+                    "y": 0.9017602205276489,
+                    "z": 0.6000000238418579
+                },
+                "rotation": 270.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan320",
+            "object_to_hide": [],
+            "instruction": "navigate to the GarbageCan in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "CellPhone",
+            "targetObjectIds": "CellPhone|+03.26|+00.79|-01.38",
+            "target_position": {
+                "x": 3.255768060684204,
+                "y": 0.7860361933708191,
+                "z": -1.3849278688430786
+            },
+            "agentPose": {
+                "position": {
+                    "x": 3.4000000953674316,
+                    "y": 0.9009991884231567,
+                    "z": 1.2000000476837158
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan321",
+            "object_to_hide": [],
+            "instruction": "navigate to the CellPhone in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Laptop",
+            "targetObjectIds": "Laptop|+02.75|+00.98|+01.71",
+            "target_position": {
+                "x": 2.749692440032959,
+                "y": 0.981804609298706,
+                "z": 1.7110432386398315
+            },
+            "agentPose": {
+                "position": {
+                    "x": 0.09999996423721313,
+                    "y": 0.9017602801322937,
+                    "z": 1.899999976158142
+                },
+                "rotation": 270.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan322",
+            "object_to_hide": [],
+            "instruction": "navigate to the Laptop in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Safe",
+            "targetObjectIds": "Safe|+02.72|+01.23|+01.78",
+            "target_position": {
+                "x": 2.721862316131592,
+                "y": 1.228367805480957,
+                "z": 1.7847342491149902
+            },
+            "agentPose": {
+                "position": {
+                    "x": 1.0,
+                    "y": 0.9009991884231567,
+                    "z": -0.4000000059604645
+                },
+                "rotation": 180.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan323",
+            "object_to_hide": [],
+            "instruction": "navigate to the Safe in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "AlarmClock",
+            "targetObjectIds": "AlarmClock|+00.07|+00.67|-02.54",
+            "target_position": {
+                "x": 0.06901704519987106,
+                "y": 0.6654676198959351,
+                "z": -2.537914276123047
+            },
+            "agentPose": {
+                "position": {
+                    "x": 1.399999976158142,
+                    "y": 0.9020034074783325,
+                    "z": -0.4000000059604645
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan324",
+            "object_to_hide": [],
+            "instruction": "navigate to the AlarmClock in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Laptop",
+            "targetObjectIds": "Laptop|+01.45|+01.03|-01.92",
+            "target_position": {
+                "x": 1.4451185464859009,
+                "y": 1.0297991037368774,
+                "z": -1.9151909351348877
+            },
+            "agentPose": {
+                "position": {
+                    "x": 3.200000047683716,
+                    "y": 0.9497443437576294,
+                    "z": 0.30000001192092896
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan325",
+            "object_to_hide": [],
+            "instruction": "navigate to the Laptop in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Laptop",
+            "targetObjectIds": "Laptop|+03.04|+00.79|-02.28",
+            "target_position": {
+                "x": 3.035794258117676,
+                "y": 0.7899055480957031,
+                "z": -2.2769720554351807
+            },
+            "agentPose": {
+                "position": {
+                    "x": 1.0,
+                    "y": 0.8994580507278442,
+                    "z": -0.4000000059604645
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan326",
+            "object_to_hide": [],
+            "instruction": "navigate to the Laptop in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "DeskLamp",
+            "targetObjectIds": "DeskLamp|-01.49|+00.67|-02.42",
+            "target_position": {
+                "x": -1.4897704124450684,
+                "y": 0.6693194508552551,
+                "z": -2.4190797805786133
+            },
+            "agentPose": {
+                "position": {
+                    "x": -0.20000000298023224,
+                    "y": 0.9009992480278015,
+                    "z": 0.20000000298023224
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan327",
+            "object_to_hide": [],
+            "instruction": "navigate to the DeskLamp in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Book",
+            "targetObjectIds": "Book|+02.88|+00.79|-01.63",
+            "target_position": {
+                "x": 2.88104248046875,
+                "y": 0.7934145331382751,
+                "z": -1.6321539878845215
+            },
+            "agentPose": {
+                "position": {
+                    "x": 1.600000023841858,
+                    "y": 0.9009991884231567,
+                    "z": 0.699999988079071
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan328",
+            "object_to_hide": [],
+            "instruction": "navigate to the Book in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Laptop",
+            "targetObjectIds": "Laptop|-00.66|+00.62|+00.78",
+            "target_position": {
+                "x": -0.6610267758369446,
+                "y": 0.6179195046424866,
+                "z": 0.7779424786567688
+            },
+            "agentPose": {
+                "position": {
+                    "x": 1.5,
+                    "y": 0.9009991884231567,
+                    "z": -1.2000000476837158
+                },
+                "rotation": 90.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan329",
+            "object_to_hide": [],
+            "instruction": "navigate to the Laptop in the room and be as close as possible to it"
+        },
+        {
+            "targetObjectType": "Bowl",
+            "targetObjectIds": "Bowl|-01.64|+01.14|-02.30",
+            "target_position": {
+                "x": -1.6403990983963013,
+                "y": 1.1422350406646729,
+                "z": -2.300286054611206
+            },
+            "agentPose": {
+                "position": {
+                    "x": -0.699999988079071,
+                    "y": 0.9009991884231567,
+                    "z": 0.40000003576278687
+                },
+                "rotation": 0.0,
+                "horizon": 0.0
+            },
+            "scene": "FloorPlan330",
+            "object_to_hide": [],
+            "instruction": "navigate to the Bowl in the room and be as close as possible to it"
+        }
+    ]
+}
