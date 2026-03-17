@@ -15,7 +15,7 @@ import numpy as np
 from PIL import Image
 
 from vagen.envs.gym_image_env import GymImageEnv
-from .prompt import system_prompt, init_observation_template, action_template, format_prompt
+from .utils.prompt import system_prompt, init_observation_template, action_template, format_prompt
 
 
 # ---------------------------------------------------------------------------
