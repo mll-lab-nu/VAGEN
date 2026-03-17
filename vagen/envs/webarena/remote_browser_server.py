@@ -6,6 +6,10 @@ Training machines send lightweight HTTP requests instead of
 running Playwright locally (eliminates network latency for
 the many sub-requests Playwright makes per step).
 
+Key optimisation: Chromium browser processes are pooled and reused
+across sessions. Only the browser *context* (cookies, pages) is
+created/destroyed per reset, saving ~1-2s of browser launch overhead.
+
 Usage:
     python -m vagen.envs.webarena.remote_browser_server --port 5100 --max-sessions 32
 """
@@ -19,9 +23,10 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from flask import Flask, jsonify, request, abort
+from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page, CDPSession
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -29,12 +34,110 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 
+# ── Browser pool ──────────────────────────────────────────────────
+
+class BrowserPool:
+    """Pool of reusable Chromium browser instances.
+
+    Each browser process can host multiple contexts (sessions).
+    This avoids the ~1-2s cost of launching a new Chromium per reset.
+    """
+
+    def __init__(self, pool_size: int = 4):
+        self.pool_size = pool_size
+        self._lock = threading.Lock()
+        # Each entry: (context_manager, playwright, browser, active_session_count)
+        self._browsers: List[Dict[str, Any]] = []
+        self._initialized = False
+
+    def initialize(self):
+        """Pre-launch browser processes."""
+        with self._lock:
+            if self._initialized:
+                return
+            logger.info("Initializing browser pool with %d browsers...", self.pool_size)
+            for i in range(self.pool_size):
+                entry = self._launch_browser()
+                self._browsers.append(entry)
+                logger.info("  Browser %d/%d launched (pid=%s)",
+                            i + 1, self.pool_size,
+                            entry["browser"].contexts.__class__.__name__)
+            self._initialized = True
+            logger.info("Browser pool ready.")
+
+    def _launch_browser(self) -> Dict[str, Any]:
+        cm = sync_playwright()
+        pw = cm.__enter__()
+        browser = pw.chromium.launch(
+            headless=True,
+            args=["--blink-settings=imagesEnabled=false"],
+        )
+        return {
+            "context_manager": cm,
+            "playwright": pw,
+            "browser": browser,
+            "session_count": 0,
+        }
+
+    def acquire(self) -> Tuple[Browser, int]:
+        """Get the least-loaded browser. Returns (browser, pool_index)."""
+        with self._lock:
+            if not self._initialized:
+                self.initialize()
+
+            # Find browser with fewest active sessions
+            min_idx = min(range(len(self._browsers)),
+                          key=lambda i: self._browsers[i]["session_count"])
+            entry = self._browsers[min_idx]
+
+            # Check if browser is still alive, relaunch if needed
+            try:
+                _ = entry["browser"].contexts  # probe
+            except Exception:
+                logger.warning("Browser %d is dead, relaunching...", min_idx)
+                self._close_browser(entry)
+                entry = self._launch_browser()
+                self._browsers[min_idx] = entry
+
+            entry["session_count"] += 1
+            return entry["browser"], min_idx
+
+    def release(self, pool_index: int):
+        """Decrement session count for a browser."""
+        with self._lock:
+            if 0 <= pool_index < len(self._browsers):
+                self._browsers[pool_index]["session_count"] = max(
+                    0, self._browsers[pool_index]["session_count"] - 1
+                )
+
+    def _close_browser(self, entry: Dict[str, Any]):
+        try:
+            entry["browser"].close()
+        except Exception:
+            pass
+        try:
+            entry["context_manager"].__exit__(None, None, None)
+        except Exception:
+            pass
+
+    def close_all(self):
+        with self._lock:
+            for entry in self._browsers:
+                self._close_browser(entry)
+            self._browsers.clear()
+            self._initialized = False
+
+
 # ── Session management ─────────────────────────────────────────────
 
 @dataclass
 class BrowserSession:
     session_id: str
-    browser_env: Any  # ScriptBrowserEnv
+    pool_index: int           # which browser in the pool
+    context: BrowserContext
+    page: Page
+    client: CDPSession
+    observation_handler: Any  # ObservationHandler
     config: dict
     created_at: float = field(default_factory=time.time)
     last_used: float = field(default_factory=time.time)
@@ -43,12 +146,14 @@ class BrowserSession:
 
 
 class SessionManager:
-    def __init__(self, max_sessions: int = 32, session_timeout: float = 600.0):
+    def __init__(self, max_sessions: int = 32, session_timeout: float = 600.0,
+                 browser_pool_size: int = 4):
         self.sessions: Dict[str, BrowserSession] = {}
         self.max_sessions = max_sessions
         self.session_timeout = session_timeout
         self._lock = threading.Lock()
-        self._reset_semaphore = threading.Semaphore(4)  # Max 4 concurrent resets
+        self._reset_semaphore = threading.Semaphore(8)  # Max concurrent resets
+        self.browser_pool = BrowserPool(pool_size=browser_pool_size)
 
     def create_session(
         self,
@@ -69,43 +174,86 @@ class SessionManager:
         with self._reset_semaphore:
             session_id = str(uuid.uuid4())[:8]
 
-            # Write config to temp file (ScriptBrowserEnv expects file path)
-            config_dir = tempfile.mkdtemp(prefix="webarena_remote_")
-            config_path = os.path.join(config_dir, "config.json")
-
-            # Handle storage_state
+            # Handle storage_state: write to temp file if provided as dict
+            storage_state_path = None
+            tmp_dir = None
             if storage_state:
-                state_path = os.path.join(config_dir, "storage_state.json")
-                with open(state_path, "w") as f:
+                tmp_dir = tempfile.mkdtemp(prefix="webarena_remote_")
+                storage_state_path = os.path.join(tmp_dir, "storage_state.json")
+                with open(storage_state_path, "w") as f:
                     json.dump(storage_state, f)
-                config["storage_state"] = state_path
             elif "storage_state" in config:
-                ss = config["storage_state"]
+                ss = config.get("storage_state")
                 if ss and not os.path.isabs(ss):
                     webarena_root = os.environ.get("WEBARENA_ROOT", "")
                     if webarena_root:
-                        config["storage_state"] = os.path.join(webarena_root, ss)
+                        storage_state_path = os.path.join(webarena_root, ss)
+                elif ss:
+                    storage_state_path = ss
 
-            with open(config_path, "w") as f:
-                json.dump(config, f)
+            # Acquire a browser from the pool (no launch cost!)
+            browser, pool_index = self.browser_pool.acquire()
 
-            # Create and reset ScriptBrowserEnv
-            from vagen.envs.webarena.browser_env.envs import ScriptBrowserEnv
+            # Create context + page on the existing browser
+            geolocation = config.get("geolocation", None)
+            viewport = {"width": viewport_width, "height": viewport_height}
 
-            browser_env = ScriptBrowserEnv(
-                headless=True,
-                observation_type=observation_type,
-                current_viewport_only=current_viewport_only,
-                viewport_size={"width": viewport_width, "height": viewport_height},
+            context = browser.new_context(
+                viewport=viewport,
+                storage_state=storage_state_path,
+                geolocation=geolocation,
+                device_scale_factor=1,
             )
 
-            obs, info = browser_env.reset(options={"config_file": config_path})
+            # Clean up temp storage_state file
+            if tmp_dir:
+                try:
+                    os.unlink(storage_state_path)
+                    os.rmdir(tmp_dir)
+                except OSError:
+                    pass
 
+            # Create observation handler
+            from vagen.envs.webarena.browser_env.processors import ObservationHandler
+            obs_handler = ObservationHandler(
+                "text", observation_type, "",
+                current_viewport_only=current_viewport_only,
+                viewport_size=viewport,
+            )
+
+            # Navigate to start URL(s)
+            start_url = config.get("start_url", None)
+            if start_url:
+                start_urls = start_url.split(" |AND| ")
+                for url in start_urls:
+                    page = context.new_page()
+                    client = page.context.new_cdp_session(page)
+                    if observation_type == "accessibility_tree":
+                        client.send("Accessibility.enable")
+                    page.client = client  # type: ignore
+                    page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                active_page = context.pages[0]
+                active_page.bring_to_front()
+            else:
+                active_page = context.new_page()
+                client = active_page.context.new_cdp_session(active_page)
+                if observation_type == "accessibility_tree":
+                    client.send("Accessibility.enable")
+                active_page.client = client  # type: ignore
+
+            active_client = active_page.client  # type: ignore
+
+            # Get initial observation
+            obs = obs_handler.get_observation(active_page, active_client)
             obs_text = obs.get("text", str(obs)) if isinstance(obs, dict) else str(obs)
 
             session = BrowserSession(
                 session_id=session_id,
-                browser_env=browser_env,
+                pool_index=pool_index,
+                context=context,
+                page=active_page,
+                client=active_client,
+                observation_handler=obs_handler,
                 config=config,
                 observation_type=observation_type,
                 prev_obs_text=obs_text,
@@ -113,13 +261,6 @@ class SessionManager:
 
             with self._lock:
                 self.sessions[session_id] = session
-
-            # Clean up temp config
-            try:
-                os.unlink(config_path)
-                os.rmdir(config_dir)
-            except OSError:
-                pass
 
             return session
 
@@ -138,9 +279,14 @@ class SessionManager:
         session = self.sessions.pop(session_id, None)
         if session:
             try:
-                session.browser_env.close()
+                session.client.detach()
             except Exception:
                 pass
+            try:
+                session.context.close()
+            except Exception:
+                pass
+            self.browser_pool.release(session.pool_index)
 
     def cleanup_expired(self):
         now = time.time()
@@ -157,6 +303,7 @@ class SessionManager:
         with self._lock:
             for sid in list(self.sessions):
                 self._close_session(sid)
+        self.browser_pool.close_all()
 
 
 session_manager = SessionManager()
@@ -198,11 +345,12 @@ def reset():
         return jsonify({"error": str(e)}), 500
 
     elapsed = time.time() - t0
-    logger.info("reset session=%s in %.1fs", session.session_id, elapsed)
+    logger.info("reset session=%s in %.1fs (pool_idx=%d)",
+                session.session_id, elapsed, session.pool_index)
 
     url = ""
     try:
-        url = session.browser_env.page.url
+        url = session.page.url
     except Exception:
         pass
 
@@ -222,40 +370,51 @@ def step(session_id):
     t0 = time.time()
 
     from vagen.envs.webarena.browser_env import create_id_based_action
+    from vagen.envs.webarena.browser_env.actions import execute_action
 
+    obs_text = ""
+    fail_error = ""
     try:
         action = create_id_based_action(action_str)
-        obs, reward, terminated, truncated, info = session.browser_env.step(action)
+        session.page = execute_action(
+            action,
+            session.page,
+            session.context,
+            session.observation_handler.action_processor,
+        )
+        # Update CDP client if page changed (e.g. new_tab, tab_focus)
+        if not hasattr(session.page, 'client') or session.page.client is None:
+            client = session.page.context.new_cdp_session(session.page)
+            if session.observation_type == "accessibility_tree":
+                client.send("Accessibility.enable")
+            session.page.client = client  # type: ignore
+            session.client = client
     except Exception as e:
-        obs = {"text": f"Action failed: {e}"}
-        reward = 0.0
-        terminated = False
-        info = {"fail_error": str(e)}
+        fail_error = str(e)
 
-    obs_text = obs.get("text", str(obs)) if isinstance(obs, dict) else str(obs)
+    # Get observation
+    try:
+        obs = session.observation_handler.get_observation(session.page, session.client)
+        obs_text = obs.get("text", str(obs)) if isinstance(obs, dict) else str(obs)
+    except Exception as e:
+        obs_text = f"Observation failed: {e}"
+
     obs_changed = obs_text != session.prev_obs_text
     session.prev_obs_text = obs_text
 
     elapsed = time.time() - t0
 
-    # Serialize info (remove non-serializable objects)
-    clean_info = {"step_time": elapsed, "obs_changed": obs_changed}
-    for k, v in info.items():
-        if k == "page":
-            clean_info["url"] = v.url if hasattr(v, "url") else str(v)
-        elif k == "observation_metadata":
-            continue
-        else:
-            try:
-                json.dumps(v)
-                clean_info[k] = v
-            except (TypeError, ValueError):
-                clean_info[k] = str(v)
+    clean_info = {
+        "step_time": elapsed,
+        "obs_changed": obs_changed,
+        "fail_error": fail_error,
+        "url": session.page.url if session.page else "",
+    }
 
     return jsonify({
         "observation": obs_text,
-        "reward": reward,
-        "done": terminated,
+        "reward": 0.0 if fail_error else 1.0,
+        "done": False,
         "info": clean_info,
     })
 
@@ -277,7 +436,7 @@ def evaluate(session_id):
         last_action = {"answer": req.get("answer", "")}
         trajectory = [last_action]
 
-        page = session.browser_env.page
+        page = session.page
         client = page.context.new_cdp_session(page)
         try:
             score = evaluator(
@@ -309,9 +468,16 @@ def close(session_id):
 
 @app.route("/health", methods=["GET"])
 def health():
+    pool_info = []
+    for i, entry in enumerate(session_manager.browser_pool._browsers):
+        pool_info.append({
+            "index": i,
+            "active_sessions": entry["session_count"],
+        })
     return jsonify({
         "status": "ok",
         "active_sessions": len(session_manager.sessions),
+        "browser_pool": pool_info,
     })
 
 
@@ -321,6 +487,7 @@ def stats():
     for sid, s in session_manager.sessions.items():
         sessions_info.append({
             "session_id": sid,
+            "pool_index": s.pool_index,
             "age_s": round(time.time() - s.created_at, 1),
             "idle_s": round(time.time() - s.last_used, 1),
         })
@@ -337,16 +504,24 @@ def main():
     parser.add_argument("--host", type=str, default="0.0.0.0")
     parser.add_argument("--max-sessions", type=int, default=32)
     parser.add_argument("--session-timeout", type=float, default=600.0)
+    parser.add_argument("--browser-pool-size", type=int, default=4,
+                        help="Number of Chromium processes to keep alive (default: 4)")
     parser.add_argument("--threaded", action="store_true", default=True,
                         help="Handle requests in threads (default: True)")
     args = parser.parse_args()
 
     session_manager.max_sessions = args.max_sessions
     session_manager.session_timeout = args.session_timeout
+    session_manager.browser_pool = BrowserPool(pool_size=args.browser_pool_size)
+
+    # Pre-launch browsers before accepting requests
+    session_manager.browser_pool.initialize()
 
     logger.info(
-        "Starting WebArena Remote Browser Server on %s:%d (max_sessions=%d, threaded=%s)",
-        args.host, args.port, args.max_sessions, args.threaded,
+        "Starting WebArena Remote Browser Server on %s:%d "
+        "(max_sessions=%d, browser_pool=%d, threaded=%s)",
+        args.host, args.port, args.max_sessions,
+        args.browser_pool_size, args.threaded,
     )
     app.run(host=args.host, port=args.port, threaded=args.threaded)
 
