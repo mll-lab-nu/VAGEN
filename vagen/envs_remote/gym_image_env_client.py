@@ -68,7 +68,10 @@ class GymImageEnvClient(GymImageEnv):
 
         Args:
             env_config: Configuration dict with keys:
-                - base_urls (str | List[str]): Server URL(s)
+                - base_urls (str | List[str]): Server URL(s). If not provided,
+                  URLs are loaded from url_file.
+                - url_file (str): Path to a text file with one URL per line.
+                  Default: /root/projects/viewsuite/client_url.txt
                 - timeout (float): Request timeout in seconds (default: 120.0)
                 - retries (int): Number of retries (default: 8)
                 - backoff (float): Backoff multiplier (default: 2.0)
@@ -79,11 +82,13 @@ class GymImageEnvClient(GymImageEnv):
         """
         super().__init__(env_config)
 
-        # Extract client config
-        base_urls = env_config.get("base_urls", "http://localhost:8000")
-        if isinstance(base_urls, str):
-            base_urls = [base_urls]
-        self.base_urls: List[str] = base_urls
+        # Extract client config — resolve URLs
+        raw_urls = env_config.get("base_urls",None)
+        if not raw_urls:
+            url_file = env_config.get("url_file", "/root/projects/viewsuite/client_url.txt")
+            with open(url_file) as f:
+                raw_urls = f.read()
+        self.base_urls: List[str] = self._parse_urls(raw_urls)
 
         self.timeout = float(env_config.get("timeout", 120.0))
         self.retries = int(env_config.get("retries", 8))
@@ -106,6 +111,7 @@ class GymImageEnvClient(GymImageEnv):
             if k
             not in {
                 "base_urls",
+                "url_file",
                 "timeout",
                 "retries",
                 "backoff",
@@ -116,6 +122,16 @@ class GymImageEnvClient(GymImageEnv):
                 "failover_after_failures",
             }
         }
+
+    @staticmethod
+    def _parse_urls(raw: Any) -> List[str]:
+        """Parse URLs from a string (';' or newline separated) or list."""
+        if isinstance(raw, list):
+            return [u.strip() for u in raw if isinstance(u, str) and u.strip()]
+        if isinstance(raw, str):
+            parts = raw.replace(";", "\n").split("\n")
+            return [p.strip() for p in parts if p.strip() and not p.strip().startswith("#")]
+        raise ValueError(f"Cannot parse URLs from {type(raw).__name__}: {raw!r}")
 
     async def _ensure_client(self):
         """Ensure HTTP client is initialized."""
@@ -129,15 +145,15 @@ class GymImageEnvClient(GymImageEnv):
         """
         Ensure session is established (called by reset only).
 
-        On first reset: Establishes connection, passes seed, and gets reset result.
+        On first reset: Establishes connection, passes seed to server so that
+        connect + reset happen in a single round-trip.
         On subsequent resets: Returns None (caller should call reset normally).
 
         Args:
-            seed: Reset seed (passed to server on first reset only)
+            seed: Reset seed (passed to server on first connect only)
 
         Returns:
-            (obs, info) if this is first reset and server returns reset result
-            None otherwise
+            (obs, info) if first connect performed reset, None otherwise
         """
         if self._session_id is None:
             return await self._connect(seed=seed)
@@ -375,14 +391,17 @@ class GymImageEnvClient(GymImageEnv):
         """
         Reset remote environment.
 
-        On first call: Establishes connection with server and obtains session_id.
-        On subsequent calls: Uses existing session_id.
-
-        This is where the session is created and locked to a specific server URL.
+        Typical lifecycle: one client instance = one session = one episode.
+        The first reset() establishes the connection AND resets in a single
+        round-trip via /connect?seed=...
         """
-        # Establish connection on first reset
-        await self._ensure_connected_for_reset()
+        # First reset: connect + reset in one round-trip (the normal path)
+        first_result = await self._ensure_connected_for_reset(seed)
+        if first_result is not None:
+            return first_result
 
+        # Defensive: if someone calls reset() again without close(),
+        # fall back to a separate /call reset.
         data, images = await self._call("reset", params={"seed": seed})
 
         obs = {"obs_str": data.get("obs", "")}
