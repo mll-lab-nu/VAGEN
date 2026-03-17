@@ -50,6 +50,7 @@ Start the server, then run training:
 python -m vagen.envs.navigation.serve
 
 # Terminal 2: run training
+cd VAGEN
 bash examples/train/navigation/train_grpo_qwen25vl3b.sh
 ```
 
