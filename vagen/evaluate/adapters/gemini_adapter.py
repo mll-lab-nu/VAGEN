@@ -4,8 +4,10 @@ import asyncio
 from PIL import Image
 from vagen.evaluate.adapters.base_adapter import ModelAdapter
 from vagen.evaluate.utils.mm_utils import pil_to_dataurl_png, compile_text_images_for_order, parse_data_url
+from vagen.evaluate.registry import register_adapter
 
 
+@register_adapter("gemini")
 class GeminiAdapter(ModelAdapter):
     def __init__(self, client, model: str):
         self.client = client

@@ -4,8 +4,10 @@ from typing import Any, Dict, List, Tuple
 from vagen.evaluate.adapters.base_adapter import ModelAdapter
 from vagen.evaluate.utils.mm_utils import pil_to_dataurl_png, compile_text_images_for_order, parse_data_url
 from vagen.evaluate.utils.adapter_utils import filter_chat_kwargs
+from vagen.evaluate.registry import register_adapter
 from PIL import Image
 
+@register_adapter("claude")
 class ClaudeAdapter(ModelAdapter):
     """
     Anthropic Claude Messages API adapter.

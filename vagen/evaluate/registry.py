@@ -10,6 +10,7 @@ class _Registry:
         self._clients: Dict[str, ClientFactory] = {}
         self._adapters: Dict[str, AdapterFactory] = {}
 
+    # --- imperative registration (still available) ---
     def register_client(self, backend: str, factory: ClientFactory) -> None:
         self._clients[backend.lower()] = factory
 
@@ -29,3 +30,22 @@ class _Registry:
         return self._adapters[b](**kwargs)
 
 REGISTRY = _Registry()
+
+
+# --- decorator-based registration ---
+def register_client(*names: str):
+    """Decorator to register a client factory function for one or more backend names."""
+    def decorator(fn: ClientFactory) -> ClientFactory:
+        for name in names:
+            REGISTRY.register_client(name, fn)
+        return fn
+    return decorator
+
+
+def register_adapter(*names: str):
+    """Decorator to register an adapter class for one or more backend names."""
+    def decorator(cls: AdapterFactory) -> AdapterFactory:
+        for name in names:
+            REGISTRY.register_adapter(name, lambda cls=cls, **kw: cls(**kw))
+        return cls
+    return decorator

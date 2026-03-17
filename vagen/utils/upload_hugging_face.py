@@ -1,8 +1,24 @@
 import os
-from typing import Optional
+from typing import List, Optional
 
 import ray
 from omegaconf import OmegaConf
+
+
+# Mapping from upload_contents names to file glob patterns within the actor/ directory
+_CONTENT_TO_PATTERNS = {
+    "model": ["model_world_size_*.pt"],
+    "optimizer": ["optim_world_size_*.pt"],
+    "extra": ["extra_state_world_size_*.pt"],
+    "hf_model": ["huggingface/**"],
+}
+
+# Files always included when uploading (metadata needed for checkpoint loading)
+_ALWAYS_INCLUDE_PATTERNS = ["fsdp_config.json", "huggingface/*.json", "huggingface/tokenizer*",
+                            "huggingface/special_tokens*", "huggingface/added_tokens*",
+                            "huggingface/preprocessor_config*", "huggingface/chat_template*"]
+
+VALID_UPLOAD_CONTENTS = set(_CONTENT_TO_PATTERNS.keys())
 
 
 @ray.remote(num_cpus=1)
@@ -37,8 +53,15 @@ class HFUploadActor:
         )
         print(f"[HFUpload] Initialized upload actor for repo: {self.repo_id}")
 
-    def upload(self, local_path: str, global_step: int, path_in_repo: str = ""):
+    def upload(self, local_path: str, global_step: int, path_in_repo: str = "",
+               allow_patterns: Optional[List[str]] = None):
         """Upload a local folder to HuggingFace Hub.
+
+        Args:
+            local_path: Local directory to upload.
+            global_step: Current training step.
+            path_in_repo: Target path in the HF repo.
+            allow_patterns: If set, only files matching these glob patterns are uploaded.
 
         Returns:
             global_step on success, None on failure.
@@ -48,9 +71,9 @@ class HFUploadActor:
             return None
 
         commit_message = (
-            f"Upload model at global_step_{global_step} ({path_in_repo})"
+            f"Upload checkpoint at global_step_{global_step} ({path_in_repo})"
             if path_in_repo
-            else f"Upload model at global_step_{global_step}"
+            else f"Upload checkpoint at global_step_{global_step}"
         )
         try:
             self.api.upload_folder(
@@ -59,6 +82,7 @@ class HFUploadActor:
                 path_in_repo=path_in_repo,
                 commit_message=commit_message,
                 repo_type="model",
+                allow_patterns=allow_patterns,
             )
             print(f"[HFUpload] Successfully uploaded {local_path} to {self.repo_id} at step {global_step}")
             return global_step
@@ -91,8 +115,44 @@ class HFUploadManager:
         self._project_name: str = config.trainer.get("project_name", "default_project")
         self._experiment_name: str = config.trainer.get("experiment_name", "default_experiment")
 
+        # upload_contents: which checkpoint components to upload
+        self._upload_contents: Optional[List[str]] = hf_hub_cfg.get("upload_contents", None)
+        self._allow_patterns: Optional[List[str]] = None
+
         if not self._hf_save_freq:
             return
+
+        # Validate upload_contents
+        if self._upload_contents is not None:
+            if not isinstance(self._upload_contents, list) or not all(
+                isinstance(x, str) for x in self._upload_contents
+            ):
+                raise ValueError("upload_contents must be a list of strings.")
+
+            invalid = set(self._upload_contents) - VALID_UPLOAD_CONTENTS
+            if invalid:
+                raise ValueError(
+                    f"Invalid upload_contents: {invalid}. "
+                    f"Valid values are: {VALID_UPLOAD_CONTENTS}"
+                )
+
+            # Validate upload_contents is a subset of save_contents
+            save_contents = list(
+                config.actor_rollout_ref.actor.checkpoint.get("save_contents", None) or []
+            )
+            if save_contents:
+                not_saved = set(self._upload_contents) - set(save_contents)
+                if not_saved:
+                    raise ValueError(
+                        f"upload_contents {not_saved} are not in actor save_contents {save_contents}. "
+                        f"upload_contents must be a subset of save_contents."
+                    )
+
+            # Build allow_patterns from upload_contents
+            patterns = list(_ALWAYS_INCLUDE_PATTERNS)  # always include metadata
+            for content in self._upload_contents:
+                patterns.extend(_CONTENT_TO_PATTERNS[content])
+            self._allow_patterns = patterns
 
         save_freq = config.trainer.save_freq
         if save_freq <= 0:
@@ -104,8 +164,9 @@ class HFUploadManager:
                 f"hf_save_freq ({self._hf_save_freq}) must be a multiple of save_freq ({save_freq})."
             )
 
-        # Remove hf_save_freq from the dict before passing to HFUploadActor
-        actor_kwargs = {k: v for k, v in hf_hub_cfg.items() if k != "hf_save_freq"}
+        # Remove non-actor kwargs before passing to HFUploadActor
+        actor_kwargs = {k: v for k, v in hf_hub_cfg.items()
+                        if k not in ("hf_save_freq", "upload_contents")}
         if actor_kwargs.get("repo_id"):
             self._actor = HFUploadActor.remote(**actor_kwargs)
         else:
@@ -125,17 +186,17 @@ class HFUploadManager:
 
         self.flush()
 
+        # Upload the entire actor/ directory (filtered by allow_patterns)
         local_path = os.path.join(
             self._default_local_dir,
             f"global_step_{global_steps}",
             "actor",
-            "huggingface",
         )
 
         if not os.path.exists(local_path):
             print(
                 f"[HFUpload] Warning: {local_path} does not exist at step {global_steps}. "
-                f"Make sure hf_save_freq aligns with save_freq and the checkpoint saves hf_model."
+                f"Make sure hf_save_freq aligns with save_freq."
             )
             return
 
@@ -144,8 +205,11 @@ class HFUploadManager:
             local_path=local_path,
             global_step=global_steps,
             path_in_repo=path_in_repo,
+            allow_patterns=self._allow_patterns,
         )
-        print(f"[HFUpload] Started async upload for step {global_steps} to {path_in_repo}")
+        contents_desc = self._upload_contents or "all"
+        print(f"[HFUpload] Started async upload for step {global_steps} to {path_in_repo} "
+              f"(contents: {contents_desc})")
 
     def flush(self):
         """Block until any pending upload finishes."""
