@@ -145,9 +145,9 @@ class BrowserPool:
 class BrowserSession:
     session_id: str
     pool_index: int           # which browser in the pool
-    context: BrowserContext
-    page: Page
-    client: CDPSession
+    context: Any              # BrowserContext
+    page: Any                 # Page
+    client: Any               # CDPSession
     observation_handler: Any  # ObservationHandler
     config: dict
     created_at: float = field(default_factory=time.time)
