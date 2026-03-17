@@ -50,55 +50,58 @@ class BrowserPool:
     def __init__(self, pool_size: int = 4):
         self.pool_size = pool_size
         self._lock = threading.Lock()
+        # Each entry: {context_manager, playwright, browser, session_count, executor}
+        # Each browser has its own single-thread executor (its "home thread")
+        # so all Playwright calls for that browser run on the same thread.
         self._browsers: List[Dict[str, Any]] = []
         self._initialized = False
-        # Dedicated thread pool for Playwright sync API calls.
-        # Multiple workers are needed for concurrent reset/step requests.
-        # Each worker thread gets its own "clean" context without asyncio loop.
-        self._pw_executor = concurrent.futures.ThreadPoolExecutor(
-            max_workers=pool_size * 2, thread_name_prefix="playwright-pool"
-        )
 
-    def _run_in_pw_thread(self, fn, *args, **kwargs):
-        """Run a function in the dedicated Playwright thread."""
-        future = self._pw_executor.submit(fn, *args, **kwargs)
-        return future.result(timeout=120)
+    def _run_on_browser(self, pool_index: int, fn, *args, timeout: float = 120, **kwargs):
+        """Run fn in the browser's dedicated thread."""
+        executor = self._browsers[pool_index]["executor"]
+        future = executor.submit(fn, *args, **kwargs)
+        return future.result(timeout=timeout)
 
     def initialize(self):
-        """Pre-launch browser processes in the dedicated thread."""
+        """Pre-launch browser processes, each in its own thread."""
         with self._lock:
             if self._initialized:
                 return
+            self._initialized = True
 
-        def _do_init():
-            from playwright.sync_api import sync_playwright
-            logger.info("Initializing browser pool with %d browsers...", self.pool_size)
-            for i in range(self.pool_size):
-                entry = self._do_launch_browser()
-                with self._lock:
-                    self._browsers.append(entry)
-                logger.info("  Browser %d/%d launched", i + 1, self.pool_size)
+        logger.info("Initializing browser pool with %d browsers...", self.pool_size)
+        for i in range(self.pool_size):
+            # Each browser gets its own thread — Playwright sync API
+            # creates an asyncio loop per thread, so they won't conflict.
+            executor = concurrent.futures.ThreadPoolExecutor(
+                max_workers=1, thread_name_prefix=f"pw-browser-{i}"
+            )
+
+            def _launch():
+                from playwright.sync_api import sync_playwright
+                cm = sync_playwright()
+                pw = cm.__enter__()
+                browser = pw.chromium.launch(
+                    headless=True,
+                    args=["--blink-settings=imagesEnabled=false"],
+                )
+                return cm, pw, browser
+
+            future = executor.submit(_launch)
+            cm, pw, browser = future.result(timeout=60)
+
+            entry = {
+                "context_manager": cm,
+                "playwright": pw,
+                "browser": browser,
+                "session_count": 0,
+                "executor": executor,
+            }
             with self._lock:
-                self._initialized = True
-            logger.info("Browser pool ready.")
+                self._browsers.append(entry)
+            logger.info("  Browser %d/%d launched", i + 1, self.pool_size)
 
-        self._run_in_pw_thread(_do_init)
-
-    def _do_launch_browser(self) -> Dict[str, Any]:
-        """Must be called from the Playwright thread."""
-        from playwright.sync_api import sync_playwright
-        cm = sync_playwright()
-        pw = cm.__enter__()
-        browser = pw.chromium.launch(
-            headless=True,
-            args=["--blink-settings=imagesEnabled=false"],
-        )
-        return {
-            "context_manager": cm,
-            "playwright": pw,
-            "browser": browser,
-            "session_count": 0,
-        }
+        logger.info("Browser pool ready.")
 
     def acquire(self) -> Tuple[Any, int]:
         """Get the least-loaded browser. Returns (browser, pool_index)."""
@@ -129,6 +132,10 @@ class BrowserPool:
             entry["context_manager"].__exit__(None, None, None)
         except Exception:
             pass
+        try:
+            entry["executor"].shutdown(wait=False)
+        except Exception:
+            pass
 
     def close_all(self):
         with self._lock:
@@ -136,7 +143,6 @@ class BrowserPool:
                 self._close_browser(entry)
             self._browsers.clear()
             self._initialized = False
-        self._pw_executor.shutdown(wait=False)
 
 
 # ── Session management ─────────────────────────────────────────────
@@ -254,7 +260,7 @@ class SessionManager:
                 return context, active_page, active_client, obs_handler, obs_text
 
             context, active_page, active_client, obs_handler, obs_text = \
-                self.browser_pool._run_in_pw_thread(_do_create)
+                self.browser_pool._run_on_browser(pool_index, _do_create)
 
             # Clean up temp storage_state file
             if tmp_dir:
@@ -305,7 +311,7 @@ class SessionManager:
                 except Exception:
                     pass
             try:
-                self.browser_pool._run_in_pw_thread(_do_close)
+                self.browser_pool._run_on_browser(session.pool_index, _do_close)
             except Exception:
                 pass
             self.browser_pool.release(session.pool_index)
@@ -430,7 +436,9 @@ def step(session_id):
 
         return _obs_text, _fail_error, _url
 
-    obs_text, fail_error, url = session_manager.browser_pool._run_in_pw_thread(_do_step)
+    obs_text, fail_error, url = session_manager.browser_pool._run_on_browser(
+        session.pool_index, _do_step
+    )
 
     obs_changed = obs_text != session.prev_obs_text
     session.prev_obs_text = obs_text
@@ -484,7 +492,7 @@ def evaluate(session_id):
             logger.error("Evaluation failed: %s", e)
             return 0.0
 
-    score = session_manager.browser_pool._run_in_pw_thread(_do_eval)
+    score = session_manager.browser_pool._run_on_browser(session.pool_index, _do_eval)
 
     try:
         os.unlink(config_path)
