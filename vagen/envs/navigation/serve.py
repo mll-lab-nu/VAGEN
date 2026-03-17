@@ -68,14 +68,20 @@ def main(
     if devices is None:
         devices = _detect_gpus()
 
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.set_default_executor(concurrent.futures.ThreadPoolExecutor(max_workers=thread_pool_size))
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=thread_pool_size)
 
     LOGGER.info(f"GPUs: {devices} | max_envs: {max_envs} | threads: {thread_pool_size}")
 
     handler = NavigationHandler(devices=devices, session_timeout=session_timeout, max_envs=max_envs)
     app = GymService(handler, max_inflight=max_inflight, api_key=api_key).build()
+
+    @app.on_event("startup")
+    async def _configure_executor():
+        asyncio.get_running_loop().set_default_executor(executor)
+
+    @app.on_event("shutdown")
+    def _shutdown_executor():
+        executor.shutdown(wait=True)
 
     uvicorn.run(app, host=host, port=port, workers=workers)
 
