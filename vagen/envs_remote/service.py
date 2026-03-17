@@ -9,6 +9,10 @@ It only handles:
 - Forwarding to handler
 
 All business logic is delegated to the handler.
+
+Customization:
+    Subclass GymService and override individual methods to customize
+    authentication, admission control, error handling, or add endpoints.
 """
 
 from __future__ import annotations
@@ -17,201 +21,186 @@ import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, File, Form, UploadFile, Request, HTTPException
 from fastapi.responses import Response
 
 from .handler import BaseGymHandler
-from .multipart_codec import encode_multipart, parse_data_field, read_images, decode_multipart
+from .multipart_codec import encode_multipart, parse_data_field, read_images
 
 LOGGER = logging.getLogger(__name__)
 
-# ----------------------------
-# Config (env-driven)
-# ----------------------------
-API_KEY = os.getenv("GYM_API_KEY", "")  # Empty => no auth
-MAX_INFLIGHT = int(os.getenv("GYM_MAX_INFLIGHT", "0"))  # 0 => unlimited
-ADMIT_TIMEOUT = float(os.getenv("GYM_ADMIT_TIMEOUT", "5.0"))
 
-IMAGE_FORMAT = os.getenv("GYM_IMAGE_FORMAT", "PNG")
-IMAGE_MIME = os.getenv("GYM_IMAGE_MIME", "image/png")
-
-# Global concurrency limiter (optional)
-_sem = asyncio.Semaphore(MAX_INFLIGHT) if MAX_INFLIGHT > 0 else None
-
-
-def _auth(request: Request) -> None:
+class GymService:
     """
-    Optional API key authentication.
+    Generic HTTP service for remote gym environments.
 
-    Accepts:
-      - Query param: ?token=...
-      - Header: X-API-Key: ...
-    """
-    if not API_KEY:
-        return
-    token = request.query_params.get("token") or request.headers.get("x-api-key")
-    if token != API_KEY:
-        raise HTTPException(status_code=401, detail="unauthorized")
+    Wraps a BaseGymHandler with FastAPI routing, authentication,
+    and concurrency control.
 
-
-def build_gym_service(handler: BaseGymHandler) -> FastAPI:
-    """
-    Build a generic gym environment service.
-
-    This function creates a FastAPI app that routes requests to the provided handler.
-    The service is completely reusable - just provide a different handler for
-    different environments.
-
-    Args:
-        handler: Handler instance that implements environment logic
-
-    Returns:
-        FastAPI application ready to serve
+    Subclass to customize:
+    - authenticate(): change auth mechanism
+    - acquire() / release(): change admission / concurrency control
+    - handle_connect_error() / handle_call_error(): change error mapping
+    - register_routes(): add or replace endpoints
 
     Usage:
-        >>> handler = MyGymHandler()
-        >>> app = build_gym_service(handler)
-        >>> # Run with: uvicorn mymodule:app --host 0.0.0.0 --port 8000
+        # Basic
+        app = GymService(MyHandler()).build()
+        # uvicorn mymodule:app --host 0.0.0.0 --port 8000
+
+        # With options
+        app = GymService(MyHandler(), max_inflight=10, api_key="secret").build()
+
+        # Subclass for custom behavior
+        class MyService(GymService):
+            def authenticate(self, request): ...
+            def register_routes(self, app):
+                super().register_routes(app)
+                app.add_api_route("/gpu-status", self.gpu_status, methods=["GET"])
+        app = MyService(MyHandler()).build()
     """
 
-    @asynccontextmanager
-    async def lifespan(app: FastAPI):
+    def __init__(
+        self,
+        handler: BaseGymHandler,
+        max_inflight: int = 0,
+        admit_timeout: float = 5.0,
+        api_key: str = "",
+        image_format: str = "PNG",
+        image_mime: str = "image/png",
+    ):
+        self.handler = handler
+        self.max_inflight = max_inflight
+        self.admit_timeout = admit_timeout
+        self.api_key = api_key or os.getenv("GYM_API_KEY", "")
+        self.image_format = image_format
+        self.image_mime = image_mime
+        self._sem: Optional[asyncio.Semaphore] = (
+            asyncio.Semaphore(max_inflight) if max_inflight > 0 else None
+        )
+
+    # ------------------------------------------------------------------
+    # Overridable hooks
+    # ------------------------------------------------------------------
+
+    def authenticate(self, request: Request) -> None:
+        """
+        Authenticate a request. Override for custom auth.
+
+        Raises HTTPException(401) on failure.
+        Default: checks GYM_API_KEY env var or api_key constructor arg.
+        """
+        if not self.api_key:
+            return
+        token = request.query_params.get("token") or request.headers.get("x-api-key")
+        if token != self.api_key:
+            raise HTTPException(status_code=401, detail="unauthorized")
+
+    async def acquire(self) -> bool:
+        """
+        Acquire admission slot. Returns True if a slot was acquired
+        (and must be released later), False if no semaphore is configured.
+
+        Override to implement custom admission control (e.g., GPU capacity queues).
+        """
+        if self._sem is None:
+            return False
         try:
-            yield
-        finally:
-            await handler.aclose()
+            await asyncio.wait_for(self._sem.acquire(), timeout=self.admit_timeout)
+            return True
+        except asyncio.TimeoutError:
+            raise HTTPException(status_code=503, detail="server busy")
 
-    app = FastAPI(
-        title="Gym Environment Service",
-        description="Generic HTTP service for remote gym environments",
-        lifespan=lifespan,
-    )
-    app.state.handler = handler
+    def release(self) -> None:
+        """Release admission slot. Override if acquire() is overridden."""
+        if self._sem is not None:
+            self._sem.release()
 
-    @app.get("/health")
-    async def health():
+    def handle_connect_error(self, e: Exception) -> None:
+        """Map connect exceptions to HTTP errors. Override to customize."""
+        if isinstance(e, RuntimeError) and "Max sessions limit reached" in str(e):
+            LOGGER.warning(f"[Service] Connect rejected: {e}")
+            raise HTTPException(status_code=503, detail=str(e))
+        LOGGER.error(f"[Service] Connect error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    def handle_call_error(self, e: Exception) -> None:
+        """Map call exceptions to HTTP errors. Override to customize."""
+        if isinstance(e, ValueError):
+            raise HTTPException(status_code=404, detail=str(e))
+        if isinstance(e, RuntimeError) and "Max sessions limit reached" in str(e):
+            raise HTTPException(status_code=503, detail=str(e))
+        LOGGER.error(f"[Service] Call error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    def _encode_result(self, result: Any) -> Response:
+        """Encode a HandlerResult into an HTTP response."""
+        boundary, body = encode_multipart(
+            result.data,
+            result.images,
+            image_format=self.image_format,
+            image_mime=self.image_mime,
+        )
+        return Response(
+            content=body,
+            media_type=f'multipart/mixed; boundary="{boundary}"',
+        )
+
+    # ------------------------------------------------------------------
+    # Endpoints
+    # ------------------------------------------------------------------
+
+    async def health(self) -> Dict[str, Any]:
         """Health check endpoint."""
         return {
             "ok": True,
             "service": "gym-env-service",
-            "max_inflight": MAX_INFLIGHT if MAX_INFLIGHT > 0 else "unlimited",
+            "max_inflight": self.max_inflight if self.max_inflight > 0 else "unlimited",
         }
 
-    @app.get("/sessions")
-    async def sessions(request: Request):
-        """
-        Get statistics about active sessions.
+    async def sessions(self, request: Request) -> Dict[str, Any]:
+        """Get statistics about active sessions."""
+        self.authenticate(request)
+        return self.handler.get_session_stats()
 
-        Returns:
-            JSON with session statistics:
-            - num_sessions: Current number of active sessions
-            - max_sessions: Maximum allowed sessions
-            - sessions: List of session details (session_id, idle_time, etc.)
-
-        Requires authentication if API_KEY is set.
-        """
-        _auth(request)
-
-        stats = handler.get_session_stats()
-        return stats
-
-    @app.post("/connect")
     async def connect(
+        self,
         request: Request,
         data: Optional[str] = Form(default=None),
-        images: Optional[List[UploadFile]] = File(default=None),
-    ):
-        """
-        Create a new session.
+        images: Optional[List[UploadFile]] = File(default=None),  # noqa: ARG002
+    ) -> Response:
+        """Create a new session, optionally with initial reset."""
+        self.authenticate(request)
 
-        Request:
-            Content-Type: multipart/form-data
-            - data: JSON string with env_config and optional seed
-                    {"env_config": {...}, "seed": 42}  (seed is optional)
-
-        Response:
-            Content-Type: multipart/mixed
-            - data: {"session_id": "..."}
-                    If seed provided: also {"obs": "...", "info": {...}}
-            - images: (if seed provided and env returns images)
-
-        If seed is provided, the server will create the session AND perform
-        initial reset in one round-trip, returning both session_id and reset result.
-        """
-        _auth(request)
-
-        acquired = False
-        if _sem is not None:
-            try:
-                await asyncio.wait_for(_sem.acquire(), timeout=ADMIT_TIMEOUT)
-                acquired = True
-            except asyncio.TimeoutError:
-                raise HTTPException(status_code=503, detail="server busy")
-
+        acquired = await self.acquire()
         try:
             data_dict = parse_data_field(data)
             env_config = data_dict.get("env_config", {})
-            seed = data_dict.get("seed")  # Optional
+            seed = data_dict.get("seed")
 
-            result = await handler.connect(env_config, seed=seed)
+            result = await self.handler.connect(env_config, seed=seed)
+            return self._encode_result(result)
 
-            boundary, body = encode_multipart(
-                result.data,
-                result.images,
-                image_format=IMAGE_FORMAT,
-                image_mime=IMAGE_MIME,
-            )
-
-            return Response(
-                content=body,
-                media_type=f'multipart/mixed; boundary="{boundary}"',
-            )
-
-        except RuntimeError as e:
-            # Handler raised RuntimeError (e.g., max sessions reached)
-            if "Max sessions limit reached" in str(e):
-                LOGGER.warning(f"[Service] Connect rejected: {e}")
-                raise HTTPException(status_code=503, detail=str(e))
-            LOGGER.error(f"[Service] Connect error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+        except HTTPException:
+            raise
         except Exception as e:
-            LOGGER.error(f"[Service] Connect error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+            self.handle_connect_error(e)
         finally:
-            if acquired and _sem is not None:
-                _sem.release()
+            if acquired:
+                self.release()
 
-    @app.post("/call")
     async def call(
+        self,
         request: Request,
         data: Optional[str] = Form(default=None),
         images: Optional[List[UploadFile]] = File(default=None),
-    ):
-        """
-        Call a method on an existing session.
+    ) -> Response:
+        """Call a method on an existing session."""
+        self.authenticate(request)
 
-        Request:
-            Content-Type: multipart/form-data
-            - data: JSON string with {session_id, method, params}
-            - images: optional images
-
-        Response:
-            Content-Type: multipart/mixed
-            - data: method result
-            - images: optional result images
-        """
-        _auth(request)
-
-        acquired = False
-        if _sem is not None:
-            try:
-                await asyncio.wait_for(_sem.acquire(), timeout=ADMIT_TIMEOUT)
-                acquired = True
-            except asyncio.TimeoutError:
-                raise HTTPException(status_code=503, detail="server busy")
-
+        acquired = await self.acquire()
         try:
             data_dict = parse_data_field(data)
             img_list = await read_images(images)
@@ -225,33 +214,57 @@ def build_gym_service(handler: BaseGymHandler) -> FastAPI:
             if not method:
                 raise HTTPException(status_code=400, detail="method required")
 
-            result = await handler.call(session_id, method, params, img_list)
+            result = await self.handler.call(session_id, method, params, img_list)
+            return self._encode_result(result)
 
-            boundary, body = encode_multipart(
-                result.data,
-                result.images,
-                image_format=IMAGE_FORMAT,
-                image_mime=IMAGE_MIME,
-            )
-
-            return Response(
-                content=body,
-                media_type=f'multipart/mixed; boundary="{boundary}"',
-            )
-
-        except ValueError as e:
-            # Handler raised ValueError (e.g., session not found)
-            raise HTTPException(status_code=404, detail=str(e))
-        except RuntimeError as e:
-            # Handler raised RuntimeError (e.g., max sessions reached)
-            if "Max sessions limit reached" in str(e):
-                raise HTTPException(status_code=503, detail=str(e))
-            raise HTTPException(status_code=500, detail=str(e))
+        except HTTPException:
+            raise
         except Exception as e:
-            LOGGER.error(f"[Service] Call error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+            self.handle_call_error(e)
         finally:
-            if acquired and _sem is not None:
-                _sem.release()
+            if acquired:
+                self.release()
 
-    return app
+    # ------------------------------------------------------------------
+    # App construction
+    # ------------------------------------------------------------------
+
+    def register_routes(self, app: FastAPI) -> None:
+        """
+        Register routes on the app. Override to add or replace endpoints.
+
+        Call super().register_routes(app) to keep the default routes,
+        then add your own.
+        """
+        app.add_api_route("/health", self.health, methods=["GET"])
+        app.add_api_route("/sessions", self.sessions, methods=["GET"])
+        app.add_api_route("/connect", self.connect, methods=["POST"])
+        app.add_api_route("/call", self.call, methods=["POST"])
+
+    def build(self) -> FastAPI:
+        """
+        Build and return the FastAPI application.
+
+        This is the main entry point. Call once, then run the returned app
+        with uvicorn.
+        """
+        handler = self.handler
+
+        @asynccontextmanager
+        async def lifespan(app: FastAPI):
+            try:
+                yield
+            finally:
+                await handler.aclose()
+
+        app = FastAPI(
+            title="Gym Environment Service",
+            description="Generic HTTP service for remote gym environments",
+            lifespan=lifespan,
+        )
+        app.state.handler = handler
+
+        self.register_routes(app)
+        return app
+
+
