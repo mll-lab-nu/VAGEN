@@ -108,7 +108,7 @@ class GenericVisionInferenceWorkflow:
             role = m.get("role", "").upper()
             c = m.get("content")
             if isinstance(c, list):
-                text = " ".join(p.get("text", "") for p in c if p.get("type") == "text")
+                text = " ".join(p.get("text", "") for p in c if p.get("type") in ("text", "input_text", "output_text"))
             else:
                 text = c or ""
             return f"{role}: {text.strip()}"
@@ -212,7 +212,7 @@ class GenericVisionInferenceWorkflow:
                     break
 
                 assistant_texts.append(reply)
-                messages.append({"role": "assistant", "content": [{"type": "text", "text": reply}]})
+                messages.append(self.adapter.format_assistant_turn(reply))
 
                 try:
                     next_obs, r, done, step_info = await env.step(reply)

@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Before running, start the navigation server in another terminal:
+#   python -m vagen.envs.navigation.serve
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG="${1:-$SCRIPT_DIR/config.yaml}"
 shift 2>/dev/null || true

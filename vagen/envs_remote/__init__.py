@@ -21,22 +21,22 @@ Usage:
     })
 
     # Server side
-    from vagen.envs.remote import build_gym_service, BaseGymHandler
+    from vagen.envs.remote import GymService, BaseGymHandler
 
     class MyEnvHandler(BaseGymHandler):
         async def create_env(self, env_config):
             return MyGymEnv(env_config)
 
-    app = build_gym_service(MyEnvHandler())
+    app = GymService(MyEnvHandler()).build()
 """
 
 from .gym_image_env_client import GymImageEnvClient
-from .service import build_gym_service
+from .service import GymService
 from .handler import BaseGymHandler, HandlerResult
 
 __all__ = [
     "GymImageEnvClient",
-    "build_gym_service",
+    "GymService",
     "BaseGymHandler",
     "HandlerResult",
 ]
