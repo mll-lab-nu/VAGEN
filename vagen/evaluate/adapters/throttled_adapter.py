@@ -120,6 +120,9 @@ class ThrottledAdapter(ModelAdapter):
     def format_user_turn(self, text: str, images: List[Image.Image]) -> Dict[str, Any]:
         return self.inner.format_user_turn(text, images)
 
+    def format_assistant_turn(self, text: str) -> Dict[str, Any]:
+        return self.inner.format_assistant_turn(text)
+
     async def acompletion(self, messages: List[Dict[str, Any]], **chat_config: Any) -> str:
         attempt = 0
         while True:
