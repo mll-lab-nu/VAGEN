@@ -86,7 +86,7 @@ def main():
         capacity=args.capacity,
         startup_concurrency=args.startup_concurrency,
     )
-    app = build_gym_service(handler, max_inflight=args.capacity)
+    app = build_gym_service(handler, max_inflight=0)
 
     # Expand the asyncio thread pool via FastAPI startup so concurrent Unity
     # startups don't queue behind Python's default limit of min(32, cpu+4).
