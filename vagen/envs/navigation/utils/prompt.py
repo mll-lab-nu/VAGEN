@@ -71,8 +71,9 @@ Hints:
 1. You can take multiple actions at a time, in most cases, if you find the target object is far away from you, you can call moveahead, moveleft and move right multiple times.
 2. If you find yourself seems to be stuck, you can lookdown to see if there's any object above or below you, you can also rotate to see if there's any object behind you."""
 
-_EXAMPLE_TEMPLATE = """\
-Example:
+_EXAMPLES = [
+    """\
+Example 1:
 Round 1:
 image_1
 I can see the garbage can in the upper left corner of the image, next to the kitchen sink. \
@@ -92,7 +93,8 @@ The garbage can is very close, still to our front-left. \
 There is still space in front of me to get closer.
 <action>moveahead{sep} moveahead{sep} moveleft</action>
 Round 4:
-Env_feedback: Success"""
+Env_feedback: Success""",
+]
 
 
 def system_prompt(
@@ -108,8 +110,8 @@ def system_prompt(
     """
     parts = [_BASE_SYSTEM_PROMPT]
     parts.append(get_format_instruction(format_name, max_actions_per_step, action_sep))
-    if example_count > 0:
-        parts.append(_EXAMPLE_TEMPLATE.format(sep=action_sep))
+    for ex in _EXAMPLES[:example_count]:
+        parts.append(ex.format(sep=action_sep))
     return "\n\n".join(parts)
 
 

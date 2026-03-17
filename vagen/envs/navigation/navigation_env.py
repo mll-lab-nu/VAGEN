@@ -39,7 +39,7 @@ class NavigationEnvConfig:
     success_reward: float = 1.0         # reaching the goal
     gpu_device: int = 0
     prompt_format: str = "free_think"   # free_think | wm | no_think | eval_mode
-    example_count: int = 1              # number of examples in system prompt (0 = none)
+    example_count: int = 0             # number of examples in system prompt (0 = none)
     success_threshold: float = 1.0
     step_length: float = 0.3
     image_placeholder: str = "<image>"
