@@ -26,7 +26,7 @@ import asyncio
 import concurrent.futures
 import uvicorn
 
-from vagen.envs_remote.service import build_gym_service
+from vagen.envs_remote.service import GymService
 from .handler import EbAlfredHandler
 
 
@@ -86,7 +86,7 @@ def main():
         capacity=args.capacity,
         startup_concurrency=args.startup_concurrency,
     )
-    app = build_gym_service(handler, max_inflight=0)
+    app = GymService(handler, max_inflight=0).build()
 
     # Expand the asyncio thread pool via FastAPI startup so concurrent Unity
     # startups don't queue behind Python's default limit of min(32, cpu+4).
