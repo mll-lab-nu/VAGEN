@@ -6,7 +6,6 @@ import asyncio
 import json
 import math
 import os
-import re
 import time
 from dataclasses import dataclass, fields
 from typing import Any, Dict, List, Optional, Tuple
@@ -15,7 +14,8 @@ import numpy as np
 from PIL import Image
 
 from vagen.envs.gym_image_env import GymImageEnv
-from .utils.prompt import system_prompt, init_observation_template, action_template, format_prompt
+from vagen.envs.navigation.utils.prompt import system_prompt, init_observation_template, action_template, get_format_instruction
+from vagen.envs.navigation.utils.parse import parse_response, compute_reward
 
 
 # ---------------------------------------------------------------------------
@@ -30,38 +30,24 @@ class NavigationEnvConfig:
     down_sample_ratio: float = 1.0
     fov: int = 100
     multiview: bool = False
-    render_mode: str = "vision"
     max_actions_per_step: int = 5
-    action_sep: str = ","
-    max_action_penalty: float = -0.1
-    format_reward: float = 0.5
+    action_sep: str = "|"
+    max_steps: int = 30
+    # Reward config (ViewSuite-style)
+    format_reward: float = 0.0          # end-of-episode bonus if ALL turns had correct format
+    per_turn_format_reward: float = 0.01  # per-step bonus if this turn's format is correct
+    success_reward: float = 1.0         # reaching the goal
     gpu_device: int = 0
-    prompt_format: str = "grounding_worldmodeling"
-    success_threshold: float = 1.5
-    step_length: float = 0.5
+    prompt_format: str = "free_think"   # free_think | wm | no_think | eval_mode
+    example_count: int = 1              # number of examples in system prompt (0 = none)
+    success_threshold: float = 1.0
+    step_length: float = 0.3
     image_placeholder: str = "<image>"
-    max_objects_in_state: int = 5
-    use_state_reward: bool = False
-    grounding_reward_weight: float = 0.5
-    worldmodeling_reward_weight: float = 0.5
 
 
 # ---------------------------------------------------------------------------
-# Action parsing
+# Action dispatch
 # ---------------------------------------------------------------------------
-
-_PARSE_PATTERNS = {
-    "free_think": r"<think>(.*?)</think>\s*<answer>(.*?)</answer>",
-    "no_think": r"<answer>(.*?)</answer>",
-    "grounding": r"<think>\s*<observation>(.*?)</observation>\s*<reasoning>(.*?)</reasoning>\s*</think>\s*<answer>(.*?)</answer>",
-    "worldmodeling": r"<think>\s*<reasoning>(.*?)</reasoning>\s*<prediction>(.*?)</prediction>\s*</think>\s*<answer>(.*?)</answer>",
-    "grounding_worldmodeling": (
-        r"<think>\s*<observation>(.*?)</observation>\s*"
-        r"<reasoning>(.*?)</reasoning>\s*"
-        r"<prediction>(.*?)</prediction>\s*</think>\s*"
-        r"<answer>(.*?)</answer>"
-    ),
-}
 
 ACTION_LOOKUP = {
     "moveahead": 1, "moveback": 2, "moveright": 3, "moveleft": 4,
@@ -69,7 +55,7 @@ ACTION_LOOKUP = {
 }
 
 _ACTION_DISPATCH = {
-    1: ("MoveAhead",  {"moveMagnitude": None}),  # filled at runtime with step_length
+    1: ("MoveAhead",  {"moveMagnitude": None}),
     2: ("MoveBack",   {"moveMagnitude": None}),
     3: ("MoveRight",  {"moveMagnitude": None}),
     4: ("MoveLeft",   {"moveMagnitude": None}),
@@ -80,19 +66,6 @@ _ACTION_DISPATCH = {
 }
 
 VALID_EVAL_SETS = ["base", "common_sense", "complex_instruction", "visual_appearance", "long_horizon"]
-
-
-def _parse_response(response: str, prompt_format: str = "free_think",
-                    action_sep: str = ",", max_actions: int = 5) -> Dict[str, Any]:
-    pattern = _PARSE_PATTERNS.get(prompt_format)
-    if pattern is None:
-        raise ValueError(f"Unknown prompt_format: {prompt_format}")
-    match = re.search(pattern, response, re.DOTALL)
-    if not match:
-        return {"llm_raw_response": response, "actions": [], "format_correct": False}
-    answer = match.group(match.lastindex).strip()
-    actions = [a.strip().lower() for a in answer.split(action_sep) if a.strip()][:max_actions]
-    return {"llm_raw_response": response, "actions": actions, "format_correct": True}
 
 
 # ---------------------------------------------------------------------------
@@ -112,13 +85,12 @@ class NavigationEnv(GymImageEnv):
         self._episode_data: Optional[Dict] = None
         self._instruction = ""
         self._step_count = 0
-        self._max_steps = 30
         self._t0 = 0.0
         self._valid_actions: List[str] = []
         self._reward = 0.0
         self._total_reward = 0.0
+        self._is_format_correct = True  # Track across episode for end-of-episode format bonus
         self._info: Dict[str, Any] = {}
-        self._fmt = format_prompt[self.cfg.prompt_format]
 
     def _load_dataset(self) -> List[Dict]:
         path = os.path.join(os.path.dirname(__file__), "datasets", f"{self.cfg.eval_set}.json")
@@ -160,18 +132,17 @@ class NavigationEnv(GymImageEnv):
 
     def _render_obs(self, init: bool) -> Dict[str, Any]:
         ph = self.cfg.image_placeholder
-        fmt = self._fmt(max_actions_per_step=self.cfg.max_actions_per_step,
-                        action_sep=self.cfg.action_sep, add_example=False)
         img = Image.fromarray(self._controller.last_event.frame.astype(np.uint8))
         if init:
+            fmt = get_format_instruction(self.cfg.prompt_format,
+                                         self.cfg.max_actions_per_step, self.cfg.action_sep)
             obs_str = init_observation_template(observation=ph, instruction=self._instruction) + "\n" + fmt
         else:
             obs_str = action_template(
                 valid_action=self._valid_actions, observation=ph,
                 reward=self._reward, done=self._is_success(),
-                instruction=self._instruction,
                 env_feedback=self._info.get("env_feedback", ""),
-            ) + "\n" + fmt
+            )
         return {"obs_str": obs_str, "multi_modal_input": {ph: [img]}}
 
     # --- sync methods (run in thread) ---
@@ -201,12 +172,17 @@ class NavigationEnv(GymImageEnv):
         self._valid_actions = []
         self._reward = 0.0
         self._total_reward = 0.0
+        self._is_format_correct = True
         self._info = {}
         return self._render_obs(init=True), {}
 
     def _sync_step(self, action_str: str) -> Tuple[Dict[str, Any], float, bool, Dict[str, Any]]:
-        parsed = _parse_response(action_str, self.cfg.prompt_format,
-                                 self.cfg.action_sep, self.cfg.max_actions_per_step)
+        parsed = parse_response(
+            action_str,
+            prompt_format=self.cfg.prompt_format,
+            action_sep=self.cfg.action_sep,
+            max_actions=self.cfg.max_actions_per_step,
+        )
         actions = parsed["actions"]
         prev_pos = self._agent_pos()
         self._reward = 0.0
@@ -215,6 +191,10 @@ class NavigationEnv(GymImageEnv):
         success = False
         info: Dict[str, Any] = {**parsed}
 
+        # Track format correctness across episode
+        if not parsed["format_correct"]:
+            self._is_format_correct = False
+
         if actions and parsed["format_correct"]:
             for action in actions:
                 if action not in ACTION_LOOKUP:
@@ -222,17 +202,23 @@ class NavigationEnv(GymImageEnv):
                 self._exec_action(ACTION_LOOKUP[action])
                 self._valid_actions.append(action)
                 if self._is_success():
-                    self._reward += 10.0
                     done = success = True
                     break
                 self._step_count += 1
-                if self._step_count >= self._max_steps:
+                if self._step_count >= self.cfg.max_steps:
                     done = True
                     break
 
-        # Format reward
-        if self._valid_actions and parsed["format_correct"]:
-            self._reward += self.cfg.format_reward
+        # Compute reward
+        self._reward = compute_reward(
+            parsed=parsed,
+            valid_actions=self._valid_actions,
+            success=success,
+            format_reward=self.cfg.format_reward,
+            per_turn_format_reward=self.cfg.per_turn_format_reward,
+            success_reward=self.cfg.success_reward,
+            is_format_correct_so_far=self._is_format_correct,
+        )
 
         cur_pos = self._agent_pos()
         info.update({
@@ -240,8 +226,12 @@ class NavigationEnv(GymImageEnv):
                 "turn_metrics": {
                     "action_is_valid": bool(self._valid_actions),
                     "action_is_effective": cur_pos["x"] != prev_pos["x"] or cur_pos["z"] != prev_pos["z"],
+                    "format_correct": parsed["format_correct"],
                 },
-                "traj_metrics": {"success": success},
+                "traj_metrics": {
+                    "success": success,
+                    "is_format_correct": self._is_format_correct,
+                },
             },
             "distance": self._distance_to_target(),
             "instruction": self._instruction,
@@ -267,9 +257,12 @@ class NavigationEnv(GymImageEnv):
     # --- async interface ---
 
     async def system_prompt(self) -> Dict[str, Any]:
-        fmt = self._fmt(max_actions_per_step=self.cfg.max_actions_per_step,
-                        action_sep=self.cfg.action_sep, add_example=True)
-        return {"obs_str": system_prompt(format=self.cfg.prompt_format) + "\n" + fmt}
+        return {"obs_str": system_prompt(
+            format_name=self.cfg.prompt_format,
+            max_actions_per_step=self.cfg.max_actions_per_step,
+            action_sep=self.cfg.action_sep,
+            example_count=self.cfg.example_count,
+        )}
 
     async def reset(self, seed: int) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         return await asyncio.to_thread(self._sync_reset, seed)
@@ -295,7 +288,11 @@ if __name__ == "__main__":
         seed: int = 0,
         save_path: str = "./test_navigation",
     ):
-        cfg = {"eval_set": eval_set, "prompt_format": prompt_format, "gpu_device": gpu_device}
+        cfg = {
+            "eval_set": eval_set,
+            "prompt_format": prompt_format,
+            "gpu_device": gpu_device,
+        }
         env = NavigationEnv(cfg)
 
         print("=== System Prompt ===")
@@ -314,9 +311,10 @@ if __name__ == "__main__":
                 print(f"  [image saved: {path}]")
 
         _save_and_show(obs, step)
-        actions = ", ".join(ACTION_LOOKUP.keys())
+        sep = env.cfg.action_sep
+        actions = f" {sep} ".join(ACTION_LOOKUP.keys())
         print(f"\nValid actions: {actions}")
-        print("Wrap in format or just type raw actions (e.g. 'moveahead,rotateright')\n")
+        print(f"Wrap in format or just type raw actions (e.g. 'moveahead{sep}rotateright')\n")
 
         while True:
             step += 1
@@ -327,8 +325,8 @@ if __name__ == "__main__":
             if raw.strip().lower() in ("quit", "q", ""):
                 break
             # Auto-wrap if user didn't use tags
-            if "<answer>" not in raw:
-                raw = f"<think>exploring</think><answer>{raw}</answer>"
+            if "<action>" not in raw:
+                raw = f"<think>exploring</think><action>{raw}</action>"
 
             obs, reward, done, info = await env.step(raw)
             print(f"  reward={reward:.2f}  done={done}  success={info.get('success')}")
