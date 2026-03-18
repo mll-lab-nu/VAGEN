@@ -22,8 +22,11 @@ pip install "ai2thor==2.1.0" "gym==0.23.0" "numpy<2.0" \
 pip install "flask==1.1.4" "werkzeug==1.0.1" \
     "markupsafe<2.1" "jinja2<3.0" "itsdangerous<2.0"
 pip install "opencv-python-headless<4.9"
+```
 
-# Download dataset
+**Download dataset** (`eval_set` selects the split: `base` — standard tasks, `long` — longer horizon):
+
+```bash
 git clone https://huggingface.co/datasets/EmbodiedBench/EB-ALFRED
 mv EB-ALFRED /root/EmbodiedBench/embodiedbench/envs/eb_alfred/data/json_2.1.0
 ```
@@ -87,24 +90,6 @@ bash examples/train/eb_alfred/train_grpo_qwen25vl3b.sh
 ```
 
 Configs: `examples/train/eb_alfred/`
-
-## Prompt Formats
-
-- `free_think`: `<think>...</think><answer>...</answer>`
-- `wm`: `<observation>...</observation><think>...</think><answer>...</answer><prediction>...</prediction>`
-
-## Datasets
-
-The `eval_set` parameter selects which episode split to use:
-- `base` — standard household tasks
-- `long` — longer horizon tasks
-
-## Interactive Test
-
-```bash
-conda activate embodiedbench
-python -m vagen.envs.eb_alfred.eb_alfred_env --x_display 0 --eval_set base --seed 0
-```
 
 ## Checklist
 
