@@ -65,7 +65,10 @@ _ACTION_DISPATCH = {
     8: ("LookDown",    {"degrees": 30}),
 }
 
-VALID_EVAL_SETS = ["base", "common_sense", "complex_instruction", "visual_appearance", "long_horizon"]
+VALID_EVAL_SETS = [
+    "base", "common_sense", "complex_instruction", "visual_appearance", "long_horizon",
+    "base_train", "common_sense_train",
+]
 
 
 # ---------------------------------------------------------------------------
