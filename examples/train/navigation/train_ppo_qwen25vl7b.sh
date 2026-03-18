@@ -7,7 +7,7 @@
 set -x
 
 PROJECT_NAME="vagen_experiments"
-EXPERIMENT_NAME="navigation_ppo_qwen25vl3b"
+EXPERIMENT_NAME="navigation_ppo_qwen25vl7b"
 
 BASEDIR=$(pwd)
 SCRIPTDIR=$(dirname "$0")
@@ -62,7 +62,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     trainer.val_before_train=True \
     trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \
-    trainer.save_freq=100 \
+    trainer.save_freq=20 \
     trainer.test_freq=20 \
     trainer.project_name=${PROJECT_NAME} \
     trainer.experiment_name=${EXPERIMENT_NAME} \
