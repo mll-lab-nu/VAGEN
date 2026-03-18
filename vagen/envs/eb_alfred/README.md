@@ -91,11 +91,3 @@ bash examples/train/eb_alfred/train_grpo_qwen25vl3b.sh
 
 Configs: `examples/train/eb_alfred/`
 
-## Checklist
-
-```bash
-ps aux | grep Xorg            # Xorg running per GPU
-curl http://localhost:8000/health
-ps aux | grep thor            # no leftover Unity processes from crashed sessions
-nvidia-smi                    # GPU memory available
-```
