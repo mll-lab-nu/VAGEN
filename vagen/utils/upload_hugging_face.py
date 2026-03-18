@@ -1,4 +1,5 @@
 import os
+
 from typing import List, Optional
 
 import ray
@@ -27,6 +28,11 @@ class HFUploadActor:
 
     def __init__(self, repo_id: str, private: bool = True, **kwargs):
         from huggingface_hub import HfApi
+
+        # Enable hf_transfer by default for uploads, without affecting processes
+        # that import this module but never create an upload actor.
+        if "HF_HUB_ENABLE_HF_TRANSFER" not in os.environ:
+            os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
 
         api_kwargs = {}
         if "token" in kwargs:

@@ -1,8 +1,8 @@
 envs:
   - name: RemoteEnv
-    n_envs: 30
+    n_envs: 10000
     data_source: navigation
-    seed: [0, 30, 1]
+    seed: [0, 30]
     max_turns: 10
     response_length_per_turn: 512
     config:
