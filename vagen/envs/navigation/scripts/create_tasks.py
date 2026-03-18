@@ -33,7 +33,7 @@ ALL_SCENES = [f"FloorPlan{i}" for r in SCENE_RANGES for i in r]
 
 # Objects considered valid navigation targets
 INTERACTIVE_OBJECT_TYPES = {
-    "StoveBurner", "Microwave", "Sink", "Bathtub", "Toilet", "Laptop", "TV",
+    "StoveBurner", "Microwave", "Fridge", "Toaster", "Sink", "Bathtub", "Toilet", "Laptop", "Television",
 }
 
 DEFAULT_TASKS_PER_SCENE = 20

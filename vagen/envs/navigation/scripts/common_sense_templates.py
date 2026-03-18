@@ -142,6 +142,11 @@ OBJECT_DESCRIPTIONS = {
         "I am looking for a glass or plastic beverage holder.",
         "I want to store some water for later.",
     ],
+    "WineBottle": [
+        "I want to pour a glass of red or white for dinner.",
+        "I am looking for the tall dark bottle with a cork.",
+        "I need to open the drink we saved for a special occasion.",
+    ],
     "SaltShaker": [
         "I need to add some seasoning to my bland food.",
         "I am looking for the container with white crystals.",
@@ -243,6 +248,11 @@ OBJECT_DESCRIPTIONS = {
         "I want to shoot some hoops outside.",
         "I am looking for the orange bouncy sphere.",
         "I need the ball for the game.",
+    ],
+    "Dumbbell": [
+        "I need some weights for my workout.",
+        "I am looking for the heavy metal exercise equipment.",
+        "I want to do some bicep curls.",
     ],
     "TeddyBear": [
         "I am looking for the soft stuffed animal.",
