@@ -14,7 +14,7 @@ envs:
       max_actions_per_step: 5
   - name: RemoteEnv
     n_envs: 1200
-    data_source: navigation_base
+    data_source: navigation_common
     seed: [1, 1200, 1]
     max_turns: 10
     response_length_per_turn: 512
