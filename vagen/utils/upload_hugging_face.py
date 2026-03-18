@@ -1,4 +1,7 @@
 import os
+
+os.environ.setdefault("HF_HUB_ENABLE_HF_TRANSFER", "1")
+
 from typing import List, Optional
 
 import ray
