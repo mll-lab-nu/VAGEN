@@ -1,0 +1,28 @@
+envs:
+  - name: RemoteEnv
+    n_envs: 60
+    data_source: navigation_base
+    seed: [1, 60, 1]
+    max_turns: 10
+    response_length_per_turn: 512
+    config:
+      base_urls: "http://localhost:8000"
+      timeout: 120
+      retries: 3
+      eval_set: base
+      prompt_format: eval_mode
+      max_actions_per_step: 5
+
+  - name: RemoteEnv
+    n_envs: 60
+    data_source: navigation_common
+    seed: [1, 60, 1]
+    max_turns: 10
+    response_length_per_turn: 512
+    config:
+      base_urls: "http://localhost:8000"
+      timeout: 120
+      retries: 3
+      eval_set: common_sense
+      prompt_format: eval_mode
+      max_actions_per_step: 5

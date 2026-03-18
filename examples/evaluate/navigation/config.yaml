@@ -23,6 +23,22 @@ envs:
       temperature: 0
       max_tokens: 1024
       top_p: 1.0
+  - name: RemoteEnv
+    n_envs: 60
+    tag_id: navigation_base
+    seed: [0, 60, 1]
+    max_turns: 10
+    config:
+      base_urls: "http://localhost:8000"
+      timeout: 120
+      retries: 3
+      eval_set: common_sense
+      prompt_format: eval_mode
+      max_actions_per_step: 5
+    chat_config:
+      temperature: 0
+      max_tokens: 1024
+      top_p: 1.0
 
 experiment:
   dump_dir: ${fileroot}/rollouts/eval_navigation
