@@ -41,7 +41,6 @@ Start the server, then run eval:
 
 ```bash
 # Terminal 1: start server
-python -m vagen.envs.navigation.serve
 
 # Terminal 2: run eval
 bash examples/evaluate/navigation/run_eval.sh
@@ -55,33 +54,10 @@ Start the server, then run training:
 
 ```bash
 # Terminal 1: start server
-python -m vagen.envs.navigation.serve
 
 # Terminal 2: run training
 cd VAGEN
-bash examples/train/navigation/train_grpo_qwen25vl3b.sh
+bash examples/train/navigation/train_ppo_qwen25vl7b.sh
 ```
 
-Configs: `examples/train/navigation/`
 
-## Prompt Formats
-
-- `free_think`: `<think>...</think><action>...</action>`
-- `wm`: `<observation>...</observation><think>...</think><action>...</action><prediction>...</prediction>`
-- `no_think`: `<action>...</action>` (strict)
-- `eval_mode`: `<action>...</action>` (lenient, allows extra text)
-
-## Datasets
-
-Located in `datasets/`. Each eval set has 60 tasks:
-- `base` — standard navigation
-- `common_sense` — requires common sense reasoning
-- `complex_instruction` — multi-step instructions
-- `visual_appearance` — target described by appearance
-- `long_horizon` — longer navigation paths
-
-## Interactive Test
-
-```bash
-python -m vagen.envs.navigation.navigation_env --eval_set base --seed 0
-```
