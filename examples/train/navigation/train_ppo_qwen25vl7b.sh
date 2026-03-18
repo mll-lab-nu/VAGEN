@@ -16,7 +16,7 @@ SAVE_CHECKPOINT_DIR=${EXPERIMENT_DIR}/verl_checkpoints
 DATASET_TRAIN=${SCRIPTDIR}/train_navigation.yaml
 DATASET_VAL=${SCRIPTDIR}/val_navigation.yaml
 agent_loop_config_path=${BASEDIR}/vagen/configs/agent.yaml
-REF_MODEL_PATH=Qwen/Qwen2.5-VL-3B-Instruct
+REF_MODEL_PATH=Qwen/Qwen2.5-VL-7B-Instruct
 mkdir -p ${EXPERIMENT_DIR}
 
 PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
