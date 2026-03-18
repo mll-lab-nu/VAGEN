@@ -79,13 +79,14 @@ def main():
     print("Controller created.\n")
 
     t_start = time.time()
-    for i, scene in enumerate(scenes, 1):
-        t0 = time.time()
-        print(f"[{i}/{len(scenes)}] {scene} ...", end=" ", flush=True)
-        controller.reset(scene=scene)
-        print(f"ok ({time.time() - t0:.1f}s)")
-
-    controller.stop()
+    try:
+        for i, scene in enumerate(scenes, 1):
+            t0 = time.time()
+            print(f"[{i}/{len(scenes)}] {scene} ...", end=" ", flush=True)
+            controller.reset(scene=scene)
+            print(f"ok ({time.time() - t0:.1f}s)")
+    finally:
+        controller.stop()
     print(f"\nDone! {len(scenes)} scenes cached in {time.time() - t_start:.0f}s")
     print("Assets are stored in ~/.ai2thor/")
 
