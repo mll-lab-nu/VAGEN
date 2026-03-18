@@ -1,5 +1,5 @@
 #!/bin/bash
-# Navigation environment training with PPO + Qwen2.5-VL-3B
+# Navigation environment training with PPO 
 #
 # Before running, start the navigation server in another terminal:
 #   python -m vagen.envs.navigation.serve
@@ -7,7 +7,7 @@
 set -x
 
 PROJECT_NAME="vagen_experiments"
-EXPERIMENT_NAME="navigation_ppo_qwen25vl3b"
+EXPERIMENT_NAME="navigation_ppo_qwen25vl7b"
 
 BASEDIR=$(pwd)
 SCRIPTDIR=$(dirname "$0")
@@ -16,7 +16,7 @@ SAVE_CHECKPOINT_DIR=${EXPERIMENT_DIR}/verl_checkpoints
 DATASET_TRAIN=${SCRIPTDIR}/train_navigation.yaml
 DATASET_VAL=${SCRIPTDIR}/val_navigation.yaml
 agent_loop_config_path=${BASEDIR}/vagen/configs/agent.yaml
-REF_MODEL_PATH=Qwen/Qwen2.5-VL-3B-Instruct
+REF_MODEL_PATH=Qwen/Qwen2.5-VL-7B-Instruct
 mkdir -p ${EXPERIMENT_DIR}
 
 PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
@@ -60,9 +60,9 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
     trainer.val_before_train=True \
-    trainer.n_gpus_per_node=4 \
+    trainer.n_gpus_per_node=8 \
     trainer.nnodes=1 \
-    trainer.save_freq=100 \
+    trainer.save_freq=20 \
     trainer.test_freq=20 \
     trainer.project_name=${PROJECT_NAME} \
     trainer.experiment_name=${EXPERIMENT_NAME} \
@@ -79,5 +79,6 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     critic.ppo_micro_batch_size_per_gpu=1 \
     critic.model.fsdp_config.param_offload=True \
     critic.model.fsdp_config.optimizer_offload=True \
+    huggingface_hub.hf_save_freq=200 \
     trainer.total_training_steps=401 2>&1 | \
     tee ${EXPERIMENT_DIR}/${PROJECT_NAME}_${EXPERIMENT_NAME}.log
