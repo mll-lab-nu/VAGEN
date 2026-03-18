@@ -6,15 +6,23 @@ AI2-THOR based indoor navigation environment. The agent receives egocentric RGB 
 
 ```bash
 pip install ai2thor
+
+# Refer to https://github.com/EmbodiedBench/EmbodiedBench, probably you also need:
+sudo apt-get update && sudo apt-get -y install libvulkan1
+sudo apt install vulkan-tools
+
 ```
 
 AI2-THOR runs a Unity backend process per environment instance. It requires a GPU with cloud rendering support.
+
 
 ## Server
 
 The navigation environment runs as a separate server (via `envs_remote` framework) because AI2-THOR controllers are heavy GPU processes that can't share a process with training.
 
 ```bash
+# Pre-download scene assets (recommended, avoids runtime downloads)
+python -m vagen.envs.navigation.pre_download_scenes
 # Auto-detect GPUs, default settings
 python -m vagen.envs.navigation.serve
 
