@@ -1,5 +1,5 @@
 #!/bin/bash
-# Navigation environment training with PPO + Qwen2.5-VL-3B
+# Navigation environment training with PPO 
 #
 # Before running, start the navigation server in another terminal:
 #   python -m vagen.envs.navigation.serve
