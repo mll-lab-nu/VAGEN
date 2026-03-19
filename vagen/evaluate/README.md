@@ -19,7 +19,7 @@ Below is a complete example (`examples/evaluate/frozenlake/config.yaml`):
 defaults:
   - ../../../vagen/configs/eval_default   # inherit shared backend definitions
 
-fileroot: ${oc.env:HOME}/projects/vagen/VAGEN
+fileroot: ${oc.env:HOME}/projects/vagen
 
 envs:
   - name: FrozenLake                      # registered env class name

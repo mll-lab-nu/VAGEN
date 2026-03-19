@@ -1,7 +1,7 @@
 defaults:
   - ../../../vagen/configs/eval_default
 
-fileroot: ${oc.env:HOME}/projects/vagen/VAGEN
+fileroot: ${oc.env:HOME}/projects/vagen
 
 envs:
   - name: SpatialGym
