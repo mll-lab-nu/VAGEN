@@ -1,112 +1,196 @@
 # Evaluate
 
-Run LLM agents across multiple environment specs and collect rollout metrics.
+Run LLM agents across vision-based gym environments and collect rollout metrics.
 
-## Quick Start
+## 1. Config
 
 ```bash
 python -m vagen.evaluate.run_eval --config path/to/config.yaml
 ```
 
-Override any field via CLI:
+CLI overrides (OmegaConf dotlist):
 ```bash
-python -m vagen.evaluate.run_eval --config config.yaml run.backend=claude run.max_concurrent_jobs=8
+python -m vagen.evaluate.run_eval --config config.yaml run.backend=claude backends.claude.model=claude-opus-4-6
 ```
 
-## Config Composition
-
-Configs support a `defaults:` key to inherit from base configs, so you only
-need to write the fields you want to override.
-
-### How `defaults` paths work
-
-Paths in `defaults:` are **relative to the config file itself**. The `.yaml`
-extension is appended automatically if omitted.
-
-```
-VAGEN/
-├── vagen/configs/eval_default.yaml          # VAGEN base config
-├── examples/evaluate/
-│   ├── sokoban/config.yaml                  # defaults: [../../../vagen/configs/eval_default]
-│   └── frozenlake/config.yaml               # same relative path
-```
-
-```
-ViewSuite/
-├── examples/evaluation/
-│   ├── eval_default.yaml                    # ViewSuite base config
-│   └── eval_proxy_task/
-│       └── gpt_5_4_pro.yaml                # defaults: [../eval_default]
-```
-
-### `default_chat_config`
-
-A top-level `default_chat_config` key can be used to set chat parameters for
-all envs that don't define their own `chat_config`. This works across files
-via the `defaults` merge — the child config can override `default_chat_config`
-without redefining all envs.
-
-### Example: Minimal proxy_task config
+Below is a complete example (`examples/evaluate/frozenlake/config.yaml`):
 
 ```yaml
 defaults:
-  - ../eval_default
+  - ../../../vagen/configs/eval_default   # inherit shared backend definitions
 
-default_chat_config:
-  temperature: 0.0
-  max_tokens: 10000
-  extra_body:
-    reasoning:
-      effort: "medium"
-
-experiment:
-  dump_dir: ${fileroot}/rollouts/my_model
-
-backends:
-  openai:
-    model: "openai/gpt-5.4-pro"
-```
-
-### Example: Custom envs with native backend
-
-```yaml
-defaults:
-  - ../eval_default
+fileroot: ${oc.env:HOME}/projects/vagen/VAGEN
 
 envs:
-  - name: ScannetTool
-    n_envs: 545
-    tag_id: 21
-    ...
-    chat_config:             # per-env chat_config overrides default_chat_config
-      max_completion_tokens: 32768
-      reasoning_effort: "high"
+  - name: FrozenLake                      # registered env class name
+    n_envs: 128                           # how many episodes to run
+    tag_id: frozenlake_test               # groups rollout outputs under tag_{tag_id}/
+    seed: [0,128,1]                       # [start, end, step] → generates seeds 0..127
+    max_turns: 5                          # max agent–env interaction turns per episode
+    config:                               # passed to the env constructor
+      render_mode: vision
+      size: 4
+      p: 0.8
+      is_slippery: false
+      slip_prob: 0.0
+      max_actions_per_step: 5
+
+experiment:
+  dump_dir: ${fileroot}/rollouts/Qwen2.5-VL-3B-Instruct   # rollout output root
+  default_max_turns: 5                                      # fallback if env omits max_turns
 
 run:
-  backend: "azure"
+  backend: "sglang"               # which backend to use (see backends section)
+  base_seed: 0                    # global seed offset added to all env seeds
+  max_concurrent_jobs: 64         # max episodes running in parallel
+  resume: skip_completed          # skip_completed | off | force_rerun
+  live_summary: true              # write summary.json after each episode finishes
 
 backends:
-  azure:
-    azure_endpoint: "https://..."
-    deployment: "gpt-5"
+  sglang:
+    base_url: "http://127.0.0.1:30000/v1"
+    api_key: "EMPTY"
+    model: "Qwen/Qwen2.5-VL-3B-Instruct"
+    max_concurrency: 2            # max concurrent API requests (rate limit gate)
+    max_retries: 6                # retry count on transient errors
+    min_backoff: 0.5              # exponential backoff lower bound (seconds)
+    max_backoff: 8.0              # exponential backoff upper bound (seconds)
 ```
 
-### Multiple defaults
+### Parameter reference
+
+**`defaults`** — List of base YAML files to inherit from (paths relative to this config file, `.yaml` auto-appended). Deep-merged in order, then this config merges on top.
+
+**`envs[]`** — Each entry defines a batch of episodes:
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | str | Registered environment class (e.g. `FrozenLake`, `Sokoban`, `RemoteEnv`, `ScannetTool`) |
+| `n_envs` | int | Number of episodes to run |
+| `tag_id` | int/str | Output subdirectory name: `tag_{tag_id}/` |
+| `seed` | list | `[start, end, step]` to generate a range, or explicit list of seeds |
+| `max_turns` | int | Max agent–env turns per episode |
+| `split` | str | Dataset split identifier (default: `"default"`) |
+| `config` | dict | Kwargs passed to the environment constructor |
+| `chat_config` | dict | Kwargs passed to the LLM completion call (temperature, max_tokens, etc.) |
+| `concat_multi_turn` | bool | `true`: send full message history; `false`: only system + last turn (default: `true`) |
+
+**`default_chat_config`** — Top-level fallback: applied to any env that doesn't define its own `chat_config`.
+
+**`experiment`**:
+- `dump_dir` — Root directory for rollout outputs
+- `default_max_turns` — Fallback max_turns if env doesn't specify one
+
+**`run`**:
+- `backend` — Which backend to use: `openai` | `azure` | `sglang` | `vllm` | `together` | `claude` | `gemini` | `openai_responses` | `azure_responses`
+- `max_concurrent_jobs` — Episode-level parallelism (how many episodes run at once)
+- `resume` — `skip_completed` skips episodes with existing successful metrics; `off` reruns everything
+- `live_summary` — Refresh `summary.json` after each episode
+
+**`backends.{name}`** — Config for each backend:
+- `api_key`, `base_url` — API credentials (or set via env vars)
+- `model` — Model identifier
+- `max_concurrency` — Request-level concurrency gate (API rate limit)
+- `max_retries`, `min_backoff`, `max_backoff` — Retry policy with exponential backoff
+
+### Output structure
+
+```
+dump_dir/
+└── tag_{tag_id}/
+    ├── summary.json                    # aggregated metrics
+    └── {env_name}_seed_{seed}/
+        ├── metrics.json                # per-episode results (success, reward, finish_reason)
+        ├── messages.json               # full conversation history
+        ├── assistant_texts.json        # model replies only
+        ├── transcript.txt              # human-readable conversation
+        └── images/
+            └── turn_00_00.png          # observation images per turn
+```
+
+## 2. Scripts
+
+Typical run script:
+
+```bash
+#!/bin/bash
+# Run FrozenLake eval with sglang backend
+cd /path/to/VAGEN
+python -m vagen.evaluate.run_eval \
+    --config examples/evaluate/frozenlake/config.yaml
+```
+
+Override model or backend on the fly:
+
+```bash
+# Switch to OpenAI
+python -m vagen.evaluate.run_eval \
+    --config examples/evaluate/frozenlake/config.yaml \
+    run.backend=openai \
+    backends.openai.model=gpt-4o-mini \
+    experiment.dump_dir=./rollouts/gpt4o_mini
+```
+
+## 3. Custom Adapters
+
+To add a new backend, implement `ModelAdapter` and register it:
+
+```python
+# my_adapter.py
+from vagen.evaluate.adapters.base_adapter import ModelAdapter
+from vagen.evaluate.registry import register_adapter, register_client
+
+# Step 1: Register client factory
+@register_client("my_backend")
+def build_my_client(cfg):
+    return MyAsyncClient(api_key=cfg.get("api_key"), base_url=cfg.get("base_url"))
+
+# Step 2: Implement and register adapter
+@register_adapter("my_backend")
+class MyAdapter(ModelAdapter):
+
+    def __init__(self, client, model: str):
+        self.client = client
+        self.model = model
+
+    def format_system(self, text, images):
+        # Convert system prompt + images to your API's message format
+        return {"role": "system", "content": ...}
+
+    def format_user_turn(self, text, images):
+        # Convert user observation + images to your API's message format
+        return {"role": "user", "content": ...}
+
+    async def acompletion(self, messages, **chat_config):
+        # Call your API and return the text response
+        resp = await self.client.generate(model=self.model, messages=messages, **chat_config)
+        return resp.text
+
+    def is_retryable_error(self, exc):
+        # Optional: customize retry behavior
+        # Return True (retry), False (don't retry), or None (use default logic)
+        return None
+```
+
+Then make sure it's imported in `register_builtins.py`:
+
+```python
+import my_adapter  # triggers @register_client and @register_adapter
+```
+
+Now use it in config:
 
 ```yaml
-defaults:
-  - shared/backends
-  - shared/viewsuite_envs
+run:
+  backend: "my_backend"
+
+backends:
+  my_backend:
+    api_key: ""
+    base_url: "http://..."
+    model: "my-model"
+    max_concurrency: 4
+    max_retries: 6
+    min_backoff: 0.5
+    max_backoff: 8.0
 ```
-
-Nested `defaults:` are also supported (a base config can reference its own defaults).
-
-## Config Structure
-
-| Section | Description |
-|---|---|
-| `default_chat_config` | Default chat params applied to envs without inline `chat_config` |
-| `envs` | List of environment specs (name, n_envs, seed, config, chat_config) |
-| `experiment` | `dump_dir`, `default_max_turns` |
-| `run` | `backend`, `max_concurrent_jobs`, `resume`, `live_summary` |
-| `backends` | Per-backend settings (openai, azure, sglang, vllm, claude, gemini, etc.) |
