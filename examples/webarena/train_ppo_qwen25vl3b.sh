@@ -38,7 +38,7 @@ REF_MODEL_PATH=Qwen/Qwen2.5-VL-3B-Instruct
 mkdir -p ${EXPERIMENT_DIR}
 
 # export WEBARENA_CONFIG_DIR="vagen/envs/webarena/config_files"
-export WEBARENA_CONFIG_DIR=""
+export WEBARENA_CONFIG_DIR="vagen/envs/webarena/config_files"
 
 PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     --config-path=${BASEDIR}/vagen/configs \
