@@ -153,8 +153,8 @@ def match_action(
     """
     name = action_name.strip()
 
-    # Try ERA-style [id, action_name] format
-    bracket_match = re.match(r'^\[(\d+),\s*(.+?)\]$', name)
+    # Try ERA-style [id, 'action_name'] format (with or without quotes)
+    bracket_match = re.match(r"^\[(\d+),\s*['\"]?(.+?)['\"]?\s*\]$", name)
     if bracket_match:
         idx = int(bracket_match.group(1))
         if 0 <= idx < len(action_list):

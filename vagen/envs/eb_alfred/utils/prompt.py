@@ -71,7 +71,7 @@ def system_prompt(task_instruction: Optional[str] = None, action_list: Optional[
                 for a in ex["actions"]:
                     aid = name_to_id.get(a.lower())
                     if aid is not None:
-                        parts.append(f"[{aid}, {a}]")
+                        parts.append(f"[{aid}, '{a}']")
                     else:
                         parts.append(a)
                 actions_str = "| ".join(parts)
@@ -83,7 +83,7 @@ def system_prompt(task_instruction: Optional[str] = None, action_list: Optional[
         base += f"\n\n## Current Task\n{task_instruction}"
 
     if action_list is not None:
-        actions_str = "\n".join(f"[{i}, {a}]" for i, a in enumerate(action_list))
+        actions_str = "\n".join(f"[{i}, '{a}']" for i, a in enumerate(action_list))
         base += f"\n\n## Available Actions (0~{len(action_list) - 1})\n{actions_str}"
 
     return base
@@ -134,40 +134,40 @@ def free_think_format_prompt(max_actions_per_step, action_sep, add_example=True)
         base = """You should output 1 action at a time.
 Output the action as [action_id, action_name] using the ID from the available actions list.
 Your response should be in the format of:
-<think>...</think><answer>[N, action name]</answer>"""
+<think>...</think><answer>[N, 'action name']</answer>"""
     else:
         base = f"""You should output a plan of up to {max_actions_per_step} actions at a time, separated by "{action_sep}".
 Output each action as [action_id, action_name] using the ID from the available actions list.
 Your response should be in the format of:
-<think>...</think><answer>[N1, action1]{action_sep} [N2, action2]{action_sep} ...</answer>"""
+<think>...</think><answer>[N1, 'action1']{action_sep} [N2, 'action2']{action_sep} ...</answer>"""
 
     if add_example:
         if max_actions_per_step == 1:
             examples = """
 Example 1:
 <think>I need to find a mug first. Let me navigate to where mugs might be.</think>
-<answer>[5, find a Mug]</answer>
+<answer>[5, 'find a Mug']</answer>
 
 Example 2:
 <think>The mug is nearby and I'm not holding anything. I should pick it up.</think>
-<answer>[12, pick up the Mug]</answer>
+<answer>[12, 'pick up the Mug']</answer>
 
 Example 3:
 <think>I'm holding the mug and I'm near the table. Let me put it down.</think>
-<answer>[38, put down the object in hand]</answer>"""
+<answer>[38, 'put down the object in hand']</answer>"""
         else:
             examples = f"""
 Example 1 (multi-step plan):
 <think>I need to find the alarm clock, pick it up, then find the desk lamp and turn it on.</think>
-<answer>[3, find a AlarmClock]{action_sep} [15, pick up the AlarmClock]{action_sep} [7, find a DeskLamp]{action_sep} [42, turn on the DeskLamp]</answer>
+<answer>[3, 'find a AlarmClock']{action_sep} [15, 'pick up the AlarmClock']{action_sep} [7, 'find a DeskLamp']{action_sep} [42, 'turn on the DeskLamp']</answer>
 
 Example 2 (single action when unsure):
 <think>I am not sure where the mug is. Let me find it first.</think>
-<answer>[5, find a Mug]</answer>
+<answer>[5, 'find a Mug']</answer>
 
 Example 3 (replanning after failure):
 <think>The last action failed because the cabinet was closed. I need to open it first, then pick up the object.</think>
-<answer>[20, open the Cabinet]{action_sep} [12, pick up the Mug]</answer>"""
+<answer>[20, 'open the Cabinet']{action_sep} [12, 'pick up the Mug']</answer>"""
         return base + "\n" + examples
 
     return base
@@ -178,7 +178,7 @@ def wm_format_prompt(max_actions_per_step, action_sep, add_example=True):
     base = f"""You should output {max_actions_per_step} action(s) at a time.
 Output the action as [action_id, action_name] using the ID from the available actions list.
 Your response must be in the format of:
-<observation>...</observation><think>...</think><answer>[N, action name]</answer><prediction>...</prediction>.
+<observation>...</observation><think>...</think><answer>[N, 'action name']</answer><prediction>...</prediction>.
 
 Rules for <observation>:
 - Describe the current scene: what objects you see, your position, what you are holding, and relevant receptacle states.
@@ -187,26 +187,26 @@ Rules for <prediction>:
 - Predict what will change after your action: where you will be, what you will see, and the expected result.
 
 Rules for <answer>:
-- Output exactly 1 action as [action_id, action_name]."""
+- Output exactly 1 action as [action_id, 'action_name']."""
 
     if add_example:
         examples = """
 Example 1:
 <observation>I see a kitchen with a counter, a microwave, and a mug on the counter. I am not holding anything.</observation>
 <think>I need to pick up the mug. First, I should find it to get close to it.</think>
-<answer>[5, find a Mug]</answer>
+<answer>[5, 'find a Mug']</answer>
 <prediction>I will navigate to the mug and see it up close on the counter.</prediction>
 
 Example 2:
 <observation>I am close to a Mug on the counter. I am not holding anything. The mug is within reach.</observation>
 <think>The mug is nearby and I'm not holding anything. I should pick it up.</think>
-<answer>[12, pick up the Mug]</answer>
+<answer>[12, 'pick up the Mug']</answer>
 <prediction>I will be holding the mug. The counter will no longer have the mug on it.</prediction>
 
 Example 3:
 <observation>I am holding a Mug. I see a table nearby with an empty spot.</observation>
 <think>I'm holding the mug and I'm near the table. Let me put it down.</think>
-<answer>[38, put down the object in hand]</answer>
+<answer>[38, 'put down the object in hand']</answer>
 <prediction>The mug will be placed on the table. I will no longer be holding anything.</prediction>"""
         return base + "\n" + examples
 
