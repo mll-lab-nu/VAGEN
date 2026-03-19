@@ -103,7 +103,8 @@ def _get_pci_bus_id(gpu_index: int) -> str:
 
 def _xorg_running(display: int) -> bool:
     """Check if an X server is already running on the given display."""
-    return os.path.exists(f"/tmp/.X{display}-lock")
+    return (os.path.exists(f"/tmp/.X{display}-lock")
+            or os.path.exists(f"/tmp/.X11-unix/X{display}"))
 
 
 def _start_xorg(gpu_index: int, display: int) -> None:
