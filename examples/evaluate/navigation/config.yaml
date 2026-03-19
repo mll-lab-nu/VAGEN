@@ -6,7 +6,7 @@ defaults:
 #
 # Each eval_set has 60 tasks. seed=[0,60,1] covers all tasks once.
 
-fileroot: ${oc.env:HOME}/projects/vagen/VAGEN
+fileroot: ${oc.env:HOME}/projects/vagen/rollouts
 
 envs:
   - name: RemoteEnv
