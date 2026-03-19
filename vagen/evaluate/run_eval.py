@@ -325,7 +325,12 @@ def _resolve_defaults(cfg_path: str, cfg: DictConfig) -> DictConfig:
     merged = OmegaConf.create()
 
     for entry in defaults:
-        ref = str(entry)
+        if not isinstance(entry, str):
+            raise TypeError(
+                f"Each entry in 'defaults' must be a string, got {type(entry).__name__}: "
+                f"{entry!r} (in {cfg_path})"
+            )
+        ref = entry
         if not ref.endswith((".yaml", ".yml")):
             ref += ".yaml"
         ref_path = os.path.normpath(os.path.join(base_dir, ref))

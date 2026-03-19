@@ -104,7 +104,7 @@ backends:
 
 ### Output structure
 
-```
+```text
 dump_dir/
 └── tag_{tag_id}/
     ├── summary.json                    # aggregated metrics
