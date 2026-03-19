@@ -11,7 +11,7 @@ import shutil
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig, OmegaConf, open_dict
 
 from vagen.evaluate.register_builtins import *  # populate registry
 from vagen.envs.registry import get_env_cls
@@ -70,6 +70,8 @@ def _parse_env_specs(cfg: Dict[str, Any]) -> List[EnvSpec]:
     if not envs_cfg:
         raise ValueError("No envs specified. Provide env definitions under 'envs:'.")
 
+    default_chat_cfg = cfg.get("default_chat_config") or {}
+
     specs: List[EnvSpec] = []
     for item in envs_cfg:
         if not isinstance(item, dict):
@@ -82,13 +84,19 @@ def _parse_env_specs(cfg: Dict[str, Any]) -> List[EnvSpec]:
         if not isinstance(tag_id_val, (int, str)):
             tag_id_val = str(tag_id_val)
 
+        # Per-env chat_config takes priority; fall back to top-level default_chat_config
+        if "chat_config" in item:
+            chat_cfg = item.get("chat_config") or {}
+        else:
+            chat_cfg = copy.deepcopy(default_chat_cfg)
+
         spec = EnvSpec(
             name=str(item["name"]),
             n_envs=int(item["n_envs"]),
             split=str(item.get("split", "default")),
             tag_id=tag_id_val,
             config=item.get("config") or {},
-            chat_config=item.get("chat_config") or {},
+            chat_config=chat_cfg,
             seed=item.get("seed") if "seed" in item else [0],
             seed_list=item.get("seed_list"),
             max_turns=item.get("max_turns"),
@@ -289,8 +297,62 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _resolve_defaults(cfg_path: str, cfg: DictConfig) -> DictConfig:
+    """
+    If the config contains a ``defaults:`` list, load each referenced YAML
+    file and deep-merge them in order, then merge the current config on top.
+
+    Paths in ``defaults`` are resolved relative to the directory of
+    *cfg_path*.  The ``.yaml`` extension is appended automatically if omitted.
+
+    Example usage inside a YAML config::
+
+        defaults:
+          - base_viewsuite        # loads base_viewsuite.yaml next to this file
+          - ../shared/backends    # relative path also works
+
+        # only the fields you want to override
+        run:
+          backend: "claude"
+        experiment:
+          dump_dir: ${fileroot}/rollouts/claude
+    """
+    defaults = OmegaConf.select(cfg, "defaults", default=None)
+    if not defaults:
+        return cfg
+
+    base_dir = os.path.dirname(cfg_path)
+    merged = OmegaConf.create()
+
+    for entry in defaults:
+        if not isinstance(entry, str):
+            raise TypeError(
+                f"Each entry in 'defaults' must be a string, got {type(entry).__name__}: "
+                f"{entry!r} (in {cfg_path})"
+            )
+        ref = entry
+        if not ref.endswith((".yaml", ".yml")):
+            ref += ".yaml"
+        ref_path = os.path.normpath(os.path.join(base_dir, ref))
+        if not os.path.isfile(ref_path):
+            raise FileNotFoundError(f"Default config not found: {ref_path} (referenced from {cfg_path})")
+        base_cfg = OmegaConf.load(ref_path)
+        # recursively resolve nested defaults
+        base_cfg = _resolve_defaults(ref_path, base_cfg)
+        merged = OmegaConf.merge(merged, base_cfg)
+
+    # remove the 'defaults' key itself before merging
+    with open_dict(cfg):
+        if "defaults" in cfg:
+            del cfg["defaults"]
+
+    merged = OmegaConf.merge(merged, cfg)
+    return merged
+
+
 def _load_config(cfg_path: str, overrides: List[str]) -> DictConfig:
     cfg: DictConfig = OmegaConf.load(cfg_path)  # type: ignore
+    cfg = _resolve_defaults(cfg_path, cfg)
     if overrides:
         override_cfg = OmegaConf.from_dotlist(overrides)
         cfg = OmegaConf.merge(cfg, override_cfg)

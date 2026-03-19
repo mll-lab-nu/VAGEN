@@ -1,0 +1,96 @@
+# ── VAGEN Evaluation Default Config ──────────────────────────────────
+# Base config for VAGEN environment evaluations (FrozenLake, Sokoban,
+# Navigation, SpatialGym, etc.).
+#
+# Usage: create a per-experiment config that inherits from this file:
+#
+#   defaults:
+#     - ../../../vagen/configs/eval_default
+#
+#   envs:
+#     - name: FrozenLake
+#       ...
+#
+#   experiment:
+#     dump_dir: ${fileroot}/rollouts/my_experiment
+#
+# Only override the fields you need to change.
+# ─────────────────────────────────────────────────────────────────────
+
+fileroot: ${oc.env:HOME}/projects/vagen
+
+experiment:
+  dump_dir: ${fileroot}/rollouts/default
+  default_max_turns: 5
+
+run:
+  backend: "openai"
+  base_seed: 0
+  max_concurrent_jobs: 16
+  resume: skip_completed
+  live_summary: true
+
+backends:
+  openai:
+    api_key: ""               # or export OPENAI_API_KEY
+    base_url: null
+    model: "gpt-4o-mini"
+    max_concurrency: 8
+    max_retries: 6
+    min_backoff: 0.5
+    max_backoff: 8.0
+
+  azure:
+    azure_endpoint: ""        # or export AZURE_OPENAI_ENDPOINT
+    azure_api_key: ""         # or export AZURE_API_KEY
+    azure_api_version: "2024-12-01-preview"
+    deployment: "gpt-5"
+    model: ${backends.azure.deployment}
+    max_concurrency: 4
+    max_retries: 6
+    min_backoff: 0.5
+    max_backoff: 8.0
+
+  sglang:
+    base_url: "http://127.0.0.1:30000/v1"
+    api_key: "EMPTY"
+    model: ""
+    max_concurrency: 2
+    max_retries: 6
+    min_backoff: 0.5
+    max_backoff: 8.0
+
+  vllm:
+    base_url: "http://127.0.0.1:8000/v1"
+    api_key: "EMPTY"
+    model: ""
+    max_concurrency: 2
+    max_retries: 6
+    min_backoff: 0.5
+    max_backoff: 8.0
+
+  together:
+    base_url: "https://api.together.xyz/v1"
+    api_key: ""               # or export TOGETHER_API_KEY
+    model: "meta-llama/Llama-3.1-8B-Instruct-Turbo"
+    max_concurrency: 2
+    max_retries: 6
+    min_backoff: 0.5
+    max_backoff: 8.0
+
+  claude:
+    api_key: ""               # or export ANTHROPIC_API_KEY
+    base_url: null
+    model: "claude-sonnet-4-5"
+    max_concurrency: 2
+    max_retries: 6
+    min_backoff: 0.5
+    max_backoff: 8.0
+
+  gemini:
+    api_key: ""               # or export GEMINI_API_KEY
+    model: "gemini-2.5-pro"
+    max_concurrency: 2
+    max_retries: 6
+    min_backoff: 0.5
+    max_backoff: 8.0
