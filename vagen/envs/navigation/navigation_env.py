@@ -49,9 +49,10 @@ class NavigationEnvConfig:
 # Action dispatch
 # ---------------------------------------------------------------------------
 
+
 ACTION_LOOKUP = {
-    "moveahead": 1, "moveback": 2, "moveright": 3, "moveleft": 4,
-    "rotateright": 5, "rotateleft": 6, "lookup": 7, "lookdown": 8,
+    "move_forward": 1, "move_backward": 2, "move_right": 3, "move_left": 4,
+    "turn_right": 5, "turn_left": 6, "look_up": 7, "look_down": 8,
 }
 
 _ACTION_DISPATCH = {
@@ -317,7 +318,7 @@ if __name__ == "__main__":
         sep = env.cfg.action_sep
         actions = f" {sep} ".join(ACTION_LOOKUP.keys())
         print(f"\nValid actions: {actions}")
-        print(f"Wrap in format or just type raw actions (e.g. 'moveahead{sep}rotateright')\n")
+        print(f"Wrap in format or just type raw actions (e.g. 'move_forward{sep}turn_right')\n")
 
         while True:
             step += 1
