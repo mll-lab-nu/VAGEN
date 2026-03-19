@@ -4,7 +4,7 @@ set -euo pipefail
 # ---------- Defaults / Paths ----------
 fileroot="${fileroot:-"$HOME/projects/vagen"}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG="${CONFIG:-"$SCRIPT_DIR/config.yaml"}"
+CONFIG="${CONFIG:-"$SCRIPT_DIR/../config.yaml"}"
 PORT="${PORT:-30000}"
 LOG_DIR="${LOG_DIR:-"$SCRIPT_DIR/logs"}"
 mkdir -p "$LOG_DIR"
@@ -51,7 +51,6 @@ wait_for_server
 python -m vagen.evaluate.run_eval --config "${CONFIG}" \
   run.backend=sglang \
   backends.sglang.base_url="http://127.0.0.1:${PORT}/v1" \
-  backends.sglang.model="${MODEL_PATH}" \
   experiment.dump_dir="${DUMP_DIR}" \
   fileroot="${fileroot}" \
   "$@" \
