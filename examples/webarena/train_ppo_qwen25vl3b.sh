@@ -36,7 +36,7 @@ autossh -M 0 \
     -L 3000:localhost:3000 \
     -L 4399:localhost:4399 \
     -fN
-    
+
 echo "SSH tunnel established to ${WEBARENA_HOST}"
 
 export SHOPPING="http://localhost:7770"
@@ -112,15 +112,15 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     trainer.n_gpus_per_node=2 \
     trainer.nnodes=1 \
     trainer.save_freq=100 \
-    trainer.test_freq=50 \
+    trainer.test_freq=25 \
     trainer.project_name=${PROJECT_NAME} \
     trainer.experiment_name=${EXPERIMENT_NAME} \
     trainer.default_local_dir=${SAVE_CHECKPOINT_DIR} \
     trainer.validation_data_dir=${EXPERIMENT_DIR}/validation \
     trainer.rollout_data_dir=${EXPERIMENT_DIR}/rollout_data \
     trainer.log_val_generations=16 \
-    trainer.max_actor_ckpt_to_keep=3 \
-    trainer.max_critic_ckpt_to_keep=3 \
+    trainer.max_actor_ckpt_to_keep=4 \
+    trainer.max_critic_ckpt_to_keep=4 \
     data.max_prompt_length=10000 \
     data.max_response_length=10000 \
     critic.optim.lr=1e-5 \
