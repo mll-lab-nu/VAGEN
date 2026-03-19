@@ -17,7 +17,7 @@
 # Only override the fields you need to change.
 # ─────────────────────────────────────────────────────────────────────
 
-fileroot: ${oc.env:HOME}/projects/vagen/VAGEN
+fileroot: ${oc.env:HOME}/projects/vagen
 
 experiment:
   dump_dir: ${fileroot}/rollouts/default
