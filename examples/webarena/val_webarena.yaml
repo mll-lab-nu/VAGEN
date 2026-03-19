@@ -1,8 +1,8 @@
 envs:
   - name: WebArena
-    n_envs: 16 # test split (165 tasks)
+    n_envs: 165 # full test split (165 tasks, 134 after skip map)
     data_source: webarena
-    seed: [0,15,1]
+    seed: [0,164,1]
     max_turns: 30
     response_length_per_turn: 512
     config:
