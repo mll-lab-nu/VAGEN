@@ -370,7 +370,7 @@ class TextObervationProcessor(ObservationProcessor):
             "Accessibility.getFullAXTree", {}
         )["nodes"]
 
-        # De-duplicate nodes
+        # a few nodes are repeated in the accessibility tree
         seen_ids = set()
         _accessibility_tree = []
         for node in accessibility_tree:
@@ -379,23 +379,109 @@ class TextObervationProcessor(ObservationProcessor):
                 seen_ids.add(node["nodeId"])
         accessibility_tree = _accessibility_tree
 
-        # Set union_bound to a dummy value — we skip per-node bounding rect
-        # computation which required 2 CDP calls per node (the main bottleneck).
-        # Instead, all nodes get a valid bound so they pass viewport filtering.
-        # The tree is then truncated at the text level in process().
-        for node in accessibility_tree:
+        # Build backendNodeId -> viewport bounds map from DOMSnapshot.
+        # DOMSnapshot (already fetched in fetch_browser_info()) contains
+        # layout bounds for all DOM nodes in page coordinates.
+        # Convert to viewport coordinates by subtracting scroll offset.
+        # This replaces the original per-node get_bounding_client_rect()
+        # which made 2 CDP calls per node (the main performance bottleneck).
+        tree = info["DOMTree"]
+        document = tree["documents"][0]
+        dom_nodes = document["nodes"]
+        layout = document["layout"]
+        scroll_x = info["config"]["win_left_bound"]
+        scroll_y = info["config"]["win_top_bound"]
+
+        backend_to_bounds: dict[int, list[float]] = {}
+        layout_node_indices = layout["nodeIndex"]
+        layout_bounds = layout["bounds"]
+        for i, dom_node_idx in enumerate(layout_node_indices):
+            if dom_node_idx < len(dom_nodes["backendNodeId"]):
+                backend_id = dom_nodes["backendNodeId"][dom_node_idx]
+                b = layout_bounds[i]
+                backend_to_bounds[backend_id] = [
+                    b[0] - scroll_x,
+                    b[1] - scroll_y,
+                    b[2],
+                    b[3],
+                ]
+
+        nodeid_to_cursor = {}
+        for cursor, node in enumerate(accessibility_tree):
+            nodeid_to_cursor[node["nodeId"]] = cursor
             if "backendDOMNodeId" not in node:
                 node["union_bound"] = None
-            else:
-                # Mark all nodes as "in viewport" with a dummy bound.
-                # This avoids N×2 CDP round-trips for getBoundingClientRect.
+                continue
+            if node["role"]["value"] == "RootWebArea":
                 node["union_bound"] = [0.0, 0.0, 10.0, 10.0]
+            else:
+                bound = backend_to_bounds.get(int(node["backendDOMNodeId"]))
+                node["union_bound"] = list(bound) if bound is not None else None
 
-        # NOTE: viewport filtering is intentionally skipped.
-        # The original code called get_bounding_client_rect() per node
-        # (2 CDP calls each), which took 500ms-9s depending on page
-        # complexity. Skipping this and truncating the final text output
-        # is orders of magnitude faster.
+        # filter nodes that are not in the current viewport
+        if current_viewport_only:
+
+            def remove_node_in_graph(node: AccessibilityTreeNode) -> None:
+                # update the node information in the accessibility tree
+                nodeid = node["nodeId"]
+                node_cursor = nodeid_to_cursor[nodeid]
+                parent_nodeid = node["parentId"]
+                children_nodeids = node["childIds"]
+                parent_cursor = nodeid_to_cursor[parent_nodeid]
+                # update the children of the parent node
+                assert (
+                    accessibility_tree[parent_cursor].get("parentId", "Root")
+                    is not None
+                )
+                # remove the nodeid from parent's childIds
+                index = accessibility_tree[parent_cursor]["childIds"].index(
+                    nodeid
+                )
+                accessibility_tree[parent_cursor]["childIds"].pop(index)
+                # Insert children_nodeids in the same location
+                for child_nodeid in children_nodeids:
+                    accessibility_tree[parent_cursor]["childIds"].insert(
+                        index, child_nodeid
+                    )
+                    index += 1
+                # update children node's parent
+                for child_nodeid in children_nodeids:
+                    child_cursor = nodeid_to_cursor[child_nodeid]
+                    accessibility_tree[child_cursor][
+                        "parentId"
+                    ] = parent_nodeid
+                # mark as removed
+                accessibility_tree[node_cursor]["parentId"] = "[REMOVED]"
+
+            config = info["config"]
+            for node in accessibility_tree:
+                if not node["union_bound"]:
+                    remove_node_in_graph(node)
+                    continue
+
+                [x, y, width, height] = node["union_bound"]
+
+                # invisible node
+                if width == 0 or height == 0:
+                    remove_node_in_graph(node)
+                    continue
+
+                in_viewport_ratio = self.get_element_in_viewport_ratio(
+                    elem_left_bound=float(x),
+                    elem_top_bound=float(y),
+                    width=float(width),
+                    height=float(height),
+                    config=config,
+                )
+
+                if in_viewport_ratio < IN_VIEWPORT_RATIO_THRESHOLD:
+                    remove_node_in_graph(node)
+
+            accessibility_tree = [
+                node
+                for node in accessibility_tree
+                if node.get("parentId", "Root") != "[REMOVED]"
+            ]
 
         return accessibility_tree
 
@@ -555,17 +641,6 @@ class TextObervationProcessor(ObservationProcessor):
                 accessibility_tree
             )
             content = self.clean_accesibility_tree(content)
-            # Truncate to max length to keep observation manageable.
-            # Since we skip per-node viewport filtering (too expensive),
-            # the tree may be larger than before. Truncate at line boundary
-            # to avoid cutting mid-node.
-            if len(content) > UTTERANCE_MAX_LENGTH:
-                truncated = content[:UTTERANCE_MAX_LENGTH]
-                # Cut at last newline to keep lines intact
-                last_nl = truncated.rfind("\n")
-                if last_nl > 0:
-                    truncated = truncated[:last_nl]
-                content = truncated + "\n[... truncated]"
             self.obs_nodes_info = obs_nodes_info
             self.meta_data["obs_nodes_info"] = obs_nodes_info
 
