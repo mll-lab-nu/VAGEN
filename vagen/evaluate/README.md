@@ -36,25 +36,34 @@ envs:
       max_actions_per_step: 5
 
 experiment:
-  dump_dir: ${fileroot}/rollouts/Qwen2.5-VL-3B-Instruct   # rollout output root
-  default_max_turns: 5                                      # fallback if env omits max_turns
+  dump_dir: ${fileroot}/rollouts/eval_frozenlake   # rollout output root
+  default_max_turns: 5                              # fallback if env omits max_turns
 
 run:
-  backend: "sglang"               # which backend to use (see backends section)
-  base_seed: 0                    # global seed offset added to all env seeds
-  max_concurrent_jobs: 64         # max episodes running in parallel
-  resume: skip_completed          # skip_completed | off | force_rerun
-  live_summary: true              # write summary.json after each episode finishes
+  backend: "openai"              # which backend to use (see backends section)
+  base_seed: 0                   # global seed offset added to all env seeds
+  max_concurrent_jobs: 64        # max episodes running in parallel
+  resume: skip_completed         # skip_completed | off | force_rerun
+  live_summary: true             # write summary.json after each episode finishes
 
 backends:
-  sglang:
+  sglang:                                 # for local model serving
     base_url: "http://127.0.0.1:30000/v1"
     api_key: "EMPTY"
-    model: "Qwen/Qwen2.5-VL-3B-Instruct"
-    max_concurrency: 2            # max concurrent API requests (rate limit gate)
-    max_retries: 6                # retry count on transient errors
-    min_backoff: 0.5              # exponential backoff lower bound (seconds)
-    max_backoff: 8.0              # exponential backoff upper bound (seconds)
+    model: ""                             # set by sglang launch script
+    max_concurrency: 2
+    max_retries: 6
+    min_backoff: 0.5
+    max_backoff: 8.0
+
+  openai:                                 # for API-based models
+    api_key: ""                           # or export OPENAI_API_KEY
+    base_url: null
+    model: "gpt-4.1-mini"
+    max_concurrency: 8                    # max concurrent API requests (rate limit gate)
+    max_retries: 6                        # retry count on transient errors
+    min_backoff: 0.5                      # exponential backoff lower bound (seconds)
+    max_backoff: 8.0                      # exponential backoff upper bound (seconds)
 ```
 
 ### Parameter reference
