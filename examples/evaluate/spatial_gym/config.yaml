@@ -1,3 +1,8 @@
+defaults:
+  - ../../../vagen/configs/eval_default
+
+fileroot: ${oc.env:HOME}/projects/vagen/VAGEN
+
 envs:
   - name: SpatialGym
     n_envs: 20
@@ -24,7 +29,7 @@ experiment:
   default_max_turns: 16
 
 run:
-  backend: openai
+  backend: "openai"
   base_seed: 0
   max_concurrent_jobs: 3
   resume: skip_completed
@@ -32,19 +37,10 @@ run:
 
 backends:
   openai:
-    api_key: ""
+    api_key: ""               # or export OPENAI_API_KEY
     base_url: null
     model: "gpt-4.1-mini"
     max_concurrency: 3
     max_retries: 6
     min_backoff: 1.0
     max_backoff: 16.0
-
-  sglang:
-    base_url: "http://127.0.0.1:30000/v1"
-    api_key: "EMPTY"
-    model: "Qwen/Qwen2.5-VL-7B-Instruct"
-    max_concurrency: 3
-    max_retries: 6
-    min_backoff: 0.5
-    max_backoff: 8.0
