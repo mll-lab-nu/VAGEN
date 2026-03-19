@@ -1,6 +1,6 @@
 """Pre-download all AI2-THOR scenes used by the navigation environment.
 
-Scans all *.json files under the adjacent datasets/ folder to collect
+Scans all *.json files under the adjacent assets/ folder to collect
 every unique scene, then creates a Controller and resets each scene
 once so AI2-THOR caches the binary + scene assets under ~/.ai2thor/.
 
@@ -15,7 +15,7 @@ import glob
 import os
 import time
 
-DATASETS_DIR = os.path.join(os.path.dirname(__file__), "datasets")
+DATASETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 
 
 def get_all_scenes():
