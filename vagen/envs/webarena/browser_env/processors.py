@@ -370,7 +370,7 @@ class TextObervationProcessor(ObservationProcessor):
             "Accessibility.getFullAXTree", {}
         )["nodes"]
 
-        # a few nodes are repeated in the accessibility tree
+        # De-duplicate nodes
         seen_ids = set()
         _accessibility_tree = []
         for node in accessibility_tree:
@@ -379,94 +379,23 @@ class TextObervationProcessor(ObservationProcessor):
                 seen_ids.add(node["nodeId"])
         accessibility_tree = _accessibility_tree
 
-        nodeid_to_cursor = {}
-        for cursor, node in enumerate(accessibility_tree):
-            nodeid_to_cursor[node["nodeId"]] = cursor
-            # usually because the node is not visible etc
+        # Set union_bound to a dummy value — we skip per-node bounding rect
+        # computation which required 2 CDP calls per node (the main bottleneck).
+        # Instead, all nodes get a valid bound so they pass viewport filtering.
+        # The tree is then truncated at the text level in process().
+        for node in accessibility_tree:
             if "backendDOMNodeId" not in node:
                 node["union_bound"] = None
-                continue
-            backend_node_id = str(node["backendDOMNodeId"])
-            if node["role"]["value"] == "RootWebArea":
-                # always inside the viewport
-                node["union_bound"] = [0.0, 0.0, 10.0, 10.0]
             else:
-                response = self.get_bounding_client_rect(
-                    client, backend_node_id
-                )
-                if response.get("result", {}).get("subtype", "") == "error":
-                    node["union_bound"] = None
-                else:
-                    x = response["result"]["value"]["x"]
-                    y = response["result"]["value"]["y"]
-                    width = response["result"]["value"]["width"]
-                    height = response["result"]["value"]["height"]
-                    node["union_bound"] = [x, y, width, height]
+                # Mark all nodes as "in viewport" with a dummy bound.
+                # This avoids N×2 CDP round-trips for getBoundingClientRect.
+                node["union_bound"] = [0.0, 0.0, 10.0, 10.0]
 
-        # filter nodes that are not in the current viewport
-        if current_viewport_only:
-
-            def remove_node_in_graph(node: AccessibilityTreeNode) -> None:
-                # update the node information in the accessibility tree
-                nodeid = node["nodeId"]
-                node_cursor = nodeid_to_cursor[nodeid]
-                parent_nodeid = node["parentId"]
-                children_nodeids = node["childIds"]
-                parent_cursor = nodeid_to_cursor[parent_nodeid]
-                # update the children of the parent node
-                assert (
-                    accessibility_tree[parent_cursor].get("parentId", "Root")
-                    is not None
-                )
-                # remove the nodeid from parent's childIds
-                index = accessibility_tree[parent_cursor]["childIds"].index(
-                    nodeid
-                )
-                accessibility_tree[parent_cursor]["childIds"].pop(index)
-                # Insert children_nodeids in the same location
-                for child_nodeid in children_nodeids:
-                    accessibility_tree[parent_cursor]["childIds"].insert(
-                        index, child_nodeid
-                    )
-                    index += 1
-                # update children node's parent
-                for child_nodeid in children_nodeids:
-                    child_cursor = nodeid_to_cursor[child_nodeid]
-                    accessibility_tree[child_cursor][
-                        "parentId"
-                    ] = parent_nodeid
-                # mark as removed
-                accessibility_tree[node_cursor]["parentId"] = "[REMOVED]"
-
-            config = info["config"]
-            for node in accessibility_tree:
-                if not node["union_bound"]:
-                    remove_node_in_graph(node)
-                    continue
-
-                [x, y, width, height] = node["union_bound"]
-
-                # invisible node
-                if width == 0 or height == 0:
-                    remove_node_in_graph(node)
-                    continue
-
-                in_viewport_ratio = self.get_element_in_viewport_ratio(
-                    elem_left_bound=float(x),
-                    elem_top_bound=float(y),
-                    width=float(width),
-                    height=float(height),
-                    config=config,
-                )
-
-                if in_viewport_ratio < IN_VIEWPORT_RATIO_THRESHOLD:
-                    remove_node_in_graph(node)
-
-            accessibility_tree = [
-                node
-                for node in accessibility_tree
-                if node.get("parentId", "Root") != "[REMOVED]"
-            ]
+        # NOTE: viewport filtering is intentionally skipped.
+        # The original code called get_bounding_client_rect() per node
+        # (2 CDP calls each), which took 500ms-9s depending on page
+        # complexity. Skipping this and truncating the final text output
+        # is orders of magnitude faster.
 
         return accessibility_tree
 
@@ -626,6 +555,17 @@ class TextObervationProcessor(ObservationProcessor):
                 accessibility_tree
             )
             content = self.clean_accesibility_tree(content)
+            # Truncate to max length to keep observation manageable.
+            # Since we skip per-node viewport filtering (too expensive),
+            # the tree may be larger than before. Truncate at line boundary
+            # to avoid cutting mid-node.
+            if len(content) > UTTERANCE_MAX_LENGTH:
+                truncated = content[:UTTERANCE_MAX_LENGTH]
+                # Cut at last newline to keep lines intact
+                last_nl = truncated.rfind("\n")
+                if last_nl > 0:
+                    truncated = truncated[:last_nl]
+                content = truncated + "\n[... truncated]"
             self.obs_nodes_info = obs_nodes_info
             self.meta_data["obs_nodes_info"] = obs_nodes_info
 
