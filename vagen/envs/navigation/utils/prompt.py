@@ -57,19 +57,19 @@ def get_format_instruction(
 
 _BASE_SYSTEM_PROMPT = """\
 You are a home robot and perform navigation tasks according to instructions.
-Actions you can take: moveahead, moveback, moveright, moveleft, rotateright, rotateleft, lookup, lookdown.
-moveahead: Move forward by some distance
-moveback: Move backward by some distance
-moveright: Move rightward by some distance
-moveleft: Move leftward by some distance
-rotateright: Rotate to the right by 90 degrees
-rotateleft: Rotate to the left by 90 degrees
-lookup: Tilt the camera upward by 30 degrees
-lookdown: Tilt the camera downward by 30 degrees
+Actions you can take: move_forward, move_backward, move_right, move_left, turn_right, turn_left, look_up, look_down.
+move_forward: Move forward by some distance
+move_backward: Move backward by some distance
+move_right: Move rightward by some distance
+move_left: Move leftward by some distance
+turn_right: Rotate to the right by 90 degrees
+turn_left: Rotate to the left by 90 degrees
+look_up: Tilt the camera upward by 30 degrees
+look_down: Tilt the camera downward by 30 degrees
 The instruction will be provided in the first observation. Look at the image carefully and navigate to complete the instruction.
 Hints:
-1. You can take multiple actions at a time, in most cases, if you find the target object is far away from you, you can call moveahead, moveleft and move right multiple times.
-2. If you find yourself seems to be stuck, you can lookdown to see if there's any object above or below you, you can also rotate to see if there's any object behind you."""
+1. You can take multiple actions at a time, in most cases, if you find the target object is far away from you, you can call move_forward, move_left and move_right multiple times.
+2. If you find yourself seems to be stuck, you can look_down to see if there's any object above or below you, you can also rotate to see if there's any object behind you."""
 
 _EXAMPLES = [
     """\
@@ -79,19 +79,19 @@ image_1
 I can see the garbage can in the upper left corner of the image, next to the kitchen sink. \
 To move there, we can go forward-left, but since there's a kitchen counter directly ahead, \
 we should go left first.
-<action>moveleft{sep} moveleft</action>
+<action>move_left{sep} move_left</action>
 Round 2:
 Env_feedback: Last action is executed successfully.
 image_2
 By moving leftward, we are getting closer to the garbage can. \
 Now, the garbage can is in front of me, slightly to the left. There's a large area ahead.
-<action>moveahead{sep} moveahead{sep} moveahead{sep} moveleft</action>
+<action>move_forward{sep} move_forward{sep} move_forward{sep} move_left</action>
 Round 3:
 Env_feedback: Last action is executed successfully.
 image_3
 The garbage can is very close, still to our front-left. \
 There is still space in front of me to get closer.
-<action>moveahead{sep} moveahead{sep} moveleft</action>
+<action>move_forward{sep} move_forward{sep} move_left</action>
 Round 4:
 Env_feedback: Success""",
 ]
