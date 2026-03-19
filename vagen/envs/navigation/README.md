@@ -1,6 +1,6 @@
 # Navigation Environment
 
-AI2-THOR based indoor navigation environment. The agent receives egocentric RGB images and follows natural language instructions to navigate to target locations.
+Modified from [EmbodiedBench](https://github.com/EmbodiedBench/EmbodiedBench) navigation environment. The agent receives egocentric RGB images and follows natural language instructions to navigate to target locations.
 
 ## Installation
 
@@ -18,7 +18,7 @@ AI2-THOR runs a Unity backend process per environment instance. It requires a GP
 
 ## Server
 
-The navigation environment runs as a separate server (via `envs_remote` framework) because AI2-THOR controllers are heavy GPU processes that can't share a process with training.
+The navigation environment runs as a separate server (via `envs_remote` framework).
 
 ```bash
 # Pre-download scene assets (recommended, avoids runtime downloads)
@@ -37,8 +37,6 @@ Key parameters:
 
 ## Evaluation
 
-Start the server, then run eval:
-
 ```bash
 # Terminal 1: start server
 
@@ -49,8 +47,6 @@ bash examples/evaluate/navigation/run_eval.sh
 Config: `examples/evaluate/navigation/config.yaml`
 
 ## Training
-
-Start the server, then run training:
 
 ```bash
 # Terminal 1: start server
