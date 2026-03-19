@@ -90,7 +90,7 @@ class NavigationHandler(BaseGymHandler):
 
     def _get_scene_for_seed(self, eval_set: str, seed: int) -> Optional[str]:
         if eval_set not in self._scene_index:
-            path = os.path.join(os.path.dirname(__file__), "datasets", f"{eval_set}.json")
+            path = os.path.join(os.path.dirname(__file__), "assets", f"{eval_set}.json")
             try:
                 with open(path) as f:
                     self._scene_index[eval_set] = [t["scene"] for t in json.load(f)["tasks"]]

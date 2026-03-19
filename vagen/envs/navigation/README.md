@@ -56,4 +56,7 @@ cd VAGEN
 bash examples/train/navigation/train_ppo_qwen25vl7b.sh
 ```
 
+## Performance
+![Performance](assets/performance.png)
+
 
