@@ -22,7 +22,7 @@ export MAP="http://localhost:3000"
 export HOMEPAGE="http://localhost:4399"
 
 # Remote browser server (set to empty to use local Playwright)
-export REMOTE_BROWSER_URL="${REMOTE_BROWSER_URL:-http://localhost:5100}"
+export REMOTE_BROWSER_URL=""
 
 PROJECT_NAME="verl_vagen"
 EXPERIMENT_NAME="webarena_ppo_qwen25vl3b"
