@@ -127,13 +127,33 @@ def match_action(
     """
     Match a parsed action against the valid action set.
 
-    Supports two formats:
+    Supports multiple formats (in priority order):
+      - ERA-style [id, action_name]: "[42, find a Cabinet]"
+      - Legacy (id: N) suffix: "find a Cabinet (id: 42)"
+      - Plain action ID: "42"
       - Action name (case-insensitive): "find a Cabinet"
-      - Action ID (integer): "42"
 
     Returns the original action string if matched, None otherwise.
     """
     name = action_name.strip()
+
+    # Try ERA-style [id, action_name] format
+    bracket_match = re.match(r'^\[(\d+),\s*(.+?)\]$', name)
+    if bracket_match:
+        idx = int(bracket_match.group(1))
+        if 0 <= idx < len(action_list):
+            return action_list[idx]
+        # ID out of range; try name part
+        fallback_name = bracket_match.group(2).strip()
+        return action_map.get(fallback_name.lower())
+
+    # Try legacy "(id: N)" suffix
+    id_match = re.search(r'\(id:\s*(\d+)\)\s*$', name)
+    if id_match:
+        idx = int(id_match.group(1))
+        if 0 <= idx < len(action_list):
+            return action_list[idx]
+        name = name[:id_match.start()].strip()
 
     # Try as integer action ID
     try:

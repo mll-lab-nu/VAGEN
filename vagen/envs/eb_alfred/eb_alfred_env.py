@@ -352,6 +352,7 @@ class EbAlfred(GymImageEnv):
                 last_action=self._last_action,
                 env_feedback=self._last_feedback,
                 img_str=img_str,
+                task_instruction=self.env.episode_language_instruction,
             )
 
         return {
