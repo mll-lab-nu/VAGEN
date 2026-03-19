@@ -5,7 +5,7 @@ set -euo pipefail
 #   python -m vagen.envs.navigation.serve --port 8000
 
 # ---------- Defaults / Paths ----------
-fileroot="${fileroot:-"$HOME/projects/vagen/VAGEN"}"
+fileroot="${fileroot:-"$HOME/projects/vagen"}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG="${CONFIG:-"$SCRIPT_DIR/../config.yaml"}"
 PORT="${PORT:-30000}"
