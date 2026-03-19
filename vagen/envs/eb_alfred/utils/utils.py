@@ -104,6 +104,21 @@ def parse_wm(response: str, action_sep: str = ",", max_actions: int = 1) -> Dict
     }
 
 
+def normalize_era_tokens(response: str) -> str:
+    """
+    Convert ERA special tokens to VAGEN plain tags so the parser can handle
+    models trained with ERA's SFT format.
+
+    ERA format:   <|think_start|>...<|think_end|><|action_start|>...<|action_end|>
+    VAGEN format: <think>...</think><answer>...</answer>
+    """
+    response = response.replace("<|think_start|>", "<think>")
+    response = response.replace("<|think_end|>", "</think>")
+    response = response.replace("<|action_start|>", "<answer>")
+    response = response.replace("<|action_end|>", "</answer>")
+    return response
+
+
 def parse_response(
     response: str,
     prompt_format: str = "free_think",
@@ -111,6 +126,7 @@ def parse_response(
     max_actions: int = 1,
 ) -> Dict:
     """Parse LLM response based on the specified prompt format."""
+    response = normalize_era_tokens(response)
     if prompt_format == "free_think":
         return parse_free_think(response, action_sep, max_actions)
     elif prompt_format == "wm":
