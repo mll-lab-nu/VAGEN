@@ -28,7 +28,7 @@ envs:
 
   - name: RemoteEnv
     n_envs: 60
-    tag_id: navigation_base
+    tag_id: navigation_common_sense
     seed: [0, 60, 1]
     max_turns: 10
     config:
