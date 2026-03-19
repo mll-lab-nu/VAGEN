@@ -928,14 +928,18 @@ class RayPPOTrainer:
             assert len(lst) == 0 or len(lst) == len(sample_scores), f"{key_info}: {len(lst)=}, {len(sample_scores)=}"
 
         data_sources = np.concatenate(data_source_lst, axis=0)
+        metric_dict = {}
 
         # Filter out reset-failed episodes from validation metrics
         reset_failed_flags = reward_extra_infos_dict.get("reset_failed", [])
         if reset_failed_flags:
             valid_mask = [not f for f in reset_failed_flags]
             n_failed = sum(1 for f in reset_failed_flags if f)
+            n_total = len(reset_failed_flags)
+            metric_dict["val-aux/reset_failed_ratio"] = float(n_failed) / n_total if n_total > 0 else 0.0
+            metric_dict["val-aux/reset_failed_count"] = n_failed
             if n_failed > 0:
-                print(f"Filtering out {n_failed}/{len(reset_failed_flags)} reset-failed episodes from validation metrics")
+                print(f"Filtering out {n_failed}/{n_total} reset-failed episodes from validation metrics")
                 data_sources = data_sources[valid_mask]
                 sample_uids = [u for u, v in zip(sample_uids, valid_mask) if v]
                 filtered_infos_dict = {}
@@ -949,7 +953,6 @@ class RayPPOTrainer:
                 reward_extra_infos_dict = filtered_infos_dict
 
         data_src2var2metric2val = process_validation_metrics(data_sources, sample_uids, reward_extra_infos_dict)
-        metric_dict = {}
         for data_source, var2metric2val in data_src2var2metric2val.items():
             core_var = "acc" if "acc" in var2metric2val else "reward"
             for var_name, metric2val in var2metric2val.items():
@@ -1639,6 +1642,26 @@ class RayPPOTrainer:
                 # TODO: implement actual tflpo and theoretical tflpo
                 n_gpus = self.resource_pool_manager.get_n_gpus()
                 metrics.update(compute_throughout_metrics(batch=batch, timing_raw=timing_raw, n_gpus=n_gpus))
+
+                # log rollout episode statistics from non_tensor_batch
+                if "reset_failed" in batch.non_tensor_batch:
+                    reset_failed = np.asarray(batch.non_tensor_batch["reset_failed"], dtype=bool)
+                    total = len(reset_failed)
+                    metrics["rollout/reset_failed_ratio"] = float(reset_failed.sum()) / total
+                    metrics["rollout/reset_failed_count"] = int(reset_failed.sum())
+                if "traj_success" in batch.non_tensor_batch:
+                    traj_success = np.asarray(batch.non_tensor_batch["traj_success"], dtype=float)
+                    metrics["rollout/traj_success_rate"] = float(traj_success.mean())
+                if "response_truncated" in batch.non_tensor_batch:
+                    resp_trunc = np.asarray(batch.non_tensor_batch["response_truncated"], dtype=float)
+                    metrics["rollout/response_truncated_ratio"] = float(resp_trunc.mean())
+                if "prompt_truncated" in batch.non_tensor_batch:
+                    prompt_trunc = np.asarray(batch.non_tensor_batch["prompt_truncated"], dtype=float)
+                    metrics["rollout/prompt_truncated_ratio"] = float(prompt_trunc.mean())
+                if "response_mask" in batch.batch:
+                    response_mask = batch.batch["response_mask"]
+                    empty_mask = (response_mask.sum(dim=-1) == 0).float()
+                    metrics["rollout/empty_response_ratio"] = float(empty_mask.mean())
                 # Note: mismatch metrics (KL, PPL, etc.) are collected at line 1179 after advantage computation
 
                 # this is experimental and may be changed/removed in the future in favor of a general-purpose one

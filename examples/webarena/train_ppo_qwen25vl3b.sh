@@ -13,6 +13,32 @@ mkdir -p /workspace/tmp /workspace/ray_tmp
 ray stop --force 2>/dev/null
 ray start --head --temp-dir=/workspace/ray_tmp
 
+# SSH tunnel to WebArena Docker machine (auto-reconnect on disconnect)
+WEBARENA_HOST="${WEBARENA_HOST:-76.71.171.224}"
+WEBARENA_SSH_PORT="${WEBARENA_SSH_PORT:-18116}"
+WEBARENA_SSH_USER="${WEBARENA_SSH_USER:-root}"
+
+# Kill any existing tunnel
+pkill -f "ssh.*${WEBARENA_SSH_PORT}.*${WEBARENA_HOST}" 2>/dev/null || true
+sleep 1
+
+autossh -M 0 \
+    -o "ServerAliveInterval=10" \
+    -o "ServerAliveCountMax=3" \
+    -o "ExitOnForwardFailure=yes" \
+    -o "StrictHostKeyChecking=no" \
+    -p ${WEBARENA_SSH_PORT} ${WEBARENA_SSH_USER}@${WEBARENA_HOST} \
+    -L 7770:localhost:7770 \
+    -L 7780:localhost:7780 \
+    -L 8023:localhost:8023 \
+    -L 9999:localhost:9999 \
+    -L 8888:localhost:8888 \
+    -L 3000:localhost:3000 \
+    -L 4399:localhost:4399 \
+    -fN
+    
+echo "SSH tunnel established to ${WEBARENA_HOST}"
+
 export SHOPPING="http://localhost:7770"
 export SHOPPING_ADMIN="http://localhost:7780/admin"
 export GITLAB="http://localhost:8023"
@@ -105,5 +131,6 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     critic.model.fsdp_config.param_offload=True \
     critic.model.fsdp_config.optimizer_offload=True \
     filter.enable=False \
+    +trainer.resume_from_checkpoint=${SAVE_CHECKPOINT_DIR}/global_step_100 \
     trainer.total_training_steps=400 2>&1 | \
     tee ${EXPERIMENT_DIR}/${PROJECT_NAME}_${EXPERIMENT_NAME}.log >(tee ${BASEDIR}/${PROJECT_NAME}_${EXPERIMENT_NAME}.log >/dev/null)
