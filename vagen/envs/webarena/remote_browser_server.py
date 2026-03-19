@@ -10,6 +10,9 @@ Key optimisation: Chromium browser processes are pooled and reused
 across sessions. Only the browser *context* (cookies, pages) is
 created/destroyed per reset, saving ~1-2s of browser launch overhead.
 
+Each browser has its own dedicated thread (Playwright sync API uses
+greenlets bound to the thread that called sync_playwright()).
+
 Usage:
     python -m vagen.envs.webarena.remote_browser_server --port 5100 --max-sessions 32
 """
@@ -39,14 +42,10 @@ app = Flask(__name__)
 class BrowserPool:
     """Pool of reusable Chromium browser instances.
 
-    Each browser process can host multiple contexts (sessions).
-    This avoids the ~1-2s cost of launching a new Chromium per reset.
-
-    Only browser LAUNCH uses a dedicated thread (to avoid the Playwright
-    "sync API inside asyncio loop" error). All subsequent operations
-    (new_context, goto, step, get_obs, etc.) run directly in the caller
-    thread — Playwright objects are thread-safe for method calls after
-    initialization.
+    Each browser runs in its own dedicated thread because Playwright
+    sync API binds greenlets to the creating thread. ALL operations
+    on a browser (new_context, goto, step, get_obs, close) must run
+    on that browser's thread via _run_on_browser().
     """
 
     def __init__(self, pool_size: int = 4):
@@ -55,8 +54,14 @@ class BrowserPool:
         self._browsers: List[Dict[str, Any]] = []
         self._initialized = False
 
+    def _run_on_browser(self, pool_index: int, fn, *args, timeout: float = 120, **kwargs):
+        """Run fn in the browser's dedicated thread."""
+        executor = self._browsers[pool_index]["executor"]
+        future = executor.submit(fn, *args, **kwargs)
+        return future.result(timeout=timeout)
+
     def initialize(self):
-        """Pre-launch browser processes, each in its own clean thread."""
+        """Pre-launch browser processes, each in its own thread."""
         with self._lock:
             if self._initialized:
                 return
@@ -64,11 +69,11 @@ class BrowserPool:
 
         logger.info("Initializing browser pool with %d browsers...", self.pool_size)
         for i in range(self.pool_size):
-            # Launch in a dedicated thread to avoid asyncio loop conflicts.
-            # sync_playwright().__enter__() fails if the current thread has
-            # an asyncio loop; a fresh ThreadPoolExecutor thread is clean.
+            # Each browser gets a PERSISTENT single-thread executor.
+            # The thread stays alive for the lifetime of the server.
+            # Playwright's greenlet is bound to this thread.
             executor = concurrent.futures.ThreadPoolExecutor(
-                max_workers=1, thread_name_prefix=f"pw-init-{i}"
+                max_workers=1, thread_name_prefix=f"pw-browser-{i}"
             )
 
             def _launch():
@@ -83,13 +88,13 @@ class BrowserPool:
 
             future = executor.submit(_launch)
             cm, pw, browser = future.result(timeout=60)
-            executor.shutdown(wait=False)  # thread no longer needed
 
             entry = {
                 "context_manager": cm,
                 "playwright": pw,
                 "browser": browser,
                 "session_count": 0,
+                "executor": executor,  # kept alive!
             }
             with self._lock:
                 self._browsers.append(entry)
@@ -102,7 +107,6 @@ class BrowserPool:
         with self._lock:
             if not self._initialized:
                 raise RuntimeError("Browser pool not initialized.")
-
             min_idx = min(range(len(self._browsers)),
                           key=lambda i: self._browsers[i]["session_count"])
             entry = self._browsers[min_idx]
@@ -128,6 +132,10 @@ class BrowserPool:
                     entry["context_manager"].__exit__(None, None, None)
                 except Exception:
                     pass
+                try:
+                    entry["executor"].shutdown(wait=False)
+                except Exception:
+                    pass
             self._browsers.clear()
             self._initialized = False
 
@@ -137,11 +145,11 @@ class BrowserPool:
 @dataclass
 class BrowserSession:
     session_id: str
-    pool_index: int           # which browser in the pool
-    context: Any              # BrowserContext
-    page: Any                 # Page
-    client: Any               # CDPSession
-    observation_handler: Any  # ObservationHandler
+    pool_index: int
+    context: Any
+    page: Any
+    client: Any
+    observation_handler: Any
     config: dict
     created_at: float = field(default_factory=time.time)
     last_used: float = field(default_factory=time.time)
@@ -194,59 +202,59 @@ class SessionManager:
                 elif ss:
                     storage_state_path = ss
 
-            # Acquire a browser from the pool (no launch cost!)
             browser, pool_index = self.browser_pool.acquire()
-
-            # All Playwright calls below run directly in the Flask request
-            # thread — no executor needed. Playwright objects are safe to
-            # call from any thread after initialization.
             viewport = {"width": viewport_width, "height": viewport_height}
 
-            context = browser.new_context(
-                viewport=viewport,
-                storage_state=storage_state_path,
-                geolocation=config.get("geolocation"),
-                device_scale_factor=1,
-            )
+            # Must run in the browser's dedicated thread (Playwright greenlet binding)
+            def _do_create():
+                context = browser.new_context(
+                    viewport=viewport,
+                    storage_state=storage_state_path,
+                    geolocation=config.get("geolocation"),
+                    device_scale_factor=1,
+                )
 
-            # Clean up temp storage_state file
+                start_url = config.get("start_url")
+                if start_url:
+                    for url in start_url.split(" |AND| "):
+                        page = context.new_page()
+                        client = page.context.new_cdp_session(page)
+                        if observation_type == "accessibility_tree":
+                            client.send("Accessibility.enable")
+                        page.client = client
+                        page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                    active_page = context.pages[0]
+                    active_page.bring_to_front()
+                else:
+                    active_page = context.new_page()
+                    client = active_page.context.new_cdp_session(active_page)
+                    if observation_type == "accessibility_tree":
+                        client.send("Accessibility.enable")
+                    active_page.client = client
+
+                active_client = active_page.client
+
+                from vagen.envs.webarena.browser_env.processors import ObservationHandler
+                obs_handler = ObservationHandler(
+                    "text", observation_type, "",
+                    current_viewport_only=current_viewport_only,
+                    viewport_size=viewport,
+                )
+                obs = obs_handler.get_observation(active_page, active_client)
+                obs_text = obs.get("text", str(obs)) if isinstance(obs, dict) else str(obs)
+
+                return context, active_page, active_client, obs_handler, obs_text
+
+            context, active_page, active_client, obs_handler, obs_text = \
+                self.browser_pool._run_on_browser(pool_index, _do_create)
+
+            # Clean up temp files
             if tmp_dir:
                 try:
                     os.unlink(storage_state_path)
                     os.rmdir(tmp_dir)
                 except OSError:
                     pass
-
-            # Navigate to start URL(s)
-            start_url = config.get("start_url")
-            if start_url:
-                for url in start_url.split(" |AND| "):
-                    page = context.new_page()
-                    client = page.context.new_cdp_session(page)
-                    if observation_type == "accessibility_tree":
-                        client.send("Accessibility.enable")
-                    page.client = client  # type: ignore
-                    page.goto(url, wait_until="domcontentloaded", timeout=30000)
-                active_page = context.pages[0]
-                active_page.bring_to_front()
-            else:
-                active_page = context.new_page()
-                client = active_page.context.new_cdp_session(active_page)
-                if observation_type == "accessibility_tree":
-                    client.send("Accessibility.enable")
-                active_page.client = client  # type: ignore
-
-            active_client = active_page.client  # type: ignore
-
-            # Create observation handler & get initial observation
-            from vagen.envs.webarena.browser_env.processors import ObservationHandler
-            obs_handler = ObservationHandler(
-                "text", observation_type, "",
-                current_viewport_only=current_viewport_only,
-                viewport_size=viewport,
-            )
-            obs = obs_handler.get_observation(active_page, active_client)
-            obs_text = obs.get("text", str(obs)) if isinstance(obs, dict) else str(obs)
 
             session = BrowserSession(
                 session_id=session_id,
@@ -279,12 +287,17 @@ class SessionManager:
     def _close_session(self, session_id: str):
         session = self.sessions.pop(session_id, None)
         if session:
+            def _do_close():
+                try:
+                    session.client.detach()
+                except Exception:
+                    pass
+                try:
+                    session.context.close()
+                except Exception:
+                    pass
             try:
-                session.client.detach()
-            except Exception:
-                pass
-            try:
-                session.context.close()
+                self.browser_pool._run_on_browser(session.pool_index, _do_close)
             except Exception:
                 pass
             self.browser_pool.release(session.pool_index)
@@ -370,49 +383,61 @@ def step(session_id):
     action_str = req.get("action", "")
     t0 = time.time()
 
-    from vagen.envs.webarena.browser_env import create_id_based_action
-    from vagen.envs.webarena.browser_env.actions import execute_action
+    def _do_step():
+        from vagen.envs.webarena.browser_env import create_id_based_action
+        from vagen.envs.webarena.browser_env.actions import execute_action
 
-    fail_error = ""
-    try:
-        action = create_id_based_action(action_str)
-        session.page = execute_action(
-            action,
-            session.page,
-            session.context,
-            session.observation_handler.action_processor,
-        )
-        # Update CDP client if page changed (e.g. new_tab, tab_focus)
-        if not hasattr(session.page, 'client') or session.page.client is None:
-            client = session.page.context.new_cdp_session(session.page)
-            if session.observation_type == "accessibility_tree":
-                client.send("Accessibility.enable")
-            session.page.client = client  # type: ignore
-            session.client = client
-    except Exception as e:
-        fail_error = str(e)
+        t_action = time.time()
+        _fail_error = ""
+        try:
+            action = create_id_based_action(action_str)
+            session.page = execute_action(
+                action,
+                session.page,
+                session.context,
+                session.observation_handler.action_processor,
+            )
+            if not hasattr(session.page, 'client') or session.page.client is None:
+                client = session.page.context.new_cdp_session(session.page)
+                if session.observation_type == "accessibility_tree":
+                    client.send("Accessibility.enable")
+                session.page.client = client
+                session.client = client
+        except Exception as e:
+            _fail_error = str(e)
+        dt_action = time.time() - t_action
 
-    # Get observation
-    obs_text = ""
-    try:
-        obs = session.observation_handler.get_observation(session.page, session.client)
-        obs_text = obs.get("text", str(obs)) if isinstance(obs, dict) else str(obs)
-    except Exception as e:
-        obs_text = f"Observation failed: {e}"
+        t_obs = time.time()
+        _obs_text = ""
+        try:
+            obs = session.observation_handler.get_observation(session.page, session.client)
+            _obs_text = obs.get("text", str(obs)) if isinstance(obs, dict) else str(obs)
+        except Exception as e:
+            _obs_text = f"Observation failed: {e}"
+        dt_obs = time.time() - t_obs
+
+        _url = ""
+        try:
+            _url = session.page.url
+        except Exception:
+            pass
+
+        return _obs_text, _fail_error, _url, dt_action, dt_obs
+
+    obs_text, fail_error, url, dt_action, dt_obs = \
+        session_manager.browser_pool._run_on_browser(session.pool_index, _do_step)
 
     obs_changed = obs_text != session.prev_obs_text
     session.prev_obs_text = obs_text
 
     elapsed = time.time() - t0
-
-    url = ""
-    try:
-        url = session.page.url
-    except Exception:
-        pass
+    dt_overhead = elapsed - dt_action - dt_obs
 
     clean_info = {
         "step_time": elapsed,
+        "action_time": dt_action,
+        "obs_time": dt_obs,
+        "overhead_time": dt_overhead,
         "obs_changed": obs_changed,
         "fail_error": fail_error,
         "url": url,
@@ -436,32 +461,34 @@ def evaluate(session_id):
     with open(config_path, "w") as f:
         json.dump(req.get("config", {}), f)
 
-    try:
+    def _do_eval():
         from vagen.envs.webarena.evaluation_harness.evaluators import evaluator_router
-        evaluator = evaluator_router(config_path)
-        last_action = {"answer": req.get("answer", "")}
-        trajectory = [last_action]
+        try:
+            evaluator = evaluator_router(config_path)
+            last_action = {"answer": req.get("answer", "")}
+            trajectory = [last_action]
+            page = session.page
+            client = page.context.new_cdp_session(page)
+            try:
+                return evaluator(
+                    trajectory=trajectory,
+                    config_file=config_path,
+                    page=page,
+                    client=client,
+                )
+            finally:
+                client.detach()
+        except Exception as e:
+            logger.error("Evaluation failed: %s", e)
+            return 0.0
 
-        page = session.page
-        client = page.context.new_cdp_session(page)
-        try:
-            score = evaluator(
-                trajectory=trajectory,
-                config_file=config_path,
-                page=page,
-                client=client,
-            )
-        finally:
-            client.detach()
-    except Exception as e:
-        logger.error("Evaluation failed: %s", e)
-        score = 0.0
-    finally:
-        try:
-            os.unlink(config_path)
-            os.rmdir(config_dir)
-        except OSError:
-            pass
+    score = session_manager.browser_pool._run_on_browser(session.pool_index, _do_eval)
+
+    try:
+        os.unlink(config_path)
+        os.rmdir(config_dir)
+    except OSError:
+        pass
 
     return jsonify({"score": score})
 
@@ -520,7 +547,6 @@ def main():
     session_manager.session_timeout = args.session_timeout
     session_manager.browser_pool = BrowserPool(pool_size=args.browser_pool_size)
 
-    # Pre-launch browsers (each in a clean thread to avoid asyncio conflicts)
     session_manager.browser_pool.initialize()
 
     logger.info(

@@ -385,9 +385,14 @@ def profile_remote_browser(remote_url: str, seeds: List[int], rounds: int = 1) -
 
             results["step_total"].append(dt_step)
             results["step_network"].append(step_net)
+            step_info = step_data.get("info", {})
+            action_t = step_info.get("action_time", 0)
+            obs_t = step_info.get("obs_time", 0)
+            overhead_t = step_info.get("overhead_time", 0)
             print(f"    seed={seed} [{','.join(sites)}] step:  "
                   f"total={fmt_time(dt_step)}  server={fmt_time(server_step_time)}  "
-                  f"network={fmt_time(step_net)}")
+                  f"network={fmt_time(step_net)}  "
+                  f"[action={fmt_time(action_t)} obs={fmt_time(obs_t)} overhead={fmt_time(overhead_t)}]")
 
             # CLOSE
             t0 = time.perf_counter()

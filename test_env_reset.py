@@ -18,17 +18,17 @@ SEEDS_STR = os.environ.get("SEEDS", "")
 # Check env vars first
 required_vars = ["SHOPPING", "SHOPPING_ADMIN", "GITLAB", "REDDIT", "WIKIPEDIA", "MAP", "HOMEPAGE"]
 print("=== Environment Variables ===")
-for var in required_vars:
-    val = os.environ.get(var, "")
-    print(f"  {var}={val}")
-    if not val:
-        print(f"ERROR: {var} not set!")
-        sys.exit(1)
 if REMOTE_BROWSER_URL:
     print(f"  REMOTE_BROWSER_URL={REMOTE_BROWSER_URL}")
-    print(f"  Mode: REMOTE")
+    print(f"  Mode: REMOTE (service env vars not required on training server)")
 else:
     print(f"  Mode: LOCAL (Playwright)")
+    for var in required_vars:
+        val = os.environ.get(var, "")
+        print(f"  {var}={val}")
+        if not val:
+            print(f"ERROR: {var} not set!")
+            sys.exit(1)
 
 from vagen.envs.webarena.webarena_env import WebArenaEnv
 
