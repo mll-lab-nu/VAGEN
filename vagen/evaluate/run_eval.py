@@ -70,7 +70,15 @@ def _parse_env_specs(cfg: Dict[str, Any]) -> List[EnvSpec]:
     if not envs_cfg:
         raise ValueError("No envs specified. Provide env definitions under 'envs:'.")
 
-    default_chat_cfg = cfg.get("default_chat_config") or {}
+    raw_default_chat_cfg = cfg.get("default_chat_config")
+    if raw_default_chat_cfg is None:
+        default_chat_cfg: Dict[str, Any] = {}
+    elif isinstance(raw_default_chat_cfg, dict):
+        default_chat_cfg = raw_default_chat_cfg
+    else:
+        raise TypeError(
+            f"default_chat_config must be a mapping, got {type(raw_default_chat_cfg).__name__}"
+        )
 
     specs: List[EnvSpec] = []
     for item in envs_cfg:
@@ -86,7 +94,16 @@ def _parse_env_specs(cfg: Dict[str, Any]) -> List[EnvSpec]:
 
         # Per-env chat_config takes priority; fall back to top-level default_chat_config
         if "chat_config" in item:
-            chat_cfg = item.get("chat_config") or {}
+            raw_chat_cfg = item.get("chat_config")
+            if raw_chat_cfg is None:
+                chat_cfg = {}
+            elif isinstance(raw_chat_cfg, dict):
+                chat_cfg = raw_chat_cfg
+            else:
+                raise TypeError(
+                    f"env '{item.get('name')}' chat_config must be a mapping, "
+                    f"got {type(raw_chat_cfg).__name__}"
+                )
         else:
             chat_cfg = copy.deepcopy(default_chat_cfg)
 
@@ -297,7 +314,7 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _resolve_defaults(cfg_path: str, cfg: DictConfig) -> DictConfig:
+def _resolve_defaults(cfg_path: str, cfg: DictConfig, _visited: Optional[set] = None) -> DictConfig:
     """
     If the config contains a ``defaults:`` list, load each referenced YAML
     file and deep-merge them in order, then merge the current config on top.
@@ -321,6 +338,13 @@ def _resolve_defaults(cfg_path: str, cfg: DictConfig) -> DictConfig:
     if not defaults:
         return cfg
 
+    if _visited is None:
+        _visited = set()
+    abs_cfg_path = os.path.abspath(cfg_path)
+    if abs_cfg_path in _visited:
+        raise ValueError(f"Cyclic defaults reference detected at: {abs_cfg_path}")
+    _visited.add(abs_cfg_path)
+
     base_dir = os.path.dirname(cfg_path)
     merged = OmegaConf.create()
 
@@ -338,7 +362,7 @@ def _resolve_defaults(cfg_path: str, cfg: DictConfig) -> DictConfig:
             raise FileNotFoundError(f"Default config not found: {ref_path} (referenced from {cfg_path})")
         base_cfg = OmegaConf.load(ref_path)
         # recursively resolve nested defaults
-        base_cfg = _resolve_defaults(ref_path, base_cfg)
+        base_cfg = _resolve_defaults(ref_path, base_cfg, _visited)
         merged = OmegaConf.merge(merged, base_cfg)
 
     # remove the 'defaults' key itself before merging
