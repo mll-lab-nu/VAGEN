@@ -68,7 +68,7 @@ _ACTION_DISPATCH = {
 
 VALID_EVAL_SETS = [
     "base", "common_sense", "complex_instruction", "visual_appearance", "long_horizon",
-    "base_train", "common_sense_train",
+    "base_train", "common_sense_train", "long_horizon_train",
 ]
 
 
@@ -97,7 +97,7 @@ class NavigationEnv(GymImageEnv):
         self._info: Dict[str, Any] = {}
 
     def _load_dataset(self) -> List[Dict]:
-        path = os.path.join(os.path.dirname(__file__), "datasets", f"{self.cfg.eval_set}.json")
+        path = os.path.join(os.path.dirname(__file__), "assets", f"{self.cfg.eval_set}.json")
         with open(path) as f:
             tasks = json.load(f)["tasks"]
         if 0 < self.cfg.down_sample_ratio < 1:

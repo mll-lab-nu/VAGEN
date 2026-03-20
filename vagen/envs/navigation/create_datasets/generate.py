@@ -18,6 +18,9 @@ Usage:
         --dataset_type base --tasks_per_scene 30 --output base_train.json
 
     python -m vagen.envs.navigation.create_datasets.generate \
+        --dataset_type long_horizon --output long_horizon_train.json
+
+    python -m vagen.envs.navigation.create_datasets.generate \
         --dataset_type base --output base_train.json --append
 """
 
@@ -83,12 +86,12 @@ GRID_SIZE = 0.1
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate navigation training tasks.")
     parser.add_argument("--output", type=str, default="base_train.json",
-                        help="Output JSON file name (saved to ../datasets/)")
+                        help="Output JSON file name (saved to ../assets/)")
     parser.add_argument("--tasks_per_scene", type=int, default=DEFAULT_TASKS_PER_SCENE,
                         help="Number of tasks to generate per scene")
     parser.add_argument("--append", action="store_true",
                         help="Append to existing file instead of overwriting")
-    parser.add_argument("--dataset_type", type=str, choices=["base", "common_sense"],
+    parser.add_argument("--dataset_type", type=str, choices=["base", "common_sense", "long_horizon"],
                         default="base", help="Type of instructions to generate")
     parser.add_argument("--gpu_device", type=int, default=0,
                         help="GPU device ID for AI2-THOR rendering")
@@ -132,6 +135,24 @@ def get_common_sense_instruction(object_type: str) -> str:
     return f"I am looking for the {object_type} to complete a task. {suffix}"
 
 
+def get_away_facing_rotation(agent_pos: Dict[str, float], target_pos: Dict[str, float]) -> float:
+    """Return a rotation (0/90/180/270) that faces AWAY from the target.
+
+    Computes the angle from agent to target, then picks the closest
+    cardinal direction that points in the opposite direction.
+    AI2-THOR rotation convention: 0=+Z, 90=+X, 180=-Z, 270=-X.
+    """
+    dx = target_pos["x"] - agent_pos["x"]
+    dz = target_pos["z"] - agent_pos["z"]
+    # Angle toward target in degrees (AI2-THOR: 0=+Z, clockwise)
+    toward_angle = np.degrees(np.arctan2(dx, dz)) % 360
+    # Opposite direction
+    away_angle = (toward_angle + 180) % 360
+    # Snap to nearest cardinal direction
+    cardinals = [0.0, 90.0, 180.0, 270.0]
+    return min(cardinals, key=lambda c: min(abs(away_angle - c), 360 - abs(away_angle - c)))
+
+
 # ---------------------------------------------------------------------------
 # Main generation
 # ---------------------------------------------------------------------------
@@ -139,8 +160,8 @@ def get_common_sense_instruction(object_type: str) -> str:
 def generate() -> None:
     args = parse_args()
 
-    # Output goes to ../datasets/ relative to this package
-    datasets_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "datasets")
+    # Output goes to ../assets/ relative to this package
+    datasets_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets")
     output_path = os.path.join(datasets_dir, args.output) if not os.path.isabs(args.output) else args.output
 
     current_tasks: List[Dict[str, Any]] = []
@@ -220,6 +241,10 @@ def generate() -> None:
                     instruction = get_common_sense_instruction(target["objectType"])
                 else:
                     instruction = get_base_instruction(target["objectType"])
+
+                # Long-horizon: face away from target for harder exploration
+                if args.dataset_type == "long_horizon":
+                    rotation = get_away_facing_rotation(start_pos, target["position"])
 
                 task = {
                     "targetObjectType": target["objectType"],
