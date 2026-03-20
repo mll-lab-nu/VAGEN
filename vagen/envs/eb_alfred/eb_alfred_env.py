@@ -135,6 +135,8 @@ class EbAlfred(GymImageEnv):
         self._total_env_steps: int = 0
         self._last_action: str = ""
         self._last_feedback: str = ""
+        self._last_thinking: str = ""
+        self._last_action_id: Optional[int] = None
         self._action_list: List[str] = []
         self._action_map: Dict[str, str] = {}  # lowercase -> original
 
@@ -204,6 +206,8 @@ class EbAlfred(GymImageEnv):
         self._total_env_steps = 0
         self._last_action = ""
         self._last_feedback = ""
+        self._last_thinking = ""
+        self._last_action_id = None
 
         # Build action lookup for this episode (action space is dynamic)
         self._action_list = list(self.env.language_skill_set)
@@ -245,6 +249,7 @@ class EbAlfred(GymImageEnv):
 
         actions = parsed.get("actions", [])
         format_correct = parsed.get("format_correct", False)
+        self._last_thinking = parsed.get("think_content", "")
 
         metrics = {
             "turn_metrics": {
@@ -285,6 +290,7 @@ class EbAlfred(GymImageEnv):
                 )
 
                 self._last_action = matched
+                self._last_action_id = self._action_list.index(matched) if matched in self._action_list else None
                 self._last_feedback = step_info.get("env_feedback", "")
 
                 action_success = step_info.get("last_action_success", 0.0)
@@ -346,6 +352,7 @@ class EbAlfred(GymImageEnv):
         if init:
             obs_str = init_observation_template(
                 img_str=img_str,
+                task_instruction=self.env.episode_language_instruction,
             )
         else:
             obs_str = action_template(
@@ -353,6 +360,9 @@ class EbAlfred(GymImageEnv):
                 env_feedback=self._last_feedback,
                 img_str=img_str,
                 task_instruction=self.env.episode_language_instruction,
+                step_id=self._total_turns - 1,
+                thinking=self._last_thinking,
+                action_id=self._last_action_id,
             )
 
         return {

@@ -109,13 +109,27 @@ def normalize_era_tokens(response: str) -> str:
     Convert ERA special tokens to VAGEN plain tags so the parser can handle
     models trained with ERA's SFT format.
 
-    ERA format:   <|think_start|>...<|think_end|><|action_start|>...<|action_end|>
-    VAGEN format: <think>...</think><answer>...</answer>
+    ERA model outputs multi-turn style:
+      <|think_start|>...<|think_end|><|im_end|>\n<|im_start|>assistant\n<|think_start|>[id, 'action']<|action_end|>
+    We need to convert this to:
+      <think>...</think><answer>[id, 'action']</answer>
     """
-    response = response.replace("<|think_start|>", "<think>")
-    response = response.replace("<|think_end|>", "</think>")
+    # Strip multi-turn separators the model sometimes emits
+    response = re.sub(r'<\|im_end\|>\s*<\|im_start\|>assistant\s*', '', response)
+    # The model may use <|think_start|> for both think and action blocks;
+    # after stripping im tokens, the second <|think_start|> is the action block
     response = response.replace("<|action_start|>", "<answer>")
     response = response.replace("<|action_end|>", "</answer>")
+    # Convert think tokens — but the second one (action) should become <answer>
+    parts = response.split("<|think_start|>")
+    if len(parts) >= 3:
+        # parts[0]=before, parts[1]=think content, parts[2]=action content
+        think_part = parts[1].replace("<|think_end|>", "")
+        action_part = parts[2]
+        response = f"<think>{think_part.strip()}</think><answer>{action_part}"
+    else:
+        response = response.replace("<|think_start|>", "<think>")
+        response = response.replace("<|think_end|>", "</think>")
     return response
 
 
