@@ -40,7 +40,8 @@ class EnvSpecs:
 def load_envspecs(yaml_path: str) -> EnvSpecs:
     print(yaml_path)
     cfg = OmegaConf.load(yaml_path)
-    specs = [EnvSpec(**OmegaConf.to_container(s, resolve=True)) for s in cfg.get("envs", [])]
+    valid_fields = {f.name for f in EnvSpec.__dataclass_fields__.values()}
+    specs = [EnvSpec(**{k: v for k, v in OmegaConf.to_container(s, resolve=True).items() if k in valid_fields}) for s in cfg.get("envs", [])]
     return EnvSpecs(specs=specs)
 
 # Upper bound used for RNG sampling when only a base seed is provided

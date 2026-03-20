@@ -22,6 +22,9 @@ pip install "ai2thor==2.1.0" "gym==0.23.0" "numpy<2.0" \
 pip install "flask==1.1.4" "werkzeug==1.0.1" \
     "markupsafe<2.1" "jinja2<3.0" "itsdangerous<2.0"
 pip install "opencv-python-headless<4.9"
+pip install fire uvicorn httpx fastapi python-multipart
+apt-get install -y xorg 
+
 ```
 
 **Download dataset** (`eval_set` selects the split: `base` — standard tasks, `long` — longer horizon):
@@ -37,6 +40,18 @@ mv EB-ALFRED /root/EmbodiedBench/embodiedbench/envs/eb_alfred/data/json_2.1.0
 conda activate embodiedbench
 python -m vagen.envs.eb_alfred.serve
 ```
+
+> **Note (this machine):** The `embodiedbench` conda env is at `/venv/embodiedbench`. Use `PYTHONPATH` to inject the VAGEN repo without reinstalling and risking version conflicts:
+>
+> ```bash
+> # Extra dep needed once
+> /venv/embodiedbench/bin/pip install hydra-core
+>
+> # Start server
+> PYTHONPATH=/workspace/VAGEN /venv/embodiedbench/bin/python -m vagen.envs.eb_alfred.serve
+> ```
+>
+> AI2-THOR will auto-download Unity (~390MB) on first connect. Verified working: server starts, `/connect` returns session_id, Unity initializes on display `:3`, session reaches `env ready` state.
 
 Key parameters:
 - `devices`: GPU indices (default: auto-detect via `CUDA_VISIBLE_DEVICES` or `nvidia-smi`)
