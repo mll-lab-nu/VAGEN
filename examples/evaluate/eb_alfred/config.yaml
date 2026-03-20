@@ -141,14 +141,14 @@ experiment:
   default_max_turns: 30
 
 run:
-  backend: "openai"
+  backend: "sglang"
   base_seed: 0
   max_concurrent_jobs: 1
   resume: skip_completed
   live_summary: true
 
 backends:
-  openai:
+  sglang:
     base_url: "http://127.0.0.1:30000/v1"
     api_key: "EMPTY"
     model: "EPL-Only-Model_EB-Alfred"
