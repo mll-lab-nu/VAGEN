@@ -93,7 +93,7 @@ backends:
 **`run`**:
 - `backend` — Which backend to use: `openai` | `azure` | `sglang` | `vllm` | `together` | `claude` | `gemini` | `openai_responses` | `azure_responses`
 - `max_concurrent_jobs` — Episode-level parallelism (how many episodes run at once)
-- `resume` — `skip_completed` skips episodes with existing successful metrics; `off` reruns everything
+- `resume` — `skip_completed` skips episodes with existing successful metrics; `off` reruns everything; `force_rerun` forces rerunning all episodes regardless of existing successful metrics (overrides `skip_completed` behavior)
 - `live_summary` — Refresh `summary.json` after each episode
 
 **`backends.{name}`** — Config for each backend:
