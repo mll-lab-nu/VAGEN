@@ -109,27 +109,47 @@ def normalize_era_tokens(response: str) -> str:
     Convert ERA special tokens to VAGEN plain tags so the parser can handle
     models trained with ERA's SFT format.
 
-    ERA model outputs multi-turn style:
-      <|think_start|>...<|think_end|><|im_end|>\n<|im_start|>assistant\n<|think_start|>[id, 'action']<|action_end|>
-    We need to convert this to:
-      <think>...</think><answer>[id, 'action']</answer>
+    Handles two cases:
+    1. Special tokens present (e.g. from Flask server / transformers):
+       <|think_start|>...<|think_end|><|im_end|>\n<|im_start|>assistant\n<|think_start|>[id, 'action']<|action_end|>
+    2. Special tokens stripped by sglang/vllm (plain text separators):
+       visual_description: ... reasoning: ... language_plan: ...\nassistant\n[id, 'action']
+    Both are converted to: <think>...</think><answer>[id, 'action']</answer>
     """
-    # Strip multi-turn separators the model sometimes emits
-    response = re.sub(r'<\|im_end\|>\s*<\|im_start\|>assistant\s*', '', response)
-    # The model may use <|think_start|> for both think and action blocks;
-    # after stripping im tokens, the second <|think_start|> is the action block
-    response = response.replace("<|action_start|>", "<answer>")
-    response = response.replace("<|action_end|>", "</answer>")
-    # Convert think tokens — but the second one (action) should become <answer>
-    parts = response.split("<|think_start|>")
-    if len(parts) >= 3:
-        # parts[0]=before, parts[1]=think content, parts[2]=action content
-        think_part = parts[1].replace("<|think_end|>", "")
-        action_part = parts[2]
-        response = f"<think>{think_part.strip()}</think><answer>{action_part}"
-    else:
-        response = response.replace("<|think_start|>", "<think>")
-        response = response.replace("<|think_end|>", "</think>")
+    # Case 1: special tokens present
+    if "<|think_start|>" in response or "<|action_start|>" in response:
+        response = re.sub(r'<\|im_end\|>\s*<\|im_start\|>assistant\s*', '', response)
+        response = response.replace("<|action_start|>", "<answer>")
+        response = response.replace("<|action_end|>", "</answer>")
+        parts = response.split("<|think_start|>")
+        if len(parts) >= 3:
+            think_part = parts[1].replace("<|think_end|>", "")
+            action_part = parts[2]
+            response = f"<think>{think_part.strip()}</think><answer>{action_part}"
+        else:
+            response = response.replace("<|think_start|>", "<think>")
+            response = response.replace("<|think_end|>", "</think>")
+        return response
+
+    # Case 2: sglang/vllm stripped special tokens, plain text separators
+    # Pattern: "thinking text\nassistant\n[id, 'action']" or just "[id, 'action']"
+    # Try splitting on "\nassistant\n"
+    assistant_split = re.split(r'\nassistant\s*\n', response)
+    if len(assistant_split) >= 2:
+        think_part = assistant_split[0].strip()
+        action_part = assistant_split[-1].strip()
+        return f"<think>{think_part}</think><answer>{action_part}</answer>"
+
+    # Fallback: look for [id, 'action'] at the end
+    action_match = re.search(r'(\[(\d+),\s*[\'"]?.+?[\'"]?\s*\])\s*$', response)
+    if action_match:
+        think_part = response[:action_match.start()].strip()
+        action_part = action_match.group(1)
+        if think_part:
+            return f"<think>{think_part}</think><answer>{action_part}</answer>"
+        return f"<answer>{action_part}</answer>"
+
+    # Nothing matched, return as-is (will fail format_correct)
     return response
 
 
