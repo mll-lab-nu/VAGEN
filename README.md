@@ -184,8 +184,9 @@ pip install -e .
 cd ../
 
 # vagen
-git clone https://github.com/RAGEN-AI/VAGEN.git
+git clone https://github.com/mll-lab-nu/VAGEN.git
 cd VAGEN
+git checkout vagen-legacy
 bash scripts/install.sh
 # This script installs dependencies for Frozenlake and Sokoban, for other environments, please refer to vagen/env/README.md
 ```
