@@ -15,7 +15,7 @@ envs:
       max_turns: 6
       max_actions_per_step: 20
       max_env_steps: 30
-      action_sep: ","
+      action_sep: "|"
       prompt_format: free_think
       use_example_in_sys_prompt: true
       format_reward: 0.1
@@ -37,7 +37,7 @@ envs:
       max_turns: 6
       max_actions_per_step: 20
       max_env_steps: 30
-      action_sep: ","
+      action_sep: "|"
       prompt_format: free_think
       use_example_in_sys_prompt: true
       format_reward: 0.1
@@ -59,7 +59,7 @@ envs:
       max_turns: 6
       max_actions_per_step: 20
       max_env_steps: 30
-      action_sep: ","
+      action_sep: "|"
       prompt_format: free_think
       use_example_in_sys_prompt: true
       format_reward: 0.1
