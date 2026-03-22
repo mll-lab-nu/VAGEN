@@ -12,7 +12,7 @@ SAVE_CHECKPOINT_DIR=${EXPERIMENT_DIR}/verl_checkpoints
 DATASET_TRAIN=${SCRIPTDIR}/train_eb_alfred_vision.yaml
 DATASET_VAL=${SCRIPTDIR}/val_eb_alfred_vision.yaml
 agent_loop_config_path=${BASEDIR}/vagen/configs/agent_no_concat.yaml
-REF_MODEL_PATH=Qwen/Qwen2.5-VL-3B-Instruct
+REF_MODEL_PATH=/scratch/bgig/jma6/Qwen2.5-VL-3B-Instruct-EB-ALFRED-vagen-sft
 mkdir -p ${EXPERIMENT_DIR}
 
 export HF_HOME=/workspace/.hf_home
