@@ -1,0 +1,158 @@
+fileroot: ${oc.env:HOME}/workspace/Yaning/VAGEN
+
+envs:
+  - name: RemoteEnv
+    n_envs: 51
+    data_source: eb_alfred
+    tag_id: eb_alfred_eval_era_base
+    seed: [0, 51, 1]
+    max_turns: 30
+    concat_multi_turn: false
+    config:
+      base_urls:
+        - "http://localhost:8000"
+      timeout: 600
+      eval_set: base
+      obs_image_size: 500
+      max_turns: 30
+      max_actions_per_step: 20
+      max_env_steps: 30
+      action_sep: "|"
+      prompt_format: free_think
+      use_example_in_sys_prompt: true
+      format_reward: 0.1
+      success_reward: 1.0
+    chat_config:
+      temperature: 0
+      max_tokens: 2048
+      top_p: 1.0
+      stop: ["<|diff_marker|>"]
+
+  - name: RemoteEnv
+    n_envs: 50
+    data_source: eb_alfred
+    tag_id: eb_alfred_eval_era_common_sense
+    seed: [0, 50, 1]
+    max_turns: 30
+    concat_multi_turn: false
+    config:
+      base_urls:
+        - "http://localhost:8000"
+      timeout: 600
+      eval_set: common_sense
+      obs_image_size: 500
+      max_turns: 30
+      max_actions_per_step: 20
+      max_env_steps: 30
+      action_sep: "|"
+      prompt_format: free_think
+      use_example_in_sys_prompt: true
+      format_reward: 0.1
+      success_reward: 1.0
+    chat_config:
+      temperature: 0
+      max_tokens: 2048
+      top_p: 1.0
+      stop: ["<|diff_marker|>"]
+
+  - name: RemoteEnv
+    n_envs: 50
+    data_source: eb_alfred
+    tag_id: eb_alfred_eval_era_complex_instruction
+    seed: [0, 50, 1]
+    max_turns: 30
+    concat_multi_turn: false
+    config:
+      base_urls:
+        - "http://localhost:8000"
+      timeout: 600
+      eval_set: complex_instruction
+      obs_image_size: 500
+      max_turns: 30
+      max_actions_per_step: 20
+      max_env_steps: 30
+      action_sep: "|"
+      prompt_format: free_think
+      use_example_in_sys_prompt: true
+      format_reward: 0.1
+      success_reward: 1.0
+    chat_config:
+      temperature: 0
+      max_tokens: 2048
+      top_p: 1.0
+      stop: ["<|diff_marker|>"]
+
+  - name: RemoteEnv
+    n_envs: 50
+    data_source: eb_alfred
+    tag_id: eb_alfred_eval_era_spatial
+    seed: [0, 50, 1]
+    max_turns: 30
+    concat_multi_turn: false
+    config:
+      base_urls:
+        - "http://localhost:8000"
+      timeout: 600
+      eval_set: spatial
+      obs_image_size: 500
+      max_turns: 30
+      max_actions_per_step: 20
+      max_env_steps: 30
+      action_sep: "|"
+      prompt_format: free_think
+      use_example_in_sys_prompt: true
+      format_reward: 0.1
+      success_reward: 1.0
+    chat_config:
+      temperature: 0
+      max_tokens: 2048
+      top_p: 1.0
+      stop: ["<|diff_marker|>"]
+
+  - name: RemoteEnv
+    n_envs: 50
+    data_source: eb_alfred
+    tag_id: eb_alfred_eval_era_visual_appearance
+    seed: [0, 50, 1]
+    max_turns: 30
+    concat_multi_turn: false
+    config:
+      base_urls:
+        - "http://localhost:8000"
+      timeout: 600
+      eval_set: visual_appearance
+      obs_image_size: 500
+      max_turns: 30
+      max_actions_per_step: 20
+      max_env_steps: 30
+      action_sep: "|"
+      prompt_format: free_think
+      use_example_in_sys_prompt: true
+      format_reward: 0.1
+      success_reward: 1.0
+    chat_config:
+      temperature: 0
+      max_tokens: 2048
+      top_p: 1.0
+      stop: ["<|diff_marker|>"]
+
+experiment:
+  dump_dir: ${fileroot}/rollouts/eval_eb_alfred_era
+  default_max_turns: 30
+
+run:
+  backend: "sglang"
+  base_seed: 0
+  max_concurrent_jobs: 1
+  resume: skip_completed
+  live_summary: true
+
+backends:
+  sglang:
+    base_url: "http://127.0.0.1:30000/v1"
+    api_key: "EMPTY"
+    model: "EPL-Only-Model_EB-Alfred"
+    max_concurrency: 1
+    max_retries: 6
+    min_backoff: 0.5
+    max_backoff: 8.0
