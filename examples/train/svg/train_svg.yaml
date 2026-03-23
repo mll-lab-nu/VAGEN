@@ -1,0 +1,19 @@
+envs:
+  - name: RemoteEnv
+    n_envs: 5000
+    data_source: svg
+    seed: [0, 50000]
+    max_turns: 3
+    response_length_per_turn: 2048
+    config:
+      base_urls: "http://localhost:8002"
+      timeout: 120
+      retries: 3
+      prompt_format: free_think
+      max_actions_per_step: 1
+      action_sep: "~~"
+      format_reward: 0.5
+      format_penalty: 0.0
+      dino_weight: 5.0
+      structural_weight: 10.0
+      dreamsim_weight: 0.0
