@@ -64,6 +64,7 @@ class SVGEnv(GymImageEnv):
         dataset=None,
         dino_model=None,
         dreamsim_model=None,
+        score_batcher=None,
     ):
         super().__init__(env_config)
         self.config = SvgEnvConfig(**env_config)
@@ -71,6 +72,8 @@ class SVGEnv(GymImageEnv):
         # Shared scoring models (injected by handler)
         self._dino = dino_model
         self._dreamsim = dreamsim_model
+        # Async batch scorer (injected by handler, preferred over direct model calls)
+        self._score_batcher = score_batcher
 
         # Dataset (shared across envs, loaded once in handler)
         self.dataset = dataset
@@ -187,16 +190,25 @@ class SVGEnv(GymImageEnv):
             self.gen_image = gen_image
 
             score_config = self.config.get_score_config()
-            scores = await asyncio.to_thread(
-                calculate_total_score,
-                self.gt_image,
-                gen_image,
-                self.gt_svg_code,
-                self.gen_svg_code,
-                score_config,
-                self._dino,
-                self._dreamsim,
-            )
+
+            if self._score_batcher is not None:
+                # Async batched scoring — multiple sessions' requests
+                # are collected and processed together
+                scores = await self._score_batcher.submit(
+                    self.gt_image, gen_image, score_config
+                )
+            else:
+                # Fallback: direct per-instance scoring
+                scores = await asyncio.to_thread(
+                    calculate_total_score,
+                    self.gt_image,
+                    gen_image,
+                    self.gt_svg_code,
+                    self.gen_svg_code,
+                    score_config,
+                    self._dino,
+                    self._dreamsim,
+                )
 
             self.reward += scores["total_score"]
             info["scores"] = scores

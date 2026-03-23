@@ -2,7 +2,7 @@ envs:
   - name: RemoteEnv
     n_envs: 5000
     data_source: svg
-    seed: [0, 50000]
+    seed: [0, 5000, 1]
     max_turns: 3
     response_length_per_turn: 2048
     config:

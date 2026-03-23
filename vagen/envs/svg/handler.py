@@ -1,9 +1,12 @@
 """
 Handler for the SVG environment.
 
-Key design: DINO and DreamSim models are loaded once in the handler
-and shared across all SVGEnv sessions, avoiding per-instance GPU waste.
-The dataset is also loaded once and shared.
+Key design:
+- DINO and DreamSim models are loaded once in the handler and shared
+  across all SVGEnv sessions, avoiding per-instance GPU waste.
+- A ScoreBatcher collects scoring requests from concurrent sessions
+  and runs them as a single batch for efficient GPU utilisation.
+- The dataset is also loaded once and shared.
 """
 
 from __future__ import annotations
@@ -21,7 +24,7 @@ LOGGER = logging.getLogger(__name__)
 
 class SVGHandler(BaseGymHandler):
     """
-    Handler with shared DINO/DreamSim models and dataset.
+    Handler with shared DINO/DreamSim models, ScoreBatcher, and dataset.
 
     Usage:
         handler = SVGHandler(
@@ -41,6 +44,9 @@ class SVGHandler(BaseGymHandler):
         dino_device: str = "cuda:0",
         dreamsim_device: str = "cuda:0",
         preload_models: bool = True,
+        # Batcher config
+        max_batch_size: int = 32,
+        max_wait_seconds: float = 0.05,
         # Dataset config
         dataset_name: str = "starvector/svg-icons-simple",
         data_dir: str = "data",
@@ -50,10 +56,13 @@ class SVGHandler(BaseGymHandler):
         self._model_size = model_size
         self._dino_device = dino_device
         self._dreamsim_device = dreamsim_device
+        self._max_batch_size = max_batch_size
+        self._max_wait_seconds = max_wait_seconds
 
         # Lazy-loaded shared resources
         self._dino_model = None
         self._dreamsim_model = None
+        self._score_batcher = None
         self._dataset = None
 
         self._dataset_name = dataset_name
@@ -83,6 +92,19 @@ class SVGHandler(BaseGymHandler):
             self._dreamsim_model = DreamSimScoreCalculator(device=self._dreamsim_device)
             LOGGER.info("DreamSim loaded.")
 
+        if self._score_batcher is None:
+            from .score_batcher import ScoreBatcher
+            self._score_batcher = ScoreBatcher(
+                dino_model=self._dino_model,
+                dreamsim_model=self._dreamsim_model,
+                max_batch_size=self._max_batch_size,
+                max_wait_seconds=self._max_wait_seconds,
+            )
+            LOGGER.info(
+                f"ScoreBatcher created (max_batch={self._max_batch_size}, "
+                f"max_wait={self._max_wait_seconds}s)"
+            )
+
     def _ensure_dataset(self):
         if self._dataset is None:
             LOGGER.info(f"Loading dataset {self._dataset_name} ({self._split}) ...")
@@ -96,7 +118,7 @@ class SVGHandler(BaseGymHandler):
     # ------------------------------------------------------------------
 
     async def create_env(self, env_config: Dict[str, Any]) -> SVGEnv:
-        """Create an SVGEnv with shared models and dataset injected."""
+        """Create an SVGEnv with shared models, batcher, and dataset injected."""
         self._ensure_models()
         self._ensure_dataset()
         return SVGEnv(
@@ -104,6 +126,7 @@ class SVGHandler(BaseGymHandler):
             dataset=self._dataset,
             dino_model=self._dino_model,
             dreamsim_model=self._dreamsim_model,
+            score_batcher=self._score_batcher,
         )
 
     # ------------------------------------------------------------------

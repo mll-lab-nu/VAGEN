@@ -8,7 +8,7 @@ fileroot: ${oc.env:HOME}/projects/vagen
 
 envs:
   - name: RemoteEnv
-    n_envs: 4
+    n_envs: 100
     tag_id: svg
     seed: [0, 100, 1]
     max_turns: 3
