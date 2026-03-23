@@ -21,8 +21,8 @@ cd verl
 pip install -e .
 cd ../
 
-# vagen
-git clone https://github.com/RAGEN-AI/VAGEN.git
+# vagen (MindCube branch)
+git clone -b MindCube https://github.com/mll-lab-nu/VAGEN.git
 cd VAGEN
 bash scripts/install.sh
 ```
