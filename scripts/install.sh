@@ -20,7 +20,7 @@ pip install 'flask'
 
 echo "Installing flash-attn with no build isolation..."
 # pip install flash-attn --no-build-isolation
-pip install flash-attn==2.5.8
+pip install https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1+cu12torch2.6cxx11abiFALSE-cp310-cp310-linux_x86_64.whl
 
 echo "Installing vagen package..."
 pip install -e .
