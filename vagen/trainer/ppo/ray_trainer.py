@@ -768,6 +768,56 @@ class RayPPOTrainer(object):
         wandb.log({"val/generations": new_table}, step=self.global_steps)
         self.validation_table = new_table
     
+    def _save_inference_results(self, validation_rst):
+        """Save inference results to a local jsonl file."""
+        import json as json_module
+
+        experiment_name = self.config.trainer.experiment_name
+        output_dir = os.path.join("eval_results", experiment_name)
+        os.makedirs(output_dir, exist_ok=True)
+        output_path = os.path.join(output_dir, f"step_{self.global_steps}_responses.jsonl")
+
+        # Build lookup from general source data for extra fields (category, type, meta_info, question)
+        # Set MINDCUBE_DATA_DIR to the prompts/general directory to enrich saved results.
+        general_lookup = {}
+        general_dir = os.environ.get("MINDCUBE_DATA_DIR", "")
+        if general_dir and os.path.isdir(general_dir):
+            for fname in os.listdir(general_dir):
+                if "tinybench" in fname and fname.endswith(".jsonl"):
+                    try:
+                        with open(os.path.join(general_dir, fname)) as f:
+                            for line in f:
+                                item = json_module.loads(line)
+                                if item.get("id") not in general_lookup:
+                                    general_lookup[item["id"]] = item
+                    except Exception:
+                        pass
+
+        results = []
+        for item in validation_rst:
+            qid = item.get("question_id", "")
+            general_data = general_lookup.get(qid, {})
+
+            result = {
+                "id": qid,
+                "category": general_data.get("category", []),
+                "type": general_data.get("type", ""),
+                "meta_info": general_data.get("meta_info", []),
+                "question": general_data.get("question", ""),
+                "images": general_data.get("images", []),
+                "gt_answer": general_data.get("gt_answer", ""),
+                "answer": item.get("llm_raw_response", ""),
+                "score": item.get("metrics", {}).get("score", 0),
+                "success": item.get("metrics", {}).get("success", False),
+            }
+            results.append(result)
+
+        with open(output_path, "w") as f:
+            for r in results:
+                f.write(json_module.dumps(r) + "\n")
+
+        print(f"[DEBUG] Saved {len(results)} inference results to {output_path}")
+
     def _validate(self, map_to_id=False):
         print(f"[DEBUG] validation at global step {self.global_steps} begins")
         # Lists to collect samples for the table
@@ -828,6 +878,11 @@ class RayPPOTrainer(object):
             validation_rst.extend(micro_validation_rst)
         
         self._maybe_log_val_generations_to_wandb(validation_rst)
+
+        # Save inference results to local jsonl if val_only mode
+        if map_to_id:
+            self._save_inference_results(validation_rst)
+
         metric_dict = self.log_rst_to_metrics_dict(validation_rst,mode='val')
         print(f"[DEBUG] validation at global step {self.global_steps} ends")
         return metric_dict

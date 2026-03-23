@@ -667,10 +667,16 @@ class QwenVLRolloutManager():
             traj_metrics=self.env_states[env_id]['metrics']['traj_metrics']
             metrics.update(turn_metrics)
             metrics.update(traj_metrics)
+            # Extract the last LLM raw response from recording
+            llm_raw_response = ""
+            if len(record) > 1 and 'info' in record[-1] and 'llm_raw_response' in record[-1]['info']:
+                llm_raw_response = record[-1]['info']['llm_raw_response']
+
             env_info.append({
                 "env_id": env_id,
                 "config_id": config_id,
                 "output_str": output_rst['prompt'],
+                "llm_raw_response": llm_raw_response,
                 "image_data": image,
                 "metrics": metrics,
             })

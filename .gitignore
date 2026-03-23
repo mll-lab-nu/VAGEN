@@ -125,6 +125,7 @@ log*
 # analysis folder
 svg_analysis_results/
 temp/
+temp_scripts/
 benchmark_results/
 env_benchmark_results/
 results/
@@ -137,3 +138,15 @@ MindCube_set_env.sh
 
 # eval data
 **/eval_data
+
+# evaluation results
+eval_results/
+
+# training logs
+logs/
+
+# image data symlink (user must create locally)
+vagen/env/crossview/other_all_image
+
+
+.claude/
