@@ -149,6 +149,9 @@ def main(
     # Max Unity processes starting up simultaneously (0 = unlimited).
     # Prevents CPU spikes when many capacity slots open at once.
     startup_concurrency: int = 8,
+    # Max idle envs kept alive in pool for instant reuse.
+    # -1 = same as capacity (default), 0 = disable pooling.
+    pool_size: int = -1,
     # Thread pool for asyncio.to_thread(). Should be >= capacity.
     thread_pool_size: int = 128,
     # Session idle timeout before auto-cleanup (seconds).
@@ -174,13 +177,14 @@ def main(
     LOGGER.info(
         f"GPUs: {devices} | displays: {x_displays} | "
         f"capacity: {capacity} | startup_concurrency: {startup_concurrency} | "
-        f"threads: {thread_pool_size}"
+        f"pool_size: {pool_size} | threads: {thread_pool_size}"
     )
 
     handler = EbAlfredHandler(
         x_displays=x_displays,
         capacity=capacity,
         startup_concurrency=startup_concurrency,
+        pool_size=pool_size,
         session_timeout=session_timeout,
         max_sessions=max_sessions,
     )
