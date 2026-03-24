@@ -65,7 +65,19 @@ def detect_gpu_displays() -> List[str]:
 
 
 class EbAlfredHandler(BaseGymHandler):
-    """Handler for EB-ALFRED with capacity-based queuing and multi-GPU load balancing.
+    """Handler for EB-ALFRED with capacity-based queuing, multi-GPU load
+    balancing, and **persistent env pooling**.
+
+    Env pooling (enabled by default):
+      - When a session closes, its Unity process is returned to an idle
+        pool instead of being destroyed.
+      - When a new session connects, an idle env is taken from the pool
+        (near-instant) instead of spawning a new Unity process (~90 s).
+      - The pool implicitly holds capacity-semaphore permits: a pooled
+        env still counts against ``capacity`` because the Unity process
+        is alive and consuming GPU memory.
+      - Set ``pool_size=0`` together with ``capacity=0`` to disable
+        pooling entirely (original behaviour).
 
     When capacity > 0:
       - /connect returns session_id immediately (env creation is deferred)
@@ -90,6 +102,7 @@ class EbAlfredHandler(BaseGymHandler):
         x_displays: Optional[List[str]] = None,
         capacity: int = 16,
         startup_concurrency: int = 8,
+        pool_size: int = -1,
         **kwargs,
     ):
         """
@@ -100,6 +113,8 @@ class EbAlfredHandler(BaseGymHandler):
             startup_concurrency: Max Unity processes that may be starting up at
                 once (0 = unlimited).  Prevents CPU spikes when many capacity
                 slots open simultaneously.  Ignored when capacity = 0.
+            pool_size: Max idle envs kept alive in the pool.  -1 (default) =
+                same as capacity (keep every env alive).  0 = disable pooling.
             **kwargs: Passed to BaseGymHandler (session_timeout, max_sessions).
         """
         super().__init__(**kwargs)
@@ -107,6 +122,10 @@ class EbAlfredHandler(BaseGymHandler):
         self._pending_counts: Dict[str, int] = {d: 0 for d in self._x_displays}
         self._capacity = capacity
         self._startup_concurrency = startup_concurrency
+        # Env pool: idle Unity processes available for immediate reuse.
+        # Each pooled env implicitly holds one capacity-semaphore permit.
+        self._pool_size = pool_size if pool_size >= 0 else max(capacity, 1)
+        self._env_pool: List[Any] = []
         # Defer semaphore creation: it must be created on the running event loop,
         # not during __init__ (which runs before uvicorn starts the loop).
         self._capacity_sem: Optional[asyncio.Semaphore] = None
@@ -114,7 +133,8 @@ class EbAlfredHandler(BaseGymHandler):
         LOGGER.info(
             f"[Handler] Using X displays: {self._x_displays}, "
             f"capacity={capacity if capacity > 0 else 'unlimited'}, "
-            f"startup_concurrency={startup_concurrency if startup_concurrency > 0 else 'unlimited'}"
+            f"startup_concurrency={startup_concurrency if startup_concurrency > 0 else 'unlimited'}, "
+            f"pool_size={self._pool_size}"
         )
 
     def _ensure_semaphore(self) -> None:
@@ -221,19 +241,29 @@ class EbAlfredHandler(BaseGymHandler):
         })
 
     async def _deferred_create(self, ctx: _DeferredSessionContext) -> None:
-        """Background task: acquire capacity slot, then create env.
+        """Background task: acquire capacity slot, then reuse pooled env or create new.
 
-        Two-phase acquisition:
-          1. capacity_sem  – limits total running envs (held for env lifetime)
-          2. startup_sem   – limits concurrent Unity startups (held only during
-                             EbAlfred.__init__, released as soon as the process
-                             is running)
-        This prevents a "startup storm" when many capacity slots open at once.
+        Always acquires a capacity permit first (so queued sessions unblock
+        as soon as any session releases its permit via close/pool).  After
+        acquiring the permit, checks the pool for an idle env:
+          - Pool hit  → instant reuse, skip Unity startup
+          - Pool miss → two-phase creation with startup_sem throttle
         """
         try:
             LOGGER.info(f"[Handler] Session {ctx.session_id} waiting for capacity slot...")
             await self._capacity_sem.acquire()
             ctx._holds_slot = True
+
+            # ---- fast path: reuse from pool ----
+            if self._env_pool:
+                ctx.env = self._env_pool.pop()
+                LOGGER.info(
+                    f"[Handler] Session {ctx.session_id} reused pooled env "
+                    f"(pool: {len(self._env_pool)} remaining)"
+                )
+                return
+
+            # ---- slow path: create new Unity process ----
             LOGGER.info(f"[Handler] Session {ctx.session_id} acquired capacity slot, waiting for startup slot...")
 
             if self._startup_sem is not None:
@@ -285,34 +315,61 @@ class EbAlfredHandler(BaseGymHandler):
 
         return await super().call(session_id, method, params, images)
 
-    async def _handle_close(self, ctx: SessionContext) -> HandlerResult:
-        """Close env and release capacity slot."""
+    async def _release_env(self, ctx: SessionContext) -> None:
+        """Pool or close the env, then always release the capacity permit.
+
+        The pool is a pure cache — it does NOT hold capacity permits.
+        This ensures queued sessions always unblock when a session closes,
+        regardless of whether the env was pooled or destroyed.
+
+        When a new session later acquires a permit, it checks the pool
+        first (fast path) before creating a new Unity process (slow path).
+        """
         try:
-            if ctx.env is not None:
-                await ctx.env.close()
+            if ctx.env is not None and len(self._env_pool) < self._pool_size:
+                # Return to pool — keep Unity alive for reuse
+                self._env_pool.append(ctx.env)
+                LOGGER.info(
+                    f"[Handler] Session {ctx.session_id} returned env to pool "
+                    f"(pool: {len(self._env_pool)}/{self._pool_size})"
+                )
+                ctx.env = None
+            else:
+                # Pool full (or no env) — actually close Unity
+                if ctx.env is not None:
+                    await ctx.env.close()
+                    ctx.env = None
         except Exception as e:
-            LOGGER.error(f"[Handler] Error closing env for session {ctx.session_id}: {e}")
+            LOGGER.error(f"[Handler] Error releasing env for session {ctx.session_id}: {e}")
         finally:
+            # Always release capacity permit so queued sessions can proceed
             if ctx._holds_slot and self._capacity_sem is not None:
                 self._capacity_sem.release()
                 ctx._holds_slot = False
-            self._sessions.pop(ctx.session_id, None)
+
+    async def _handle_close(self, ctx: SessionContext) -> HandlerResult:
+        """Close session: return env to pool or destroy it."""
+        await self._release_env(ctx)
+        self._sessions.pop(ctx.session_id, None)
 
         n_active = sum(1 for s in self._sessions.values() if s.env is not None)
         n_queued = len(self._sessions) - n_active
         LOGGER.info(
             f"[Handler] Closed session {ctx.session_id} "
-            f"(active={n_active}, queued={n_queued}, capacity={self._capacity})"
+            f"(active={n_active}, queued={n_queued}, "
+            f"pool={len(self._env_pool)}, capacity={self._capacity})"
         )
         return HandlerResult(data={"closed": True})
 
     def get_session_stats(self) -> Dict[str, Any]:
-        """Session stats with active/queued breakdown."""
+        """Session stats with active/queued/pool breakdown."""
         stats = super().get_session_stats()
         n_active = sum(1 for s in self._sessions.values() if s.env is not None)
         stats["active"] = n_active
         stats["queued"] = len(self._sessions) - n_active
         stats["capacity"] = self._capacity if self._capacity > 0 else "unlimited"
+        stats["pool_size"] = len(self._env_pool)
+        stats["pool_max"] = self._pool_size
         for s in stats.get("sessions", []):
             sid = s["session_id"]
             ctx = self._sessions.get(sid)
@@ -320,7 +377,7 @@ class EbAlfredHandler(BaseGymHandler):
         return stats
 
     async def _cleanup_loop(self):
-        """Cleanup timed-out sessions, releasing capacity slots."""
+        """Cleanup timed-out sessions, releasing capacity slots or pooling envs."""
         while True:
             try:
                 await asyncio.sleep(60)
@@ -335,23 +392,15 @@ class EbAlfredHandler(BaseGymHandler):
                     ctx = self._sessions.get(session_id)
                     if ctx is None:
                         continue
-                    try:
-                        if ctx.env is not None:
-                            await ctx.env.close()
-                    except Exception as e:
-                        LOGGER.error(f"[Handler] Cleanup error {session_id}: {e}")
-                    finally:
-                        if ctx._holds_slot and self._capacity_sem is not None:
-                            self._capacity_sem.release()
-                            ctx._holds_slot = False
-                        self._sessions.pop(session_id, None)
+                    await self._release_env(ctx)
+                    self._sessions.pop(session_id, None)
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 LOGGER.error(f"[Handler] Cleanup loop error: {e}")
 
     async def aclose(self):
-        """Shutdown: close all sessions, release all capacity slots."""
+        """Shutdown: close all sessions and pooled envs, release all capacity slots."""
         if self._cleanup_task and not self._cleanup_task.done():
             self._cleanup_task.cancel()
             try:
@@ -375,4 +424,14 @@ class EbAlfredHandler(BaseGymHandler):
                 *(_close_one(sid, ctx) for sid, ctx in self._sessions.items())
             )
         self._sessions.clear()
-        LOGGER.info("[Handler] All sessions closed")
+
+        # Close all pooled envs (they don't hold capacity permits)
+        n_pooled = len(self._env_pool)
+        for env in self._env_pool:
+            try:
+                await env.close()
+            except Exception as e:
+                LOGGER.error(f"[Handler] Shutdown pool close error: {e}")
+        self._env_pool.clear()
+
+        LOGGER.info(f"[Handler] All sessions closed, {n_pooled} pooled envs released")
