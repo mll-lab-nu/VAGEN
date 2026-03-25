@@ -259,11 +259,76 @@ async def test_batch_cycle():
     print("PASS: test_batch_cycle")
 
 
+async def test_preload():
+    """Verify preload fills the pool before any client connects."""
+    FakeEnv._count = 0
+    handler = EbAlfredHandler(
+        x_displays=["0"],
+        capacity=4,
+        startup_concurrency=4,
+        pool_size=4,
+    )
+
+    async def fake_create(config):
+        await asyncio.sleep(0.01)
+        env = FakeEnv()
+        env._assigned_display = "0"
+        return env
+
+    handler.create_env = fake_create
+
+    # Preload 4 envs
+    await handler.preload(4, {"eval_set": "base"})
+    assert len(handler._env_pool) == 4, f"Expected 4 preloaded, got {len(handler._env_pool)}"
+    assert FakeEnv._count == 4
+
+    # Connect 4 sessions → all should reuse from pool instantly
+    handler._ensure_semaphore()
+    for i in range(4):
+        await handler.connect({"eval_set": "base"}, seed=i)
+
+    for ctx in handler._sessions.values():
+        if hasattr(ctx, '_ready') and ctx._ready:
+            await ctx._ready.wait()
+
+    assert FakeEnv._count == 4, f"Should reuse preloaded, got {FakeEnv._count}"
+    assert len(handler._env_pool) == 0
+
+    await handler.aclose()
+    print("PASS: test_preload")
+
+
+async def test_preload_capped_by_pool_size():
+    """Preload(n) should be capped at pool_size."""
+    FakeEnv._count = 0
+    handler = EbAlfredHandler(
+        x_displays=["0"],
+        capacity=8,
+        startup_concurrency=8,
+        pool_size=3,
+    )
+
+    async def fake_create(config):
+        env = FakeEnv()
+        env._assigned_display = "0"
+        return env
+
+    handler.create_env = fake_create
+
+    await handler.preload(10, {"eval_set": "base"})  # Request 10, capped to 3
+    assert len(handler._env_pool) == 3, f"Expected 3 (capped), got {len(handler._env_pool)}"
+
+    await handler.aclose()
+    print("PASS: test_preload_capped_by_pool_size")
+
+
 async def main():
     await test_pool_basic()
     await test_pool_overflow()
     await test_no_deadlock_with_queuing()
     await test_batch_cycle()
+    await test_preload()
+    await test_preload_capped_by_pool_size()
     print("\nAll tests passed!")
 
 

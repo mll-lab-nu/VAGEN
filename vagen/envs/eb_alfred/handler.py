@@ -144,6 +144,36 @@ class EbAlfredHandler(BaseGymHandler):
         if self._startup_sem is None and self._startup_concurrency > 0 and self._capacity > 0:
             self._startup_sem = asyncio.Semaphore(self._startup_concurrency)
 
+    async def preload(self, n: int, env_config: Dict[str, Any]) -> None:
+        """Pre-create *n* environments and place them in the idle pool.
+
+        Called once during server startup so that the first training batch
+        gets instant env assignment instead of waiting ~90 s per Unity
+        process.  Envs are created with ``startup_concurrency`` throttling.
+
+        Args:
+            n: Number of envs to pre-create (capped at pool_size).
+            env_config: Config dict forwarded to ``create_env()``.
+        """
+        n = min(n, self._pool_size)
+        if n <= 0:
+            return
+
+        sem = asyncio.Semaphore(self._startup_concurrency or n)
+
+        async def _create_one(idx: int):
+            async with sem:
+                LOGGER.info(f"[Preload] Creating env {idx + 1}/{n} ...")
+                env = await self.create_env(env_config)
+                return env
+
+        t0 = time.time()
+        LOGGER.info(f"[Preload] Pre-creating {n} envs (concurrency={self._startup_concurrency or n}) ...")
+        envs = await asyncio.gather(*[_create_one(i) for i in range(n)])
+        self._env_pool.extend(envs)
+        elapsed = time.time() - t0
+        LOGGER.info(f"[Preload] {n} envs ready in {elapsed:.1f}s (pool: {len(self._env_pool)})")
+
     def _least_loaded_display(self) -> str:
         """Pick the display with the fewest active + pending sessions.
 
