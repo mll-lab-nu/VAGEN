@@ -154,9 +154,8 @@ def main(
     pool_size: int = -1,
     # Pre-create this many envs on server startup (0 = lazy).
     # Fills the pool so the first training batch doesn't wait ~90s per env.
+    # Each env loads all eval_sets, so no split-specific config is needed.
     preload: int = 0,
-    # eval_set used for preloaded envs (must match training config).
-    preload_eval_set: str = "base",
     # Thread pool for asyncio.to_thread(). Should be >= capacity.
     thread_pool_size: int = 128,
     # Session idle timeout before auto-cleanup (seconds).
@@ -199,7 +198,7 @@ def main(
     async def _configure_executor():
         asyncio.get_running_loop().set_default_executor(executor)
         if preload > 0:
-            await handler.preload(preload, {"eval_set": preload_eval_set})
+            await handler.preload(preload, {})
 
     @app.on_event("shutdown")
     def _shutdown_executor():
