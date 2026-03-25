@@ -9,8 +9,10 @@ It requires a GPU-accelerated X server for rendering.
 """
 
 import asyncio
+import json
 import os
 import signal
+import time
 import threading
 import numpy as np
 from PIL import Image
@@ -130,6 +132,19 @@ class EbAlfred(GymImageEnv):
         finally:
             _tl.x_display = None
 
+        # Replace single-split dataset with ALL splits so that a pooled
+        # env can serve any eval_set on reset without recreating Unity.
+        # Original EBAlfEnv loads only one eval_set into self.dataset (list).
+        # We reload the full splits.json into a dict {eval_set: [episodes]}.
+        with open(self.env.data_path) as f:
+            all_splits = json.load(f)
+        ds_ratio = self.config.down_sample_ratio
+        if 0 < ds_ratio < 1:
+            every = round(1 / ds_ratio)
+            all_splits = {k: v[::every] for k, v in all_splits.items()}
+        self.env.dataset = all_splits
+        self.env._default_eval_set = self.config.eval_set
+
         # Adapter state (reset per episode)
         self._total_turns: int = 0
         self._total_env_steps: int = 0
@@ -184,21 +199,37 @@ class EbAlfred(GymImageEnv):
         )
         return {"obs_str": sys_str + "\n" + fmt_str}
 
-    async def reset(self, seed: int) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    def _reset_sync(self, eval_set: str, episode_idx: int):
+        """Synchronous reset that drives the underlying EBAlfEnv.
+
+        We call ``_reset_controller`` directly (instead of ``env.reset()``)
+        because the upstream EBAlfEnv.reset() only supports sequential
+        iteration over a single eval_set.  This wrapper manages episode
+        selection externally via (eval_set, episode_idx).
+        """
+        task = self.env.dataset[eval_set][episode_idx]
+        self.env._reset_controller(task)
+        self.env._current_step = 0
+        self.env._cur_invalid_actions = 0
+        self.env._reset = True
+        self.env.episode_log = []
+        self.env._episode_start_time = time.time()
+
+    async def reset(self, seed: int, eval_set: str = None) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """
         Reset environment for a new episode.
 
         The seed selects which episode to load from the dataset
-        (seed % number_of_episodes). After reset, the observation
-        includes the task instruction, available actions, and
-        the initial RGB image from AI2-THOR.
+        (seed % number_of_episodes_in_eval_set). The eval_set can be
+        overridden per-reset so a single pooled env can serve any split.
         """
-        # Select episode based on seed
-        episode_idx = seed % self.env.number_of_episodes
-        self.env._current_episode_num = episode_idx
+        es = eval_set or self.config.eval_set
+        n_episodes = len(self.env.dataset.get(es, []))
+        episode_idx = seed % n_episodes
 
         await asyncio.wait_for(
-            asyncio.to_thread(self.env.reset), timeout=300.0
+            asyncio.to_thread(self._reset_sync, es, episode_idx),
+            timeout=300.0,
         )
 
         # Reset adapter state
@@ -218,7 +249,7 @@ class EbAlfred(GymImageEnv):
         info = {
             "task_instruction": self.env.episode_language_instruction,
             "num_actions": len(self._action_list),
-            "eval_set": self.config.eval_set,
+            "eval_set": es,
             "episode_idx": episode_idx,
         }
         return obs, info

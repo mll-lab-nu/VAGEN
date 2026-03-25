@@ -287,9 +287,15 @@ class EbAlfredHandler(BaseGymHandler):
             # ---- fast path: reuse from pool ----
             if self._env_pool:
                 ctx.env = self._env_pool.pop()
+                # Update eval_set to match new session (env loads all splits,
+                # so only the config default needs updating)
+                new_eval_set = ctx.env_config.get("eval_set")
+                if new_eval_set and hasattr(ctx.env, "config"):
+                    ctx.env.config.eval_set = new_eval_set
                 LOGGER.info(
                     f"[Handler] Session {ctx.session_id} reused pooled env "
-                    f"(pool: {len(self._env_pool)} remaining)"
+                    f"(pool: {len(self._env_pool)} remaining, "
+                    f"eval_set={new_eval_set})"
                 )
                 return
 
