@@ -241,18 +241,24 @@ class GymService:
         app.add_api_route("/connect", self.connect, methods=["POST"])
         app.add_api_route("/call", self.call, methods=["POST"])
 
-    def build(self) -> FastAPI:
+    def build(self, on_startup=None) -> FastAPI:
         """
         Build and return the FastAPI application.
 
         This is the main entry point. Call once, then run the returned app
         with uvicorn.
+
+        Args:
+            on_startup: Optional async callable invoked during lifespan startup
+                        (before the app starts serving requests).
         """
         handler = self.handler
 
         @asynccontextmanager
         async def lifespan(app: FastAPI):
             try:
+                if on_startup is not None:
+                    await on_startup()
                 yield
             finally:
                 await handler.aclose()
