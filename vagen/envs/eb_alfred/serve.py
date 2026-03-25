@@ -192,17 +192,12 @@ def main(
         session_timeout=session_timeout,
         max_sessions=max_sessions,
     )
-    app = GymService(handler, api_key=api_key).build()
-
-    @app.on_event("startup")
-    async def _configure_executor():
+    async def _on_startup():
         asyncio.get_running_loop().set_default_executor(executor)
         if preload > 0:
             await handler.preload(preload, {})
 
-    @app.on_event("shutdown")
-    def _shutdown_executor():
-        executor.shutdown(wait=True)
+    app = GymService(handler, api_key=api_key).build(on_startup=_on_startup)
 
     uvicorn.run(app, host=host, port=port, workers=workers)
 
