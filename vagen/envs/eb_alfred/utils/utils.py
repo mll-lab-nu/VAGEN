@@ -27,10 +27,21 @@ def parse_free_think(response: str, action_sep: str = ",", max_actions: int = 1)
         if max_actions == 1:
             actions = [action_content.strip()] if action_content.strip() else []
         else:
-            actions = [a.strip() for a in action_content.split(action_sep) if a.strip()]
-            if len(actions) > max_actions:
-                actions = actions[:max_actions]
-                action_content = action_sep.join(actions)
+            # First try splitting on action_sep
+            candidates = [a.strip() for a in action_content.split(action_sep) if a.strip()]
+            # If splitting produced broken bracket fragments (ERA model uses "," inside
+            # [id, 'action'] notation AND as the multi-action separator), fall back to
+            # regex extraction of all [id, 'action'] tokens.
+            has_broken_brackets = any(
+                re.match(r'^\[?\d+$', c) or re.match(r"^['\"].+$", c)
+                for c in candidates
+            )
+            if has_broken_brackets or (len(candidates) <= 1 and re.search(r'\]\s*,\s*\[', action_content)):
+                candidates = re.findall(r'\[\d+,\s*[\'"]?[^\[\]]+?[\'"]?\s*\]', action_content)
+            if len(candidates) > max_actions:
+                candidates = candidates[:max_actions]
+            actions = candidates
+            action_content = action_sep.join(actions)
 
     llm_response = f"<think>{think_content}</think><answer>{action_content}</answer>"
 

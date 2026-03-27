@@ -26,7 +26,7 @@ ERA_SYSTEM_PROMPT_TEMPLATE = """\
 ## The available action id (0 ~ {max_action_id}) and action names are: {available_actions}.
 
 ## Guidelines
-1. **Output Plan**: Avoid generating empty plan. Each plan should include no more than 20 actions.
+1. **Output Plan**: Avoid generating empty plan. Each plan should include no more than {max_actions_per_step} actions.
 2. **Visibility**: Always locate a visible object by the 'find' action before interacting with it.
 3. **Action Guidelines**: Make sure match the action name and its corresponding action id in the output. Avoid performing actions that do not meet the defined validity criteria. For instance, if you want to put object in a receptacle, use 'put down' rather than 'drop' actions.
 4. **Prevent Repeating Action Sequences**: Do not repeatedly execute the same action or sequence of actions. Try to modify the action sequence because previous actions do not lead to success.
@@ -34,8 +34,9 @@ ERA_SYSTEM_PROMPT_TEMPLATE = """\
 6. **Reflection on History and Feedback**: Use interaction history and feedback from the environment to refine and improve your current plan. If the last action is invalid, reflect on the reason, such as not adhering to action rules or missing preliminary actions, and adjust your plan accordingly.
 
     ** Generation Guide **
-    - Include the thinking process between <|think_start|> and <|think_end|>
-    - Include only the target action in <|action_start|> and <|action_end|>, i.e. the content inside <|action_start|> and <|action_end|> should be nothing more than [action_id, 'action_name'], where the action id is an integer and the action name is the corresponding name. Do not include any other thing, such as '"'.
+    - You have at most {max_turns} turns to complete the task.
+    - Include the thinking process between <|think_start|> and <|think_end|>.
+    - Include up to {max_actions_per_step} action(s) in <|action_start|> and <|action_end|>, separated by '{action_sep}'. Each action must be [action_id, 'action_name'], where action_id is an integer and action_name is the corresponding name from the available actions list.
     """
 
 
@@ -43,14 +44,11 @@ def system_prompt(
     task_instruction: Optional[str] = None,
     action_list: Optional[List[str]] = None,
     add_task_examples: bool = True,
+    max_actions_per_step: int = 20,
+    action_sep: str = "|",
+    max_turns: int = 30,
 ):
-    """
-    Build ERA-aligned system prompt for EB-ALFRED.
-
-    The prompt exactly matches what the ERA EPL-Only model was trained on,
-    so the model stays in-distribution.  Output normalisation (ERA tokens →
-    VAGEN tags) happens downstream in normalize_era_tokens().
-    """
+    """Build system prompt for EB-ALFRED."""
     if action_list is not None:
         max_id = len(action_list) - 1
         available = ", ".join(
@@ -63,6 +61,9 @@ def system_prompt(
     return ERA_SYSTEM_PROMPT_TEMPLATE.format(
         max_action_id=max_id,
         available_actions=available,
+        max_actions_per_step=max_actions_per_step,
+        action_sep=action_sep,
+        max_turns=max_turns,
     )
 
 
@@ -119,10 +120,15 @@ def format_prompt(max_actions_per_step, action_sep, add_example=True, prompt_for
 
 
 def free_think_format_prompt(max_actions_per_step, action_sep, add_example=True):
-    """Minimal format prompt — the ERA system prompt already has the Generation Guide."""
-    # The ERA system prompt already instructs the model on output format.
-    # Adding extra format instructions can confuse an SFT model, so keep it short.
-    return ""
+    """Format prompt for free_think mode with concrete output examples."""
+    if not add_example:
+        return ""
+
+    return f"""
+Example output (multiple actions, separated by '{action_sep}'):
+<think>I can see the mug nearby and I am not holding anything. I will pick it up and then put it on the table.</think>
+<answer>[12, 'pick up the Mug']{action_sep}[38, 'put down the object in hand']</answer>
+"""
 
 
 def wm_format_prompt(max_actions_per_step, action_sep, add_example=True):
@@ -153,13 +159,7 @@ Example 2:
 <observation>I am close to a Mug on the counter. I am not holding anything. The mug is within reach.</observation>
 <think>The mug is nearby and I'm not holding anything. I should pick it up.</think>
 <answer>[12, 'pick up the Mug']</answer>
-<prediction>I will be holding the mug. The counter will no longer have the mug on it.</prediction>
-
-Example 3:
-<observation>I am holding a Mug. I see a table nearby with an empty spot.</observation>
-<think>I'm holding the mug and I'm near the table. Let me put it down.</think>
-<answer>[38, 'put down the object in hand']</answer>
-<prediction>The mug will be placed on the table. I will no longer be holding anything.</prediction>"""
+<prediction>I will be holding the mug. The counter will no longer have the mug on it.</prediction>"""
         return base + "\n" + examples
 
     return base

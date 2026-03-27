@@ -4,15 +4,15 @@ envs:
     data_source: eb_alfred
     tag_id: eb_alfred_train_base
     seed: [0, 200, 1]
-    max_turns: 6
-    response_length_per_turn: 512
+    max_turns: 20
+    response_length_per_turn: 2048
     config:
       base_urls:
         - "http://localhost:8000"
       timeout: 600
       eval_set: base
       obs_image_size: 500
-      max_turns: 6
+      max_turns: 20
       max_actions_per_step: 20
       max_env_steps: 30
       action_sep: "|"
@@ -26,15 +26,15 @@ envs:
     data_source: eb_alfred
     tag_id: eb_alfred_train_complex
     seed: [0, 200, 1]
-    max_turns: 6
-    response_length_per_turn: 512
+    max_turns: 20
+    response_length_per_turn: 2048
     config:
       base_urls:
         - "http://localhost:8000"
       timeout: 600
       eval_set: complex_instruction
       obs_image_size: 500
-      max_turns: 6
+      max_turns: 20
       max_actions_per_step: 20
       max_env_steps: 30
       action_sep: "|"
@@ -48,15 +48,15 @@ envs:
     data_source: eb_alfred
     tag_id: eb_alfred_train_visual
     seed: [0, 200, 1]
-    max_turns: 6
-    response_length_per_turn: 512
+    max_turns: 20
+    response_length_per_turn: 2048
     config:
       base_urls:
         - "http://localhost:8000"
       timeout: 600
       eval_set: visual_appearance
       obs_image_size: 500
-      max_turns: 6
+      max_turns: 20
       max_actions_per_step: 20
       max_env_steps: 30
       action_sep: "|"

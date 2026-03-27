@@ -152,6 +152,10 @@ def main(
     # Max idle envs kept alive in pool for instant reuse.
     # -1 = same as capacity (default), 0 = disable pooling.
     pool_size: int = -1,
+    # Max concurrent Unity scene resets (0 = unlimited).
+    # Prevents I/O and X11 saturation when all sessions reset simultaneously
+    # at the start of each rollout/eval batch.
+    reset_concurrency: int = 8,
     # Pre-create this many envs on server startup (0 = lazy).
     # Fills the pool so the first training batch doesn't wait ~90s per env.
     # Each env loads all eval_sets, so no split-specific config is needed.
@@ -189,6 +193,7 @@ def main(
         capacity=capacity,
         startup_concurrency=startup_concurrency,
         pool_size=pool_size,
+        reset_concurrency=reset_concurrency,
         session_timeout=session_timeout,
         max_sessions=max_sessions,
     )
