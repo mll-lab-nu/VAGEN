@@ -103,6 +103,7 @@ class EbAlfredHandler(BaseGymHandler):
         capacity: int = 16,
         startup_concurrency: int = 8,
         pool_size: int = -1,
+        reset_concurrency: int = 8,
         **kwargs,
     ):
         """
@@ -115,6 +116,9 @@ class EbAlfredHandler(BaseGymHandler):
                 slots open simultaneously.  Ignored when capacity = 0.
             pool_size: Max idle envs kept alive in the pool.  -1 (default) =
                 same as capacity (keep every env alive).  0 = disable pooling.
+            reset_concurrency: Max Unity scene resets happening simultaneously
+                (0 = unlimited).  Prevents I/O and X11 saturation when many
+                sessions reset at the same time (e.g. start of each rollout).
             **kwargs: Passed to BaseGymHandler (session_timeout, max_sessions).
         """
         super().__init__(**kwargs)
@@ -122,6 +126,7 @@ class EbAlfredHandler(BaseGymHandler):
         self._pending_counts: Dict[str, int] = {d: 0 for d in self._x_displays}
         self._capacity = capacity
         self._startup_concurrency = startup_concurrency
+        self._reset_concurrency = reset_concurrency
         # Env pool: idle Unity processes available for immediate reuse.
         # Each pooled env implicitly holds one capacity-semaphore permit.
         self._pool_size = pool_size if pool_size >= 0 else max(capacity, 1)
@@ -130,11 +135,13 @@ class EbAlfredHandler(BaseGymHandler):
         # not during __init__ (which runs before uvicorn starts the loop).
         self._capacity_sem: Optional[asyncio.Semaphore] = None
         self._startup_sem: Optional[asyncio.Semaphore] = None
+        self._reset_sem: Optional[asyncio.Semaphore] = None
         LOGGER.info(
             f"[Handler] Using X displays: {self._x_displays}, "
             f"capacity={capacity if capacity > 0 else 'unlimited'}, "
             f"startup_concurrency={startup_concurrency if startup_concurrency > 0 else 'unlimited'}, "
-            f"pool_size={self._pool_size}"
+            f"pool_size={self._pool_size}, "
+            f"reset_concurrency={reset_concurrency if reset_concurrency > 0 else 'unlimited'}"
         )
 
     def _ensure_semaphore(self) -> None:
@@ -143,6 +150,8 @@ class EbAlfredHandler(BaseGymHandler):
             self._capacity_sem = asyncio.Semaphore(self._capacity)
         if self._startup_sem is None and self._startup_concurrency > 0 and self._capacity > 0:
             self._startup_sem = asyncio.Semaphore(self._startup_concurrency)
+        if self._reset_sem is None and self._reset_concurrency > 0:
+            self._reset_sem = asyncio.Semaphore(self._reset_concurrency)
 
     async def preload(self, n: int, env_config: Dict[str, Any]) -> None:
         """Pre-create *n* environments and place them in the idle pool.
@@ -382,6 +391,14 @@ class EbAlfredHandler(BaseGymHandler):
             if ctx._holds_slot and self._capacity_sem is not None:
                 self._capacity_sem.release()
                 ctx._holds_slot = False
+
+    async def _handle_reset(self, ctx: SessionContext, params: Dict[str, Any]) -> HandlerResult:
+        """Handle reset with concurrency throttling to avoid I/O saturation."""
+        self._ensure_semaphore()
+        if self._reset_sem is not None:
+            async with self._reset_sem:
+                return await super()._handle_reset(ctx, params)
+        return await super()._handle_reset(ctx, params)
 
     async def _handle_close(self, ctx: SessionContext) -> HandlerResult:
         """Close session: return env to pool or destroy it."""

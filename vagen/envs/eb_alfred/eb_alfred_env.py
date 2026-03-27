@@ -78,7 +78,7 @@ class EbAlfredEnvConfig:
     max_turns: int = 30
     max_actions_per_step: int = 20
     max_env_steps: int = 30  # Max total environment actions per episode (matches ERA)
-    action_sep: str = ","
+    action_sep: str = "|"
     image_placeholder: str = "<image>"
     prompt_format: str = "free_think"
     use_example_in_sys_prompt: bool = True
@@ -190,6 +190,9 @@ class EbAlfred(GymImageEnv):
         sys_str = system_prompt(
             task_instruction=self.env.episode_language_instruction,
             action_list=self._action_list,
+            max_actions_per_step=self.config.max_actions_per_step,
+            action_sep=self.config.action_sep,
+            max_turns=self.config.max_turns,
         )
         fmt_str = format_prompt(
             max_actions_per_step=self.config.max_actions_per_step,
