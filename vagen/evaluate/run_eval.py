@@ -279,7 +279,7 @@ def _expand_jobs(
     jobs: List[Dict[str, Any]] = []
     for spec_idx, spec in enumerate(env_specs):
         env_cls = get_env_cls(spec.name)
-        resolved_config = _resolve_paths_in_config(copy.deepcopy(spec.config), base_dir)
+        resolved_config = copy.deepcopy(spec.config)
         seeds = generate_seeds_for_spec(spec, base_seed, spec_idx)
         job_max_turns = int(spec.max_turns if spec.max_turns is not None else default_max_turns or 10)
         env_chat_cfg = spec.chat_config or {}
@@ -396,6 +396,7 @@ def main() -> None:
 
     cfg: Dict[str, Any] = OmegaConf.to_container(cfg_node, resolve=True)  # type: ignore
     base_dir = os.path.dirname(cfg_path)
+    cfg = _resolve_paths_in_config(cfg, base_dir)
 
     run_cfg = cfg.get("run") or {}
     backend = str(run_cfg.get("backend", "openai")).lower()
@@ -404,7 +405,7 @@ def main() -> None:
     max_concurrent = int(run_cfg.get("max_concurrent_jobs", 4))
     base_seed = int(run_cfg.get("base_seed", run_cfg.get("start_seed", 0)))
 
-    backend_cfg: Dict[str, Any] = OmegaConf.to_container(cfg_node.backends[backend], resolve=True)  # type: ignore
+    backend_cfg: Dict[str, Any] = cfg.get("backends", {})[backend]
     model = backend_cfg.get("model") or backend_cfg.get("deployment")
     if not model:
         raise ValueError(f"[{backend}] requires 'model' (or 'deployment' for Azure) in backends.{backend}.*")
