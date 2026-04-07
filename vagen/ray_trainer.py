@@ -1534,6 +1534,15 @@ class RayPPOTrainer:
                             print(f"After filtering: Pad {pad_size} samples to make batch size {batch_size} divisible by {divisor_size} dp_workers")
                             self._balance_batch(batch, metrics=metrics, logging_prefix="filtered_global_seqlen")
                     
+                    # Free SGLang inference memory before training updates (only for small GPU configs)
+                    _free_inference_mem = (
+                        self.config.trainer.n_gpus_per_node <= 2
+                        and hasattr(self, 'actor_rollout_wg')
+                        and hasattr(self.actor_rollout_wg, 'sleep')
+                    )
+                    if _free_inference_mem:
+                        self.actor_rollout_wg.sleep()
+
                     # update critic
                     if self.use_critic:
                         with marked_timer("update_critic", timing_raw, color="pink"):
@@ -1549,6 +1558,10 @@ class RayPPOTrainer:
                             actor_output = self.actor_rollout_wg.update_actor(batch)
                         actor_output_metrics = reduce_metrics(actor_output.meta_info["metrics"])
                         metrics.update(actor_output_metrics)
+
+                    # Resume SGLang inference memory after training updates
+                    if _free_inference_mem:
+                        self.actor_rollout_wg.wake_up()
 
                     # Log rollout generations if enabled
                     rollout_data_dir = self.config.trainer.get("rollout_data_dir", None)
