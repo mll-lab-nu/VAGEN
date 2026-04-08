@@ -251,10 +251,12 @@ See [docs/issues.md](docs/issues.md)
 If you find our framework and paper useful, we appreciate it if you could cite our work:
 
 ```bibtex
-@misc{wang2025vagen,
-  title={VAGEN:Reinforcing World Model Reasoning for Multi-Turn VLM Agents},
-  author={Kangrui Wang* and Pingyue Zhang* and Zihan Wang* and Yaning Gao* and Linjie Li* and Qineng Wang and Hanyang Chen and Chi Wan and Yiping Lu and Zhengyuan Yang and Lijuan Wang and Ranjay Krishna and Jiajun Wu and Li Fei-Fei and Yejin Choi and Manling Li},
-  year={2025},
-  url={https://arxiv.org/abs/2510.16907}
+@inproceedings{
+wang2025vagen,
+title={{VAGEN}: Reinforcing World Model Reasoning for Multi-Turn {VLM} Agents},
+author={Kangrui Wang and Pingyue Zhang and Zihan Wang and Yaning Gao and Linjie Li and Qineng Wang and Hanyang Chen and Yiping Lu and Zhengyuan Yang and Lijuan Wang and Ranjay Krishna and Jiajun Wu and Li Fei-Fei and Yejin Choi and Manling Li},
+booktitle={The Thirty-ninth Annual Conference on Neural Information Processing Systems},
+year={2025},
+url={https://arxiv.org/abs/2510.16907}
 }
 ```
