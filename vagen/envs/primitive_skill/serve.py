@@ -47,7 +47,7 @@ def main(
     port: int = 8000,
     devices: Optional[List[int]] = None,
     max_envs: int = 64,
-    max_inflight: int = 64,
+    max_inflight: int = 0,
     thread_pool_size: int = 64,
     session_timeout: float = 3600.0,
     api_key: str = "",

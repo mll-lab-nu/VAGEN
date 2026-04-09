@@ -15,7 +15,7 @@ envs:
     config:
       base_urls: "http://localhost:8000"
       timeout: 120
-      retries: 3
+      retries: 6
       env_id: AlignTwoCube
       prompt_format: wm
       max_actions_per_step: 2
@@ -36,7 +36,7 @@ envs:
     config:
       base_urls: "http://localhost:8000"
       timeout: 120
-      retries: 3
+      retries: 6
       env_id: PlaceTwoCube
       prompt_format: wm
       max_actions_per_step: 2
@@ -57,7 +57,7 @@ envs:
     config:
       base_urls: "http://localhost:8000"
       timeout: 120
-      retries: 3
+      retries: 6
       env_id: StackThreeCube
       prompt_format: wm
       max_actions_per_step: 2
@@ -78,7 +78,7 @@ envs:
     config:
       base_urls: "http://localhost:8000"
       timeout: 120
-      retries: 3
+      retries: 6
       env_id: PutAppleInDrawer
       prompt_format: wm
       max_actions_per_step: 2

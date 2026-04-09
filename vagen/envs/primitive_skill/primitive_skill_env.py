@@ -261,7 +261,15 @@ class PrimitiveSkillEnv(GymImageEnv):
         for action in parsed["actions"]:
             parsed_action = self._parse_action(action)
             if parsed_action is not None:
-                _, _, terminated, truncated, step_info = self._env.step(parsed_action)
+                # ManiSkill GPU rendering has rare thread-safety issues
+                # where self.agent/self.scene becomes None under concurrent load.
+                # Retry once on AttributeError to handle this.
+                try:
+                    _, _, terminated, truncated, step_info = self._env.step(parsed_action)
+                except AttributeError:
+                    LOGGER.warning("[PrimSkillEnv] ManiSkill AttributeError during step, retrying")
+                    time.sleep(0.1)
+                    _, _, terminated, truncated, step_info = self._env.step(parsed_action)
                 valid_actions.append(action)
                 self._last_info = step_info
                 self._step_count += 1
