@@ -15,7 +15,7 @@ envs:
       action_sep: "|"
       render_mode: vision
       format_reward: 0.1
-      success_reward: 10.0
+      success_reward: 1
 
   - name: RemoteEnv
     n_envs: 5000
@@ -33,7 +33,7 @@ envs:
       action_sep: "|"
       render_mode: vision
       format_reward: 0.1
-      success_reward: 10.0
+      success_reward: 1
 
   - name: RemoteEnv
     n_envs: 5000
@@ -51,7 +51,7 @@ envs:
       action_sep: "|"
       render_mode: vision
       format_reward: 0.1
-      success_reward: 10.0
+      success_reward: 1
 
   - name: RemoteEnv
     n_envs: 5000
@@ -69,4 +69,4 @@ envs:
       action_sep: "|"
       render_mode: vision
       format_reward: 0.1
-      success_reward: 10.0
+      success_reward: 1
