@@ -141,17 +141,17 @@ class PutAppleInDrawerEnv(BaseEnv):
     def _get_obs_info(self):
         info= {}
         for name in self.object_list:
-            info[f"is_{name}_grasped"] = self.agent.is_grasping(self.object_list[name])[0]
-            info[f"{name}_position"] = self.object_list[name].pose.p[0]
-        
+            info[f"is_{name}_grasped"] = self.agent.is_grasping(self.object_list[name])
+            info[f"{name}_position"] = self.object_list[name].pose.p
+
         info["stage"] = self.cur_stage
-        info["gripper_position"] = self.agent.tcp.pose.p[0]
+        info["gripper_position"] = self.agent.tcp.pose.p
 
         drawer_link = self.drawer_joint.get_child_link()
-        info["drawer_handle_position"] = drawer_link.pose.p.to(self.device)[0] + np.array([0, 0.37, -0.3])
-        info["drawer_position"] = drawer_link.pose.p.to(self.device)[0] + np.array([0, 0.2, -0.3])
+        info["drawer_handle_position"] = drawer_link.pose.p.to(self.device) + torch.tensor([[0, 0.37, -0.3]], device=self.device)
+        info["drawer_position"] = drawer_link.pose.p.to(self.device) + torch.tensor([[0, 0.2, -0.3]], device=self.device)
 
-        info["drawer_open_value"] = (info["drawer_handle_position"][1] - np.array([0.5, -0.63,  0.2]))[1]
+        info["drawer_open_value"] = (info["drawer_handle_position"][:, 1] - torch.tensor([0.5, -0.63, 0.2], device=self.device)[1])
         
      
         return info
@@ -162,36 +162,18 @@ class PutAppleInDrawerEnv(BaseEnv):
         def stage0_success(info):
             return info[f"is_apple_grasped"]
         
-        def stage1_success(info):
-            # Check if apple is in drawer
-            abs_diff_xy = torch.abs(info["apple_position"][:2] - info["drawer_position"][:2])
-
-            # Check if x and y differences are within tolerance
+        def _apple_in_drawer(info):
+            abs_diff_xy = torch.abs(info["apple_position"][:, :2] - info["drawer_position"][:, :2])
             within_xy = (abs_diff_xy <= 0.1).all(dim=-1)
+            within_z = (info["apple_position"][:, 2] >= 0.1) & (info["apple_position"][:, 2] <= 0.4)
+            return within_xy & within_z
 
-            # Check if z position is within valid range
-            within_z = (info["apple_position"][2] >= 0.1) & (info["apple_position"][2] <= 0.4)
-
-            # Combine conditions
-            is_apple_in_drawer = within_xy & within_z
-            return is_apple_in_drawer & (~info["is_apple_grasped"])
+        def stage1_success(info):
+            return _apple_in_drawer(info) & (~info["is_apple_grasped"])
 
         def stage2_success(info):
-            # Check if apple is in drawer
-            abs_diff_xy = torch.abs(info["apple_position"][:2] - info["drawer_position"][:2])
-
-            # Check if x and y differences are within tolerance
-            within_xy = (abs_diff_xy <= 0.1).all(dim=-1)
-
-            # Check if z position is within valid range
-            within_z = (info["apple_position"][2] >= 0.1) & (info["apple_position"][2] <= 0.4)
-
-            # Combine conditions
-            is_apple_in_drawer = within_xy & within_z
-            
-            # Check if drawer is closed
             is_drawer_closed = (info["drawer_open_value"] <= 0.1)
-            return is_apple_in_drawer & is_drawer_closed & (~info["is_apple_grasped"])
+            return _apple_in_drawer(info) & is_drawer_closed & (~info["is_apple_grasped"])
 
         info["stage0_success"] = stage0_success(info)
         info["stage1_success"] = stage1_success(info)
@@ -199,18 +181,13 @@ class PutAppleInDrawerEnv(BaseEnv):
 
         return info
 
-    def get_obs(self, info: Dict = None):
-        if info is None:
-            info = self.get_info()
-        obs = []
+    def _get_obs_extra(self, info: Dict):
+        assert "state" in self.obs_mode
+        obs = {}
         for name in self.object_list:
-            obs += info[f"{name}_position"].flatten().tolist()
-
-        for name in self.object_list:
-             obs += info[f"is_{name}_grasped"].flatten().tolist()
-        
-        obs += [self.cur_stage]
-        return torch.tensor([obs], device = self.device, dtype = torch.float32)
+            obs[f"{name}_position"] = info[f"{name}_position"]
+            obs[f"is_{name}_grasped"] = info[f"is_{name}_grasped"]
+        return obs
 
     def compute_dense_reward(self, obs: Any, action: torch.Tensor, info: Dict):
         return torch.zeros_like(info["success"],dtype=torch.float32,device=self.device)

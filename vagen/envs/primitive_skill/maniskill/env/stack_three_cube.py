@@ -123,10 +123,10 @@ class StackThreeCubeEnv(BaseEnv):
     def _get_obs_info(self):
         info = {}
         for name in self.object_list:
-            info[f"is_{name}_grasped"] = self.agent.is_grasping(self.object_list[name])[0]
-            info[f"{name}_position"] = self.object_list[name].pose.p[0]
-        info["cube_size"]=torch.ones_like(info["red_cube_position"])*0.04
-        info["gripper_position"] = self.agent.tcp.pose.p[0]
+            info[f"is_{name}_grasped"] = self.agent.is_grasping(self.object_list[name])
+            info[f"{name}_position"] = self.object_list[name].pose.p
+        info["cube_size"] = torch.ones_like(info["red_cube_position"]) * 0.04
+        info["gripper_position"] = self.agent.tcp.pose.p
         return info
 
     def evaluate(self):
@@ -137,17 +137,16 @@ class StackThreeCubeEnv(BaseEnv):
         
         def stage1_success(info):
             red_not_grasped = ~info["is_red_cube_grasped"]
-            red_on_green = (torch.linalg.norm(info["red_cube_position"][:2] - info["green_cube_position"][:2]) < self.cube_size/2) and (info["red_cube_position"][2] > (info["green_cube_position"][2] + self.cube_size/2))
-            return (red_on_green and red_not_grasped)
-        
+            red_on_green = (torch.linalg.norm(info["red_cube_position"][:, :2] - info["green_cube_position"][:, :2], dim=-1) < self.cube_size/2) & (info["red_cube_position"][:, 2] > (info["green_cube_position"][:, 2] + self.cube_size/2))
+            return red_on_green & red_not_grasped
+
         def stage2_success(info):
             return info["is_purple_cube_grasped"]
-        
+
         def stage3_success(info):
             purple_not_grasped = ~info["is_purple_cube_grasped"]
-            purple_on_red = (torch.linalg.norm(info["purple_cube_position"][:2] - info["red_cube_position"][:2]) < self.cube_size/2) and (info["purple_cube_position"][2] > (info["red_cube_position"][2] + self.cube_size/2))
-            
-            return purple_on_red and purple_not_grasped and stage1_success(info)
+            purple_on_red = (torch.linalg.norm(info["purple_cube_position"][:, :2] - info["red_cube_position"][:, :2], dim=-1) < self.cube_size/2) & (info["purple_cube_position"][:, 2] > (info["red_cube_position"][:, 2] + self.cube_size/2))
+            return purple_on_red & purple_not_grasped & stage1_success(info)
         
         info["stage0_success"] = stage0_success(info)
         info["stage1_success"] = stage1_success(info)
@@ -156,18 +155,13 @@ class StackThreeCubeEnv(BaseEnv):
         
         return info
 
-    def get_obs(self, info: Dict = None):
-        if info is None:
-            info = self.get_info()
-        obs = []
+    def _get_obs_extra(self, info: Dict):
+        assert "state" in self.obs_mode
+        obs = {}
         for name in self.object_list:
-            obs += info[f"{name}_position"].flatten().tolist()
-
-        for name in self.object_list:
-             obs += info[f"is_{name}_grasped"].flatten().tolist()
-        
-        obs += [self.cur_stage]
-        return torch.tensor([obs], device = self.device, dtype = torch.float32)
+            obs[f"{name}_position"] = info[f"{name}_position"]
+            obs[f"is_{name}_grasped"] = info[f"is_{name}_grasped"]
+        return obs
 
     def compute_dense_reward(self, obs: Any, action: torch.Tensor, info: Dict):
         return torch.zeros_like(info["success"],dtype=torch.float32,device=self.device)

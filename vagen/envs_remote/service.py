@@ -123,7 +123,7 @@ class GymService:
         if isinstance(e, RuntimeError) and "Max sessions limit reached" in str(e):
             LOGGER.warning(f"[Service] Connect rejected: {e}")
             raise HTTPException(status_code=503, detail=str(e))
-        LOGGER.error(f"[Service] Connect error: {e}")
+        LOGGER.error(f"[Service] Connect error: {type(e).__name__}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
     def handle_call_error(self, e: Exception) -> None:
