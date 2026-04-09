@@ -14,7 +14,7 @@ Usage:
     env = GymImageEnvClient(env_config={
         "base_urls": ["http://localhost:8000", "http://localhost:8001"],
         "timeout": 120.0,
-        "retries": 8,
+        "retries": 6,
         "backoff": 2.0,
         # ... other config passed to remote environment
     })
@@ -73,7 +73,7 @@ class GymImageEnvClient(GymImageEnv):
                 - url_file (str): Path to a text file with one URL per line.
                   Default: /root/projects/viewsuite/client_url.txt
                 - timeout (float): Request timeout in seconds (default: 120.0)
-                - retries (int): Number of retries (default: 8)
+                - retries (int): Number of retries (default: 6)
                 - backoff (float): Backoff multiplier (default: 2.0)
                 - token (str, optional): API key for authentication
                 - log_retries (bool): Whether to log retries (default: True)
@@ -91,8 +91,9 @@ class GymImageEnvClient(GymImageEnv):
         self.base_urls: List[str] = self._parse_urls(raw_urls)
 
         self.timeout = float(env_config.get("timeout", 120.0))
-        self.retries = int(env_config.get("retries", 8))
+        self.retries = int(env_config.get("retries", 6))
         self.backoff = float(env_config.get("backoff", 2.0))
+        self.max_delay = float(env_config.get("max_delay", 64.0))
         self.backoff_jitter_min = float(env_config.get("backoff_jitter_min", 0.7))
         self.backoff_jitter_range = float(env_config.get("backoff_jitter_range", 0.6))
         self.token = env_config.get("token")
@@ -115,6 +116,7 @@ class GymImageEnvClient(GymImageEnv):
                 "timeout",
                 "retries",
                 "backoff",
+                "max_delay",
                 "backoff_jitter_min",
                 "backoff_jitter_range",
                 "token",
@@ -249,7 +251,7 @@ class GymImageEnvClient(GymImageEnv):
                     raise RuntimeError(f"Failed to connect to any server: {e}") from e
 
                 jitter = self.backoff_jitter_min + self.backoff_jitter_range * random.random()
-                delay = self.backoff * (2**attempt) * jitter
+                delay = min(self.backoff * (2**attempt) * jitter, self.max_delay)
 
                 if self.log_retries:
                     next_url_index = self._pick_url_index(attempt + 1)

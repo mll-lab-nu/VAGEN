@@ -103,8 +103,12 @@ class NavigationHandler(BaseGymHandler):
     # GPU assignment
     # ------------------------------------------------------------------
 
-    def _pick_device(self) -> int:
-        """Pick GPU with fewest active envs."""
+    def _pick_device(self, preferred_scene: Optional[str] = None) -> int:
+        """Pick GPU: prefer one with a matching cached scene, else fewest active."""
+        if preferred_scene:
+            for device, pool in self._cache.items():
+                if any(scene == preferred_scene for scene, _ in pool):
+                    return device
         return min(self._active, key=self._active.get)
 
     def _pop_cached(self, device: int, preferred_scene: Optional[str] = None) -> Optional[NavigationEnv]:
@@ -193,7 +197,10 @@ class NavigationHandler(BaseGymHandler):
     ) -> HandlerResult:
         # Pick device and increment IMMEDIATELY (before any await) to prevent
         # all concurrent connects from seeing the same counts and picking the same GPU.
-        device = self._pick_device()
+        preferred_scene = None
+        if seed is not None:
+            preferred_scene = self._get_scene_for_seed(env_config.get("eval_set", "base"), seed)
+        device = self._pick_device(preferred_scene)
         self._active[device] += 1
 
         try:
@@ -259,6 +266,69 @@ class NavigationHandler(BaseGymHandler):
         stats["cached_per_device"] = {d: len(pool) for d, pool in self._cache.items()}
         stats["total_alive"] = self._total_alive()
         return stats
+
+    # ------------------------------------------------------------------
+    # Shutdown
+    # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # Cleanup: override base class to release semaphore + active count
+    # ------------------------------------------------------------------
+
+    async def _cleanup_loop(self):
+        """Background task to cleanup timed-out sessions.
+
+        Overrides base class to properly release semaphore slots and
+        decrement _active counts when sessions are cleaned up.
+        """
+        while True:
+            try:
+                await asyncio.sleep(60)
+
+                now = time.time()
+                to_remove = []
+
+                for session_id, ctx in self._sessions.items():
+                    idle_time = now - ctx.last_access
+                    if idle_time > self.session_timeout:
+                        to_remove.append(session_id)
+                        LOGGER.warning(
+                            f"[NavHandler] Session {session_id[:8]} timed out "
+                            f"after {idle_time:.1f}s idle"
+                        )
+
+                for session_id in to_remove:
+                    ctx = self._sessions.get(session_id)
+                    if ctx is None:
+                        continue
+                    try:
+                        env: NavigationEnv = ctx.env
+                        device = env.cfg.gpu_device
+                        await env.close()
+                        self._sessions.pop(session_id, None)
+                        self._active[device] = max(0, self._active[device] - 1)
+                        self._env_slots.release()
+                        LOGGER.info(
+                            f"[NavHandler] Cleaned up timed-out session "
+                            f"{session_id[:8]} GPU {device} ({self._stats_str()})"
+                        )
+                    except Exception as e:
+                        LOGGER.error(
+                            f"[NavHandler] Error cleaning up session "
+                            f"{session_id[:8]}: {e}"
+                        )
+                        self._sessions.pop(session_id, None)
+                        try:
+                            device = ctx.env.cfg.gpu_device
+                            self._active[device] = max(0, self._active[device] - 1)
+                        except Exception:
+                            pass
+                        self._env_slots.release()
+
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                LOGGER.error(f"[NavHandler] Cleanup loop error: {e}")
 
     # ------------------------------------------------------------------
     # Shutdown
