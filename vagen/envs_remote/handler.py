@@ -182,27 +182,21 @@ class BaseGymHandler(ABC):
             raise SessionNotFoundError(f"Session {session_id} not found")
 
         ctx = self._sessions[session_id]
+        ctx.last_access = time.time()
 
-        async with ctx.lock:
-            # Re-check after acquiring lock (session may have been closed)
-            if session_id not in self._sessions:
-                raise SessionNotFoundError(f"Session {session_id} was closed")
+        # Dispatch to appropriate method
+        if method == "system_prompt":
+            result = await self._handle_system_prompt(ctx)
+        elif method == "reset":
+            result = await self._handle_reset(ctx, params)
+        elif method == "step":
+            result = await self._handle_step(ctx, params)
+        elif method == "close":
+            result = await self._handle_close(ctx)
+        else:
+            raise ValueError(f"Unknown method: {method}")
 
-            ctx.last_access = time.time()
-
-            # Dispatch to appropriate method
-            if method == "system_prompt":
-                result = await self._handle_system_prompt(ctx)
-            elif method == "reset":
-                result = await self._handle_reset(ctx, params)
-            elif method == "step":
-                result = await self._handle_step(ctx, params)
-            elif method == "close":
-                result = await self._handle_close(ctx)
-            else:
-                raise ValueError(f"Unknown method: {method}")
-
-            return result
+        return result
 
     async def _handle_system_prompt(self, ctx: SessionContext) -> HandlerResult:
         """Handle system_prompt call."""
@@ -364,8 +358,3 @@ class SessionContext:
     env: Any  # Environment instance
     created_at: float
     last_access: float
-    lock: asyncio.Lock = None  # Per-session lock to prevent concurrent operations
-
-    def __post_init__(self):
-        if self.lock is None:
-            self.lock = asyncio.Lock()
