@@ -1,7 +1,7 @@
 envs:
   - name: RemoteEnv
     n_envs: 5000
-    data_source: primitive_skill
+    data_source: AlignTwoCube
     seed: [0, 5000]
     max_turns: 5
     response_length_per_turn: 1024
@@ -19,7 +19,7 @@ envs:
 
   - name: RemoteEnv
     n_envs: 5000
-    data_source: primitive_skill
+    data_source: PlaceTwoCube
     seed: [0, 5000]
     max_turns: 5
     response_length_per_turn: 1024
@@ -37,7 +37,7 @@ envs:
 
   - name: RemoteEnv
     n_envs: 5000
-    data_source: primitive_skill
+    data_source: StackThreeCube
     seed: [0, 5000]
     max_turns: 5
     response_length_per_turn: 1024
@@ -55,7 +55,7 @@ envs:
 
   - name: RemoteEnv
     n_envs: 5000
-    data_source: primitive_skill
+    data_source: PutAppleInDrawer
     seed: [0, 5000]
     max_turns: 5
     response_length_per_turn: 1024
