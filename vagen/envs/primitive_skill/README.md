@@ -14,7 +14,7 @@ ManiSkill-based robot manipulation environment. The agent controls a Franka Emik
 ## Installation
 
 ```bash
-pip install mani_skill gymnasium
+pip install mani_skill gymnasium "numpy<=2.2"
 
 # ManiSkill requires GPU rendering
 # See https://maniskill.readthedocs.io/ for full setup
@@ -39,18 +39,25 @@ Key parameters:
 - `max_envs`: max concurrent environments, bounds GPU memory (default: 64)
 - `thread_pool_size`: should be >= max_envs (default: 64)
 
-## Benchmark
+## Evaluation
 
 ```bash
 # Terminal 1: start server
-python -m vagen.envs.primitive_skill.serve
 
-# Terminal 2: run benchmark
-python -m vagen.envs.primitive_skill.benchmark \
-    --base_url http://localhost:8000 \
-    --num_rounds 10 \
-    --num_clients 32 \
-    --num_steps 3
+# Terminal 2: run eval
+bash examples/evaluate/primitive_skill/run_eval.sh
+```
+
+Config: `examples/evaluate/primitive_skill/config.yaml`
+
+## Training
+
+```bash
+# Terminal 1: start server
+
+# Terminal 2: run training
+cd VAGEN
+bash examples/train/primitive_skill/train_ppo_qwen25vl3b.sh
 ```
 
 ## Prompt Formats

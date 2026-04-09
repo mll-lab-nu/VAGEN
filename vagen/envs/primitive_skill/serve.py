@@ -54,6 +54,13 @@ def main(
     workers: int = 1,
 ):
     """Start the primitive_skill environment server."""
+    if workers > 1:
+        raise ValueError(
+            f"workers={workers} is not supported. Sessions are stored in-memory "
+            f"per process, so multiple workers would lose sessions across processes. "
+            f"Use workers=1 (the default)."
+        )
+
     if devices is None:
         devices = _detect_gpus()
 
@@ -64,15 +71,11 @@ def main(
     handler = PrimitiveSkillHandler(
         devices=devices, session_timeout=session_timeout, max_envs=max_envs
     )
-    app = GymService(handler, max_inflight=max_inflight, api_key=api_key).build()
-
-    @app.on_event("startup")
-    async def _configure_executor():
-        asyncio.get_running_loop().set_default_executor(executor)
-
-    @app.on_event("shutdown")
-    def _shutdown_executor():
-        executor.shutdown(wait=True)
+    service = GymService(handler, max_inflight=max_inflight, api_key=api_key)
+    app = service.build(
+        startup_callback=lambda: asyncio.get_running_loop().set_default_executor(executor),
+        shutdown_callback=lambda: executor.shutdown(wait=True),
+    )
 
     uvicorn.run(app, host=host, port=port, workers=workers)
 
