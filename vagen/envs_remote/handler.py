@@ -26,6 +26,11 @@ from PIL import Image
 LOGGER = logging.getLogger(__name__)
 
 
+class SessionNotFoundError(Exception):
+    """Raised when a session_id is not found in active sessions."""
+    pass
+
+
 @dataclass
 class HandlerResult:
     """
@@ -170,7 +175,11 @@ class BaseGymHandler(ABC):
             ValueError: If session not found or method invalid
         """
         if session_id not in self._sessions:
-            raise ValueError(f"Session {session_id} not found")
+            LOGGER.error(
+                f"[Handler] Session {session_id} not found. "
+                f"Active sessions: {list(self._sessions.keys())}"
+            )
+            raise SessionNotFoundError(f"Session {session_id} not found")
 
         ctx = self._sessions[session_id]
         ctx.last_access = time.time()

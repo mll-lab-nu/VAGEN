@@ -32,11 +32,12 @@ Usage:
 
 from .gym_image_env_client import GymImageEnvClient
 from .service import GymService
-from .handler import BaseGymHandler, HandlerResult
+from .handler import BaseGymHandler, HandlerResult, SessionNotFoundError
 
 __all__ = [
     "GymImageEnvClient",
     "GymService",
     "BaseGymHandler",
     "HandlerResult",
+    "SessionNotFoundError",
 ]
