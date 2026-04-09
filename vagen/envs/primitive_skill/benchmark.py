@@ -145,6 +145,9 @@ async def run_single_client(
 # Main benchmark
 # ---------------------------------------------------------------------------
 
+ALL_ENV_IDS = ["AlignTwoCube", "PlaceTwoCube", "StackThreeCube", "PutAppleInDrawer"]
+
+
 async def _run_benchmark(
     base_url: str = "http://localhost:8000",
     num_rounds: int = 10,
@@ -152,13 +155,16 @@ async def _run_benchmark(
     num_steps: int = 3,
     timeout: float = 300.0,
     env_config_overrides: dict | None = None,
+    mix_envs: bool = True,
 ):
     """Core async benchmark loop."""
     overrides = env_config_overrides or {}
     all_round_stats = []
 
+    env_label = "mixed" if mix_envs else overrides.get("env_id", "AlignTwoCube")
     LOGGER.info(
-        f"Benchmark: {num_rounds} rounds x {num_clients} clients x {num_steps} steps"
+        f"Benchmark: {num_rounds} rounds x {num_clients} clients x {num_steps} steps "
+        f"[env={env_label}]"
     )
     LOGGER.info(f"Server: {base_url}")
 
@@ -178,17 +184,21 @@ async def _run_benchmark(
         LOGGER.info(f"--- Round {round_idx + 1}/{num_rounds} ---")
         round_start = time.perf_counter()
 
-        tasks = [
-            run_single_client(
-                client_id=i,
-                base_url=base_url,
-                num_steps=num_steps,
-                seed=round_idx * num_clients + i,
-                timeout=timeout,
-                env_config_overrides=overrides,
+        tasks = []
+        for i in range(num_clients):
+            client_overrides = {**overrides}
+            if mix_envs:
+                client_overrides["env_id"] = ALL_ENV_IDS[i % len(ALL_ENV_IDS)]
+            tasks.append(
+                run_single_client(
+                    client_id=i,
+                    base_url=base_url,
+                    num_steps=num_steps,
+                    seed=round_idx * num_clients + i,
+                    timeout=timeout,
+                    env_config_overrides=client_overrides,
+                )
             )
-            for i in range(num_clients)
-        ]
         results: List[ClientResult] = await asyncio.gather(*tasks)
 
         round_time = time.perf_counter() - round_start
@@ -263,6 +273,7 @@ def main(
     timeout: float = 300.0,
     env_id: str = "AlignTwoCube",
     prompt_format: str = "wm",
+    mix_envs: bool = True,
 ):
     """
     Run async multi-client benchmark against the primitive_skill service.
@@ -273,8 +284,10 @@ def main(
         num_clients: Number of concurrent clients per round.
         num_steps: Number of steps each client takes per round.
         timeout: HTTP request timeout in seconds.
-        env_id: ManiSkill environment ID.
+        env_id: ManiSkill environment ID (ignored when mix_envs=True).
         prompt_format: Prompt format for the environment.
+        mix_envs: If True, cycle clients across all 4 env types
+                  (AlignTwoCube, PlaceTwoCube, StackThreeCube, PutAppleInDrawer).
     """
     asyncio.run(
         _run_benchmark(
@@ -287,6 +300,7 @@ def main(
                 "env_id": env_id,
                 "prompt_format": prompt_format,
             },
+            mix_envs=mix_envs,
         )
     )
 

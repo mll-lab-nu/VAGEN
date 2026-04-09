@@ -76,8 +76,12 @@ class PrimitiveSkillHandler(BaseGymHandler):
     # GPU assignment
     # ------------------------------------------------------------------
 
-    def _pick_device(self) -> int:
-        """Pick GPU with fewest active envs."""
+    def _pick_device(self, env_id: str = "") -> int:
+        """Pick GPU: prefer one with a matching cached env, else fewest active."""
+        if env_id:
+            for device, pool in self._cache.items():
+                if any(cid == env_id for cid, _ in pool):
+                    return device
         return min(self._active, key=self._active.get)
 
     def _pop_cached(self, device: int, env_id: str) -> Optional[PrimitiveSkillEnv]:
@@ -91,12 +95,10 @@ class PrimitiveSkillHandler(BaseGymHandler):
                 pool.pop(i)
                 LOGGER.info(f"[PrimSkillHandler] Cache hit: env_id={env_id} GPU {device}")
                 return env
-        # Different env_id: destroy cached env, free the slot for a new one
+        # Different env_id: destroy cached env synchronously, then free slot
         _, old_env = pool.pop()
         LOGGER.info(f"[PrimSkillHandler] Cache evict (diff env_id) GPU {device}")
-        # Close the old env synchronously-ish via fire-and-forget
         asyncio.create_task(self._close_env_quiet(old_env))
-        # Slot is freed by _close_env_quiet, but we re-acquire below
         return None
 
     def _pop_any_cached(self) -> Optional[Tuple[int, PrimitiveSkillEnv]]:
@@ -174,7 +176,8 @@ class PrimitiveSkillHandler(BaseGymHandler):
     async def connect(
         self, env_config: Dict[str, Any], seed: Optional[int] = None
     ) -> HandlerResult:
-        device = self._pick_device()
+        env_id = env_config.get("env_id", "AlignTwoCube")
+        device = self._pick_device(env_id)
         self._active[device] += 1
 
         try:
@@ -235,6 +238,66 @@ class PrimitiveSkillHandler(BaseGymHandler):
             f"env_id={env_id} GPU {device} ({self._stats_str()})"
         )
         return HandlerResult(data={"closed": True})
+
+    # ------------------------------------------------------------------
+    # Cleanup: override base class to release semaphore + active count
+    # ------------------------------------------------------------------
+
+    async def _cleanup_loop(self):
+        """Background task to cleanup timed-out sessions.
+
+        Overrides base class to properly release semaphore slots and
+        decrement _active counts when sessions are cleaned up.
+        """
+        while True:
+            try:
+                await asyncio.sleep(60)
+
+                now = time.time()
+                to_remove = []
+
+                for session_id, ctx in self._sessions.items():
+                    idle_time = now - ctx.last_access
+                    if idle_time > self.session_timeout:
+                        to_remove.append(session_id)
+                        LOGGER.warning(
+                            f"[PrimSkillHandler] Session {session_id[:8]} timed out "
+                            f"after {idle_time:.1f}s idle"
+                        )
+
+                for session_id in to_remove:
+                    ctx = self._sessions.get(session_id)
+                    if ctx is None:
+                        continue
+                    try:
+                        env: PrimitiveSkillEnv = ctx.env
+                        device = env.cfg.gpu_device
+                        await env.close()
+                        self._sessions.pop(session_id, None)
+                        self._active[device] = max(0, self._active[device] - 1)
+                        self._env_slots.release()
+                        LOGGER.info(
+                            f"[PrimSkillHandler] Cleaned up timed-out session "
+                            f"{session_id[:8]} GPU {device} ({self._stats_str()})"
+                        )
+                    except Exception as e:
+                        LOGGER.error(
+                            f"[PrimSkillHandler] Error cleaning up session "
+                            f"{session_id[:8]}: {e}"
+                        )
+                        # Still try to remove session and release resources
+                        self._sessions.pop(session_id, None)
+                        try:
+                            device = ctx.env.cfg.gpu_device
+                            self._active[device] = max(0, self._active[device] - 1)
+                        except Exception:
+                            pass
+                        self._env_slots.release()
+
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                LOGGER.error(f"[PrimSkillHandler] Cleanup loop error: {e}")
 
     # ------------------------------------------------------------------
     # Stats endpoint
