@@ -76,7 +76,7 @@ def handle_info(info,state_keys,mask_success=False,env=None,):
     }
     
 def get_workspace_limits(env):
-    x_workspace = tuple(np.round(np.array(env.workspace_x)*1000, 0).astype(int))
-    y_workspace = tuple(np.round(np.array(env.workspace_y)*1000, 0).astype(int))
-    z_workspace = tuple(np.round(np.array(env.workspace_z)*1000, 0).astype(int))
+    x_workspace = tuple(int(v) for v in np.round(np.array(env.workspace_x)*1000, 0))
+    y_workspace = tuple(int(v) for v in np.round(np.array(env.workspace_y)*1000, 0))
+    z_workspace = tuple(int(v) for v in np.round(np.array(env.workspace_z)*1000, 0))
     return x_workspace, y_workspace, z_workspace

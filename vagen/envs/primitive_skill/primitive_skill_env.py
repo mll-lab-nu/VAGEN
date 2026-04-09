@@ -353,7 +353,7 @@ if __name__ == "__main__":
 
     async def _run(
         env_id: str = "AlignTwoCube",
-        prompt_format: str = "wm",
+        prompt_format: str = "free_think",
         render_mode: str = "vision",
         seed: int = 0,
         save_path: str = "./test_primitive_skill",
@@ -374,7 +374,7 @@ if __name__ == "__main__":
 
         def _save_and_show(obs, step):
             print(f"\n--- Observation (step {step}) ---")
-            print(obs["obs_str"][:500] + ("..." if len(obs["obs_str"]) > 500 else ""))
+            print(obs["obs_str"])
             if "multi_modal_input" in obs:
                 path = os.path.join(save_path, f"step_{step}.png")
                 obs["multi_modal_input"]["<image>"][0].save(path)
@@ -392,7 +392,15 @@ if __name__ == "__main__":
                 break
             # Auto-wrap if user didn't use tags
             if "<answer>" not in raw:
-                raw = f"<think>exploring</think><answer>{raw}</answer>"
+                if env.cfg.prompt_format == "wm":
+                    raw = (
+                        f"<observation>I see objects on the table.</observation>"
+                        f"<think>exploring</think>"
+                        f"<answer>{raw}</answer>"
+                        f"<prediction>The object will move.</prediction>"
+                    )
+                else:
+                    raw = f"<think>exploring</think><answer>{raw}</answer>"
 
             obs, reward, done, info = await env.step(raw)
             print(f"  reward={reward:.2f}  done={done}  success={info.get('success')}")
