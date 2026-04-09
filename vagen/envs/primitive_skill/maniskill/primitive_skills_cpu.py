@@ -114,7 +114,7 @@ def mat2euler(rmat, axes="sxyz"):
     j = _NEXT_AXIS[i + parity]
     k = _NEXT_AXIS[i - parity + 1]
 
-    M = np.array(rmat, dtype=np.float32, copy=False)[:3, :3]
+    M = np.asarray(rmat, dtype=np.float32)[:3, :3]
     if repetition:
         sy = math.sqrt(M[i, j] * M[i, j] + M[i, k] * M[i, k])
         if sy > EPS:

@@ -21,13 +21,13 @@ import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, File, Form, UploadFile, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import Response
 
-from .handler import BaseGymHandler
-from .multipart_codec import encode_multipart, parse_data_field, read_images
+from .handler import BaseGymHandler, SessionNotFoundError
+from .multipart_codec import encode_multipart, decode_multipart
 
 LOGGER = logging.getLogger(__name__)
 
@@ -128,11 +128,11 @@ class GymService:
 
     def handle_call_error(self, e: Exception) -> None:
         """Map call exceptions to HTTP errors. Override to customize."""
-        if isinstance(e, ValueError):
+        if isinstance(e, SessionNotFoundError):
             raise HTTPException(status_code=404, detail=str(e))
         if isinstance(e, RuntimeError) and "Max sessions limit reached" in str(e):
             raise HTTPException(status_code=503, detail=str(e))
-        LOGGER.error(f"[Service] Call error: {e}")
+        LOGGER.error(f"[Service] Call error: {type(e).__name__}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
     def _encode_result(self, result: Any) -> Response:
@@ -165,18 +165,16 @@ class GymService:
         self.authenticate(request)
         return self.handler.get_session_stats()
 
-    async def connect(
-        self,
-        request: Request,
-        data: Optional[str] = Form(default=None),
-        images: Optional[List[UploadFile]] = File(default=None),  # noqa: ARG002
-    ) -> Response:
+    async def connect(self, request: Request) -> Response:
         """Create a new session, optionally with initial reset."""
         self.authenticate(request)
 
         acquired = await self.acquire()
         try:
-            data_dict = parse_data_field(data)
+            content_type = request.headers.get("content-type", "")
+            body = await request.body()
+            data_dict, _ = decode_multipart(content_type, body)
+
             env_config = data_dict.get("env_config", {})
             seed = data_dict.get("seed")
 
@@ -191,19 +189,15 @@ class GymService:
             if acquired:
                 self.release()
 
-    async def call(
-        self,
-        request: Request,
-        data: Optional[str] = Form(default=None),
-        images: Optional[List[UploadFile]] = File(default=None),
-    ) -> Response:
+    async def call(self, request: Request) -> Response:
         """Call a method on an existing session."""
         self.authenticate(request)
 
         acquired = await self.acquire()
         try:
-            data_dict = parse_data_field(data)
-            img_list = await read_images(images)
+            content_type = request.headers.get("content-type", "")
+            body = await request.body()
+            data_dict, img_list = decode_multipart(content_type, body)
 
             session_id = data_dict.get("session_id")
             method = data_dict.get("method")
@@ -241,20 +235,33 @@ class GymService:
         app.add_api_route("/connect", self.connect, methods=["POST"])
         app.add_api_route("/call", self.call, methods=["POST"])
 
-    def build(self) -> FastAPI:
+    def build(
+        self,
+        startup_callback: Optional[callable] = None,
+        shutdown_callback: Optional[callable] = None,
+    ) -> FastAPI:
         """
         Build and return the FastAPI application.
 
         This is the main entry point. Call once, then run the returned app
         with uvicorn.
+
+        Args:
+            startup_callback: Optional sync callable invoked during app startup
+                (inside the running event loop, before requests are served).
+            shutdown_callback: Optional sync callable invoked during app shutdown.
         """
         handler = self.handler
 
         @asynccontextmanager
         async def lifespan(app: FastAPI):
+            if startup_callback is not None:
+                startup_callback()
             try:
                 yield
             finally:
+                if shutdown_callback is not None:
+                    shutdown_callback()
                 await handler.aclose()
 
         app = FastAPI(
