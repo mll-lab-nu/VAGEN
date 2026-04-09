@@ -114,8 +114,31 @@ class GymAgentLoop(AgentLoopBase):
         env: GymImageEnv = env_cls(env_config=env_config)
 
         # Bootstrap: reset -> system_prompt (message order: system, then initial user)
-        init_obs, info = await env.reset(seed=seed)
-        sys_obs = await env.system_prompt()
+        try:
+            init_obs, info = await env.reset(seed=seed)
+            sys_obs = await env.system_prompt()
+        except Exception as exc:
+            logger.error("Env reset failed in '%s' seed=%s: %s", env_name, seed, exc)
+            # Return a minimal failed output so training can continue
+            dummy_ids = [self.tokenizer.eos_token_id or 0]
+            try:
+                await env.close()
+            except Exception:
+                pass
+            from PIL import Image as _PILImage
+            dummy_image = _PILImage.new('RGB', (256, 256), color='white')
+            return [AgentLoopOutput(
+                prompt_ids=dummy_ids,
+                response_ids=dummy_ids,
+                response_mask=[1],
+                multi_modal_data={"image": [dummy_image]},
+                response_logprobs=None,
+                reward_score=0.0,
+                num_turns=0,
+                metrics=metrics,
+                extra_fields={"reward_extra_info": {"traj_success": 0.0},
+                               "last_turn": True},
+            )]
 
        
         
