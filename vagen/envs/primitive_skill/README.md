@@ -14,7 +14,9 @@ ManiSkill-based robot manipulation environment. The agent controls a Franka Emik
 ## Installation
 
 ```bash
-pip install mani_skill gymnasium "numpy<=2.2"
+pip install "mani_skill<=3.0.0b22" gymnasium "numpy<=2.2"
+python -m mani_skill.utils.download_asset partnet_mobility_cabinet
+python -m mani_skill.utils.download_asset ycb
 
 # ManiSkill requires GPU rendering
 # See https://maniskill.readthedocs.io/ for full setup
@@ -26,10 +28,10 @@ pip install mani_skill gymnasium "numpy<=2.2"
 
 ```bash
 # Auto-detect GPUs, default settings
-python -m vagen.envs.primitive_skill.serve
+python -m vagen.envs.primitive_skill.serve 2>&1 | tee serve_$(date +%Y%m%d_%H%M%S).log
 
 # Custom settings
-python -m vagen.envs.primitive_skill.serve --devices='[0,1]' --max_envs=32 --port=8001
+python -m vagen.envs.primitive_skill.serve --devices='[0,1]' --max_envs=32 --port=8001 2>&1 | tee serve_$(date +%Y%m%d_%H%M%S).log
 ```
 
 Key parameters:
