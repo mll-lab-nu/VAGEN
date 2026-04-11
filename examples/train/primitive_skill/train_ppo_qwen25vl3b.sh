@@ -1,20 +1,23 @@
 #!/bin/bash
+# Primitive skill environment training with PPO (all 4 tasks jointly)
+#
+# Before running, start the primitive_skill server in another terminal:
+#   python -m vagen.envs.primitive_skill.serve
 
 set -x
 
 PROJECT_NAME="vagen_experiments"
-EXPERIMENT_NAME="sokoban_ppo_qwen25vl3b"
+EXPERIMENT_NAME="primitive_skill_ppo_qwen25vl3b"
 
 BASEDIR=$(pwd)
 SCRIPTDIR=$(dirname "$0")
 EXPERIMENT_DIR=${BASEDIR}/exps/${PROJECT_NAME}/${EXPERIMENT_NAME}
 SAVE_CHECKPOINT_DIR=${EXPERIMENT_DIR}/verl_checkpoints
-DATASET_TRAIN=${SCRIPTDIR}/train_sokoban_vision.yaml
-DATASET_VAL=${SCRIPTDIR}/val_sokoban_vision.yaml
+DATASET_TRAIN=${SCRIPTDIR}/train_primitive_skill.yaml
+DATASET_VAL=${SCRIPTDIR}/val_primitive_skill.yaml
 agent_loop_config_path=${BASEDIR}/vagen/configs/agent.yaml
 REF_MODEL_PATH=Qwen/Qwen2.5-VL-3B-Instruct
 mkdir -p ${EXPERIMENT_DIR}
-
 
 PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     --config-path=${BASEDIR}/vagen/configs \
@@ -57,7 +60,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
     trainer.val_before_train=True \
-    trainer.n_gpus_per_node=4 \
+    trainer.n_gpus_per_node=8 \
     trainer.nnodes=1 \
     trainer.save_freq=100 \
     trainer.test_freq=20 \
@@ -67,8 +70,8 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     trainer.validation_data_dir=${EXPERIMENT_DIR}/validation \
     trainer.rollout_data_dir=${EXPERIMENT_DIR}/rollout_data \
     trainer.log_val_generations=32 \
-    data.max_prompt_length=1000 \
-    data.max_response_length=4000 \
+    data.max_prompt_length=3000 \
+    data.max_response_length=10000 \
     critic.optim.lr=1e-5 \
     critic.model.use_remove_padding=True \
     critic.model.path=${REF_MODEL_PATH} \
@@ -77,8 +80,4 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     critic.model.fsdp_config.param_offload=True \
     critic.model.fsdp_config.optimizer_offload=True \
     trainer.total_training_steps=401 2>&1 | \
-    tee ${EXPERIMENT_DIR}/${PROJECT_NAME}_${EXPERIMENT_NAME}.log >(tee ${BASEDIR}/${PROJECT_NAME}_${EXPERIMENT_NAME}.log >/dev/null)
-# actor_rollout_ref.model.lora_rank=8 \
-#     actor_rollout_ref.model.lora_alpha=16 \
-#     actor_rollout_ref.rollout.load_format="safetensors" \
-#     actor_rollout_ref.model.target_modules="all-linear" \
+    tee ${EXPERIMENT_DIR}/${PROJECT_NAME}_${EXPERIMENT_NAME}.log
