@@ -3,7 +3,7 @@
 set -x
 
 PROJECT_NAME="vagen_experiments"
-EXPERIMENT_NAME="grpo_qwen25vl3b_filter"
+EXPERIMENT_NAME="sokoban_grpo_qwen25vl3b_filter"
 
 BASEDIR=$(pwd)
 SCRIPTDIR=$(dirname "$0")
