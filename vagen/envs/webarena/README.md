@@ -108,6 +108,41 @@ PYTHONPATH=. python -m vagen.envs.webarena.serve \
 
 Clients use `vagen.envs_remote.GymImageEnvClient` against `http://localhost:8002`.
 
+## Benchmark
+
+Stress-test the running server with N concurrent clients running M steps
+over R rounds. Each client: connect → reset → step × (M-1) → `exit(...)` → close.
+
+Prereqs: tunnel up, auth cache pre-populated, server running on `--port`.
+
+```bash
+PYTHONPATH=. python -m vagen.envs.webarena.benchmark \
+    --base_url=http://localhost:8002 \
+    --num_rounds=2 --num_clients=16 --num_steps=3
+```
+
+Flags:
+- `--num_clients` concurrent sessions per round
+- `--num_steps` steps per client (last one is forced `exit` → triggers evaluator)
+- `--num_rounds` how many rounds to repeat
+- `--max_steps` env's internal cap (default 10)
+- `--viewport_width / --viewport_height` browser viewport
+
+### Interpreting latency
+
+Under a pool of `K` browsers with `M` sessions each, each browser's Python
+thread serializes `M` contexts' Playwright calls. A single step's latency is
+roughly:
+
+```
+step_latency ≈ queue_position × (sleep_after_execution + playwright_op + obs_parse)
+             ≈ (M/2)          × (3s                    + ~0.5s          + ~0.5s)
+```
+
+So with default `sleep_after_execution=3s` and M=4, expect ~8s median step
+latency. Lower the sleep (see `WebArenaEnvConfig.sleep_after_execution`) for
+actions that don't need page-settling time.
+
 ## Capacity tuning
 
 | n_browsers | max_contexts | total sessions | base RAM | notes |
