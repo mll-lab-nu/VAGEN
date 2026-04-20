@@ -1,0 +1,13 @@
+{
+    "intro": "",
+    "examples": [],
+    "template": "",
+    "meta_data": {
+      "observation": "webrl",
+      "action_type": "webrl_id",
+      "keywords": [],
+      "prompt_constructor": "WebRLPromptConstructor",
+      "answer_phrase": "",
+      "action_splitter": ""
+    }
+  }
