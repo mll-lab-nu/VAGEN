@@ -34,7 +34,7 @@ class BrowserSlot:
 
     def __init__(self, browser_id: int, launch_args: Optional[List[str]] = None):
         self.browser_id = browser_id
-        self._launch_args = launch_args or [
+        self._launch_args = launch_args if launch_args is not None else [
             "--blink-settings=imagesEnabled=false",
             "--disable-gpu",
             "--disable-dev-shm-usage",

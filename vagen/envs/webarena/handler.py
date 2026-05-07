@@ -7,10 +7,16 @@ Owns a Chromium browser pool (K browsers × M contexts each). One session
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import logging
 import os
+import shutil
+import subprocess
+import sys
 import time
 import uuid
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from vagen.envs_remote.handler import BaseGymHandler, HandlerResult, SessionContext
@@ -18,6 +24,22 @@ from .browser_pool import BrowserPool, BrowserSlot
 from .webarena_env import WebArenaEnv, load_tasks
 
 LOGGER = logging.getLogger(__name__)
+
+
+# Sites that auto_login.py knows how to log into (single-site mode).
+_AUTH_SITES = ("gitlab", "shopping", "shopping_admin", "reddit")
+# Env vars that uniquely identify a docker deployment. If any of these
+# change, cached cookies are no longer valid.
+_FINGERPRINT_VARS = (
+    "DATASET", "REDDIT", "SHOPPING", "SHOPPING_ADMIN",
+    "GITLAB", "WIKIPEDIA", "MAP", "HOMEPAGE",
+)
+
+
+def _docker_fingerprint() -> str:
+    """Hash of the WebArena URL env vars. If docker host changes, this changes."""
+    payload = "\n".join(f"{k}={os.environ.get(k, '')}" for k in _FINGERPRINT_VARS)
+    return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
 
 class WebArenaHandler(BaseGymHandler):
@@ -76,8 +98,71 @@ class WebArenaHandler(BaseGymHandler):
             if self._started:
                 return
             os.makedirs(self.auth_cache_dir, exist_ok=True)
+            self._refresh_auth_cache_if_needed()
             await self.pool.start()
             self._started = True
+
+    def _refresh_auth_cache_if_needed(self) -> None:
+        """Invalidate auth cache if the WebArena docker fingerprint changed.
+
+        Cookies issued by docker A are not valid for docker B. We hash the
+        webarena URL env vars; if it differs from what produced the cached
+        cookies, blow away the cache and regenerate fresh ones for each
+        single-site combo.
+        """
+        current_fp = _docker_fingerprint()
+        meta_path = Path(self.auth_cache_dir) / "_fingerprint.json"
+        cached_fp = None
+        if meta_path.exists():
+            try:
+                cached_fp = json.loads(meta_path.read_text()).get("fingerprint")
+            except Exception:
+                cached_fp = None
+
+        if cached_fp == current_fp and any(Path(self.auth_cache_dir).glob("*_state.json")):
+            LOGGER.info(f"[WebArenaHandler] auth cache valid (fingerprint={current_fp})")
+            return
+
+        if cached_fp != current_fp:
+            LOGGER.warning(
+                f"[WebArenaHandler] docker fingerprint changed "
+                f"(was {cached_fp!r}, now {current_fp!r}); regenerating auth cache"
+            )
+        else:
+            LOGGER.info(
+                f"[WebArenaHandler] auth cache empty; populating "
+                f"(fingerprint={current_fp})"
+            )
+
+        # Wipe stale cookies but keep the dir
+        for f in Path(self.auth_cache_dir).glob("*_state.json"):
+            f.unlink()
+
+        auto_login_path = Path(__file__).parent / "browser_env" / "auto_login.py"
+        for site in _AUTH_SITES:
+            try:
+                subprocess.run(
+                    [sys.executable, str(auto_login_path),
+                     "--auth_folder", self.auth_cache_dir,
+                     "--site_list", site],
+                    capture_output=True, text=True, env=os.environ.copy(),
+                    timeout=180, check=False,
+                )
+                cookie = Path(self.auth_cache_dir) / f"{site}_state.json"
+                if cookie.exists():
+                    LOGGER.info(f"[WebArenaHandler]   {site}: ok")
+                else:
+                    LOGGER.warning(f"[WebArenaHandler]   {site}: failed (no cookie file)")
+            except subprocess.TimeoutExpired:
+                LOGGER.warning(f"[WebArenaHandler]   {site}: timeout")
+            except Exception as e:
+                LOGGER.warning(f"[WebArenaHandler]   {site}: {e}")
+
+        meta_path.write_text(json.dumps({
+            "fingerprint": current_fp,
+            "generated_at": time.time(),
+            "env_vars": {k: os.environ.get(k, "") for k in _FINGERPRINT_VARS},
+        }, indent=2))
 
     async def aclose(self) -> None:
         await super().aclose()

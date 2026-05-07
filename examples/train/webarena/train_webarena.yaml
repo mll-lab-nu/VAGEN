@@ -1,0 +1,22 @@
+envs:
+  - name: RemoteEnv
+    n_envs: 4
+    data_source: webarena
+    # Non-map seeds only — port 3000 (map) is not tunneled, so map tasks
+    # always fail /connect. verl's agent_loop is not fault-tolerant: a
+    # single failed rollout kills the training run.
+    seed_list: [4, 5, 8, 9, 10, 13, 14, 17, 21, 22, 25, 26, 27, 28, 29, 32]
+    max_turns: 5
+    response_length_per_turn: 512
+    config:
+      base_urls: "http://dt-login03:8002"
+      timeout: 600
+      retries: 3
+      max_steps: 5
+      viewport_width: 1280
+      viewport_height: 720
+      observation_type: webrl
+      sleep_after_execution: 0.5
+      reset_timeout: 600.0
+      step_timeout: 90.0
+      eval_timeout: 90.0
