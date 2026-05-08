@@ -2,32 +2,52 @@
 # Automated setup for VAGEN-WEBAGENT on a fresh machine.
 #
 # Covers SETUP.md sections 2 (system pkgs), 4 (clone), 5 (envs), 6 (HF
-# models). Sections 3 (WebArena Docker) and 7 (auth bootstrap) require
-# user-specific assets (Docker image tars or SSH credentials) and are
-# left as manual steps with prompts at the end.
+# models), plus a GitHub SSH-key bootstrap step. Sections 3 (WebArena
+# Docker) and 7 (auth bootstrap) require user-specific assets (Docker
+# image tars or webarena-host credentials) and are left as manual
+# steps with prompts at the end.
+#
+# Default paths land under /workspace so data survives instance destroy
+# when /workspace is backed by a Vast.ai Volume (NOT default container
+# storage — see https://docs.vast.ai/guides/instances/storage/types).
 #
 # Idempotent: re-runnable. Each step skips if its output already exists.
 #
 # Usage:
 #   bash setup.sh                       # default: all steps, verbose
 #   bash setup.sh --skip-system         # skip apt-get steps (no root)
+#   bash setup.sh --skip-ssh            # skip GitHub SSH bootstrap
 #   bash setup.sh --skip-models         # skip HF download
 #   bash setup.sh --only=envs           # only build conda envs
 #   REPO_ROOT=/path/to/repo bash setup.sh
 #
 # Env vars (override defaults):
-#   REPO_ROOT       directory to clone into [default: $PWD]
-#   HF_HOME         HF cache location      [default: $HOME/hf_cache]
+#   REPO_ROOT       directory to clone into [default: /workspace]
+#   VAGEN_REPO_URL  VAGEN repo to clone    [default: git@github.com:YuRuiii/VAGEN.git]
+#   VAGEN_REPO_BRANCH branch / tag to use  [default: main]
+#   HF_HOME         HF cache location      [default: /workspace/hf_cache]
+#   VAGEN_ENV       conda env for training [default: vagen]
+#                     Creates a fresh Python 3.12 env if missing. Override
+#                     to install into an existing env (e.g. Vast.ai's
+#                     "main"), but if that env already has a different
+#                     vllm version the script will refuse without
+#                     ALLOW_CLOBBER_VLLM=1 — VAGEN/verl are tied to
+#                     vllm==0.11.0 and a downgrade may break the host env.
 #   CONDA_BIN       path to conda binary   [default: auto-detect]
 #   CUDA_INDEX_URL  pytorch wheel index    [default: cu128]
 
 set -euo pipefail
 
 # ---------------------------------------------------------------- defaults
-REPO_ROOT="${REPO_ROOT:-$PWD}"
-HF_HOME="${HF_HOME:-$HOME/hf_cache}"
+REPO_ROOT="${REPO_ROOT:-/workspace}"
+HF_HOME="${HF_HOME:-/workspace/hf_cache}"
+VAGEN_ENV="${VAGEN_ENV:-vagen}"
+VAGEN_REPO_URL="${VAGEN_REPO_URL:-git@github.com:YuRuiii/VAGEN.git}"
+VAGEN_REPO_BRANCH="${VAGEN_REPO_BRANCH:-main}"
+ALLOW_CLOBBER_VLLM="${ALLOW_CLOBBER_VLLM:-0}"
 CUDA_INDEX_URL="${CUDA_INDEX_URL:-https://download.pytorch.org/whl/cu128}"
 SKIP_SYSTEM=0
+SKIP_SSH=0
 SKIP_DOCKER_NOTES=0
 SKIP_MODELS=0
 SKIP_SMOKE=1   # smoke needs WebArena up; off by default
@@ -36,12 +56,13 @@ ONLY=""
 for arg in "$@"; do
   case "$arg" in
     --skip-system) SKIP_SYSTEM=1 ;;
+    --skip-ssh) SKIP_SSH=1 ;;
     --skip-docker-notes) SKIP_DOCKER_NOTES=1 ;;
     --skip-models) SKIP_MODELS=1 ;;
     --run-smoke) SKIP_SMOKE=0 ;;
     --only=*) ONLY="${arg#--only=}" ;;
     -h|--help)
-      sed -n '2,25p' "$0"; exit 0 ;;
+      sed -n '2,37p' "$0"; exit 0 ;;
     *) echo "Unknown flag: $arg"; exit 2 ;;
   esac
 done
@@ -62,21 +83,122 @@ log "REPO_ROOT=$REPO_ROOT"
 log "HF_HOME=$HF_HOME"
 mkdir -p "$REPO_ROOT" "$HF_HOME"
 
-if have nvidia-smi; then
-  GPU_COUNT=$(nvidia-smi -L 2>/dev/null | wc -l)
-  ok "Found $GPU_COUNT GPU(s)"
-  nvidia-smi -L 2>&1 | head -4
-else
-  warn "nvidia-smi not found — training will not work, only env server can run"
+# conda is usually a shell function defined by `conda init` in .bashrc, so it
+# does NOT propagate to this `bash setup.sh` subshell. Try, in order:
+#   1) $CONDA_EXE (exported by conda init in some setups)
+#   2) source ~/.bashrc to pull in the conda init block
+#   3) scan common install dirs
+# Then source conda.sh so `conda activate` works in this script.
+if ! have conda && [ -n "${CONDA_EXE:-}" ] && [ -x "$CONDA_EXE" ]; then
+  export PATH="$(dirname "$CONDA_EXE"):$PATH"
+  log "Picked up conda from \$CONDA_EXE: $CONDA_EXE"
+fi
+
+if ! have conda && [ -f "$HOME/.bashrc" ]; then
+  log "Sourcing ~/.bashrc to load conda init block ..."
+  set +u
+  # shellcheck disable=SC1091
+  source "$HOME/.bashrc" >/dev/null 2>&1 || true
+  set -u
+fi
+
+if ! have conda; then
+  for p in /opt/conda /opt/miniconda3 /opt/anaconda3 \
+           "$HOME/miniconda3" "$HOME/anaconda3" \
+           /root/miniconda3 /root/anaconda3 /usr/local/anaconda3; do
+    if [ -x "$p/bin/conda" ]; then
+      export PATH="$p/bin:$PATH"
+      log "Found conda at $p/bin/conda — added to PATH"
+      break
+    fi
+  done
 fi
 
 if have conda; then
   CONDA_BIN="${CONDA_BIN:-$(command -v conda)}"
   CONDA_BASE=$(conda info --base)
   ok "conda at $CONDA_BIN (base: $CONDA_BASE)"
+  # shellcheck disable=SC1091
   source "$CONDA_BASE/etc/profile.d/conda.sh"
 else
-  err "conda not found. Install Miniconda first: https://docs.conda.io/en/latest/miniconda.html"
+  err "conda not found. Try:  type conda  in your shell to see where it lives,
+       then re-run with PATH explicitly:
+         PATH=\$(dirname \$(type -P conda)):\$PATH bash setup.sh ..."
+fi
+
+# ---------------------------------------------------------------- 0.5 GitHub SSH key
+if should_run ssh && [ "$SKIP_SSH" = 0 ]; then
+  step "GitHub SSH key (skip with --skip-ssh)"
+
+  SSH_DIR="$HOME/.ssh"
+  SSH_KEY="$SSH_DIR/id_ed25519"
+  mkdir -p "$SSH_DIR" && chmod 700 "$SSH_DIR"
+
+  if [ ! -f "$SSH_KEY" ]; then
+    log "Generating ed25519 key (no passphrase) ..."
+    ssh-keygen -t ed25519 -N "" -f "$SSH_KEY" -C "vagen-$(hostname)-$(date +%Y%m%d)" -q
+    ok "Generated $SSH_KEY"
+  else
+    ok "Existing key found at $SSH_KEY"
+  fi
+
+  if ! grep -q "^github.com " "$SSH_DIR/known_hosts" 2>/dev/null; then
+    ssh-keyscan -t ed25519,rsa github.com 2>/dev/null >> "$SSH_DIR/known_hosts"
+    ok "Pinned github.com in known_hosts"
+  fi
+
+  github_ssh_ok() {
+    ssh -o BatchMode=yes -o ConnectTimeout=5 -T git@github.com 2>&1 \
+      | grep -q "successfully authenticated"
+  }
+
+  github_port22_blocked() {
+    ! timeout 5 bash -c '</dev/tcp/github.com/22' 2>/dev/null
+  }
+
+  enable_github_443_fallback() {
+    if grep -q "Hostname ssh.github.com" "$SSH_DIR/config" 2>/dev/null; then
+      ok "github.com → ssh.github.com:443 fallback already configured"
+      return
+    fi
+    log "Outbound port 22 blocked — adding ssh.github.com:443 fallback to ~/.ssh/config"
+    cat >> "$SSH_DIR/config" <<'EOF'
+
+Host github.com
+  Hostname ssh.github.com
+  Port 443
+  User git
+EOF
+    chmod 600 "$SSH_DIR/config"
+    ssh-keyscan -p 443 -t ed25519,rsa ssh.github.com 2>/dev/null >> "$SSH_DIR/known_hosts"
+    ok "443 fallback configured"
+  }
+
+  if ! github_ssh_ok && github_port22_blocked; then
+    enable_github_443_fallback
+  fi
+
+  if github_ssh_ok; then
+    ok "SSH to GitHub works"
+  else
+    warn "GitHub SSH not yet authorized. Add this public key at"
+    warn "  https://github.com/settings/keys  (type: Authentication Key)"
+    echo
+    echo "  ──────────── BEGIN PUBLIC KEY ────────────"
+    sed 's/^/  /' "$SSH_KEY.pub"
+    echo "  ─────────────  END PUBLIC KEY  ───────────"
+    echo
+    if [ -t 0 ]; then
+      read -r -p "  Press Enter once added to GitHub (or Ctrl-C to abort) ... " _
+      if github_ssh_ok; then
+        ok "SSH to GitHub now works"
+      else
+        err "Still cannot authenticate. Verify the key was pasted correctly, then re-run."
+      fi
+    else
+      err "Not a TTY — cannot pause for key upload. Add key to GitHub then re-run setup.sh."
+    fi
+  fi
 fi
 
 # ---------------------------------------------------------------- 1. system packages
@@ -103,7 +225,10 @@ if should_run code; then
       log "Already inside VAGEN-WEBAGENT (setup.py present)"
       VAGEN_DIR="$REPO_ROOT"
     else
-      err "VAGEN-WEBAGENT not found at $REPO_ROOT. Clone it first or cd into it."
+      log "Cloning $VAGEN_REPO_URL → $REPO_ROOT/VAGEN-WEBAGENT (branch $VAGEN_REPO_BRANCH) ..."
+      git clone --branch "$VAGEN_REPO_BRANCH" "$VAGEN_REPO_URL" VAGEN-WEBAGENT
+      VAGEN_DIR="$REPO_ROOT/VAGEN-WEBAGENT"
+      ok "VAGEN-WEBAGENT cloned"
     fi
   else
     VAGEN_DIR="$REPO_ROOT/VAGEN-WEBAGENT"
@@ -112,9 +237,14 @@ if should_run code; then
   log "VAGEN_DIR=$VAGEN_DIR"
 
   if [ ! -d verl_src/.git ]; then
-    log "Cloning verl into ./verl_src ..."
-    git clone --depth 1 https://github.com/volcengine/verl.git verl_src
-    ok "verl cloned"
+    log "Cloning verl into ./verl_src (via SSH) ..."
+    if git clone --depth 1 git@github.com:volcengine/verl.git verl_src; then
+      ok "verl cloned (SSH)"
+    else
+      warn "SSH clone failed — falling back to HTTPS"
+      git clone --depth 1 https://github.com/volcengine/verl.git verl_src
+      ok "verl cloned (HTTPS)"
+    fi
   else
     ok "verl_src already exists"
   fi
@@ -138,16 +268,33 @@ fi
 
 # ---------------------------------------------------------------- 3. vagen conda env
 if should_run vagen-env; then
-  step "Conda env: vagen (Python 3.12, training)"
+  step "Conda env: $VAGEN_ENV (Python 3.12, training)"
 
-  if conda env list | awk '{print $1}' | grep -qx vagen; then
-    ok "vagen env already exists (skipping create)"
+  if conda env list | awk '{print $1}' | grep -qx "$VAGEN_ENV"; then
+    ok "$VAGEN_ENV env already exists (skipping create — installs go into it)"
   else
-    log "Creating conda env vagen ..."
-    conda create -n vagen python=3.12 -y -q
+    log "Creating conda env $VAGEN_ENV ..."
+    conda create -n "$VAGEN_ENV" python=3.12 -y -q
   fi
 
-  conda activate vagen
+  conda activate "$VAGEN_ENV"
+  PY_VER=$(python -c 'import sys; print("%d.%d"%sys.version_info[:2])')
+  if [ "$PY_VER" != "3.12" ]; then
+    err "$VAGEN_ENV has Python $PY_VER but training stack needs 3.12. Set VAGEN_ENV to a different env."
+  fi
+  ok "Active env: $VAGEN_ENV (Python $PY_VER)"
+
+  EXISTING_VLLM=$(python -c 'import vllm; print(vllm.__version__)' 2>/dev/null || true)
+  if [ -n "$EXISTING_VLLM" ] && [ "$EXISTING_VLLM" != "0.11.0" ]; then
+    if [ "$ALLOW_CLOBBER_VLLM" != "1" ]; then
+      err "$VAGEN_ENV already has vllm==$EXISTING_VLLM, but VAGEN/verl require 0.11.0.
+       Re-running would downgrade vllm in this env and may break anything else
+       that depends on it. Either:
+         - use a fresh env:  VAGEN_ENV=vagen bash setup.sh   (recommended)
+         - force-downgrade:  ALLOW_CLOBBER_VLLM=1 bash setup.sh"
+    fi
+    warn "Clobbering vllm $EXISTING_VLLM → 0.11.0 in $VAGEN_ENV (ALLOW_CLOBBER_VLLM=1)"
+  fi
 
   log "Installing pytorch (cu128 wheels) ..."
   pip install -q \
@@ -232,7 +379,7 @@ fi
 if should_run models && [ "$SKIP_MODELS" = 0 ]; then
   step "Hugging Face models (weizhepei SFT baseline + Qwen base)"
 
-  conda activate vagen
+  conda activate "$VAGEN_ENV"
   export HF_HOME
 
   if have huggingface-cli; then
@@ -292,7 +439,7 @@ if [ "$SKIP_SMOKE" = 0 ] && should_run smoke; then
     warn "http://localhost:8002/health not responding — start the env server first"
     warn "See examples/train/webarena/RUN_INSTRUCTIONS.md §1"
   else
-    conda activate vagen
+    conda activate "$VAGEN_ENV"
     export HF_HOME
     cd "$VAGEN_DIR"
     bash examples/train/webarena/train_smoke_qwen25_05b.sh \
@@ -307,6 +454,13 @@ step "Summary"
 ok "Setup complete (the parts this script can automate)."
 echo
 cat <<EOF
+Persistence reminder:
+  REPO_ROOT=$REPO_ROOT
+  HF_HOME=$HF_HOME
+  Conda envs live at \$CONDA_BASE/envs (NOT on /workspace by default —
+  re-run setup.sh on a fresh instance to recreate them, or move
+  miniconda itself onto /workspace).
+
 Next steps:
   1. Bring up the WebArena Docker stack (SETUP.md §3) — manual
   2. Run auto_login.py to bootstrap .wa_auth/ cookies (SETUP.md §7)
@@ -318,7 +472,7 @@ Next steps:
          --task_config_file=vagen/envs/webarena/config_files/normalized_test.json \\
          --n_browsers=2 --max_contexts_per_browser=2 --port=8002 \\
          --auth_cache_dir=./.wa_auth &
-       conda activate vagen
+       conda activate $VAGEN_ENV
        export HF_HOME=$HF_HOME
        bash examples/train/webarena/train_smoke_qwen25_05b.sh
   4. Full training (SETUP.md §9 / RUN_INSTRUCTIONS.md):
