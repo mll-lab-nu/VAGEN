@@ -42,17 +42,19 @@ export OPENBLAS_NUM_THREADS=4
 export OMP_NUM_THREADS=4
 export MKL_NUM_THREADS=4
 export TOKENIZERS_PARALLELISM=false
-export HF_HOME=/work/nvme/bgig/ryu4/huggingface_cache
+export HF_HOME=${HF_HOME:-/workspace/hf_cache}
 
 PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     --config-path=${BASEDIR}/vagen/configs \
     --config-name='vagen_multiturn' \
     \
-    `# Data — paper sets max context 16384 + max_response 1024` \
+    `# Data — paper sets max context 16384 + max_response 1024.` \
+    `# max_prompt_length bumped from 15360 to 24000: WebArena page HTML` \
+    `# routinely exceeds 16k tokens; smaller cap caused -442 max_tokens.` \
     data.train_files=${DATASET_TRAIN} \
     data.val_files=${DATASET_VAL} \
     data.train_batch_size=16 \
-    data.max_prompt_length=15360 \
+    data.max_prompt_length=24000 \
     data.max_response_length=1024 \
     \
     `# Algorithm = GRPO (paper's M-GRPO maps to verl's grpo adv_estimator)` \
