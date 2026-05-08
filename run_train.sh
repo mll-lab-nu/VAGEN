@@ -122,7 +122,7 @@ if [ "$SKIP_AUTH" = 0 ] && [ ! -d .wa_auth ] || [ -z "$(ls -A .wa_auth 2>/dev/nu
   conda activate "$WEBARENA_ENV"
   source vagen/envs/webarena/setup_vars.sh
   mkdir -p .wa_auth
-  PYTHONPATH=. python vagen/envs/webarena/browser_env/auto_login.py \
+  PYTHONPATH=. /venv/vagen/bin/python vagen/envs/webarena/browser_env/auto_login.py \
     --auth_folder "$(pwd)/.wa_auth" \
     --site_list shopping shopping_admin reddit gitlab
   ok ".wa_auth populated"
@@ -180,6 +180,12 @@ fi
 # -------------------------------------------------------------- training
 step "Launching training (mode=$MODE)"
 conda activate "$VAGEN_ENV"
+# vast.ai's /venv/vagen is a Python venv registered as a conda env.
+# `conda activate` sets CONDA_PREFIX but doesn't always prepend the bin
+# dir, so `python3` falls back to /usr/bin/python3 (no deps). Force it.
+if [ -n "${CONDA_PREFIX:-}" ] && [ -d "$CONDA_PREFIX/bin" ]; then
+  export PATH="$CONDA_PREFIX/bin:$PATH"
+fi
 export HF_HOME
 export PYTHONUNBUFFERED=1
 # Vast.ai images sometimes set RAY_ADDRESS=127.0.0.1 (no port) in main env's
