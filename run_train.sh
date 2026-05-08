@@ -103,6 +103,8 @@ fi
 if [ "$SKIP_TUNNEL_CHECK" = 0 ]; then
   step "SSH tunnel check"
   bad=0
+  # 3000 (map/OSM) intentionally NOT checked: only needed if you train
+  # on map tasks. Use seed_list to exclude map seeds instead.
   for p in 7770 7780 9999 8023 8888; do
     code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://localhost:$p/" || echo "000")
     if [ "$code" = "000" ]; then
