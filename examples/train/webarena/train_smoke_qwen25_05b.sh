@@ -55,10 +55,10 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     actor_rollout_ref.actor.ulysses_sequence_parallel_size=1 \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
-    actor_rollout_ref.rollout.name=sglang \
+    `# Use vllm (matches full training script). sglang on Blackwell hits` \
+    `# CUDA illegal memory access during resume_memory_occupation; vllm is stable.` \
+    actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.mode=async \
-    `# Blackwell (SM>=100) is outside sglang's default fa3 backend support range; use flashinfer instead.` \
-    +actor_rollout_ref.rollout.engine_kwargs.sglang.attention_backend=flashinfer \
     actor_rollout_ref.rollout.n=1 \
     actor_rollout_ref.rollout.max_num_batched_tokens=10000 \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.35 \
