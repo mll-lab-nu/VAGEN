@@ -6,8 +6,8 @@ envs:
     # always fail /connect. verl's agent_loop is not fault-tolerant: a
     # single failed rollout kills the training run.
     seed_list: [4, 5, 8, 9, 10, 13, 14, 17, 21, 22, 25, 26, 27, 28, 29, 32]
-    max_turns: 5
-    response_length_per_turn: 512
+    max_turns: 1
+    response_length_per_turn: 256
     config:
       base_urls: "http://dt-login03:8002"
       timeout: 600
