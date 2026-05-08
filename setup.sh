@@ -236,33 +236,29 @@ if should_run code; then
   cd "$VAGEN_DIR"
   log "VAGEN_DIR=$VAGEN_DIR"
 
-  if [ ! -d verl_src/.git ]; then
-    log "Cloning verl into ./verl_src (via SSH) ..."
-    if git clone --depth 1 git@github.com:volcengine/verl.git verl_src; then
-      ok "verl cloned (SSH)"
+  # verl is a git submodule of VAGEN, pinned to JamesKrW/verl @ vagen-lite.
+  # See .gitmodules. The official volcengine/verl does NOT contain the
+  # commit VAGEN needs (compute_reward was refactored away upstream).
+  if [ -f .gitmodules ] && grep -q "submodule \"verl\"" .gitmodules; then
+    log "Initializing verl submodule (JamesKrW/verl @ vagen-lite) ..."
+    git submodule update --init --recursive
+    ok "verl submodule at $(cd verl && git rev-parse --short HEAD)"
+  else
+    warn "No verl submodule defined — falling back to manual clone of JamesKrW/verl@vagen-lite"
+    if [ ! -d verl/.git ]; then
+      rm -rf verl verl_src
+      git clone --branch vagen-lite https://github.com/JamesKrW/verl.git verl
+      ok "verl cloned (JamesKrW/verl @ vagen-lite)"
     else
-      warn "SSH clone failed — falling back to HTTPS"
-      git clone --depth 1 https://github.com/volcengine/verl.git verl_src
-      ok "verl cloned (HTTPS)"
+      ok "verl/ already exists"
     fi
-  else
-    ok "verl_src already exists"
   fi
 
-  if [ ! -e verl ]; then
-    ln -s verl_src verl
-    ok "Created symlink: verl -> verl_src"
-  elif [ -L verl ]; then
-    ok "verl symlink already in place"
-  elif [ -d verl ] && [ -z "$(ls -A verl 2>/dev/null)" ]; then
-    rmdir verl && ln -s verl_src verl
-    ok "Replaced empty verl/ dir with symlink"
-  fi
-
-  if [ -f verl/verl/trainer/config/ppo_trainer.yaml ]; then
-    ok "verl Hydra config reachable"
+  if [ -f verl/verl/trainer/config/ppo_trainer.yaml ] \
+     && grep -q "^def compute_reward" verl/verl/trainer/ppo/reward.py; then
+    ok "verl Hydra config + compute_reward present"
   else
-    err "verl/verl/trainer/config/ppo_trainer.yaml NOT found. Check verl clone + symlink."
+    err "verl tree looks wrong — missing ppo_trainer.yaml or compute_reward. Check submodule URL/branch."
   fi
 fi
 
@@ -328,8 +324,8 @@ if should_run vagen-env; then
       warn "flash-attn build failed — try later with matching CUDA toolkit; training degrades but works without it"
   fi
 
-  log "Installing verl (editable from ./verl_src) ..."
-  pip install -q -e "$VAGEN_DIR/verl_src"
+  log "Installing verl (editable from ./verl submodule) ..."
+  pip install -q -e "$VAGEN_DIR/verl"
 
   log "Installing vagen (editable) ..."
   pip install -q -e "$VAGEN_DIR"
@@ -370,6 +366,7 @@ if should_run webarena-env; then
     matplotlib==3.10.8 \
     dashscope anthropic \
     'openai>=1.0' \
+    fire \
     numpy pandas python-multipart httpx aiofiles
 
   log "Installing Chromium for Playwright (~150 MB) ..."
