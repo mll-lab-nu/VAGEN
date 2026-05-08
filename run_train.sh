@@ -142,20 +142,27 @@ start_env_servers() {
   sleep 3
 
   conda activate "$WEBARENA_ENV"
+  # Force PATH (conda activate doesn't always prepend bin in script mode)
+  if [ -n "${CONDA_PREFIX:-}" ] && [ -d "$CONDA_PREFIX/bin" ]; then
+    export PATH="$CONDA_PREFIX/bin:$PATH"
+  fi
+  WEBARENA_PY="$CONDA_PREFIX/bin/python"
   source vagen/envs/webarena/setup_vars.sh
+
+  log "Using webarena python: $WEBARENA_PY"
 
   # Pool sized to match agent.num_workers (16). Smaller pools surface
   # session leaks immediately rather than hiding behind spare slots, and
   # reset faster on `--restart-servers`.
   log "Starting train server on :8002 (n_browsers=4 × 4 contexts = 16 slots) ..."
-  nohup env PYTHONPATH=. python -m vagen.envs.webarena.serve \
+  nohup env PYTHONPATH=. "$WEBARENA_PY" -m vagen.envs.webarena.serve \
     --task_config_file=vagen/envs/webarena/config_files/normalized_train.json \
     --n_browsers=4 --max_contexts_per_browser=4 \
     --port=8002 --auth_cache_dir=./.wa_auth \
     > examples/evaluate/webarena/logs/webarena_train_server.log 2>&1 &
 
   log "Starting val server on :8003 (n_browsers=2 × 4 contexts = 8 slots) ..."
-  nohup env PYTHONPATH=. python -m vagen.envs.webarena.serve \
+  nohup env PYTHONPATH=. "$WEBARENA_PY" -m vagen.envs.webarena.serve \
     --task_config_file=vagen/envs/webarena/config_files/normalized_test.json \
     --n_browsers=2 --max_contexts_per_browser=4 \
     --port=8003 --auth_cache_dir=./.wa_auth \
