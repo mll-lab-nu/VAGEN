@@ -314,9 +314,19 @@ if should_run vagen-env; then
     pypdf==6.10.2 \
     wandb httpx fire pillow numpy pandas
 
-  log "Installing flash-attn (no-build-isolation, slow) ..."
-  pip install -q flash-attn==2.8.1 --no-build-isolation || \
-    warn "flash-attn build failed — try later with matching CUDA toolkit; training degrades but works without it"
+  # Source-build of flash-attn takes 30-60 min. Prefer Dao-AILab's prebuilt
+  # wheel (must match python / torch / cuda / cxx11abi). The URL below is for
+  # py3.12 + torch2.8 + cu12 + cxx11abi=FALSE (stock pip torch).
+  FLASH_ATTN_WHL="https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.1/flash_attn-2.8.1+cu12torch2.8cxx11abiFALSE-cp312-cp312-linux_x86_64.whl"
+  log "Installing flash-attn (prebuilt wheel) ..."
+  if pip install -q "$FLASH_ATTN_WHL"; then
+    ok "flash-attn installed from prebuilt wheel"
+  else
+    warn "Prebuilt wheel failed (404 or arch mismatch). Falling back to source build (~30-60 min)."
+    warn "If you Ctrl-C, training still works but with reduced throughput."
+    pip install flash-attn==2.8.1 --no-build-isolation || \
+      warn "flash-attn build failed — try later with matching CUDA toolkit; training degrades but works without it"
+  fi
 
   log "Installing verl (editable from ./verl_src) ..."
   pip install -q -e "$VAGEN_DIR/verl_src"
