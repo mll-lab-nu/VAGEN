@@ -180,6 +180,15 @@ step "Launching training (mode=$MODE)"
 conda activate "$VAGEN_ENV"
 export HF_HOME
 export PYTHONUNBUFFERED=1
+# Vast.ai images sometimes set RAY_ADDRESS=127.0.0.1 (no port) in main env's
+# bashrc, which makes ray.init() fail with "Invalid address format". Unset.
+unset RAY_ADDRESS
+# Vast.ai images also tend to start a Ray head (RAY_ARGS=--head --port 6379)
+# at boot. The address persists in /tmp/ray/ray_current_cluster even after
+# the head dies, so ray.init() tries to attach to a ghost. Stop + scrub.
+log "Scrubbing any stale Ray cluster ..."
+ray stop --force >/dev/null 2>&1 || true
+rm -rf /tmp/ray/* 2>/dev/null || true
 
 if [ "$MODE" = "smoke" ]; then
   TRAIN_SCRIPT="examples/train/webarena/train_smoke_qwen25_05b.sh"
