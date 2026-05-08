@@ -74,8 +74,8 @@ Or sbatch equivalent. Get the JOBID + NODELIST from `squeue -u $USER`.
 
 ```bash
 srun --jobid=<jobid> --overlap bash -c '
-  curl -s -o /dev/null -w "train server %{http_code}\n" http://dt-login03:8002/health
-  curl -s -o /dev/null -w "val server %{http_code}\n"   http://dt-login03:8003/health
+  curl -s -o /dev/null -w "train server %{http_code}\n" http://localhost:8002/health
+  curl -s -o /dev/null -w "val server %{http_code}\n"   http://localhost:8003/health
 '
 ```
 Both should return 200.

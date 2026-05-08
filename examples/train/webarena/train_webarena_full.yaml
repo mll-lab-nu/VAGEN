@@ -36,7 +36,7 @@ envs:
     max_turns: 15
     response_length_per_turn: 1024
     config:
-      base_urls: "http://dt-login03:8002"
+      base_urls: "http://localhost:8002"
       timeout: 600
       retries: 3
       max_steps: 15
