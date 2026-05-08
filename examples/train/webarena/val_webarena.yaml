@@ -1,19 +1,21 @@
 envs:
   - name: RemoteEnv
-    n_envs: 165
-    data_source: webarena_test
-    seed: [0, 165, 1]
-    max_turns: 15
-    response_length_per_turn: 1024
+    n_envs: 1
+    data_source: webarena
+    # Smoke-friendly: 1 env, 2 known-good seeds, 1 turn, short timeouts.
+    # Full validation lives in val_webarena_full.yaml.
+    seed_list: [0, 1]
+    max_turns: 1
+    response_length_per_turn: 256
     config:
       base_urls: "http://dt-login03:8002"
-      timeout: 600
-      retries: 3
-      max_steps: 15
+      timeout: 60
+      retries: 1
+      max_steps: 1
       viewport_width: 1280
       viewport_height: 720
       observation_type: webrl
       sleep_after_execution: 0.5
-      reset_timeout: 180.0
-      step_timeout: 90.0
-      eval_timeout: 90.0
+      reset_timeout: 60.0
+      step_timeout: 30.0
+      eval_timeout: 30.0
