@@ -32,7 +32,7 @@ export MKL_NUM_THREADS=2
 export HF_HOME=/work/nvme/bgig/ryu4/huggingface_cache
 export TOKENIZERS_PARALLELISM=false
 
-PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
+PYTHONUNBUFFERED=1 python -m vagen.main_ppo \
     --config-path=${BASEDIR}/vagen/configs \
     --config-name='vagen_multiturn' \
     data.train_files=${DATASET_TRAIN} \

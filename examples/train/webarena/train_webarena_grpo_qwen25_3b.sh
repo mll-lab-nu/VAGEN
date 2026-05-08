@@ -44,7 +44,7 @@ export MKL_NUM_THREADS=4
 export TOKENIZERS_PARALLELISM=false
 export HF_HOME=${HF_HOME:-/workspace/hf_cache}
 
-PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
+PYTHONUNBUFFERED=1 python -m vagen.main_ppo \
     --config-path=${BASEDIR}/vagen/configs \
     --config-name='vagen_multiturn' \
     \

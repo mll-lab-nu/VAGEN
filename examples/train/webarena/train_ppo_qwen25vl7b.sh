@@ -41,7 +41,7 @@ agent_loop_config_path=${BASEDIR}/vagen/configs/agent.yaml
 REF_MODEL_PATH=Qwen/Qwen2.5-VL-7B-Instruct
 mkdir -p ${EXPERIMENT_DIR}
 
-PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
+PYTHONUNBUFFERED=1 python -m vagen.main_ppo \
     --config-path=${BASEDIR}/vagen/configs \
     --config-name='vagen_multiturn' \
     data.train_files=${DATASET_TRAIN} \
