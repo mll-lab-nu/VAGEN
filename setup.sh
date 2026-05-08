@@ -297,38 +297,27 @@ if should_run vagen-env; then
     torch==2.8.0 torchvision==0.23.0 torchaudio==2.8.0 \
     --index-url "$CUDA_INDEX_URL"
 
-  log "Installing core RL stack ..."
-  pip install -q \
-    'ray[default]==2.53.0' \
-    sglang==0.5.2 \
-    vllm==0.11.0 \
-    flashinfer-python==0.3.1 \
-    transformers==4.56.1 \
-    accelerate==1.11.0 \
-    hydra-core==1.3.2 omegaconf==2.3.0 \
-    triton==3.4.0 \
-    pypdf==6.10.2 \
-    wandb httpx fire pillow numpy pandas
-
-  # Source-build of flash-attn takes 30-60 min. Prefer Dao-AILab's prebuilt
-  # wheel (must match python / torch / cuda / cxx11abi). The URL below is for
-  # py3.12 + torch2.8 + cu12 + cxx11abi=FALSE (stock pip torch).
-  FLASH_ATTN_WHL="https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.1/flash_attn-2.8.1+cu12torch2.8cxx11abiFALSE-cp312-cp312-linux_x86_64.whl"
-  log "Installing flash-attn (prebuilt wheel) ..."
-  if pip install -q "$FLASH_ATTN_WHL"; then
-    ok "flash-attn installed from prebuilt wheel"
+  # Use verl's official install script — handles sglang[all]==0.5.2 + torch-
+  # memory-saver, vllm==0.11.0, all transformers+ray+hydra+tensordict+
+  # liger-kernel etc, flash-attn 2.8.1 prebuilt wheel, flashinfer 0.3.1, opencv.
+  # Skip Megatron+TransformerEngine (USE_MEGATRON=0). Skip sglang if already
+  # at correct version to avoid re-download.
+  if [ -f "$VAGEN_DIR/verl/scripts/install_vllm_sglang_mcore.sh" ]; then
+    log "Running verl/scripts/install_vllm_sglang_mcore.sh (USE_MEGATRON=0) ..."
+    USE_MEGATRON=0 bash "$VAGEN_DIR/verl/scripts/install_vllm_sglang_mcore.sh"
+    ok "verl deps installed via official script"
   else
-    warn "Prebuilt wheel failed (404 or arch mismatch). Falling back to source build (~30-60 min)."
-    warn "If you Ctrl-C, training still works but with reduced throughput."
-    pip install flash-attn==2.8.1 --no-build-isolation || \
-      warn "flash-attn build failed — try later with matching CUDA toolkit; training degrades but works without it"
+    err "verl/scripts/install_vllm_sglang_mcore.sh missing — verl submodule not initialized?"
   fi
 
-  log "Installing verl (editable from ./verl submodule) ..."
-  pip install -q -e "$VAGEN_DIR/verl"
+  log "Installing verl (editable, --no-deps; the script above handled deps) ..."
+  pip install -q --no-deps -e "$VAGEN_DIR/verl"
 
   log "Installing vagen (editable) ..."
   pip install -q -e "$VAGEN_DIR"
+
+  log "Installing trl (pinned per VAGEN README) ..."
+  pip install -q "trl==0.26.2"
 
   log "Sanity checks ..."
   python -c "import verl; from verl.trainer.constants_ppo import get_ppo_ray_runtime_env" \
