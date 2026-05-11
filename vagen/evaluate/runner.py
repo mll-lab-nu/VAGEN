@@ -185,3 +185,47 @@ async def run_eval_parallel(
                     pass
 
     return results
+
+
+# Multi-process worker entry — invoked by run_eval.main when num_workers > 1.
+# Picklable, module-level so spawn can resolve it by name.
+def run_eval_chunk_subprocess(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Run one job chunk in a subprocess; ``normal_finish_reasons`` carries the
+    parent's override across the spawn boundary (monkey-patches do not)."""
+    # Re-register builtin envs in this child (registry is process-local).
+    from vagen.evaluate import register_builtins  # noqa: F401
+
+    nfr = payload.get("normal_finish_reasons")
+    if nfr is not None:
+        global NORMAL_FINISH_REASONS  # noqa: PLW0603
+        NORMAL_FINISH_REASONS = set(nfr)
+
+    return asyncio.run(
+        run_eval_parallel(
+            payload["jobs"],
+            backend=payload["backend"],
+            backend_cfg=payload["backend_cfg"],
+            model=payload["model"],
+            default_max_turns=payload["default_max_turns"],
+            dump_dir=payload.get("dump_dir"),
+            max_concurrent_jobs=int(payload.get("max_concurrent_jobs", 4)),
+            resume_mode=payload.get("resume_mode", "skip_completed"),
+            live_summary=bool(payload.get("live_summary", False)),
+        )
+    )
+
+
+def split_jobs_round_robin(
+    jobs: List[Dict[str, Any]], num_workers: int,
+) -> List[List[Dict[str, Any]]]:
+    """Round-robin partition of ``jobs`` so each worker sees a representative
+    mix rather than a contiguous block. Trailing empty chunks are trimmed."""
+    if num_workers < 1:
+        raise ValueError(f"num_workers must be >= 1, got {num_workers}")
+    if not jobs:
+        return []
+    n = min(num_workers, len(jobs))
+    chunks: List[List[Dict[str, Any]]] = [[] for _ in range(n)]
+    for i, j in enumerate(jobs):
+        chunks[i % n].append(j)
+    return chunks

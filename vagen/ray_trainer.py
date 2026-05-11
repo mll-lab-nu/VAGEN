@@ -59,6 +59,7 @@ from verl.utils.rollout_skip import RolloutSkip
 from verl.utils.seqlen_balancing import calculate_workload, get_seqlen_balanced_partitions, log_seqlen_unbalance
 from verl.utils.torch_functional import masked_mean
 from vagen.utils.image_dump_actor import ImageDumpActor
+from vagen.utils.best_val import BestValTracker
 from vagen.utils.upload_hugging_face import HFUploadManager
 from vagen.utils.image_validation_logger import ValidationGenerationsLogger
 from vagen.utils.concat_val_multi_turn import concat_val_multi_turn
@@ -411,6 +412,9 @@ class RayPPOTrainer:
 
         # HuggingFace Hub upload
         self._hf_upload_manager = HFUploadManager(config)
+
+        # Best-validation checkpointing (see vagen/utils/best_val.py).
+        self._best_val_tracker = BestValTracker(config)
 
         # if ref_in_actor is True, the reference policy will be actor without lora applied
         self.ref_in_actor = (
@@ -1565,6 +1569,15 @@ class RayPPOTrainer:
                         val_metrics: dict = self._validate()
                         if is_last_step:
                             last_val_metrics = val_metrics
+                        # No-op unless trainer.save_best_val is True. Kept
+                        # inside the testing timer so its cost is attributed
+                        # correctly.
+                        self._best_val_tracker.maybe_save(
+                            val_metrics=val_metrics,
+                            global_steps=self.global_steps,
+                            actor_rollout_wg=self.actor_rollout_wg,
+                            hf_upload_manager=self._hf_upload_manager,
+                        )
                     metrics.update(val_metrics)
 
                 # Check if the ESI (Elastic Server Instance)/training plan is close to expiration.

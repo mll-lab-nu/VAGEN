@@ -47,6 +47,11 @@ trainer:
   max_actor_ckpt_to_keep: 1                # Max number of actor checkpoints to keep (saves disk space)
   max_critic_ckpt_to_keep: 1               # Max number of critic checkpoints to keep
   concat_multi_turn: True                 # Concatenate multi-turn messages for rollout and training
+  save_best_val: True                     # If True, every time a validation pass beats the current best
+                                          # val-core score, also dump just ``actor/huggingface`` into
+                                          # ``<default_local_dir>/best_val/`` (no optimizer / extra
+                                          # state). If huggingface_hub.hf_save_freq is also set, the
+                                          # new best_val model is uploaded under <project>/<exp>/best_val/.
   log_image:
     enable: false           # Whether to log environment-rendered images to logger (e.g. wandb)
     max_pending: 2          # Max pending async image dump tasks (prevents IO from blocking training)
@@ -73,6 +78,18 @@ filter:
 # ============================================================================
 huggingface_hub:
   hf_save_freq: null            # null = no auto-upload
-  repo_id: vagen-training       
+  repo_id: vagen-training
   private: false
-  upload_contents: ['hf_model']            
+  # ``upload_contents`` is a list of HF Hub glob patterns interpreted
+  # relative to verl's per-step checkpoint root, i.e. the directory
+  # constructed by ray_trainer._save_checkpoint as:
+  #
+  #     local_path = os.path.join(default_local_dir, f"global_step_{global_steps}")
+  #
+  # So the default below uploads ``global_step_<N>/actor/huggingface/**``
+  # (i.e. the merged HF model produced by FSDPCheckpointManager).
+  # The same patterns are also used for best_val uploads, where the root
+  # is ``<default_local_dir>/best_val/`` and the layout mirrors
+  # ``actor/huggingface/...``. Folder patterns end with ``/**``; single
+  # files are matched by their glob (e.g. ``data.pt``).
+  upload_contents: ['actor/huggingface/**']            
