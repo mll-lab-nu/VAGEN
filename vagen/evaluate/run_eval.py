@@ -214,6 +214,13 @@ def _refresh_tag_summaries(dump_dir: Optional[str]) -> None:
             logger.warning("Resume: failed to refresh summary for %s: %s", tag_entry.path, exc)
 
 
+def _pick_meta_then_metrics(meta: Dict[str, Any], metrics: Dict[str, Any], key: str) -> Any:
+    """Prefer meta[key] over metrics[key], but fall back only when meta's
+    value is missing/None — NOT when it's a falsy-but-valid 0."""
+    v = meta.get(key)
+    return v if v is not None else metrics.get(key)
+
+
 def _collect_completed_runs(dump_dir: Optional[str]) -> Dict[Tuple[str, int, Union[int, str]], str]:
     """Find completed (success) runs keyed by (env_name, seed, tag_id)."""
     completed: Dict[Tuple[str, int, Union[int, str]], str] = {}
@@ -227,12 +234,9 @@ def _collect_completed_runs(dump_dir: Optional[str]) -> Dict[Tuple[str, int, Uni
         if _rollout_finish_reason(metrics) not in _runner_mod.NORMAL_FINISH_REASONS:
             continue
         meta = _read_json(os.path.join(rollout.path, "meta.json")) or {}
-        # Prefer meta.json over metrics.json, but fall back only when meta's
-        # value is missing/None — NOT when it's a falsy-but-valid 0.
-        def _pick(key: str) -> Any:
-            v = meta.get(key)
-            return v if v is not None else metrics.get(key)
-        env_name, seed, tag_id = _pick("env_name"), _pick("seed"), _pick("tag_id")
+        env_name = _pick_meta_then_metrics(meta, metrics, "env_name")
+        seed = _pick_meta_then_metrics(meta, metrics, "seed")
+        tag_id = _pick_meta_then_metrics(meta, metrics, "tag_id")
         if env_name is None or seed is None or tag_id is None:
             continue
         try:
@@ -409,11 +413,23 @@ def _run_jobs_multiprocess(
     per_worker_backend_conc = max(1, math.ceil(global_backend_conc / n_actual))
     per_worker_backend_cfg = {**backend_cfg, "max_concurrency": per_worker_backend_conc}
 
+    # Round-robin splitting can place jobs from the same tag in different
+    # workers, so concurrent ``write_rollouts_summary_from_dump`` calls would
+    # race on ``tag_<id>/summary.json``. Disable child-side live summary; the
+    # final per-tag summary is rewritten by main() after all workers join.
+    child_live_summary = live_summary
+    if live_summary:
+        logger.warning(
+            "live_summary disabled in child workers to avoid concurrent "
+            "writes to tag_<id>/summary.json; final summary written by parent."
+        )
+        child_live_summary = False
+
     payload_base = dict(
         backend=backend, backend_cfg=per_worker_backend_cfg, model=model,
         default_max_turns=default_max_turns, dump_dir=dump_dir,
         max_concurrent_jobs=per_worker_max_jobs, resume_mode=resume_mode,
-        live_summary=live_summary, normal_finish_reasons=normal_finish_reasons,
+        live_summary=child_live_summary, normal_finish_reasons=normal_finish_reasons,
     )
     worker_payloads = [{"jobs": chunk, **payload_base} for chunk in chunks]
 
@@ -503,7 +519,7 @@ def main() -> None:
         _purge_error_rollouts(dump_dir, resume_mode)
         _refresh_tag_summaries(dump_dir)
 
-    completed_index: Dict[Tuple[str, int, int], str] = {}
+    completed_index: Dict[Tuple[str, int, Union[int, str]], str] = {}
     if resume_mode == "skip_completed":
         completed_index = _collect_completed_runs(dump_dir)
         logger.info("Resume: detected %d completed rollouts to skip", len(completed_index))
