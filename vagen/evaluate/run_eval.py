@@ -6,8 +6,10 @@ import asyncio
 import copy
 import json
 import logging
+import math
 import os
 import shutil
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -15,8 +17,8 @@ from omegaconf import DictConfig, OmegaConf, open_dict
 
 from vagen.evaluate.register_builtins import *  # populate registry
 from vagen.envs.registry import get_env_cls
+from vagen.evaluate import runner as _runner_mod
 from vagen.evaluate.runner import (
-    NORMAL_FINISH_REASONS,
     run_eval_chunk_subprocess,
     run_eval_parallel,
     split_jobs_round_robin,
@@ -139,52 +141,64 @@ def _resolve_dump_dir(cfg: Dict[str, Any], base_dir: str) -> str:
     return dump_dir
 
 
-def _purge_error_rollouts(dump_dir: Optional[str], resume_mode: str) -> None:
-    """
-    Remove previous error rollouts so reruns start clean.
-    Only invoked when resume mode keeps completed runs.
-    """
-    if resume_mode == "off" or not dump_dir:
-        return
-    if not os.path.isdir(dump_dir):
-        return
+def _read_json(path: str) -> Optional[Dict[str, Any]]:
+    """Best-effort JSON load; returns None on any error."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
 
-    success_reasons = set(NORMAL_FINISH_REASONS)
+
+def _iter_rollout_dirs(dump_dir: str):
+    """Yield ``os.DirEntry`` for each ``dump_dir/tag_*/<rollout>`` directory."""
     for tag_entry in os.scandir(dump_dir):
         if not tag_entry.is_dir() or not tag_entry.name.startswith("tag_"):
             continue
         for rollout_entry in os.scandir(tag_entry.path):
-            if not rollout_entry.is_dir():
-                continue
-            metrics_path = os.path.join(rollout_entry.path, "metrics.json")
-            if not os.path.isfile(metrics_path):
-                try:
-                    shutil.rmtree(rollout_entry.path, ignore_errors=False)
-                    logger.info("Removed rollout without metrics: %s", rollout_entry.path)
-                except Exception:
-                    logger.warning("Failed to remove rollout without metrics: %s", rollout_entry.path)
-                continue
-            try:
-                with open(metrics_path, "r", encoding="utf-8") as f:
-                    metrics = json.load(f)
-            except Exception:
-                continue
+            if rollout_entry.is_dir():
+                yield rollout_entry
 
-            finish_reason = metrics.get("finish_reason")
-            if not finish_reason:
-                terminated = bool(metrics.get("terminated"))
-                success = bool(metrics.get("success"))
-                if terminated and success:
-                    finish_reason = "done"
 
-            if finish_reason in success_reasons:
-                continue
+def _rollout_finish_reason(metrics: Dict[str, Any]) -> Optional[str]:
+    """Derive finish_reason: explicit field, else terminated+success → 'done'."""
+    fr = metrics.get("finish_reason")
+    if fr:
+        return fr
+    if metrics.get("terminated") and metrics.get("success"):
+        return "done"
+    return None
 
-            try:
-                shutil.rmtree(rollout_entry.path, ignore_errors=False)
-                logger.info("Removed previous error rollout folder: %s", rollout_entry.path)
-            except Exception:
-                logger.warning("Failed to remove error rollout folder: %s", rollout_entry.path)
+
+def _rmtree_logged(path: str, ok_msg: str, fail_msg: str) -> None:
+    try:
+        shutil.rmtree(path, ignore_errors=False)
+        logger.info("%s: %s", ok_msg, path)
+    except Exception:
+        logger.warning("%s: %s", fail_msg, path)
+
+
+def _purge_error_rollouts(dump_dir: Optional[str], resume_mode: str) -> None:
+    """Remove previous error rollouts so reruns start clean. No-op when resume is off."""
+    if resume_mode == "off" or not dump_dir or not os.path.isdir(dump_dir):
+        return
+    # Read through the runner module so main()'s override is reflected here.
+    success_reasons = set(_runner_mod.NORMAL_FINISH_REASONS)
+    for rollout in _iter_rollout_dirs(dump_dir):
+        metrics_path = os.path.join(rollout.path, "metrics.json")
+        if not os.path.isfile(metrics_path):
+            _rmtree_logged(rollout.path,
+                "Removed rollout without metrics",
+                "Failed to remove rollout without metrics")
+            continue
+        metrics = _read_json(metrics_path)
+        if metrics is None:
+            continue
+        if _rollout_finish_reason(metrics) in success_reasons:
+            continue
+        _rmtree_logged(rollout.path,
+            "Removed previous error rollout folder",
+            "Failed to remove error rollout folder")
 
 
 def _refresh_tag_summaries(dump_dir: Optional[str]) -> None:
@@ -201,60 +215,32 @@ def _refresh_tag_summaries(dump_dir: Optional[str]) -> None:
 
 
 def _collect_completed_runs(dump_dir: Optional[str]) -> Dict[Tuple[str, int, Union[int, str]], str]:
-    """
-    Scan existing rollouts to find completed (success) runs keyed by (env_name, seed, tag_id).
-    """
+    """Find completed (success) runs keyed by (env_name, seed, tag_id)."""
     completed: Dict[Tuple[str, int, Union[int, str]], str] = {}
     if not dump_dir or not os.path.isdir(dump_dir):
         return completed
 
-    for tag_entry in os.scandir(dump_dir):
-        if not tag_entry.is_dir() or not tag_entry.name.startswith("tag_"):
+    for rollout in _iter_rollout_dirs(dump_dir):
+        metrics = _read_json(os.path.join(rollout.path, "metrics.json"))
+        if metrics is None:
             continue
-        for rollout_entry in os.scandir(tag_entry.path):
-            if not rollout_entry.is_dir():
-                continue
-            metrics_path = os.path.join(rollout_entry.path, "metrics.json")
-            if not os.path.isfile(metrics_path):
-                continue
-            try:
-                with open(metrics_path, "r", encoding="utf-8") as f:
-                    metrics = json.load(f)
-            except Exception:
-                continue
-
-            finish_reason = metrics.get("finish_reason")
-            if not finish_reason:
-                terminated = bool(metrics.get("terminated"))
-                success = bool(metrics.get("success"))
-                if terminated and success:
-                    finish_reason = "done"
-
-            if finish_reason not in NORMAL_FINISH_REASONS:
-                continue
-
-            meta_path = os.path.join(rollout_entry.path, "meta.json")
-            meta_payload: Optional[Dict[str, Any]] = None
-            if os.path.isfile(meta_path):
-                try:
-                    with open(meta_path, "r", encoding="utf-8") as f:
-                        meta_payload = json.load(f)
-                except Exception:
-                    meta_payload = None
-
-            env_name = (meta_payload or {}).get("env_name") or metrics.get("env_name")
-            seed = (meta_payload or {}).get("seed") or metrics.get("seed")
-            tag_id = (meta_payload or {}).get("tag_id") or metrics.get("tag_id")
-            if env_name is None or seed is None or tag_id is None:
-                continue
-            try:
-                # Keep tag_id as original type (int or str)
-                if not isinstance(tag_id, (int, str)):
-                    tag_id = str(tag_id)
-                key = (str(env_name), int(seed), tag_id)
-            except (TypeError, ValueError):
-                continue
-            completed[key] = "done"
+        if _rollout_finish_reason(metrics) not in _runner_mod.NORMAL_FINISH_REASONS:
+            continue
+        meta = _read_json(os.path.join(rollout.path, "meta.json")) or {}
+        # Prefer meta.json over metrics.json, but fall back only when meta's
+        # value is missing/None — NOT when it's a falsy-but-valid 0.
+        def _pick(key: str) -> Any:
+            v = meta.get(key)
+            return v if v is not None else metrics.get(key)
+        env_name, seed, tag_id = _pick("env_name"), _pick("seed"), _pick("tag_id")
+        if env_name is None or seed is None or tag_id is None:
+            continue
+        try:
+            if not isinstance(tag_id, (int, str)):
+                tag_id = str(tag_id)
+            completed[(str(env_name), int(seed), tag_id)] = "done"
+        except (TypeError, ValueError):
+            continue
     return completed
 
 
@@ -402,56 +388,69 @@ def _run_jobs_multiprocess(
     num_workers: int,
     normal_finish_reasons: Optional[List[str]],
 ) -> List[Dict[str, Any]]:
-    """Fan ``jobs`` out to ``num_workers`` subprocess workers.
+    """Fan ``jobs`` out to ``num_workers`` subprocess workers sharing one backend.
 
-    Each worker spins up its own asyncio loop and calls
-    :func:`run_eval_parallel` on a non-overlapping seed/job slice. They
-    all hit the same backend client (e.g. one sglang server URL) and
-    write into the same ``dump_dir`` — but rollout results live in
-    per-seed subdirs (``tag_<id>/<seed>/``) so concurrent writes never
-    collide. Returns the concatenated per-rollout result list, in the
-    same shape ``run_eval_parallel`` would have returned with
-    ``num_workers=1``.
+    Global budgets (``max_concurrent_jobs``, ``backend_cfg.max_concurrency``)
+    are ceil-divided across workers so total backend pressure stays at the
+    configured limit. Each worker crashes independently — failed chunks
+    surface as one structured error record per job, not as a batch abort.
     """
-    from concurrent.futures import ProcessPoolExecutor
+    from concurrent.futures import ProcessPoolExecutor, as_completed
     import multiprocessing as mp
 
     chunks = split_jobs_round_robin(jobs, num_workers)
     if not chunks:
         return []
-    # Each worker uses ``max_concurrent_jobs`` AS-IS (per-worker cap),
-    # matching the single-process semantics. Total in-flight across the
-    # backend = num_workers * max_concurrent_jobs.
-    worker_payloads: List[Dict[str, Any]] = []
-    for chunk in chunks:
-        worker_payloads.append({
-            "jobs": chunk,
-            "backend": backend,
-            "backend_cfg": backend_cfg,
-            "model": model,
-            "default_max_turns": default_max_turns,
-            "dump_dir": dump_dir,
-            "max_concurrent_jobs": max_concurrent_jobs,
-            "resume_mode": resume_mode,
-            "live_summary": live_summary,
-            "normal_finish_reasons": normal_finish_reasons,
-        })
+    n_actual = len(chunks)
 
-    n_actual = len(worker_payloads)
+    # Ceil-split the global budgets; ``max(1, …)`` keeps tiny caps usable.
+    per_worker_max_jobs = max(1, math.ceil(max_concurrent_jobs / n_actual))
+    global_backend_conc = int(backend_cfg.get("max_concurrency", 2))
+    per_worker_backend_conc = max(1, math.ceil(global_backend_conc / n_actual))
+    per_worker_backend_cfg = {**backend_cfg, "max_concurrency": per_worker_backend_conc}
+
+    payload_base = dict(
+        backend=backend, backend_cfg=per_worker_backend_cfg, model=model,
+        default_max_turns=default_max_turns, dump_dir=dump_dir,
+        max_concurrent_jobs=per_worker_max_jobs, resume_mode=resume_mode,
+        live_summary=live_summary, normal_finish_reasons=normal_finish_reasons,
+    )
+    worker_payloads = [{"jobs": chunk, **payload_base} for chunk in chunks]
+
     logger.info(
-        "Multi-process rollout: %d worker(s), %d total jobs, ~%d jobs/worker, "
-        "max_concurrent_jobs=%d (per worker)",
-        n_actual, len(jobs), len(jobs) // n_actual, max_concurrent_jobs,
+        "Multi-process rollout: %d worker(s), %d jobs (~%d/worker); "
+        "max_concurrent_jobs %d→%d/worker, backend max_concurrency %d→%d/worker",
+        n_actual, len(jobs), len(jobs) // n_actual,
+        max_concurrent_jobs, per_worker_max_jobs,
+        global_backend_conc, per_worker_backend_conc,
     )
 
-    # Use spawn so the child has a clean Python state (no shared asyncio
-    # loop, no inherited fds beyond what we pickle). Forking a
-    # CUDA-touching parent breaks; spawn is portable across platforms.
+    # spawn: clean child state, portable, no fork-after-CUDA breakage.
     ctx = mp.get_context("spawn")
     results: List[Dict[str, Any]] = []
     with ProcessPoolExecutor(max_workers=n_actual, mp_context=ctx) as pool:
-        for chunk_results in pool.map(run_eval_chunk_subprocess, worker_payloads):
-            results.extend(chunk_results)
+        fut_to_idx = {pool.submit(run_eval_chunk_subprocess, p): i
+                      for i, p in enumerate(worker_payloads)}
+        for fut in as_completed(fut_to_idx):
+            idx = fut_to_idx[fut]
+            try:
+                results.extend(fut.result())
+            except (KeyboardInterrupt, SystemExit):
+                raise
+            except BaseException as exc:  # noqa: BLE001 — incl. BrokenProcessPool
+                logger.exception("Worker %d crashed: %s", idx, exc)
+                # One error record per job in the crashed chunk so summaries
+                # still account for them.
+                for job in worker_payloads[idx]["jobs"]:
+                    data = job.get("data", {})
+                    rec = {
+                        "rollout_id": f"WORKER-ERR-{idx}-{uuid.uuid4().hex[:8]}",
+                        "error": f"worker {idx} crashed: {exc!r}",
+                    }
+                    for k in ("env_name", "split", "tag_id", "seed"):
+                        if data.get(k) is not None:
+                            rec[k] = data[k]
+                    results.append(rec)
     return results
 
 
@@ -476,22 +475,16 @@ def main() -> None:
     live_summary = bool(run_cfg.get("live_summary", False))
     max_concurrent = int(run_cfg.get("max_concurrent_jobs", 4))
     base_seed = int(run_cfg.get("base_seed", run_cfg.get("start_seed", 0)))
-    # Multi-process knob (default 1 = legacy single-process asyncio path).
-    # When > 1, the job list is partitioned round-robin across that many
-    # subprocess workers — each runs its own asyncio event loop against
-    # the shared backend, with ``max_concurrent_jobs`` as a per-worker cap.
-    # Use this when the bottleneck is single-process Python CPU
-    # (image preprocessing, JSON encoding, regex parsing) rather than the
-    # backend itself; common for VLM workloads at high concurrency.
+    # num_workers > 1 → opt-in multi-process mode: round-robin partition the
+    # jobs across ``ProcessPoolExecutor`` workers sharing the same backend.
+    # Use this when single-process CPU (PIL, JSON, regex) is the bottleneck.
     num_workers = int(run_cfg.get("num_workers", 1))
-    # Optional explicit override of the parent's NORMAL_FINISH_REASONS.
-    # Useful when the caller (e.g. the reasoning-augmentation pipeline)
-    # monkey-patches it to ``{"done"}`` so ``max_turns`` exits don't count
-    # as a successful resume — the patch otherwise wouldn't propagate
-    # across the spawn boundary in multi-process mode.
+    # Override what counts as a "successfully completed" run. The reasoning-
+    # augmentation pipeline narrows this to {"done"} so max_turns exits are
+    # retried instead of skipped on resume. Rebound on runner so both the
+    # parent (via ``_runner_mod``) and child workers (via payload) see it.
     nfr_override = run_cfg.get("normal_finish_reasons")
     if nfr_override is not None:
-        from vagen.evaluate import runner as _runner_mod
         _runner_mod.NORMAL_FINISH_REASONS = set(nfr_override)
 
     backend_cfg: Dict[str, Any] = cfg.get("backends", {})[backend]
@@ -537,9 +530,7 @@ def main() -> None:
     logger.info("Total pending jobs: %d", len(jobs))
 
     if num_workers <= 1 or len(jobs) <= 1:
-        # Default in-process path — bit-identical to the pre-multi-worker
-        # behaviour so existing configs (without ``num_workers``) get the
-        # same result.
+        # Default in-process path — identical to the pre-multi-worker behaviour.
         results = asyncio.run(
             run_eval_parallel(
                 jobs,
