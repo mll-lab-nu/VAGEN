@@ -108,7 +108,7 @@ VAGEN currently supports PPO / GRPO with two multi-turn training paradigms:
 ```bash
 # Qwen/Qwen2.5-VL-3B-Instruct
 cd VAGEN
-bash examples/sokoban/train_ppo_qwen25vl3b.sh
+bash examples/train/sokoban/train_ppo_qwen25vl3b.sh
 ```
 
 ```bash
@@ -116,13 +116,13 @@ bash examples/sokoban/train_ppo_qwen25vl3b.sh
 # pip install transformers==4.57.1
 # pip install "sglang[all]==0.5.3.post3"
 cd VAGEN
-bash examples/sokoban/train_grpo_qwen3vl4b.sh
+bash examples/train/sokoban/train_grpo_qwen3vl4b.sh
 ```
 
 ```bash
 # Enable reward variance based top-p filtering
 cd VAGEN
-bash examples/frozenlake/train_grpo_qwen25vl3b_filtertopp_vision.sh
+bash examples/train/frozenlake/train_grpo_qwen25vl3b_filtertopp_vision.sh
 ```
 
 
@@ -130,7 +130,7 @@ bash examples/frozenlake/train_grpo_qwen25vl3b_filtertopp_vision.sh
 
 ```bash
 cd VAGEN
-bash examples/sokoban/train_ppo_no_concat_qwen25vl3b.sh
+bash examples/train/sokoban/train_ppo_no_concat_qwen25vl3b.sh
 ```
 ### Evaluation
 
@@ -180,15 +180,15 @@ Prepare training and validation configs:
 
 You can follow the Sokoban examples as templates:
 
-* [`examples/sokoban/train_sokoban_vision.yaml`](examples/sokoban/train_sokoban_vision.yaml)
-* [`examples/sokoban/val_sokoban_vision.yaml`](examples/sokoban/val_sokoban_vision.yaml)
+* [`examples/train/sokoban/train_sokoban_vision.yaml`](examples/train/sokoban/train_sokoban_vision.yaml)
+* [`examples/train/sokoban/val_sokoban_vision.yaml`](examples/train/sokoban/val_sokoban_vision.yaml)
 
 
 ### 4. Create a Training Script
 
 Write your training script based on:
 
-* [`examples/sokoban/train_ppo_qwen25vl3b.sh`](examples/sokoban/train_ppo_qwen25vl3b.sh)
+* [`examples/train/sokoban/train_ppo_qwen25vl3b.sh`](examples/train/sokoban/train/train_ppo_qwen25vl3b.sh)
 
 
 ## More Customization
