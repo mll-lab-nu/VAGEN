@@ -13,9 +13,11 @@ fileroot: ${oc.env:HOME}/projects/vagen
 
 envs:
   - name: RemoteEnv
-    n_envs: 5
+    n_envs: 8
     tag_id: webarena_smoke
-    seed_list: [4, 5, 8, 9, 10]   # shopping, reddit, shopping_admin, gitlab, shopping (no map)
+    # Verified non-map / non-admin seeds (from val_webarena_full.yaml first row).
+    # Override with NEW seed_list via Hydra if you want different tasks.
+    seed_list: [0, 1, 2, 3, 4, 5, 9, 10, 11, 12]
     max_turns: 5
     config:
       base_urls: "http://localhost:8002"
