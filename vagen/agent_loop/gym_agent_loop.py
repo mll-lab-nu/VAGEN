@@ -51,6 +51,47 @@ def _flatten_text_only_content(msg):
     return new_msg
 
 
+def _compress_history(messages):
+    """Match WebAgent-R1 paper's WebRLChatPromptConstructor: replace HTML in
+    historical user messages with `** Simplified html **`, keeping only the
+    most recent user message's real observation. System and assistant
+    messages are untouched. Without this compression, multi-turn chat
+    accumulates full HTML each turn and quickly exceeds 32K context.
+    """
+    if not messages:
+        return messages
+    user_idxs = [i for i, m in enumerate(messages) if m.get("role") == "user"]
+    if len(user_idxs) <= 1:
+        return messages
+    last_user_idx = user_idxs[-1]
+    out = []
+    for i, m in enumerate(messages):
+        if m.get("role") != "user" or i == last_user_idx:
+            out.append(m)
+            continue
+        content = m.get("content", "")
+        if isinstance(content, list):
+            text = "".join(
+                blk.get("text", "") for blk in content
+                if isinstance(blk, dict) and blk.get("type") == "text"
+            )
+        else:
+            text = content or ""
+        # Preserve "Task Instruction: ...\n\nRound N" prefix (model needs intent)
+        if "Task Instruction" in text.split("\n\n", 1)[0]:
+            prefix = text.split("\n\n** Simplified html **", 1)[0]
+            # split into ["Task Instruction: ...", "Round N", "<html...>"]
+            parts = text.split("\n\n", 2)
+            prefix = "\n\n".join(parts[:2]) if len(parts) >= 2 else parts[0]
+            new_content = f"{prefix}\n\n** Simplified html **"
+        else:
+            # "Round N\n\n<html...>" — keep "Round N"
+            first_line = text.split("\n", 1)[0]
+            new_content = f"{first_line}\n\n** Simplified html **"
+        out.append({"role": "user", "content": new_content})
+    return out
+
+
 class AgentState(Enum):
     PENDING = "pending"
     GENERATING = "generating"
@@ -320,12 +361,39 @@ class GymAgentLoop(AgentLoopBase):
         max_new_tokens=sampling_params_for_turn.get("max_new_tokens", None) or agent_data.response_limit
         max_new_tokens = min(max_new_tokens, agent_data.response_limit)
         sampling_params_for_turn["max_new_tokens"] = max_new_tokens
-            
+
+        # Inject stop_token_ids from the model's tokenizer eos_token_id.
+        # verl's agent_loop builds sampling_params without stop tokens, so
+        # vLLM never halts at <|im_end|> for chat-tuned models — it just
+        # hits max_tokens with garbage. Use tokenizer.eos_token_id as the
+        # source of truth (151645 for Qwen2.5 chat).
+        if "stop_token_ids" not in sampling_params_for_turn:
+            eos_id = getattr(self.tokenizer, "eos_token_id", None)
+            if eos_id is not None:
+                stop_ids = [eos_id] if isinstance(eos_id, int) else list(eos_id)
+                sampling_params_for_turn["stop_token_ids"] = stop_ids
+
+        # Re-tokenize from compressed messages each turn (mirrors WebAgent-R1's
+        # WebRLChatPromptConstructor): historical user messages have their
+        # HTML obs replaced with a placeholder. Avoids context blow-up when
+        # webarena pages routinely produce 5-10k token HTML per turn.
+        # Only kicks in once we have 2+ user turns (i.e., turn 1 onward).
+        prompt_ids_for_call = agent_data.prompt_ids
+        if self.processor is None and sum(1 for m in agent_data.messages if m.get("role") == "user") >= 2:
+            compressed = _compress_history(agent_data.messages)
+            flat = [_flatten_text_only_content(m) for m in compressed]
+            prompt_ids_for_call = await self.loop.run_in_executor(
+                None,
+                lambda: self.tokenizer.apply_chat_template(
+                    flat, add_generation_prompt=True,
+                    tokenize=True, return_dict=False, **self.apply_chat_template_kwargs
+                ),
+            )
 
         with simple_timer("generate_sequences", agent_data.metrics):
             output = await self.server_manager.generate(
                 request_id=agent_data.request_id,
-                prompt_ids=agent_data.prompt_ids,
+                prompt_ids=prompt_ids_for_call,
                 sampling_params=sampling_params_for_turn,
                 image_data=agent_data.image_data,
             )

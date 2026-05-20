@@ -91,10 +91,6 @@ PYTHONUNBUFFERED=1 python -m vagen.main_ppo \
     `# Group size n=4 (down from paper's likely 8) to fit our smaller VRAM` \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.mode=async \
-    `# Stop on <|im_end|> (151645). Without this, Qwen2.5 chat model never` \
-    `# halts and generates 1024 tokens of garbage every turn. Patched into` \
-    `# verl agent_loop.py to read this key.` \
-    +actor_rollout_ref.rollout.stop_token_ids=[151645] \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.n=4 \
     actor_rollout_ref.rollout.temperature=1.0 \

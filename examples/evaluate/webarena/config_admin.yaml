@@ -1,0 +1,41 @@
+defaults:
+  - ../../../vagen/configs/eval_default
+
+# shopping_admin-only eval (35 tasks). To compare with paper baseline
+# alongside the 99 non-admin/non-map tasks we already ran.
+
+fileroot: ${oc.env:HOME}/projects/vagen
+
+envs:
+  - name: RemoteEnv
+    n_envs: 35
+    tag_id: webarena_admin
+    seed_list: [0, 2, 8, 13, 17, 21, 26, 27, 30, 32, 33, 40, 47, 48, 50, 51, 59, 70, 80, 88, 101, 106, 107, 108, 110, 113, 114, 115, 116, 125, 126, 145, 149, 150, 160]
+    max_turns: 30
+    config:
+      base_urls: "http://localhost:8002"
+      timeout: 600
+      retries: 3
+      max_steps: 30
+      viewport_width: 1280
+      viewport_height: 720
+      observation_type: webrl
+      sleep_after_execution: 3.0
+      reset_timeout: 180.0
+      step_timeout: 90.0
+      eval_timeout: 90.0
+    chat_config:
+      temperature: 0
+      max_tokens: 1024
+      top_p: 1.0
+
+experiment:
+  dump_dir: ${fileroot}/rollouts/eval_webarena_admin
+  default_max_turns: 30
+
+run:
+  backend: "sglang"
+  base_seed: 0
+  max_concurrent_jobs: 8
+  resume: skip_completed
+  live_summary: true

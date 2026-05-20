@@ -95,6 +95,17 @@ def renew_comb(comb: list[str], auth_folder: str = "./.auth") -> None:
     context = browser.new_context()
     page = context.new_page()
 
+    def _wait_after_login():
+        """Wait for navigation + cookies/localStorage to settle. Without this,
+        storage_state() saves before the post-login redirect completes, leaving
+        origins=[] (no localStorage) and only 1-2 cookies — model then sees a
+        logged-out page on every task and has to manually re-login."""
+        try:
+            page.wait_for_load_state("networkidle", timeout=15000)
+        except Exception:
+            pass
+        time.sleep(2)
+
     if "shopping" in comb:
         username = ACCOUNTS["shopping"]["username"]
         password = ACCOUNTS["shopping"]["password"]
@@ -102,6 +113,7 @@ def renew_comb(comb: list[str], auth_folder: str = "./.auth") -> None:
         page.get_by_label("Email", exact=True).fill(username)
         page.get_by_label("Password", exact=True).fill(password)
         page.get_by_role("button", name="Sign In").click()
+        _wait_after_login()
 
     if "reddit" in comb:
         username = ACCOUNTS["reddit"]["username"]
@@ -110,6 +122,7 @@ def renew_comb(comb: list[str], auth_folder: str = "./.auth") -> None:
         page.get_by_label("Username").fill(username)
         page.get_by_label("Password").fill(password)
         page.get_by_role("button", name="Log in").click()
+        _wait_after_login()
 
     if "classifieds" in comb:
         username = ACCOUNTS["classifieds"]["username"]
@@ -118,14 +131,69 @@ def renew_comb(comb: list[str], auth_folder: str = "./.auth") -> None:
         page.locator("#email").fill(username)
         page.locator("#password").fill(password)
         page.get_by_role("button", name="Log in").click()
+        _wait_after_login()
 
     if "shopping_admin" in comb:
         username = ACCOUNTS["shopping_admin"]["username"]
         password = ACCOUNTS["shopping_admin"]["password"]
         page.goto(f"{SHOPPING_ADMIN}")
-        page.get_by_placeholder("user name").fill(username)
-        page.get_by_placeholder("password").fill(password)
-        page.get_by_role("button", name="Sign in").click()
+        # Wait for JS-rendered Magento admin login form
+        try:
+            page.wait_for_load_state("networkidle", timeout=15000)
+        except Exception:
+            pass
+        # Try multiple selectors — Magento admin placeholder casing varies.
+        for sel in [
+            'input[name="login[username]"]',
+            'input#username',
+            'input[placeholder="Username"]',
+            'input[placeholder="user name"]',
+        ]:
+            try:
+                page.locator(sel).first.fill(username, timeout=3000)
+                break
+            except Exception:
+                continue
+        for sel in [
+            'input[name="login[password]"]',
+            'input#password',
+            'input[placeholder="Password"]',
+            'input[placeholder="password"]',
+            'input[type="password"]',
+        ]:
+            try:
+                page.locator(sel).first.fill(password, timeout=3000)
+                break
+            except Exception:
+                continue
+        # Click the submit button (multiple possible labels)
+        clicked = False
+        for sel in [
+            'button.action-login',
+            'button[type="submit"]',
+            'button:has-text("Sign in")',
+            'button:has-text("Sign In")',
+            'button:has-text("Login")',
+        ]:
+            try:
+                page.locator(sel).first.click(timeout=3000)
+                clicked = True
+                break
+            except Exception:
+                continue
+        if clicked:
+            # Wait for dashboard navigation (Magento admin redirects after login)
+            try:
+                page.wait_for_url("**/admin/**", timeout=20000)
+            except Exception:
+                pass
+            try:
+                page.wait_for_load_state("networkidle", timeout=20000)
+            except Exception:
+                pass
+            time.sleep(4)  # extra to ensure adminhtml cookies+localStorage saved
+        else:
+            print("[auto_login] WARNING: shopping_admin sign-in button not found")
 
     if "gitlab" in comb:
         username = ACCOUNTS["gitlab"]["username"]
@@ -136,6 +204,7 @@ def renew_comb(comb: list[str], auth_folder: str = "./.auth") -> None:
         page.get_by_test_id("username-field").press("Tab")
         page.get_by_test_id("password-field").fill(password)
         page.get_by_test_id("sign-in-button").click()
+        _wait_after_login()
 
     context.storage_state(path=f"{auth_folder}/{'.'.join(comb)}_state.json")
 
