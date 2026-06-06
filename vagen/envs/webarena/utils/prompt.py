@@ -40,11 +40,13 @@ def compress_history(messages):
     messages are untouched. Without this compression, multi-turn chat
     accumulates full HTML each turn and quickly exceeds 32K context.
 
-    Currently not wired into the shared agent loop (this PR keeps all
-    non-webarena files identical to upstream/main). To enable for RL
-    training, either subclass `GymAgentLoop` for webarena and call this
-    inside the subclass's per-turn re-tokenize step, or land a small
-    per-env hook in upstream `vagen/agent_loop/gym_agent_loop.py`.
+    Wired in via `vagen/envs/webarena/agent_loop.py:WebArenaGymAgentLoop`,
+    which subclasses `GymAgentLoop` and overrides `_handle_generating_state`
+    to re-tokenize from compressed messages each turn. The webarena training
+    scripts in `examples/train/webarena/*.sh` point
+    `actor_rollout_ref.rollout.agent.agent_loop_config_path` to
+    `vagen/envs/webarena/configs/agent.yaml`, which maps the `gym_agent`
+    name to the webarena subclass.
     """
     if not messages:
         return messages

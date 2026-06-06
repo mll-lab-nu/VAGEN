@@ -40,6 +40,10 @@ class EnvSpec:
     seed_list: Optional[List[int]] = None
     max_turns: Optional[int] = None
     concat_multi_turn: bool = True
+    # Optional discriminator used by vision_workflow's per-env message-
+    # transform registry (e.g. "webarena" enables HTML-history compression
+    # so multi-turn rollouts don't exceed the model's context length).
+    data_source: Optional[str] = None
 
 
 def _looks_like_path_key(key: str) -> bool:
@@ -118,6 +122,7 @@ def _parse_env_specs(cfg: Dict[str, Any]) -> List[EnvSpec]:
             seed_list=item.get("seed_list"),
             max_turns=item.get("max_turns"),
             concat_multi_turn=item.get("concat_multi_turn", True),
+            data_source=item.get("data_source"),
         )
         specs.append(spec)
     return specs
@@ -295,6 +300,7 @@ def _expand_jobs(
                 "tag_id": spec.tag_id,  # Keep original type (int or str)
                 "split": spec.split,
                 "env_name": spec.name,
+                "data_source": spec.data_source,
                 "max_turns": job_max_turns,
                 "chat_config": chat_cfg,
                 "concat_multi_turn": spec.concat_multi_turn,

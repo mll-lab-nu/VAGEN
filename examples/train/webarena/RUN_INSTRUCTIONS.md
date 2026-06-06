@@ -43,14 +43,14 @@ source vagen/envs/webarena/setup_vars.sh
 nohup env PYTHONPATH=. python -m vagen.envs.webarena.serve \
   --task_config_file=vagen/envs/webarena/config_files/normalized_train.json \
   --n_browsers=8 --max_contexts_per_browser=8 \
-  --port=8002 --auth_cache_dir=./.wa_auth \
+  --port=8002 --auth_cache_dir=./vagen/envs/webarena/.wa_auth \
   > examples/evaluate/webarena/logs/webarena_train_server.log 2>&1 &
 
 # Val server (port 8003, 4x8=32 contexts)
 nohup env PYTHONPATH=. python -m vagen.envs.webarena.serve \
   --task_config_file=vagen/envs/webarena/config_files/normalized_test.json \
   --n_browsers=4 --max_contexts_per_browser=8 \
-  --port=8003 --auth_cache_dir=./.wa_auth \
+  --port=8003 --auth_cache_dir=./vagen/envs/webarena/.wa_auth \
   > examples/evaluate/webarena/logs/webarena_val_server.log 2>&1 &
 
 # Wait for ready

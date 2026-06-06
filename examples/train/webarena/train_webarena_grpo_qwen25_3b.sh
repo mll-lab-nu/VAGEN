@@ -30,7 +30,7 @@ EXPERIMENT_DIR=${BASEDIR}/exps/${PROJECT_NAME}/${EXPERIMENT_NAME}
 SAVE_CHECKPOINT_DIR=${EXPERIMENT_DIR}/verl_checkpoints
 DATASET_TRAIN=${SCRIPTDIR}/train_webarena_full.yaml
 DATASET_VAL=${SCRIPTDIR}/val_webarena_full.yaml
-agent_loop_config_path=${BASEDIR}/vagen/configs/agent.yaml
+agent_loop_config_path=${BASEDIR}/vagen/envs/webarena/configs/agent.yaml
 
 # weizhepei's SFT baseline — this is the RL initialization policy in the paper
 REF_MODEL_PATH=weizhepei/Qwen2.5-3B-WebArena-Lite-SFT-epoch-5

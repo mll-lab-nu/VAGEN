@@ -30,5 +30,5 @@ export WIKIPEDIA="http://${PUBLIC_HOSTNAME}:${WIKIPEDIA_PORT}/wikipedia_en_all_m
 export HOMEPAGE="http://${PUBLIC_HOSTNAME}:${HOMEPAGE_PORT}"
 export MAP="http://${PUBLIC_HOSTNAME}:${MAP_PORT}"
 
-export OPENAI_API_KEY="xxxx"
-export OPENAI_API_URL="https://api.openai.com/v1"
+: "${OPENAI_API_KEY:=xxxx}"; export OPENAI_API_KEY
+: "${OPENAI_API_URL:=https://api.openai.com/v1}"; export OPENAI_API_URL #"https://api.openai.com/v1"

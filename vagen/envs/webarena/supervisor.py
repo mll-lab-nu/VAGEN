@@ -15,7 +15,7 @@ Usage:
     PYTHONPATH=. python -m vagen.envs.webarena.supervisor \\
         --n_workers=8 --start_port=8002 \\
         --task_config_file=vagen/envs/webarena/config_files/normalized_test.json \\
-        --auth_cache_dir=./.wa_auth
+        --auth_cache_dir=./vagen/envs/webarena/.wa_auth
 
 Workers run on ports start_port .. start_port + n_workers - 1.
 Clients pass that list to GymImageEnvClient as `base_urls=[...]`;
@@ -347,7 +347,7 @@ def main(
     n_workers: int = 8,
     start_port: int = 8002,
     task_config_file: str = "vagen/envs/webarena/config_files/normalized_test.json",
-    auth_cache_dir: str = "./.wa_auth",
+    auth_cache_dir: str = "./vagen/envs/webarena/.wa_auth",
     log_dir: str = "./log_files/webarena_workers",
     session_timeout: float = 3600.0,
     health_interval: float = 30.0,

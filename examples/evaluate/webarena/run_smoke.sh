@@ -64,7 +64,7 @@ echo "[smoke] Starting WebArena server (this node)..."
     --task_config_file=vagen/envs/webarena/config_files/normalized_test.json \
     --n_browsers=2 --max_contexts_per_browser=2 \
     --port=${WEBARENA_PORT} \
-    --auth_cache_dir=./.wa_auth
+    --auth_cache_dir=./vagen/envs/webarena/.wa_auth
 ) >"${WEBARENA_LOG}" 2>&1 &
 WEBARENA_PID=$!
 

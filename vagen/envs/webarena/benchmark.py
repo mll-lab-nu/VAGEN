@@ -13,12 +13,12 @@ Prereqs:
     # (a) Single in-process pool (legacy):
     PYTHONPATH=. python -m vagen.envs.webarena.serve \\
         --n_browsers=4 --max_contexts_per_browser=16 --port=8002 \\
-        --auth_cache_dir=./.wa_auth
+        --auth_cache_dir=./vagen/envs/webarena/.wa_auth
 
     # (b) Recommended: supervisor + N worker processes (hang-resilient):
     PYTHONPATH=. python -m vagen.envs.webarena.supervisor \\
         --n_workers=8 --start_port=8002 \\
-        --auth_cache_dir=./.wa_auth
+        --auth_cache_dir=./vagen/envs/webarena/.wa_auth
 
 Usage:
     # Single URL:

@@ -109,6 +109,7 @@ async def run_eval_parallel(
             dump_enabled=True,  # ignored in workflow; always dump executed episodes
             chat_config=data.get("chat_config") or {},
             concat_multi_turn=data.get("concat_multi_turn", True),
+            data_source=data.get("data_source"),
         )
         async with episode_gate:
             logger.info(

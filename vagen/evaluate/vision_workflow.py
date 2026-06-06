@@ -14,6 +14,30 @@ from vagen.evaluate.utils.json_utils import sanitize_for_json
 
 logger = logging.getLogger(__name__)
 
+
+# Per-env optional message-history transform applied just before each
+# acompletion() call in concat_multi_turn mode. Lazy-imported on first use
+# so generic builds don't pull env-specific deps. To add a new env: implement
+# `compress_history(messages)` in the env's utils and add an `elif` here.
+# Mirrors `vagen/agent_loop/gym_agent_loop.py:_get_message_transform`.
+_MESSAGE_TRANSFORM_CACHE: Dict[str, Any] = {}
+
+
+def _get_message_transform(data_source: Optional[str]):
+    if data_source is None:
+        return None
+    if data_source in _MESSAGE_TRANSFORM_CACHE:
+        return _MESSAGE_TRANSFORM_CACHE[data_source]
+    transform = None
+    if data_source == "webarena":
+        try:
+            from vagen.envs.webarena.utils.prompt import compress_history
+            transform = compress_history
+        except Exception:
+            transform = None
+    _MESSAGE_TRANSFORM_CACHE[data_source] = transform
+    return transform
+
 # Optional: import provider error base class
 try:
     import openai
@@ -36,10 +60,17 @@ class GenericVisionInferenceWorkflow:
         success_threshold: float = 0.99,
         chat_config: Optional[Dict[str, Any]] = None,
         concat_multi_turn: bool = True,
+        data_source: Optional[str] = None,
     ):
         self.adapter = adapter
         self.dump_dir = dump_dir
         self.concat_multi_turn = concat_multi_turn
+        self.data_source = data_source
+        # Resolve the per-env message transform once (None for envs that
+        # don't register one). Currently only `webarena` registers, to
+        # mirror WebAgent-R1's WebRLChatPromptConstructor and avoid 32K
+        # context overflow on multi-turn HTML observations.
+        self._message_transform = _get_message_transform(data_source)
         # IMPORTANT: dump_enabled is ignored; we always dump for executed episodes
         self.dump_enabled = True
         self.success_keys = success_keys or ["success", "is_success", "solved"]
@@ -186,7 +217,13 @@ class GenericVisionInferenceWorkflow:
                 try:
                     # In non-concat mode, only send system prompt + current user message
                     if self.concat_multi_turn:
-                        api_messages = messages
+                        # Apply per-env transform (e.g. webarena collapses
+                        # historical user HTML to a placeholder) — keeps
+                        # multi-turn rollouts under the model's context limit.
+                        if self._message_transform is not None:
+                            api_messages = self._message_transform(messages)
+                        else:
+                            api_messages = messages
                     else:
                         api_messages = [messages[0], messages[-1]]
                     reply = await self.adapter.acompletion(api_messages, **self.chat_config)

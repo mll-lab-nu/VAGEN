@@ -81,7 +81,7 @@ source vagen/envs/webarena/setup_vars.sh
 
 ```bash
 PYTHONPATH=. python -m vagen.envs.webarena.tests.test_env_local \
-    --seed=0 --max_steps=3 --auth_cache_dir=./.wa_auth
+    --seed=0 --max_steps=3 --auth_cache_dir=./vagen/envs/webarena/.wa_auth
 ```
 
 Runs `reset` → `do(action="Wait")` → `exit(...)` on `task[seed % 165]`.
@@ -92,7 +92,7 @@ First run generates cookies via `auto_login.py`; later runs reuse the cache.
 ```bash
 PYTHONPATH=. python -m vagen.envs.webarena.tests.test_handler_parallel \
     --n_browsers=2 --max_contexts_per_browser=2 \
-    --n_sessions=4 --auth_cache_dir=./.wa_auth
+    --n_sessions=4 --auth_cache_dir=./vagen/envs/webarena/.wa_auth
 ```
 
 Watch `per_browser=[a, b]` in the output — should stay balanced.
@@ -107,7 +107,7 @@ Two modes:
 PYTHONPATH=. python -m vagen.envs.webarena.serve \
     --task_config_file=vagen/envs/webarena/config_files/normalized_test.json \
     --n_browsers=4 --max_contexts_per_browser=16 \
-    --port=8002 --auth_cache_dir=./.wa_auth
+    --port=8002 --auth_cache_dir=./vagen/envs/webarena/.wa_auth
 ```
 
 Clients use `vagen.envs_remote.GymImageEnvClient` against `http://localhost:8002`.
@@ -127,7 +127,7 @@ checks each worker and `SIGKILL+respawn`s any that hang or die.
 PYTHONPATH=. python -m vagen.envs.webarena.supervisor \
     --n_workers=8 --start_port=8002 \
     --task_config_file=vagen/envs/webarena/config_files/normalized_test.json \
-    --auth_cache_dir=./.wa_auth
+    --auth_cache_dir=./vagen/envs/webarena/.wa_auth
 ```
 
 Workers listen on `start_port, start_port+1, ..., start_port+n_workers-1`.

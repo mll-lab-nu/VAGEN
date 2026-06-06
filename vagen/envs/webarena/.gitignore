@@ -1,0 +1,13 @@
+# Runtime artifacts produced by the WebArena env.
+# Kept here (env-local) so the top-level .gitignore stays untouched.
+
+# Auth cookie cache populated by browser_env/auto_login.py.
+# Per-site session cookies — invalidated when WebArena docker restarts.
+.wa_auth/
+.wa_auth*/
+
+# Debug screenshots & raw HTML dumps from html_tools/fetch.py.
+debug_info/
+
+# Supervisor + worker stdout/stderr logs.
+log_files/

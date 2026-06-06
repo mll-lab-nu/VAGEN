@@ -1,0 +1,13 @@
+# Webarena agent-loop registry.
+#
+# Replaces the default `gym_agent` mapping (which points to
+# `vagen.agent_loop.gym_agent_loop.GymAgentLoop`) with the webarena
+# subclass that compresses historical HTML observations before each
+# LLM call. The dataset (`vagen/gym_agent_dataset.py`) hardcodes
+# `agent_name="gym_agent"`, so we keep that name.
+#
+# Pass this path via the training script:
+#   actor_rollout_ref.rollout.agent.agent_loop_config_path=$BASEDIR/vagen/envs/webarena/configs/agent.yaml
+
+- name: gym_agent
+  _target_: vagen.envs.webarena.agent_loop.WebArenaGymAgentLoop

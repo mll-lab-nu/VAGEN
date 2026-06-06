@@ -14,13 +14,13 @@
 #        PYTHONPATH=. python -m vagen.envs.webarena.serve \
 #            --task_config_file=vagen/envs/webarena/config_files/normalized_train.json \
 #            --n_browsers=4 --max_contexts_per_browser=16 \
-#            --port=8002 --auth_cache_dir=./.wa_auth
+#            --port=8002 --auth_cache_dir=./vagen/envs/webarena/.wa_auth
 #
 #   4) Start the VAL server (loads 165 official test tasks):
 #        PYTHONPATH=. python -m vagen.envs.webarena.serve \
 #            --task_config_file=vagen/envs/webarena/config_files/normalized_test.json \
 #            --n_browsers=2 --max_contexts_per_browser=16 \
-#            --port=8003 --auth_cache_dir=./.wa_auth
+#            --port=8003 --auth_cache_dir=./vagen/envs/webarena/.wa_auth
 #
 # Total rollout concurrency is bounded by n_browsers × max_contexts_per_browser
 # on each server. Make sure the trainer's effective batch concurrency does not
@@ -37,7 +37,7 @@ EXPERIMENT_DIR=${BASEDIR}/exps/${PROJECT_NAME}/${EXPERIMENT_NAME}
 SAVE_CHECKPOINT_DIR=${EXPERIMENT_DIR}/verl_checkpoints
 DATASET_TRAIN=${SCRIPTDIR}/train_webarena.yaml
 DATASET_VAL=${SCRIPTDIR}/val_webarena.yaml
-agent_loop_config_path=${BASEDIR}/vagen/configs/agent.yaml
+agent_loop_config_path=${BASEDIR}/vagen/envs/webarena/configs/agent.yaml
 REF_MODEL_PATH=Qwen/Qwen2.5-VL-7B-Instruct
 mkdir -p ${EXPERIMENT_DIR}
 

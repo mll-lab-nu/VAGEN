@@ -122,7 +122,7 @@ if [ "$SKIP_WEBARENA" = 0 ]; then
     nohup env PYTHONPATH=. "$WEBARENA_PY" -m vagen.envs.webarena.serve \
       --task_config_file=vagen/envs/webarena/config_files/normalized_test.json \
       --n_browsers=2 --max_contexts_per_browser=4 \
-      --port="${WEBARENA_PORT}" --auth_cache_dir=./.wa_auth \
+      --port="${WEBARENA_PORT}" --auth_cache_dir=./vagen/envs/webarena/.wa_auth \
       > "$WA_LOG" 2>&1 &
     WEBARENA_PID=$!
     conda deactivate

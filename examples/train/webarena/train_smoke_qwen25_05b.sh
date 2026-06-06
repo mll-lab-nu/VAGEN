@@ -21,7 +21,7 @@ EXPERIMENT_DIR=${BASEDIR}/exps/${PROJECT_NAME}/${EXPERIMENT_NAME}
 SAVE_CHECKPOINT_DIR=${EXPERIMENT_DIR}/verl_checkpoints
 DATASET_TRAIN=${SCRIPTDIR}/train_webarena.yaml
 DATASET_VAL=${SCRIPTDIR}/val_webarena.yaml
-agent_loop_config_path=${BASEDIR}/vagen/configs/agent.yaml
+agent_loop_config_path=${BASEDIR}/vagen/envs/webarena/configs/agent.yaml
 REF_MODEL_PATH=Qwen/Qwen2.5-0.5B-Instruct
 mkdir -p ${EXPERIMENT_DIR}
 
