@@ -6,11 +6,11 @@ WebAgent-R1's `WebRLChatPromptConstructor`. Without this, multi-turn
 training accumulates full HTML each turn and hits the 32K context limit
 within ~4-5 turns on heavy shopping/gitlab pages.
 
-Wired in via `vagen/envs/webarena/configs/agent.yaml`, which webarena
-training scripts (`examples/train/webarena/*.sh`) pass as
-`agent_loop_config_path`. The YAML keeps the existing `gym_agent` name
-(matching the hardcoded value in `vagen/gym_agent_dataset.py`) so the
-dataset side needs no change.
+Wired in via `vagen/envs/webarena/configs/agent.yaml`, which a webarena
+training script should pass as
+`actor_rollout_ref.rollout.agent.agent_loop_config_path`. The YAML keeps
+the existing `gym_agent` name (matching the hardcoded value in
+`vagen/gym_agent_dataset.py`) so the dataset side needs no change.
 """
 
 from typing import Any, Dict

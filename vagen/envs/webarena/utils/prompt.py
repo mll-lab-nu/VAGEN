@@ -42,8 +42,8 @@ def compress_history(messages):
 
     Wired in via `vagen/envs/webarena/agent_loop.py:WebArenaGymAgentLoop`,
     which subclasses `GymAgentLoop` and overrides `_handle_generating_state`
-    to re-tokenize from compressed messages each turn. The webarena training
-    scripts in `examples/train/webarena/*.sh` point
+    to re-tokenize from compressed messages each turn. A training script
+    enables this path by setting
     `actor_rollout_ref.rollout.agent.agent_loop_config_path` to
     `vagen/envs/webarena/configs/agent.yaml`, which maps the `gym_agent`
     name to the webarena subclass.
