@@ -99,6 +99,10 @@ Watch `per_browser=[a, b]` in the output — should stay balanced.
 
 ## Serving (for trainer / agent_loop)
 
+Two modes:
+
+### (a) Single server, in-process pool
+
 ```bash
 PYTHONPATH=. python -m vagen.envs.webarena.serve \
     --task_config_file=vagen/envs/webarena/config_files/normalized_test.json \
@@ -108,6 +112,57 @@ PYTHONPATH=. python -m vagen.envs.webarena.serve \
 
 Clients use `vagen.envs_remote.GymImageEnvClient` against `http://localhost:8002`.
 
+Caveat: Playwright sync calls can hang inside a browser's thread, and
+Python can't kill a thread — one hang takes down all `M` sessions on
+that browser and eventually deadlocks the pool. Use (b) for long-running
+training jobs.
+
+### (b) Supervisor + worker fleet (hang-resilient, recommended)
+
+Each worker is a separate process running `serve.py` with
+`n_browsers=1, max_contexts_per_browser=1`. A parent supervisor health-
+checks each worker and `SIGKILL+respawn`s any that hang or die.
+
+```bash
+PYTHONPATH=. python -m vagen.envs.webarena.supervisor \
+    --n_workers=8 --start_port=8002 \
+    --task_config_file=vagen/envs/webarena/config_files/normalized_test.json \
+    --auth_cache_dir=./.wa_auth
+```
+
+Workers listen on `start_port, start_port+1, ..., start_port+n_workers-1`.
+Clients pass the full list to `GymImageEnvClient`:
+
+```python
+env = GymImageEnvClient({
+    "base_urls": [
+        "http://localhost:8002",
+        "http://localhost:8003",
+        # ...
+    ],
+})
+```
+
+Supervisor flags:
+- `--health_interval=30` seconds between health sweeps
+- `--health_timeout=10` per-request `/health` timeout
+- `--max_consecutive_health_failures=3` strikes before `SIGKILL+restart`
+- `--startup_grace=30` skip health checks for this long after each (re)start
+- `--startup_stagger=1.5` seconds between worker launches (avoids burst
+  fork of N Chromiums on dense nodes)
+- `--log_dir=./log_files/webarena_workers` per-worker stdout/stderr land here
+
+Workers are launched with `OPENBLAS_NUM_THREADS=OMP_NUM_THREADS=MKL_NUM_THREADS=1`
+in their environment. Without these caps, numpy/scipy/OpenBLAS auto-spawn
+~`min(64, cpu_count())` threads *per worker process* at import time — on a
+128-core node with 8 workers, that's 500+ threads burned before serving any
+request, and `pthread_create EAGAIN` under burst load. See
+`vagen/envs/webarena/supervisor.py:Worker.start()`.
+
+Trade-off vs (a): per-worker auth cache regen runs on first start, so the
+fleet takes ~`n_workers × 30s` longer to be fully ready (or just pre-warm
+the shared `auth_cache_dir`).
+
 ## Benchmark
 
 Stress-test the running server with N concurrent clients running M steps
@@ -116,9 +171,15 @@ over R rounds. Each client: connect → reset → step × (M-1) → `exit(...)` 
 Prereqs: tunnel up, auth cache pre-populated, server running on `--port`.
 
 ```bash
+# Single server
 PYTHONPATH=. python -m vagen.envs.webarena.benchmark \
-    --base_url=http://localhost:8002 \
+    --base_urls=http://localhost:8002 \
     --num_rounds=2 --num_clients=16 --num_steps=3
+
+# Supervisor fleet (comma-separated URLs)
+PYTHONPATH=. python -m vagen.envs.webarena.benchmark \
+    --base_urls=http://localhost:8002,http://localhost:8003,http://localhost:8004 \
+    --num_rounds=2 --num_clients=24 --num_steps=3
 ```
 
 Flags:
@@ -172,3 +233,31 @@ actions that don't need page-settling time.
 ```bash
 pkill -f '<REMOTE_HOST>'
 ```
+
+## Known issues
+
+- **BrowserPool slot leak under error paths.** If `env.reset()` raises after
+  `acquire_slot()` but the cleanup path doesn't reach `release_slot()`, the
+  slot stays held forever. Workers eventually fail `acquire_slot` with a 300s
+  timeout. Long-running fleets gradually lose capacity. Workaround: restart
+  the offending worker (supervisor will respawn it cleanly). Real fix: audit
+  all exception paths in `handler.connect()` and `webarena_env.py:close()`.
+
+- **`sleep_after_execution` is a single knob for two phases.** Observation
+  diffing (5 seeds, sleep 3.0 vs 0.5 / 1.5) shows page LOAD (`reset`'s
+  `goto`) needs ≥3s on shopping pages to capture lazy-loaded breadcrumb /
+  product images, but post-load actions (scroll/wait/click) settle in
+  ≤0.5s. Splitting into `sleep_after_navigation=3.0` and
+  `sleep_after_action=0.5` would give ~2.8× step speedup without obs
+  quality loss.
+
+- **`auto_login.py` Magento (shopping_admin) selector is stale.** Produces
+  a 1-cookie / 0-origin storage_state that doesn't authenticate. The
+  Magento admin login button selectors no longer match the rendered DOM.
+  Other 3 sites (gitlab/shopping/reddit) re-login fine.
+
+- **Cluster cgroup `pids.max=1000` caps single-node fleet to ~8 workers.**
+  Each worker (Python + Chromium + renderers) consumes ~70-90 tasks; at 16+
+  workers, supervisor's `fork_exec` returns EAGAIN. For 32+ workers, deploy
+  across multiple SLURM nodes — `GymImageEnvClient` already supports the
+  multi-URL routing.

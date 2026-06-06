@@ -8,17 +8,27 @@ Prereqs:
     # 1. SSH tunnel to WebArena docker services (see README).
     # 2. Source env vars:
     source vagen/envs/webarena/setup_vars.sh
-    # 3. Start the server:
+    # 3. Start the server. Two options:
+
+    # (a) Single in-process pool (legacy):
     PYTHONPATH=. python -m vagen.envs.webarena.serve \\
         --n_browsers=4 --max_contexts_per_browser=16 --port=8002 \\
         --auth_cache_dir=./.wa_auth
 
+    # (b) Recommended: supervisor + N worker processes (hang-resilient):
+    PYTHONPATH=. python -m vagen.envs.webarena.supervisor \\
+        --n_workers=8 --start_port=8002 \\
+        --auth_cache_dir=./.wa_auth
+
 Usage:
+    # Single URL:
     PYTHONPATH=. python -m vagen.envs.webarena.benchmark \\
-        --base_url=http://localhost:8002 \\
-        --num_rounds=3 \\
-        --num_clients=16 \\
-        --num_steps=5
+        --base_urls=http://localhost:8002
+
+    # Multi-URL (supervisor fleet):
+    PYTHONPATH=. python -m vagen.envs.webarena.benchmark \\
+        --base_urls=http://localhost:8002,http://localhost:8003,http://localhost:8004 \\
+        --num_clients=24
 """
 
 from __future__ import annotations
@@ -76,7 +86,7 @@ class ClientResult:
 
 async def run_single_client(
     client_id: int,
-    base_url: str,
+    base_urls: List[str],
     num_steps: int,
     seed: int,
     timeout: float,
@@ -88,8 +98,14 @@ async def run_single_client(
     result = ClientResult(client_id=client_id, seed=seed)
     t0 = time.perf_counter()
 
+    # Per-client URL shuffle so a multi-URL fleet load-balances new
+    # sessions across workers (default sticky routing would otherwise
+    # pin every client to base_urls[0]).
+    urls = list(base_urls)
+    random.Random(client_id).shuffle(urls)
+
     env_config = {
-        "base_urls": [base_url],
+        "base_urls": urls,
         "timeout": timeout,
         "retries": 3,
         "backoff": 1.0,
@@ -134,7 +150,7 @@ async def run_single_client(
 # ---------------------------------------------------------------------------
 
 async def _run_benchmark(
-    base_url: str,
+    base_urls: List[str],
     num_rounds: int,
     num_clients: int,
     num_steps: int,
@@ -147,16 +163,17 @@ async def _run_benchmark(
     LOGGER.info(
         f"Benchmark: {num_rounds} rounds × {num_clients} clients × {num_steps} steps"
     )
-    LOGGER.info(f"Server: {base_url}")
+    LOGGER.info(f"Servers ({len(base_urls)}): {base_urls}")
 
     import httpx
     async with httpx.AsyncClient(timeout=10) as hc:
-        try:
-            resp = await hc.get(f"{base_url}/health")
-            LOGGER.info(f"Health check: {resp.json()}")
-        except Exception as e:
-            LOGGER.error(f"Health check failed: {e}. Is the server running?")
-            return
+        for url in base_urls:
+            try:
+                resp = await hc.get(f"{url}/health")
+                LOGGER.info(f"Health {url}: {resp.json()}")
+            except Exception as e:
+                LOGGER.error(f"Health check failed for {url}: {e}. Is the server running?")
+                return
 
     benchmark_start = time.perf_counter()
 
@@ -166,8 +183,8 @@ async def _run_benchmark(
 
         tasks = [
             run_single_client(
-                client_id=i,
-                base_url=base_url,
+                client_id=round_idx * num_clients + i,  # unique across rounds for shuffle
+                base_urls=base_urls,
                 num_steps=num_steps,
                 seed=round_idx * num_clients + i,
                 timeout=timeout,
@@ -246,7 +263,7 @@ async def _run_benchmark(
 
 
 def main(
-    base_url: str = "http://localhost:8002",
+    base_urls: str = "http://localhost:8002",
     num_rounds: int = 3,
     num_clients: int = 16,
     num_steps: int = 5,
@@ -259,7 +276,9 @@ def main(
     Run async multi-client benchmark against the WebArena service.
 
     Args:
-        base_url: Server URL (default matches serve.py's default port).
+        base_urls: Server URL, or comma-separated list (supervisor fleet).
+            Examples: "http://localhost:8002"
+                      "http://localhost:8002,http://localhost:8003"
         num_rounds: Number of benchmark rounds.
         num_clients: Number of concurrent clients per round.
         num_steps: Steps each client runs per round (last one is exit).
@@ -268,9 +287,12 @@ def main(
         viewport_width: Browser viewport width.
         viewport_height: Browser viewport height.
     """
+    urls = [u.strip() for u in str(base_urls).split(",") if u.strip()]
+    if not urls:
+        raise ValueError(f"No URLs parsed from base_urls={base_urls!r}")
     asyncio.run(
         _run_benchmark(
-            base_url=base_url,
+            base_urls=urls,
             num_rounds=num_rounds,
             num_clients=num_clients,
             num_steps=num_steps,
