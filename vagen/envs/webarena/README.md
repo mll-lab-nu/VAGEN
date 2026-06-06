@@ -163,6 +163,56 @@ Trade-off vs (a): per-worker auth cache regen runs on first start, so the
 fleet takes ~`n_workers × 30s` longer to be fully ready (or just pre-warm
 the shared `auth_cache_dir`).
 
+## Evaluation
+
+Reproduces the WebAgent-R1 BC paper's eval pipeline against the
+`weizhepei/Qwen2.5-3B-WebArena-Lite-SFT-epoch-5` SFT checkpoint (or any
+other OpenAI-compatible chat endpoint). Three processes: the env
+supervisor, a model server (sglang/vllm/...), and the eval driver.
+
+```bash
+# Terminal 1: env supervisor (login node, behind the SSH tunnel)
+source vagen/envs/webarena/setup_vars.sh
+conda activate webarena
+PYTHONPATH=. python -m vagen.envs.webarena.supervisor \
+    --n_workers=8 --start_port=8002 \
+    --task_config_file=vagen/envs/webarena/config_files/normalized_test_nomap.json \
+    --auth_cache_dir=./vagen/envs/webarena/.wa_auth
+
+# Terminal 2: model server on a GPU node (sglang here; vllm works too)
+conda activate vagen
+srun --jobid="$SLURM_JOBID" --overlap python -m sglang.launch_server \
+    --host 0.0.0.0 --port 30000 \
+    --model-path weizhepei/Qwen2.5-3B-WebArena-Lite-SFT-epoch-5 \
+    --tp 1 --trust-remote-code --mem-fraction-static 0.80
+
+# Terminal 3: eval driver (login node)
+export OPENAI_API_KEY=sk-...    # used by the fuzzy_match LLM-as-judge in
+                                # evaluation_harness; needs to be a valid key
+conda activate vagen
+PYTHONPATH=. python -m vagen.evaluate.run_eval \
+    --config examples/evaluate/webarena/config.yaml \
+    backends.sglang.base_url="http://<gpu_node>:30000/v1" \
+    backends.sglang.model="weizhepei/Qwen2.5-3B-WebArena-Lite-SFT-epoch-5"
+```
+
+Config: [`examples/evaluate/webarena/config.yaml`](../../../examples/evaluate/webarena/config.yaml).
+
+The config sets `data_source: webarena`, which activates the per-env
+message-history compressor in `vagen/evaluate/vision_workflow.py` —
+historical user turns' HTML observations are replaced by a placeholder
+to mirror WebAgent-R1's `WebRLChatPromptConstructor` and avoid 32K
+context overflow on multi-turn rollouts.
+
+To override the seed list (e.g. full 165-task test):
+
+```bash
+... 'envs.0.seed_list=[0,1,2,...,164]' envs.0.n_envs=165
+```
+
+Rollouts (messages, screenshots, metrics) dump to
+`$HOME/projects/vagen/rollouts/eval_webarena_smoke/`.
+
 ## Benchmark
 
 Stress-test the running server with N concurrent clients running M steps
