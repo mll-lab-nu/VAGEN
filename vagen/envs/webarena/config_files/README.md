@@ -12,11 +12,22 @@ below before running the env.
 
 ## Where to get them
 
-**TODO**: pick one and update this section once uploaded:
+Hosted on Google Drive:
+https://drive.google.com/drive/folders/1gvLX9CZ29ELWKeoMcequ51RgNmpjLJyy?usp=sharing
 
-- [ ] Hugging Face Hub: `huggingface.co/datasets/<org>/vagen-webarena-tasks`
-- [ ] GitHub Release asset on `mll-lab-nu/VAGEN`
-- [ ] Internal S3 / shared drive
+Download all three JSONs into this directory:
 
-Once uploaded, the canonical fetch should be one shell command that
-drops the three JSONs into this directory.
+```
+vagen/envs/webarena/config_files/
+├── normalized_test.json
+├── normalized_test_nomap.json
+└── normalized_train.json
+```
+
+You can fetch them programmatically with `gdown`:
+
+```bash
+pip install gdown
+cd vagen/envs/webarena/config_files
+gdown --folder https://drive.google.com/drive/folders/1gvLX9CZ29ELWKeoMcequ51RgNmpjLJyy
+```
