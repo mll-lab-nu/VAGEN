@@ -11,3 +11,9 @@ debug_info/
 
 # Supervisor + worker stdout/stderr logs.
 log_files/
+
+# Task config JSONs (hosted externally; see config_files/README.md for
+# download instructions). Large — 1.2 MB combined — and just data, no code.
+config_files/normalized_test.json
+config_files/normalized_test_nomap.json
+config_files/normalized_train.json
