@@ -14,66 +14,6 @@ from vagen.evaluate.utils.json_utils import sanitize_for_json
 
 logger = logging.getLogger(__name__)
 
-
-_HTML_PLACEHOLDER = "** Simplified html **"
-
-
-def _compress_user_history(messages):
-    """Match WebAgent-R1's WebRLChatPromptConstructor: keep the latest user
-    message's full content but replace all earlier user messages' content
-    with a placeholder (preserving any "Task Instruction" / "Round N"
-    prefix lines). System and assistant messages are untouched.
-
-    Without this, multi-turn chat with full HTML obs accumulates >32K
-    tokens within 4-5 turns and hits the model's context limit.
-    """
-    if not messages:
-        return messages
-    user_idxs = [i for i, m in enumerate(messages) if m.get("role") == "user"]
-    if len(user_idxs) <= 1:
-        return list(messages)
-    last_user_idx = user_idxs[-1]
-    out = []
-    for i, m in enumerate(messages):
-        if m.get("role") != "user" or i == last_user_idx:
-            out.append(m)
-            continue
-        content = m.get("content", "")
-        if isinstance(content, list):
-            # multimodal: keep non-text blocks, replace text blocks with placeholder
-            new_blocks = []
-            replaced_text = False
-            for blk in content:
-                if isinstance(blk, dict) and blk.get("type") == "text":
-                    if not replaced_text:
-                        text = blk.get("text", "")
-                        first_line = text.split("\n", 1)[0]
-                        new_text = f"{first_line}\n\n{_HTML_PLACEHOLDER}" if first_line and (
-                            first_line.lower().startswith("round") or
-                            first_line.lower().startswith("task instruction")
-                        ) else _HTML_PLACEHOLDER
-                        new_blocks.append({"type": "text", "text": new_text})
-                        replaced_text = True
-                    # drop additional text blocks
-                else:
-                    # drop images on historical turns too (they're stale)
-                    pass
-            out.append({"role": m["role"], "content": new_blocks})
-        else:
-            text = content or ""
-            first_line = text.split("\n", 1)[0]
-            if first_line.lower().startswith("task instruction"):
-                # keep "Task Instruction: ...\n\nRound N" prefix (two lines), drop rest
-                parts = text.split("\n\n", 2)
-                prefix = "\n\n".join(parts[:2]) if len(parts) >= 2 else parts[0]
-                new_content = f"{prefix}\n\n{_HTML_PLACEHOLDER}"
-            elif first_line.lower().startswith("round"):
-                new_content = f"{first_line}\n\n{_HTML_PLACEHOLDER}"
-            else:
-                new_content = _HTML_PLACEHOLDER
-            out.append({"role": m["role"], "content": new_content})
-    return out
-
 # Optional: import provider error base class
 try:
     import openai
@@ -244,11 +184,9 @@ class GenericVisionInferenceWorkflow:
             for t in range(turn_limit):
                 # Safeguard completion
                 try:
-                    # In non-concat mode, only send system prompt + current user message.
-                    # In concat mode (default for WebArena), compress historical user
-                    # messages (replace HTML with placeholder) to avoid 32K context overflow.
+                    # In non-concat mode, only send system prompt + current user message
                     if self.concat_multi_turn:
-                        api_messages = _compress_user_history(messages)
+                        api_messages = messages
                     else:
                         api_messages = [messages[0], messages[-1]]
                     reply = await self.adapter.acompletion(api_messages, **self.chat_config)

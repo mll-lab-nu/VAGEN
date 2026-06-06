@@ -51,27 +51,6 @@ def _flatten_text_only_content(msg):
     return new_msg
 
 
-# Per-env optional message-history transform applied before each generate.
-# Lazy-imported on first use so generic builds don't pull env-specific deps.
-# To add a new env's transform: implement `compress_history(messages)` in
-# the env's utils, then add an `elif` branch below.
-_MESSAGE_TRANSFORM_CACHE = {}
-
-
-def _get_message_transform(env_name):
-    if env_name in _MESSAGE_TRANSFORM_CACHE:
-        return _MESSAGE_TRANSFORM_CACHE[env_name]
-    transform = None
-    if env_name == "webarena":
-        try:
-            from vagen.envs.webarena.utils.prompt import compress_history
-            transform = compress_history
-        except Exception:
-            transform = None
-    _MESSAGE_TRANSFORM_CACHE[env_name] = transform
-    return transform
-
-
 class AgentState(Enum):
     PENDING = "pending"
     GENERATING = "generating"
@@ -341,42 +320,12 @@ class GymAgentLoop(AgentLoopBase):
         max_new_tokens=sampling_params_for_turn.get("max_new_tokens", None) or agent_data.response_limit
         max_new_tokens = min(max_new_tokens, agent_data.response_limit)
         sampling_params_for_turn["max_new_tokens"] = max_new_tokens
-
-        # Inject stop_token_ids from the model's tokenizer eos_token_id.
-        # verl's agent_loop builds sampling_params without stop tokens, so
-        # vLLM never halts at <|im_end|> for chat-tuned models — it just
-        # hits max_tokens with garbage. Use tokenizer.eos_token_id as the
-        # source of truth (151645 for Qwen2.5 chat).
-        if "stop_token_ids" not in sampling_params_for_turn:
-            eos_id = getattr(self.tokenizer, "eos_token_id", None)
-            if eos_id is not None:
-                stop_ids = [eos_id] if isinstance(eos_id, int) else list(eos_id)
-                sampling_params_for_turn["stop_token_ids"] = stop_ids
-
-        # Optional per-env history transform applied before regenerating
-        # prompt_ids. Webarena uses this to mirror WebAgent-R1's
-        # WebRLChatPromptConstructor — replace HTML in historical user
-        # messages with a placeholder, avoiding 32K context blow-up.
-        # Only kicks in once we have 2+ user turns (i.e., turn 1 onward).
-        prompt_ids_for_call = agent_data.prompt_ids
-        transform = _get_message_transform(agent_data.env_name)
-        if (transform is not None
-                and self.processor is None
-                and sum(1 for m in agent_data.messages if m.get("role") == "user") >= 2):
-            compressed = transform(agent_data.messages)
-            flat = [_flatten_text_only_content(m) for m in compressed]
-            prompt_ids_for_call = await self.loop.run_in_executor(
-                None,
-                lambda: self.tokenizer.apply_chat_template(
-                    flat, add_generation_prompt=True,
-                    tokenize=True, return_dict=False, **self.apply_chat_template_kwargs
-                ),
-            )
+            
 
         with simple_timer("generate_sequences", agent_data.metrics):
             output = await self.server_manager.generate(
                 request_id=agent_data.request_id,
-                prompt_ids=prompt_ids_for_call,
+                prompt_ids=agent_data.prompt_ids,
                 sampling_params=sampling_params_for_turn,
                 image_data=agent_data.image_data,
             )
