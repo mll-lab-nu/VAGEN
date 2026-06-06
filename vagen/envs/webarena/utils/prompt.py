@@ -31,3 +31,45 @@ def format_task_prompt(intent: str, round_idx: int, observation: str) -> str:
     if round_idx == 0:
         return f"Task Instruction: {intent}\n\nRound {round_idx}\n\n{observation}"
     return f"Round {round_idx}\n\n{observation}"
+
+
+def compress_history(messages):
+    """Mirror WebAgent-R1's WebRLChatPromptConstructor: replace HTML in
+    historical user messages with `** Simplified html **`, keeping only the
+    most recent user message's real observation. System and assistant
+    messages are untouched. Without this compression, multi-turn chat
+    accumulates full HTML each turn and quickly exceeds 32K context.
+
+    Registered as the per-turn message transform for env_name="webarena"
+    in vagen/agent_loop/gym_agent_loop.py:_get_message_transform.
+    """
+    if not messages:
+        return messages
+    user_idxs = [i for i, m in enumerate(messages) if m.get("role") == "user"]
+    if len(user_idxs) <= 1:
+        return messages
+    last_user_idx = user_idxs[-1]
+    out = []
+    for i, m in enumerate(messages):
+        if m.get("role") != "user" or i == last_user_idx:
+            out.append(m)
+            continue
+        content = m.get("content", "")
+        if isinstance(content, list):
+            text = "".join(
+                blk.get("text", "") for blk in content
+                if isinstance(blk, dict) and blk.get("type") == "text"
+            )
+        else:
+            text = content or ""
+        # Preserve "Task Instruction: ...\n\nRound N" prefix (model needs intent)
+        if "Task Instruction" in text.split("\n\n", 1)[0]:
+            parts = text.split("\n\n", 2)
+            prefix = "\n\n".join(parts[:2]) if len(parts) >= 2 else parts[0]
+            new_content = f"{prefix}\n\n** Simplified html **"
+        else:
+            # "Round N\n\n<html...>" — keep "Round N"
+            first_line = text.split("\n", 1)[0]
+            new_content = f"{first_line}\n\n** Simplified html **"
+        out.append({"role": "user", "content": new_content})
+    return out
