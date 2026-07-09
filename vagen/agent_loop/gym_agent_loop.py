@@ -320,7 +320,17 @@ class GymAgentLoop(AgentLoopBase):
         max_new_tokens=sampling_params_for_turn.get("max_new_tokens", None) or agent_data.response_limit
         max_new_tokens = min(max_new_tokens, agent_data.response_limit)
         sampling_params_for_turn["max_new_tokens"] = max_new_tokens
-            
+
+        # Inject stop_token_ids from the model's tokenizer eos_token_id.
+        # verl's agent_loop builds sampling_params without stop tokens, so
+        # vLLM never halts at <|im_end|> for chat-tuned models — it just
+        # hits max_tokens and emits garbage tail. Use tokenizer.eos_token_id
+        # as the source of truth (151645 for Qwen2.5 chat).
+        if "stop_token_ids" not in sampling_params_for_turn:
+            eos_id = getattr(self.tokenizer, "eos_token_id", None)
+            if eos_id is not None:
+                stop_ids = [eos_id] if isinstance(eos_id, int) else list(eos_id)
+                sampling_params_for_turn["stop_token_ids"] = stop_ids
 
         with simple_timer("generate_sequences", agent_data.metrics):
             output = await self.server_manager.generate(
