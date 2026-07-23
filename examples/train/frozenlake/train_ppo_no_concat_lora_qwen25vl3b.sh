@@ -1,9 +1,8 @@
 #!/bin/bash
 # FrozenLake, NON-CONCAT multi-turn PPO with LoRA (Qwen2.5-VL-3B).
 #
-# This is the correct recipe for the setup in issue #108 (LoRA + no-concat FrozenLake).
-# No-concat mode requires THREE settings to agree, or rollout dies with
-# `KeyError: 'group_idx'` during validation:
+
+# No-concat mode requires:
 #   1) actor_rollout_ref.rollout.agent.agent_loop_config_path -> vagen/configs/agent_no_concat.yaml
 #   2) trainer.concat_multi_turn=False
 #   3) algorithm.adv_estimator=no_concat_gae   (turn-level GAE; needs a critic, so critic.enable=True)
