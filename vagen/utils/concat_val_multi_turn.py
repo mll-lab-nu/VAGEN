@@ -22,6 +22,33 @@ def _as_1d_object_array(items: List[Any]) -> np.ndarray:
     return arr
 
 
+def _real_len_right(t: torch.Tensor, pad_id: int) -> int:
+    """Length of the real (non-pad) prefix of a RIGHT-padded 1D tensor.
+
+    Returns ``last_non_pad_index + 1`` (0 if all pad). Using the last non-pad
+    index rather than a non-pad *count* is robust to a pad-valued token appearing
+    inside the real content (e.g. an interior eos == pad_id): only the trailing
+    pad run is trimmed.
+    """
+    nonpad = (t != pad_id).nonzero()
+    if nonpad.numel() == 0:
+        return 0
+    return int(nonpad.max().item()) + 1
+
+
+def _real_start_left(t: torch.Tensor, pad_id: int) -> int:
+    """Start index of the real span of a LEFT-padded 1D tensor.
+
+    Returns the first non-pad index (``len(t)`` if all pad), so ``t[start:]`` is
+    the real content. Robust to interior pad-valued tokens (only the leading pad
+    run is trimmed).
+    """
+    nonpad = (t != pad_id).nonzero()
+    if nonpad.numel() == 0:
+        return t.shape[0]
+    return int(nonpad.min().item())
+
+
 def concat_val_multi_turn(
     test_output_gen_batch: DataProto,
     test_gen_batch: DataProto,
@@ -87,6 +114,7 @@ def concat_val_multi_turn(
         mask_parts: List[torch.Tensor] = []
         rm_parts: List[torch.Tensor] = []
 
+        pad_id = tokenizer.pad_token_id
         for j, (_, i) in enumerate(turns):
             resp = test_output_gen_batch.batch["responses"][i]
 
@@ -97,18 +125,28 @@ def concat_val_multi_turn(
 
             rm = test_output_gen_batch.batch["rm_scores"][i]
 
-            resp_parts.append(resp)
-            mask_parts.append(mask)
-            rm_parts.append(rm)
+            # Strip the right-padding of this turn's response before concatenating.
+            # Each per-turn tensor is individually padded (response right-padded to
+            # response_length, prompts left-padded to prompt_length); concatenating
+            # them as-is would bury pad tokens *inside* the sequence, which then
+            # breaks the trailing-pad assumption of the `s[:l]` decode in _validate
+            # (later turns get truncated from the logged text while image_data keeps
+            # every turn's image -> "N images but fewer visible turns").
+            r_len = _real_len_right(resp, pad_id)
+            resp_parts.append(resp[:r_len])
+            mask_parts.append(mask[:r_len])
+            rm_parts.append(rm[:r_len])
 
-            # insert next prompt segment (as-is)
+            # insert next prompt segment (left-padding stripped, marked mask/rm = 0)
             if j < len(turns) - 1:
                 next_i = turns[j + 1][1]
                 next_prompt = test_output_gen_batch.batch["prompts"][next_i]
 
-                resp_parts.append(next_prompt)
-                mask_parts.append(torch.zeros_like(next_prompt))
-                rm_parts.append(torch.zeros_like(next_prompt, dtype=rm.dtype, device=rm.device))
+                p_start = _real_start_left(next_prompt, pad_id)
+                prompt_seg = next_prompt[p_start:]
+                resp_parts.append(prompt_seg)
+                mask_parts.append(torch.zeros_like(prompt_seg))
+                rm_parts.append(torch.zeros(prompt_seg.shape[0], dtype=rm.dtype, device=rm.device))
 
         concat_response = torch.cat(resp_parts, dim=0)
         concat_response_mask = torch.cat(mask_parts, dim=0)
@@ -377,7 +415,11 @@ def test_two_turn_reward_extra_info_uses_last_turn_and_is_copied_to_top_level():
         ],
     )
     tg = _make_test_gen_batch_uid_from_output(dp)
-    out = concat_val_multi_turn(dp, tg)
+
+    class _Tok:
+        pad_token_id = PAD_TOKEN_ID
+
+    out = concat_val_multi_turn(dp, tg, _Tok())
 
     assert out.non_tensor_batch["reward_extra_info"][0] == {"traj_success": 1.0, "foo": 2, "bar": "x"}
     assert out.non_tensor_batch["traj_success"][0] == 1.0
