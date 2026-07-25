@@ -1,0 +1,64 @@
+defaults:
+  - ../../../vagen/configs/eval_default
+
+# Minimal eval example for the WebArena env.
+#
+# Prereqs (start in this order, see vagen/envs/webarena/README.md for details):
+#   1) SSH tunnel to WebArena docker (ports 7770/7780/9999/8023/8888/...).
+#   2) Drop the task corpus JSONs into vagen/envs/webarena/config_files/
+#      (see config_files/README.md for download instructions).
+#   3) source vagen/envs/webarena/setup_vars.sh
+#   4) Start the env supervisor (8 workers, default ports 8002-8009):
+#         python -m vagen.envs.webarena.supervisor \
+#           --task_config_file=vagen/envs/webarena/config_files/normalized_test_nomap.json
+#   5) Start an OpenAI-compatible model server (sglang, vllm, ...) and
+#      pass its base_url via Hydra:
+#         backends.sglang.base_url=http://<gpu_node>:30000/v1
+#         backends.sglang.model=weizhepei/Qwen2.5-3B-WebArena-Lite-SFT-epoch-5
+#   6) Run:
+#         python -m vagen.evaluate.run_eval --config examples/evaluate/webarena/config.yaml
+#
+# `data_source: webarena` switches on the per-env message-history transform
+# in vision_workflow.py (compress historical HTML observations to a
+# placeholder so multi-turn rollouts don't overflow the 32K context window).
+
+fileroot: ${oc.env:HOME}/projects/vagen
+
+envs:
+  - name: RemoteEnv
+    n_envs: 5
+    tag_id: webarena_smoke
+    data_source: webarena
+    # Five seeds that index to non-map non-admin tasks in
+    # `normalized_test_nomap.json`. Override via Hydra for different runs.
+    seed_list: [2, 3, 5, 6, 8]
+    max_turns: 15
+    config:
+      base_urls: "http://localhost:8002;http://localhost:8003;http://localhost:8004;http://localhost:8005;http://localhost:8006;http://localhost:8007;http://localhost:8008;http://localhost:8009"
+      timeout: 600
+      retries: 3
+      max_steps: 15
+      viewport_width: 1280
+      viewport_height: 720
+      observation_type: webrl
+      sleep_after_execution: 3.0
+      reset_timeout: 180.0
+      step_timeout: 90.0
+      eval_timeout: 90.0
+    chat_config:
+      temperature: 0
+      max_tokens: 1024
+      top_p: 1.0
+
+experiment:
+  dump_dir: ${fileroot}/rollouts/eval_webarena_smoke
+  default_max_turns: 5
+
+run:
+  backend: "sglang"
+  base_seed: 0
+  # Per-job concurrency. With supervisor's 1 context per worker, 4
+  # concurrent jobs evenly use 4 of 8 workers — leaves headroom.
+  max_concurrent_jobs: 4
+  resume: skip_completed
+  live_summary: true
