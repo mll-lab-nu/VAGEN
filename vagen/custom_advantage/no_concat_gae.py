@@ -2,7 +2,7 @@ import numpy as np
 import torch
 
 import verl.utils.torch_functional as verl_F
-from verl.trainer.ppo.core_algos import register_adv_est
+from vagen.custom_advantage.registry import register_sentinel_adv_est
 
 
 def _to_numpy_int64(x, factorize_if_non_numeric: bool = False):
@@ -43,7 +43,7 @@ def _to_numpy_int64(x, factorize_if_non_numeric: bool = False):
     return x.astype(np.int64, copy=False)
 
 
-@register_adv_est("no_concat_gae_last")
+@register_sentinel_adv_est("no_concat_gae_last")
 def compute_gae_no_concat_advantage_return(
     data,
     gamma,
@@ -190,7 +190,7 @@ def compute_gae_no_concat_advantage_return(
     return advantages_full, returns_full
 
 
-@register_adv_est("no_concat_gae")
+@register_sentinel_adv_est("no_concat_gae")
 def compute_gae_no_concat_advantage_return_firsttok(
     data,
     gamma,
