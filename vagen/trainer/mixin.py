@@ -33,7 +33,12 @@ from verl.utils.debug import marked_timer
 from vagen.custom_advantage import needs_value_mask
 from vagen.custom_filter.filter import FILTER_REGISTRY
 from vagen.custom_metric.metric import METRIC_REGISTRY
-from vagen.trainer.logic import collect_registry_metrics, value_mask_from_returns
+from vagen.trainer.logic import (
+    alignment_indices,
+    collect_registry_metrics,
+    traj_idx_for_interleaved_repeat,
+    value_mask_from_returns,
+)
 
 
 class VagenLogicMixin:
@@ -97,6 +102,36 @@ class VagenLogicMixin:
             print(f"[vagen] filter: padded {before} -> {before + pad_size} for {divisor} dp workers")
             self._balance_batch(batch, metrics=self.metrics, logging_prefix="filtered_global_seqlen")
         return batch
+
+    # ------------------------------------------------------- no-concat indices
+    def _vagen_assign_group_and_traj_idx(self, gen_batch, num_traj_per_sample: int) -> None:
+        """Label each generated row with the prompt group and trajectory it belongs to.
+
+        Turn-level GAE groups on ``(group_idx, traj_idx)`` and orders by ``turn_idx``
+        within a group, so these are what make a trajectory reconstructable after the
+        rows have been flattened.
+        """
+        gen_batch.non_tensor_batch["group_idx"] = gen_batch.non_tensor_batch["uid"]
+        gen_batch.non_tensor_batch["traj_idx"] = traj_idx_for_interleaved_repeat(
+            len(gen_batch.non_tensor_batch["uid"]), num_traj_per_sample
+        )
+
+    def _vagen_align_no_concat_batch(self, batch, gen_batch_output):
+        """Replicate the input batch's rows to match the generated rows, then union.
+
+        No-concat generation emits a variable number of rows per prompt, so columns
+        that never went through generation have to be stretched to match before the
+        two can be unioned.
+        """
+        gen_batch_output.non_tensor_batch["uid"] = gen_batch_output.non_tensor_batch["group_idx"]
+        indices = alignment_indices(
+            gen_batch_output.non_tensor_batch["uid"], batch.non_tensor_batch["uid"]
+        )
+        batch = batch.select_idxs(indices)
+        assert len(batch) == len(gen_batch_output), (
+            f"alignment produced {len(batch)} rows for {len(gen_batch_output)} generated rows"
+        )
+        return batch.union(gen_batch_output)
 
     # ------------------------------------------------------------ checkpoint
     def _vagen_should_upload_hf(self) -> bool:
