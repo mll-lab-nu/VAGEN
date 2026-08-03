@@ -12,6 +12,7 @@ from uuid import uuid4
 from PIL import Image
 from verl.experimental.agent_loop.agent_loop import AgentLoopOutput, register
 from .base import VagenGymAgentLoopBase
+from .prompt_check import check_prompt_matches_engine
 from verl.utils.profiler import simple_timer
 from verl.utils.rollout_trace import rollout_trace_op
 from ..envs.gym_image_env import GymImageEnv
@@ -192,6 +193,9 @@ class GymAgentLoop(VagenGymAgentLoopBase):
                 # different number of placeholders than the prompt contains.
                 mm_processor_kwargs = self._get_mm_processor_kwargs() or None,
             )
+        check_prompt_matches_engine(
+            agent_data.turn_prompt_ids, output, env_name=agent_data.env_name
+        )
 
 
         agent_data.turn_response_ids = output.token_ids
