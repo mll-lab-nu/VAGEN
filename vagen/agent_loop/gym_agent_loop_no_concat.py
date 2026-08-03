@@ -10,13 +10,13 @@ from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from PIL import Image
-from .agent_loop_no_concat import AgentLoopBase, AgentLoopOutput, register
+from verl.experimental.agent_loop.agent_loop import AgentLoopOutput, register
+from .base import VagenGymAgentLoopBase
 from verl.utils.profiler import simple_timer
 from verl.utils.rollout_trace import rollout_trace_op
 from ..envs.gym_image_env import GymImageEnv
 from omegaconf import OmegaConf
 import traceback
-import importlib
 logger = logging.getLogger(__file__)
 logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
 from .gym_agent_loop import convert_obs_to_content, extract_success, _flatten_text_only_content, _normalize_images
@@ -73,41 +73,14 @@ class AgentData:
 
 # -------------------- Gym Agent Loop --------------------
 
-class GymAgentLoop(AgentLoopBase):
-    @classmethod
-    def init_class(cls, config, tokenizer, processor, **kwargs):
-        if cls._class_initialized:
-            return
-        cls._class_initialized = True
-        print("Performing class-level GymAgentLoop initialization")
-
-        cls.tokenizer = tokenizer
-        cls.processor = processor
-        cls.multi_turn_cfg = config.actor_rollout_ref.rollout.multi_turn
-        
-        # Store module paths for lazy loading; environments are imported on first use
-        cls.env_registry_paths = dict(config.env_registry.items())
-        cls.env_registry = {}
-            
-        cls.apply_chat_template_kwargs = config.data.get("apply_chat_template_kwargs", {})
-        cls.prompt_length = config.actor_rollout_ref.rollout.prompt_length
-        cls.response_length = config.actor_rollout_ref.rollout.response_length
-        
-
+class GymAgentLoop(VagenGymAgentLoopBase):
     @rollout_trace_op
     async def run(self, sampling_params: Dict[str, Any], **kwargs) -> AgentLoopOutput:
         metrics: Dict[str, Any] = {}
         request_id = uuid4().hex
 
-        # Build env (lazy import on first use)
         env_name = kwargs["env_name"]
-        if env_name not in self.env_registry:
-            if env_name not in self.env_registry_paths:
-                raise KeyError(f"Unknown env: {env_name}. Available: {list(self.env_registry_paths.keys())}")
-            module_path, class_name = self.env_registry_paths[env_name].rsplit(".", 1)
-            module = importlib.import_module(module_path)
-            self.env_registry[env_name] = getattr(module, class_name)
-        env_cls = self.env_registry[env_name]
+        env_cls = self.resolve_env_class(env_name)
         env_config = kwargs["config"]
         seed = kwargs["seed"]
         self.env_max_turns = kwargs.get("max_turns", None)
