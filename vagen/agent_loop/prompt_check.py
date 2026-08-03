@@ -23,6 +23,21 @@ class PromptLengthMismatch(RuntimeError):
     """Raised when the engine ran a different prompt from the one being trained on."""
 
 
+def engine_prompt_ids(output) -> list[int] | None:
+    """The prompt the engine actually ran, if it reported one.
+
+    Adopting these instead of the locally tokenized ids makes the training sequence the
+    sampling sequence by construction, for any model family -- no per-family expansion
+    rules to reimplement and keep in step with the engine.
+
+    Only safe where the caller rebuilds its prompt each turn. A loop that accumulates
+    one prompt across turns tracks its response mask by appending counts, and adopting a
+    re-expanded prompt would move tokens the mask has already been measured against.
+    """
+    ids = (getattr(output, "extra_fields", None) or {}).get("prompt_token_ids")
+    return list(ids) if ids else None
+
+
 def check_prompt_matches_engine(prompt_ids, output, *, env_name: str = "?", strict: bool = True) -> None:
     """Compare the kept prompt against the one the engine reported running.
 
