@@ -60,6 +60,32 @@ class VagenPPOTrainer(VagenV0Mixin, SeparateRayPPOTrainer):
             role=str(role),
         )
 
+    def _get_gen_batch(self, batch):
+        """Move the placeholder prompt tensors out of the batch before generation.
+
+        The dataset emits one-element ``input_ids`` / ``attention_mask`` /
+        ``position_ids``: an agent loop builds the real prompt from environment
+        observations, so there is nothing meaningful to put there, but a DataProto
+        still needs tensors to carry a batch size.
+
+        verl used to pop exactly these three for generation and no longer does, which
+        leaves the placeholders in ``batch`` while ``gen_batch_output`` brings back the
+        real ones -- and ``batch.union(gen_batch_output)`` asserts that shared keys
+        hold the same tensor. Popping them restores the intended dataflow: placeholders
+        go out with the gen batch (where the loop ignores them) and the generated
+        tensors come back unopposed.
+        """
+        reward_keys = {"data_source", "reward_model", "extra_info", "uid"} & batch.non_tensor_batch.keys()
+        placeholders = [k for k in ("input_ids", "attention_mask", "position_ids") if k in batch.batch]
+
+        gen_batch = batch.pop(
+            batch_keys=placeholders,
+            non_tensor_batch_keys=list(set(batch.non_tensor_batch.keys()) - reward_keys),
+        )
+        # The agent loop scores in-flight, so it needs the reward-model keys too.
+        gen_batch.non_tensor_batch.update(batch.non_tensor_batch)
+        return gen_batch
+
     def _init_async_rollout_manager(self):
         """Stand up the LLM servers and the agent loop manager.
 
