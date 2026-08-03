@@ -39,7 +39,8 @@ def base_postprocess():
         seen["inputs"] = inputs
         seen["non_tensor"] = input_non_tensor_batch
         seen["validate"] = validate
-        return "batch"
+        # verl returns a DataProto; the override reads non_tensor_batch off it.
+        return types.SimpleNamespace(non_tensor_batch=dict(input_non_tensor_batch or {}))
 
     with patch.object(AgentLoopWorker, "_postprocess", fake):
         yield seen
@@ -299,3 +300,37 @@ def test_postprocess_reports_how_many_rows_each_rollout_produced(worker, base_po
 
     out = capsys.readouterr().out
     assert "2 rollouts produced 4 rows" in out, out
+
+
+def test_index_columns_are_restored_when_verl_drops_them(worker):
+    """★ verl's _postprocess skips input_non_tensor_batch entirely when streaming
+    reward is enabled. The no-concat loop survives that because it emits group_idx per
+    turn via extra_fields; the concat loop does not, so the trajectory estimators
+    failed with KeyError under the concat layout alone."""
+
+    class _Out:
+        def __init__(self):
+            self.non_tensor_batch = {}  # verl kept nothing
+
+    with patch.object(AgentLoopWorker, "_postprocess", lambda self, *a, **k: _Out()):
+        out = worker._postprocess(
+            [["a"], ["b"]],
+            input_non_tensor_batch={"group_idx": np.array(["A", "B"], dtype=object), "traj_idx": np.array([0, 0])},
+        )
+
+    assert out.non_tensor_batch["group_idx"].tolist() == ["A", "B"]
+    assert out.non_tensor_batch["traj_idx"].tolist() == [0, 0]
+
+
+def test_restored_indices_do_not_overwrite_per_turn_values(worker):
+    """The no-concat loop's per-turn group_idx is the authoritative one; the input
+    column is the pre-fan-out value and must not shadow it."""
+
+    class _Out:
+        def __init__(self):
+            self.non_tensor_batch = {"group_idx": np.array(["kept"], dtype=object)}
+
+    with patch.object(AgentLoopWorker, "_postprocess", lambda self, *a, **k: _Out()):
+        out = worker._postprocess([["a"]], input_non_tensor_batch={"group_idx": np.array(["input"], dtype=object)})
+
+    assert out.non_tensor_batch["group_idx"].tolist() == ["kept"]
