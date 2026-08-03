@@ -1,4 +1,3 @@
-# All comments are in English.
 """Importing this package registers VAGEN's advantage estimators with verl."""
 
 from vagen.custom_advantage import no_concat_gae  # noqa: F401  (import for side effect)

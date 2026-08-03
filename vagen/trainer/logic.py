@@ -1,4 +1,3 @@
-# All comments are in English.
 """Pure trainer-side logic, extracted from the vendored ``vagen/ray_trainer.py``.
 
 Nothing here imports verl, ray or hydra: every function takes plain tensors or a
@@ -63,7 +62,7 @@ def collect_registry_metrics(
     A misbehaving metric must not take down a training step, so by default failures
     are caught. But a metric that silently vanishes from the dashboard is its own kind
     of bug, so each failure also emits ``{prefix}/_failed/{name} = 1.0`` -- visible in
-    wandb rather than only in stdout, which is what the original implementation did.
+    wandb rather than only in stdout, where it would go unnoticed.
 
     Set ``strict=True`` in tests to turn failures back into exceptions.
     """

@@ -1,19 +1,11 @@
-# All comments are in English.
-"""Guards against the class of bug that silently broke every no-concat PPO run.
+"""Guards for the sentinel-estimator registry.
 
-The original code decided whether to compute ``value_mask`` from a hard-coded list::
+Whether an estimator needs a ``value_mask`` used to be decided by a hard-coded list of
+names. A list like that can disagree with the names actually registered, and when it
+does the critic is trained on the -100 sentinel with nothing failing loudly.
 
-    if self.config.algorithm.adv_estimator in ["no_concat_gae_last", "no_concat_gae_first"]:
-
-``no_concat_gae_first`` never existed -- the registered name is ``no_concat_gae``, and
-that is what every no-concat script passes. So ``value_mask`` was never produced and
-the critic regressed towards the -100 sentinel on nearly every token. Measured on
-sokoban: ``critic/vf_loss`` 568 -> ... -> 1.2e-4 (fitting the constant), against ~0.5
-for the concat control.
-
-``test_every_sentinel_writing_estimator_is_declared`` is the test that would have
-caught it: it reads the estimator sources and fails if one writes IGNORE_RETURN
-without declaring itself.
+``test_every_sentinel_writing_estimator_is_declared`` is the structural guard: it reads
+the estimator sources and fails if one writes ``IGNORE_RETURN`` without declaring it.
 """
 
 import ast
