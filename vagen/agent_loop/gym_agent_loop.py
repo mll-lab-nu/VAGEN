@@ -12,7 +12,7 @@ from uuid import uuid4
 from PIL import Image
 from verl.experimental.agent_loop.agent_loop import AgentLoopOutput, register
 from .base import VagenGymAgentLoopBase
-from .prompt_check import check_prompt_matches_engine
+from .prompt_check import adopt_engine_prompt, check_prompt_matches_engine, engine_prompt_ids
 from verl.utils.profiler import simple_timer
 from verl.utils.rollout_trace import rollout_trace_op
 from ..envs.gym_image_env import GymImageEnv
@@ -84,6 +84,12 @@ class AgentData:
         self.response_ids: List[int] = []
         self.response_mask: List[int] = []
         self.response_logprobs: List[float] = []
+
+        # Adoption bookkeeping: length of the trailing observation block (None while
+        # the tail is still the initial prompt), and the prompt prefix the mask is
+        # measured from, fixed once the engine's form is first adopted.
+        self.tail_obs_len: Optional[int] = None
+        self.prefix_len: Optional[int] = None
 
         # Env stats
         self.env_rewards: List[float] = []
@@ -300,7 +306,26 @@ class GymAgentLoop(VagenGymAgentLoopBase):
                 # different number of placeholders than the prompt contains.
                 mm_processor_kwargs=self._get_mm_processor_kwargs() or None,
             )
-        check_prompt_matches_engine(agent_data.prompt_ids, output, env_name=agent_data.env_name)
+        engine_ids = engine_prompt_ids(output)
+        if engine_ids is not None:
+            # Train on what the engine ran. This loop carries one prompt across turns,
+            # so the mask has to move with it -- see adopt_engine_prompt.
+            (
+                agent_data.response_mask,
+                agent_data.response_logprobs,
+                agent_data.tail_obs_len,
+                agent_data.prefix_len,
+            ) = adopt_engine_prompt(
+                engine_ids,
+                agent_data.prompt_ids,
+                agent_data.response_mask,
+                agent_data.response_logprobs,
+                agent_data.tail_obs_len,
+                agent_data.prefix_len,
+            )
+            agent_data.prompt_ids = engine_ids
+        else:
+            check_prompt_matches_engine(agent_data.prompt_ids, output, env_name=agent_data.env_name)
 
 
         agent_data.response_ids = output.token_ids
@@ -393,6 +418,8 @@ class GymAgentLoop(VagenGymAgentLoopBase):
         response_ids = response_ids[len(self.system_prompt_prefix_ids()):]
         agent_data.prompt_ids += response_ids
         agent_data.response_mask += [0] * len(response_ids)
+        # The newest observation: the only region the engine can re-expand next turn.
+        agent_data.tail_obs_len = len(response_ids)
         if agent_data.response_logprobs:
             agent_data.response_logprobs += [0.0] * len(response_ids)
 

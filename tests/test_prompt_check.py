@@ -101,7 +101,7 @@ def test_absent_engine_prompt_is_none_not_empty():
     assert engine_prompt_ids(types.SimpleNamespace(extra_fields={"prompt_token_ids": []})) is None
 
 
-def test_only_the_per_turn_loop_adopts_the_engine_prompt():
+def test_each_loop_adopts_in_the_way_its_bookkeeping_allows():
     """★ The concat loop accumulates one prompt across turns and tracks its response
     mask by appending counts, so adopting a re-expanded prompt would move tokens the
     mask has already been measured against. It must keep checking instead."""
@@ -118,7 +118,86 @@ def test_only_the_per_turn_loop_adopts_the_engine_prompt():
         }
 
     assert "engine_prompt_ids" in calls(gym_agent_loop_no_concat)
-    assert "engine_prompt_ids" not in calls(gym_agent_loop), (
-        "the accumulating loop must not adopt a re-expanded prompt"
+    # The accumulating loop adopts too, but has to move its mask with the prompt.
+    assert "engine_prompt_ids" in calls(gym_agent_loop)
+    assert "adopt_engine_prompt" in calls(gym_agent_loop)
+    assert "adopt_engine_prompt" not in calls(gym_agent_loop_no_concat), (
+        "the per-turn loop rebuilds its prompt, so it has no mask to move"
     )
-    assert "check_prompt_matches_engine" in calls(gym_agent_loop)
+    # Both keep the check for engines that report no ids.
+    for module in (gym_agent_loop, gym_agent_loop_no_concat):
+        assert "check_prompt_matches_engine" in calls(module)
+
+
+# ------------------------------------------- adopting inside an accumulating prompt
+
+
+def _adopt(engine_len, local_len, mask, tail, prefix, logprobs=None):
+    from vagen.agent_loop.prompt_check import adopt_engine_prompt
+
+    return adopt_engine_prompt(
+        list(range(engine_len)), list(range(local_len)), list(mask), list(logprobs or []), tail, prefix
+    )
+
+
+def test_first_adoption_fixes_the_prefix():
+    """Turn one: the mask is empty because nothing follows the initial prompt yet."""
+    mask, _, tail, prefix = _adopt(engine_len=10, local_len=8, mask=[], tail=None, prefix=None)
+
+    assert mask == [] and tail is None and prefix == 10
+
+
+def test_a_grown_observation_grows_its_run_of_zeros():
+    """★ The engine expanded the newest image into two more tokens than we did, so the
+    mask must describe two more observation positions -- otherwise the split between
+    prompt and response lands in the wrong place."""
+    mask, _, tail, prefix = _adopt(
+        engine_len=20, local_len=18, mask=[1, 1, 1] + [0] * 5, tail=5, prefix=10
+    )
+
+    assert mask == [1, 1, 1] + [0] * 7
+    assert tail == 7 and prefix == 10
+
+
+def test_a_shrunken_observation_shrinks_it():
+    mask, _, tail, _ = _adopt(engine_len=16, local_len=18, mask=[1, 1, 1] + [0] * 5, tail=5, prefix=10)
+
+    assert mask == [1, 1, 1] + [0] * 3 and tail == 3
+
+
+def test_responses_are_never_touched():
+    """Only observations carry images, so a response must come through byte for byte --
+    a shifted response mask is exactly the corruption being avoided."""
+    mask, _, _, _ = _adopt(engine_len=25, local_len=18, mask=[1, 1, 1] + [0] * 5, tail=5, prefix=10)
+
+    assert mask[:3] == [1, 1, 1]
+    assert sum(mask) == 3, "the count of trained-on positions must not change"
+
+
+def test_logprobs_track_the_mask():
+    _, logprobs, _, _ = _adopt(
+        engine_len=20, local_len=18, mask=[1, 1, 1] + [0] * 5, tail=5, prefix=10,
+        logprobs=[0.5, 0.5, 0.5] + [0.0] * 5,
+    )
+
+    assert len(logprobs) == 10 and logprobs[:3] == [0.5, 0.5, 0.5]
+
+
+def test_a_delta_too_large_to_absorb_raises():
+    """If the engine's prompt is shorter than the observation it re-expanded, the change
+    was not confined there and the mask cannot be placed."""
+    with pytest.raises(PromptLengthMismatch, match="cannot be confined"):
+        _adopt(engine_len=10, local_len=18, mask=[1, 1, 1] + [0] * 5, tail=5, prefix=10)
+
+
+def test_a_shifted_prefix_raises():
+    """★ The load-bearing assumption is that everything before the newest observation is
+    already in engine form and re-expands identically. Assert it rather than trust it."""
+    with pytest.raises(PromptLengthMismatch, match="no longer lines up"):
+        _adopt(engine_len=20, local_len=18, mask=[1, 1, 1] + [0] * 5, tail=None, prefix=10)
+
+
+def test_unchanged_length_leaves_everything_alone():
+    mask, _, tail, prefix = _adopt(engine_len=18, local_len=18, mask=[1] * 3 + [0] * 5, tail=5, prefix=10)
+
+    assert mask == [1] * 3 + [0] * 5 and tail == 5 and prefix == 10

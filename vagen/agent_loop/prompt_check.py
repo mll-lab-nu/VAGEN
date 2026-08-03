@@ -63,3 +63,52 @@ def check_prompt_matches_engine(prompt_ids, output, *, env_name: str = "?", stri
     if strict:
         raise PromptLengthMismatch(message)
     warnings.warn(message, stacklevel=2)
+
+
+def adopt_engine_prompt(engine_ids, prompt_ids, response_mask, response_logprobs, tail_obs_len, prefix_len):
+    """Adopt the engine's prompt in a loop that accumulates one across turns.
+
+    Returns ``(mask, logprobs, tail_obs_len, prefix_len)`` for the adopted prompt.
+
+    Only the newest observation can change length. Everything before it was adopted on
+    an earlier turn, so it is already in the engine's own form and re-expanding it is
+    idempotent -- the deduplication that precedes the round trip is exactly its inverse.
+    That makes the whole delta attributable to the trailing observation, which is a run
+    of zeros of known length, so the mask can be corrected without having to locate
+    anything inside the token stream.
+
+    ``tail_obs_len`` is ``None`` on the first turn, where the tail is the initial prompt
+    and the mask covers none of it.
+
+    The invariant is asserted rather than assumed: the prompt and the mask must still
+    describe the same sequence afterwards.
+    """
+    delta = len(engine_ids) - len(prompt_ids)
+
+    if delta and tail_obs_len is not None:
+        adjusted = tail_obs_len + delta
+        if adjusted < 0:
+            raise PromptLengthMismatch(
+                f"engine prompt is {-delta} tokens shorter than the observation it re-expanded "
+                f"({tail_obs_len} tokens), so the change cannot be confined to it -- the mask "
+                "can no longer be placed"
+            )
+        keep = len(response_mask) - tail_obs_len
+        response_mask = response_mask[:keep] + [0] * adjusted
+        if response_logprobs:
+            response_logprobs = response_logprobs[:keep] + [0.0] * adjusted
+        tail_obs_len = adjusted
+
+    if prefix_len is None:
+        # First adoption fixes the prefix; it is in engine form from here on.
+        prefix_len = len(engine_ids) - len(response_mask)
+
+    if len(engine_ids) - len(response_mask) != prefix_len:
+        raise PromptLengthMismatch(
+            f"after adopting the engine prompt the mask no longer lines up: "
+            f"{len(engine_ids)} tokens minus {len(response_mask)} masked is not the "
+            f"{prefix_len}-token prefix. The change was not confined to the trailing "
+            "observation, so some earlier region was re-expanded differently."
+        )
+
+    return response_mask, response_logprobs, tail_obs_len, prefix_len
