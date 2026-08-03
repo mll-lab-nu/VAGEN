@@ -1,4 +1,3 @@
-# All comments are in English.
 from __future__ import annotations
 from typing import Any, Dict, List, Tuple
 from PIL import Image

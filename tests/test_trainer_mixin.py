@@ -1,4 +1,3 @@
-# All comments are in English.
 """Unit tests for vagen/trainer/mixin.py.
 
 The mixin is exercised against a fake base trainer rather than a real

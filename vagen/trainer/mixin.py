@@ -1,4 +1,3 @@
-# All comments are in English.
 """VAGEN's trainer customisations, as mixins over verl's ``_fit_*`` hooks.
 
 Replaces the vendored copy of ``verl/trainer/ppo/ray_trainer.py``. Rationale: v0.8.0's
@@ -19,11 +18,10 @@ Two layers on purpose:
       -> _fit_dump_data -> _fit_validate -> _fit_save_checkpoint
       -> _fit_collect_metrics -> _fit_experimental
 
-The original code did value_mask / custom metrics / filtering *between* advantage and
-update_critic. So all three hang off ``_fit_compute_advantage``'s tail. In particular
-the filter must NOT go on ``_fit_experimental`` (which the design sketch suggested):
-that runs after the actor update, so filtering there would train on the unfiltered
-batch and then discard the result.
+value_mask, custom metrics and filtering all belong *between* advantage and
+update_critic, so all three hang off ``_fit_compute_advantage``'s tail. In particular
+the filter must NOT go on ``_fit_experimental``: that runs after the actor update, so
+filtering there would train on the unfiltered batch and then discard the result.
 """
 
 from __future__ import annotations
@@ -50,7 +48,7 @@ class VagenLogicMixin:
 
     # -------------------------------------------------------------- advantage
     def _vagen_after_advantage(self, batch):
-        """Everything the original ``fit()`` did between advantage and update_critic.
+        """Everything that belongs between advantage computation and update_critic.
 
         Order is load-bearing: value_mask must exist before the critic runs, and the
         filter must shrink the batch before either update.
@@ -64,9 +62,8 @@ class VagenLogicMixin:
         """Tell the critic which positions carry return supervision.
 
         Only for estimators that emit sentinel returns. ``needs_value_mask`` reads the
-        registry the estimators themselves populate -- the previous hard-coded name
-        list silently missed ``no_concat_gae`` and trained the critic on the sentinel
-        (see custom_advantage/registry.py).
+        registry the estimators themselves populate, so it cannot drift from the set of
+        estimators that actually emit sentinels (see custom_advantage/registry.py).
         """
         if needs_value_mask(self.config.algorithm.adv_estimator):
             batch.batch["value_mask"] = value_mask_from_returns(
@@ -140,10 +137,9 @@ class VagenV0Mixin(VagenLogicMixin):
         """HF Hub upload on its own schedule, independent of ``trainer.save_freq``.
 
         An upload-only step (hf_save_freq hits, save_freq does not) still needs a
-        checkpoint on disk to upload from -- the original code forced a save in that
-        case. Rather than duplicating verl's save condition (which would silently rot
-        when upstream changes it), we let ``super()`` decide, then check the filesystem
-        for what we actually need.
+        checkpoint on disk to upload from, so one has to be forced. Rather than
+        duplicating verl's save condition (which would silently rot when upstream
+        changes it), let ``super()`` decide and then check the filesystem.
         """
         upload = self._vagen_should_upload_hf()
         if upload:

@@ -1,28 +1,19 @@
-# All comments are in English.
 """Registration for advantage estimators that emit *sentinel* returns.
 
-Background -- a live bug this module exists to make impossible:
+Turn-level estimators such as ``no_concat_gae`` write a real return at one anchor token
+per turn and leave every other position at ``IGNORE_RETURN`` (-100.0). The critic must
+therefore be told which positions carry supervision, via ``value_mask``; without it, it
+is trained to regress towards the sentinel almost everywhere.
 
-    ``no_concat_gae`` / ``no_concat_gae_last`` write a real return at one anchor token
-    per turn and leave every other position at ``IGNORE_RETURN`` (-100.0). The critic
-    must therefore be told which positions carry supervision, via ``value_mask``.
+Deciding that from a hard-coded list of estimator names is what this module exists to
+avoid: the list and the registered names drift apart silently, and the symptom -- a
+critic fitting a constant -- shows up as a *falling* value loss and a healthy-looking
+explained variance, so nothing obvious fails.
 
-    ``ray_trainer.py`` decided that with a hard-coded list::
-
-        if self.config.algorithm.adv_estimator in ["no_concat_gae_last", "no_concat_gae_first"]:
-            batch.batch["value_mask"] = compute_value_mask(batch)
-
-    but the registered names are ``no_concat_gae_last`` and ``no_concat_gae`` --
-    ``no_concat_gae_first`` never existed. Every no-concat script uses
-    ``adv_estimator=no_concat_gae``, so ``value_mask`` was never set and the critic was
-    trained to regress towards -100 on almost every token. Observed on sokoban:
-    ``critic/vf_loss`` 568 -> 482 -> ... -> 1.2e-4 (converging onto the constant
-    sentinel), against ~0.5 for the concat control.
-
-The fix is structural rather than a corrected string: an estimator declares that it
-emits sentinels *at the point where it registers itself*, so the two can never drift.
-``tests/test_advantage_registry.py`` additionally asserts that every estimator whose
-implementation mentions ``IGNORE_RETURN`` has actually declared it.
+Instead an estimator declares that it emits sentinels at the point where it registers
+itself, so the two cannot disagree. ``tests/test_advantage_registry.py`` additionally
+asserts that every estimator whose implementation mentions ``IGNORE_RETURN`` has
+actually declared it.
 """
 
 from __future__ import annotations

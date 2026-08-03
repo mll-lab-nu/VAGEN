@@ -1,4 +1,3 @@
-# All comments are in English.
 """Unit tests for vagen/trainer/logic.py.
 
 Pure tensor logic -- no verl, no ray, no GPU. Should run in well under a second.
@@ -101,7 +100,7 @@ def test_collect_registry_metrics_prefixes_names():
 
 def test_failing_metric_does_not_kill_the_step_but_is_visible():
     """A broken metric must not abort training -- but it must not vanish silently
-    either, which is what the original implementation did (print only)."""
+    either, which printing alone would allow."""
 
     def boom(_):
         raise RuntimeError("nope")

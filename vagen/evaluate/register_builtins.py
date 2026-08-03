@@ -1,4 +1,3 @@
-# All comments are in English.
 # Importing these modules triggers @register_client / @register_adapter decorators.
 
 import vagen.evaluate.clients  
