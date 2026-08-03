@@ -288,3 +288,14 @@ def test_validation_uses_the_validation_rollout_count():
     m._vagen_assign_indices(p)
 
     assert p.non_tensor_batch["traj_idx"].tolist() == [0, 1]
+
+
+def test_postprocess_reports_how_many_rows_each_rollout_produced(worker, base_postprocess, capsys):
+    """★ Observability, not decoration. Every no-concat row reports num_turns=1 by
+    construction and the batch dimensions look identical to a single-turn run, so a
+    rollout that silently stops after one turn is invisible in the metrics -- which is
+    exactly what happened before this line existed."""
+    worker._postprocess([["a1", "a2", "a3"], ["b1"]])
+
+    out = capsys.readouterr().out
+    assert "2 rollouts produced 4 rows" in out, out
