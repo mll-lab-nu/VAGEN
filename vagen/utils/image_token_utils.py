@@ -1,117 +1,68 @@
-"""Utility functions for handling image tokens in text."""
+"""Collapse image-placeholder runs so logged text stays readable.
+
+A rendered VLM prompt repeats one placeholder token once per image patch, which for a
+single frame can be hundreds of tokens. Dumped verbatim it buries the actual prompt.
+
+The token is read off the processor rather than matched against a per-family regex: a
+table of patterns has to be extended for every new model, and when it is not the miss is
+silent -- the log simply looks wrong. Asking the processor works for any VLM that
+declares its placeholder, which is the normal case.
+"""
+
+from __future__ import annotations
 
 import re
 import warnings
-from typing import Union, Optional
+from typing import Optional, Union
+
+# Attributes a processor may expose its image placeholder under, most specific first.
+_TOKEN_ATTRS = ("image_token", "image_placeholder_token", "boi_token")
 
 
-# Supported model patterns for image token replacement
-SUPPORTED_PATTERNS = {
-    "qwen2_vl": {
-        # Qwen2-VL / Qwen2.5-VL: <|vision_start|><|image_pad|>...<|image_pad|><|vision_end|>
-        "pattern": r"<\|vision_start\|>(<\|image_pad\|>)+<\|vision_end\|>",
-        "processor_check": lambda p: p is not None and hasattr(p, 'image_processor') and "Qwen2VL" in p.image_processor.__class__.__name__,
-    },
-    "qwen_vl_legacy": {
-        # Fallback pattern: consecutive <|image_pad|> without vision tags
-        "pattern": r"(<\|image_pad\|>)+",
-        "processor_check": lambda p: False,  # Only used as fallback
-    },
-    "imgpad": {
-        # Alternative: <|imgpad|> tokens
-        "pattern": r"(<\|imgpad\|>)+",
-        "processor_check": lambda p: False,  # Only used as fallback
-    },
-}
-
-
-def get_model_type(processor) -> Optional[str]:
-    """Detect the model type from processor.
-
-    Args:
-        processor: The processor object
-
-    Returns:
-        Model type string or None if not detected
-    """
+def get_image_token(processor) -> Optional[str]:
+    """The placeholder string this processor repeats once per image patch."""
     if processor is None:
         return None
-
-    if hasattr(processor, 'image_processor'):
-        class_name = processor.image_processor.__class__.__name__
-        if "Qwen2VL" in class_name:
-            return "qwen2_vl"
-
+    for attr in _TOKEN_ATTRS:
+        token = getattr(processor, attr, None)
+        if isinstance(token, str) and token:
+            return token
+    # Some processors carry only the id, with the tokenizer holding the string.
+    token_id = getattr(processor, "image_token_id", None)
+    tokenizer = getattr(processor, "tokenizer", None)
+    if token_id is not None and tokenizer is not None:
+        try:
+            return tokenizer.convert_ids_to_tokens(int(token_id))
+        except Exception:  # noqa: BLE001 - a processor that cannot answer is not an error
+            return None
     return None
 
 
 def replace_image_tokens_for_logging(
     texts: Union[str, list[str]],
     processor=None,
-    tokenizer=None,
-    replacement: str = "<image>"
+    replacement: str = "<image>",
 ) -> Union[str, list[str]]:
-    """Replace image token sequences with a single placeholder for cleaner logging.
+    """Replace each run of the image placeholder with a single readable marker.
 
-    This function takes decoded text that may contain image token sequences
-    (e.g., <|vision_start|><|image_pad|>...<|vision_end|> for Qwen2-VL) and
-    replaces each sequence with a single <image> placeholder.
-
-    Currently supported models:
-    - Qwen2-VL / Qwen2.5-VL: <|vision_start|><|image_pad|>...<|vision_end|> -> <image>
-
-    Args:
-        texts: A single string or list of strings to process
-        processor: Optional processor to detect model type
-        tokenizer: Optional tokenizer (for future use)
-        replacement: The string to replace image sequences with (default: "<image>")
-
-    Returns:
-        Processed string(s) with image token sequences replaced
-
-    Example:
-        >>> text = "Hello <|vision_start|><|image_pad|><|image_pad|><|vision_end|> world"
-        >>> replace_image_tokens_for_logging(text)
-        "Hello <image> world"
+    Returns the text unchanged when the processor declares no placeholder: the log is
+    then merely long, which must not be worth failing a training step over.
     """
-    model_type = get_model_type(processor)
+    single = isinstance(texts, str)
+    items = [texts] if single else list(texts)
 
-    # Determine which patterns to try
-    patterns_to_try = []
-
-    if model_type == "qwen2_vl":
-        patterns_to_try.append(SUPPORTED_PATTERNS["qwen2_vl"]["pattern"])
-    else:
-        # For unknown models, try all patterns and warn
-        warned = False
-        for name, config in SUPPORTED_PATTERNS.items():
-            patterns_to_try.append(config["pattern"])
-
-        # Check if text contains any known image tokens to decide if warning is needed
-        sample_text = texts if isinstance(texts, str) else (texts[0] if texts else "")
-        has_image_tokens = any(
-            re.search(config["pattern"], sample_text)
-            for config in SUPPORTED_PATTERNS.values()
-        )
-
-        if has_image_tokens and processor is not None:
+    token = get_image_token(processor)
+    if token is None:
+        if processor is not None:
             warnings.warn(
-                f"Could not detect model type from processor. "
-                f"Image token replacement currently has full support for: Qwen2-VL, Qwen2.5-VL. "
-                f"Attempting to use fallback patterns.",
-                UserWarning
+                f"{type(processor).__name__} declares no image token; logged prompts keep the raw "
+                "placeholder run",
+                stacklevel=2,
             )
+        return texts
 
-    def process_single_text(text: str) -> str:
-        result = text
-        for pattern in patterns_to_try:
-            result = re.sub(pattern, replacement, result)
-        return result
-
-    if isinstance(texts, str):
-        return process_single_text(texts)
-    else:
-        return [process_single_text(t) for t in texts]
-
-
-
+    # Surrounding markers such as Qwen's <|vision_start|>/<|vision_end|> are left alone:
+    # they are one token each, and dropping them would misrepresent what the model saw.
+    pattern = re.compile(f"(?:{re.escape(token)})+")
+    replaced = [pattern.sub(replacement, item) for item in items]
+    return replaced[0] if single else replaced

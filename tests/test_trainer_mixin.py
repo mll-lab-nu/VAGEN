@@ -429,3 +429,79 @@ def test_flush_before_save_drains_pending_writes(monkeypatch):
 
     fake_ray.get.assert_called_once_with(["f1", "f2"])
     assert t._vagen_image_futures == []
+
+
+# --------------------------------------------------------- image token collapsing
+
+
+class _Proc:
+    image_token = "<|image_pad|>"
+
+
+def test_image_token_runs_are_collapsed_in_dumps():
+    """★ One frame expands to hundreds of repeats of the same token, which buries the
+    prompt in the JSONL dump."""
+    t = _Trainer(_cfg())
+    t.processor = _Proc()
+    seen = {}
+
+    class _Base(_FakeBase):
+        def _dump_generations(self, inputs, outputs, *a, **k):
+            seen["inputs"], seen["outputs"] = inputs, outputs
+
+    t.__class__ = type("_T", (VagenV0Mixin, _Base), {})
+    t._dump_generations(["a <|image_pad|><|image_pad|><|image_pad|> b"], ["out"], None, None, None, "/tmp")
+
+    assert seen["inputs"] == ["a <image> b"]
+    assert seen["outputs"] == ["out"]
+
+
+def test_collapsing_can_be_turned_off():
+    cfg = _cfg()
+    cfg.trainer.replace_image_tokens_for_logging = False
+    t = _Trainer(cfg)
+    t.processor = _Proc()
+    seen = {}
+
+    class _Base(_FakeBase):
+        def _dump_generations(self, inputs, outputs, *a, **k):
+            seen["inputs"] = inputs
+
+    t.__class__ = type("_T", (VagenV0Mixin, _Base), {})
+    t._dump_generations(["a <|image_pad|> b"], ["out"], None, None, None, "/tmp")
+
+    assert seen["inputs"] == ["a <|image_pad|> b"]
+
+
+def test_unknown_processor_leaves_text_alone_rather_than_failing():
+    """★ A processor that declares no image token must not break the dump -- the log is
+    then merely long, which is not worth failing a training step over."""
+    from vagen.utils.image_token_utils import replace_image_tokens_for_logging
+
+    class _Bare:
+        pass
+
+    import warnings as _w
+
+    with _w.catch_warnings(record=True) as caught:
+        _w.simplefilter("always")
+        out = replace_image_tokens_for_logging(["a <|image_pad|> b"], _Bare())
+
+    assert out == ["a <|image_pad|> b"]
+    assert any("declares no image token" in str(c.message) for c in caught)
+
+
+def test_image_token_is_read_from_the_tokenizer_when_only_an_id_is_exposed():
+    """Processors vary in where they keep the placeholder; a per-family table is what
+    this avoids."""
+    from vagen.utils.image_token_utils import get_image_token
+
+    class _Tok:
+        def convert_ids_to_tokens(self, i):
+            return "<IMG>" if i == 7 else None
+
+    class _P:
+        image_token_id = 7
+        tokenizer = _Tok()
+
+    assert get_image_token(_P()) == "<IMG>"
