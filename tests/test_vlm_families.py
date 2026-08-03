@@ -69,3 +69,20 @@ def test_image_token_is_discovered_per_family(repo, expects_mrope, expected_toke
 
     assert token == expected_token
     assert replace_image_tokens_for_logging(f"a {token}{token}{token} b", processor) == "a <image> b"
+
+
+def test_gym_loops_forward_mm_processor_kwargs(repo, expects_mrope, expected_token):
+    """★ The prompt is tokenized by the agent loop but the images are re-processed by
+    the inference engine, and both must agree on how an image is tiled. verl threads
+    data.mm_processor_kwargs to the engine; a loop that drops it on the tokenizing side
+    leaves the two disagreeing, which surfaces as a CUDA assert deep in the engine
+    rather than a config error."""
+    import inspect
+
+    from vagen.agent_loop import gym_agent_loop, gym_agent_loop_no_concat
+
+    for module in (gym_agent_loop, gym_agent_loop_no_concat):
+        src = inspect.getsource(module)
+        calls = src.count("self.processor(")
+        forwards = src.count("**self._get_mm_processor_kwargs()")
+        assert calls == forwards, f"{module.__name__}: {calls} processor calls, {forwards} forward the kwargs"
