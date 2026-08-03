@@ -71,7 +71,13 @@ class TrajectoryView:
         device = response_mask.device
         group = to_int64_codes(non_tensor_batch["group_idx"], factorize_if_non_numeric=True)
         traj = to_int64_codes(non_tensor_batch["traj_idx"])
-        turn = to_int64_codes(non_tensor_batch["turn_idx"])
+        # Concat keeps a whole trajectory in one row, so there is no turn axis and the
+        # agent loop emits none. Defaulting to zero is what makes an estimator run
+        # unchanged under either layout instead of needing a concat-specific branch.
+        if "turn_idx" in non_tensor_batch:
+            turn = to_int64_codes(non_tensor_batch["turn_idx"])
+        else:
+            turn = np.zeros(len(traj), dtype=np.int64)
 
         key = np.stack([group, traj, turn], axis=1)
         uniq_key, first_idx, inverse = np.unique(key, axis=0, return_index=True, return_inverse=True)
