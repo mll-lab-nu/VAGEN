@@ -252,3 +252,24 @@ def test_view_reports_an_empty_row_as_having_no_last_position():
     view = TrajectoryView.build(mask, _nt(["g", "g"], [0, 1], [0, 0]))
 
     assert view.last_pos.tolist() == [-1, 1]
+
+
+def test_view_treats_a_missing_turn_axis_as_a_single_turn():
+    """★ Concat keeps a whole trajectory in one row, so its agent loop emits no
+    turn_idx. Requiring the column would mean an estimator could not be used under the
+    concat layout at all -- which is the orthogonality these estimators exist for."""
+    mask = torch.ones(2, 1, dtype=torch.long)
+    nt = {"group_idx": np.array(["a", "a"], dtype=object), "traj_idx": np.array([0, 1])}
+
+    view = TrajectoryView.build(mask, nt)
+
+    assert len(view.trajectories) == 2
+    assert all(len(t) == 1 for t in view.trajectories)
+
+
+def test_token_gae_runs_without_a_turn_column():
+    cfg = _Cfg()
+    nt = {"group_idx": np.array(["a"], dtype=object), "traj_idx": np.array([0])}
+    _, ret = TOKEN_GAE(batch=_batch([[0.0, 1.0]], [[1, 1]]), non_tensor_batch=nt, config=cfg)
+
+    assert ret[0].tolist() == pytest.approx([1.0, 1.0])
