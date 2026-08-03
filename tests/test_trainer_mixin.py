@@ -243,3 +243,41 @@ def test_save_checkpoint_forwards_extra_arguments():
     t._fit_save_checkpoint(force=True)
 
     assert t.calls == ["super_save(force=True)"]
+
+
+# ------------------------------------------------------------- concrete trainer
+# Static checks only: instantiating needs a Ray cluster, and what can silently go
+# wrong here is the class layout, not the runtime behaviour.
+
+
+def test_mixin_overrides_win_the_mro():
+    """★ With the bases reversed the mixin's _fit_* overrides never run and nothing
+    raises -- value_mask just quietly stops being written, which is the same silent
+    failure mode this whole path already produced once."""
+    from verl.experimental.separation.ray_trainer import SeparateRayPPOTrainer
+
+    from vagen.trainer.ppo_trainer import VagenPPOTrainer
+
+    mro = VagenPPOTrainer.__mro__
+    assert mro.index(VagenV0Mixin) < mro.index(SeparateRayPPOTrainer)
+    assert VagenPPOTrainer._fit_compute_advantage is VagenV0Mixin._fit_compute_advantage
+    assert VagenPPOTrainer._fit_save_checkpoint is VagenV0Mixin._fit_save_checkpoint
+
+
+def test_super_from_the_mixin_reaches_the_trainer():
+    """The overrides call super(); if the mixin were not co-operative in this MRO the
+    base implementation would be skipped entirely."""
+    from verl.experimental.separation.ray_trainer import SeparateRayPPOTrainer
+
+    from vagen.trainer.ppo_trainer import VagenPPOTrainer
+
+    after_mixin = VagenPPOTrainer.__mro__[VagenPPOTrainer.__mro__.index(VagenV0Mixin) + 1 :]
+    assert SeparateRayPPOTrainer in after_mixin
+
+
+def test_base_still_provides_the_hooks_we_override():
+    """A rename upstream would leave our override sitting on a method nobody calls."""
+    from verl.experimental.separation.ray_trainer import SeparateRayPPOTrainer
+
+    for hook in ("_fit_compute_advantage", "_fit_save_checkpoint"):
+        assert hook in vars(SeparateRayPPOTrainer), f"{hook} is gone from SeparateRayPPOTrainer"
