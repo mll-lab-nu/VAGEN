@@ -54,6 +54,9 @@ class _Trainer(VagenV0Mixin, _FakeBase):
         self.global_steps = 7
         self.actor_rollout_wg = types.SimpleNamespace(world_size=4)
         self._hf_upload_manager = hf or MagicMock(**{"should_upload.return_value": False})
+        # what _vagen_init would set up; tests bypass it since it builds a real uploader
+        self._vagen_image_actors = {}
+        self._vagen_image_futures = []
 
 
 def _cfg(adv="gae", filter_enable=False, balance=True, local_dir="/nonexistent"):
@@ -354,3 +357,75 @@ def test_get_gen_batch_tolerates_absent_placeholders():
     )
     gen = VagenPPOTrainer._get_gen_batch(object(), batch)
     assert "input_ids" in gen.batch
+
+
+# --------------------------------------------------------------------- image dumps
+
+
+def _img_cfg(enable=True, dump_dir="/tmp/x", max_pending=2):
+    cfg = _cfg()
+    cfg.trainer.log_image = {"enable": enable, "max_pending": max_pending, "png_compress_level": 0}
+    cfg.trainer.rollout_data_dir = dump_dir
+    return cfg
+
+
+def _img_batch(images=None):
+    import types as _t
+
+    return _t.SimpleNamespace(non_tensor_batch={"image_data": images} if images is not None else {})
+
+
+def test_images_are_not_dumped_when_disabled(monkeypatch):
+    t = _Trainer(_img_cfg(enable=False))
+    t._vagen_dump_images(_img_batch([["frame"]]))
+    assert t._vagen_image_futures == []
+
+
+def test_images_are_not_dumped_without_a_destination():
+    t = _Trainer(_img_cfg(dump_dir=None))
+    t._vagen_dump_images(_img_batch([["frame"]]))
+    assert t._vagen_image_futures == []
+
+
+def test_batch_without_images_is_skipped():
+    """Text-only environments must not create an actor per step."""
+    t = _Trainer(_img_cfg())
+    t._vagen_dump_images(_img_batch(None))
+    assert t._vagen_image_actors == {}
+
+
+def test_in_flight_writes_are_capped(monkeypatch):
+    """★ An environment that renders every turn queues frames faster than they are
+    written; without the cap the driver's object store grows without bound."""
+    import vagen.trainer.mixin as m
+
+    monkeypatch.setattr(m, "METRIC_REGISTRY", {}, raising=False)
+    fake_ray = MagicMock()
+    fake_ray.wait.side_effect = lambda futs, num_returns: (futs[:1], futs[1:])
+    monkeypatch.setitem(__import__("sys").modules, "ray", fake_ray)
+
+    actor = MagicMock()
+    actor.dump_images.remote.side_effect = lambda **kw: f"future{len(kw)}"
+    t = _Trainer(_img_cfg(max_pending=2))
+    t._vagen_image_actors["/tmp/x"] = actor
+
+    for _ in range(5):
+        t._vagen_dump_images(_img_batch([["frame"]]))
+
+    assert len(t._vagen_image_futures) <= 2, t._vagen_image_futures
+    assert fake_ray.get.called, "a completed write must be reaped, not just dropped"
+
+
+def test_flush_before_save_drains_pending_writes(monkeypatch):
+    """★ Saving can delete directories an in-flight write is still targeting."""
+    fake_ray = MagicMock()
+    monkeypatch.setitem(__import__("sys").modules, "ray", fake_ray)
+
+    hf = MagicMock(**{"should_upload.return_value": False})
+    t = _Trainer(_cfg(), hf=hf)
+    t._vagen_image_futures = ["f1", "f2"]
+
+    t._fit_save_checkpoint()
+
+    fake_ray.get.assert_called_once_with(["f1", "f2"])
+    assert t._vagen_image_futures == []
