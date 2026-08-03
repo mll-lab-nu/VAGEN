@@ -203,13 +203,16 @@ def test_manager_is_reachable_by_fqn():
 
 
 class _FakeProto:
-    def __init__(self, uids):
+    def __init__(self, uids, validate=False):
         self.non_tensor_batch = {"uid": np.array(uids, dtype=object)}
+        self.meta_info = {"validate": validate} if validate else {}
 
 
-def _manager(rollout_n):
+def _manager(rollout_n, val_n=None):
     m = MultiOutputAgentLoopManager.__new__(MultiOutputAgentLoopManager)
-    m.rollout_config = types.SimpleNamespace(n=rollout_n)
+    m.rollout_config = types.SimpleNamespace(
+        n=rollout_n, val_kwargs=types.SimpleNamespace(n=val_n or rollout_n)
+    )
     return m
 
 
@@ -239,3 +242,49 @@ def test_assignment_happens_before_the_chunking_call():
 
     assert seen["traj_idx"] is not None, "indices must be set before delegating"
     assert seen["traj_idx"].tolist() == [0, 1]
+
+
+# ------------------------------------------------------------ validation merging
+
+
+def _proto(uids, validate):
+    return _FakeProto(uids, validate=validate)
+
+
+def test_training_output_is_not_merged():
+    """Training wants one row per turn; folding them back would undo the whole point."""
+    m = _manager(2)
+    with patch.object(AgentLoopManager, "generate_sequences", lambda self, p: "raw"):
+        assert m.generate_sequences(_proto(["A", "A"], validate=False)) == "raw"
+
+
+def test_validation_output_is_merged_to_one_row_per_trajectory():
+    """★ verl unpads the generated batch positionally against the padded input and then
+    unions the two, so validation needs one output row per input row. Merging here is
+    what lets _validate stay untouched."""
+    seen = {}
+    m = _manager(1)
+    m._vagen_tokenizer = lambda: "tok"
+    def record(out, prompts):
+        seen["merged"] = (out, prompts)
+        return "merged"
+
+    m._vagen_merge_for_validation = record
+
+    with patch.object(AgentLoopManager, "generate_sequences", lambda self, p: "per_turn_rows"):
+        result = m.generate_sequences(_proto(["A"], validate=True))
+
+    assert result == "merged"
+    assert seen["merged"][0] == "per_turn_rows"
+
+
+def test_validation_uses_the_validation_rollout_count():
+    """val_kwargs.n usually differs from rollout.n; using the training one would
+    mislabel traj_idx and merge the wrong rows together."""
+    m = MultiOutputAgentLoopManager.__new__(MultiOutputAgentLoopManager)
+    m.rollout_config = types.SimpleNamespace(n=1, val_kwargs=types.SimpleNamespace(n=2))
+    p = _proto(["A", "A"], validate=True)
+
+    m._vagen_assign_indices(p)
+
+    assert p.non_tensor_batch["traj_idx"].tolist() == [0, 1]
