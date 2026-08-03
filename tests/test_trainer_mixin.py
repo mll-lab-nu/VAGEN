@@ -281,3 +281,33 @@ def test_base_still_provides_the_hooks_we_override():
 
     for hook in ("_fit_compute_advantage", "_fit_save_checkpoint"):
         assert hook in vars(SeparateRayPPOTrainer), f"{hook} is gone from SeparateRayPPOTrainer"
+
+
+def test_actor_rollout_placement_is_implemented():
+    """★ SeparateRayPPOTrainer leaves _create_actor_rollout_classes abstract -- it is
+    the one method a concrete subclass must supply. Inheriting the base's
+    `raise NotImplementedError` only surfaces at init_workers, i.e. after a cluster has
+    been spun up and models loaded."""
+    from verl.experimental.separation.ray_trainer import SeparateRayPPOTrainer
+
+    from vagen.trainer.ppo_trainer import VagenPPOTrainer
+
+    assert "_create_actor_rollout_classes" in vars(SeparateRayPPOTrainer), (
+        "base no longer declares the hook; re-check whether an override is still needed"
+    )
+    assert VagenPPOTrainer._create_actor_rollout_classes is not (
+        SeparateRayPPOTrainer._create_actor_rollout_classes
+    )
+
+
+def test_base_init_models_expects_the_role_we_register():
+    """_init_models indexes all_wg by str(Role.ActorRollout). Registering under
+    ActorRolloutRef ('actor_rollout_ref') would only fail there, as a bare KeyError."""
+    import inspect
+
+    from verl.experimental.separation.ray_trainer import SeparateRayPPOTrainer
+    from verl.trainer.ppo.ray_trainer import Role
+
+    src = inspect.getsource(SeparateRayPPOTrainer._init_models)
+    assert "Role.ActorRollout]" in src or "str(Role.ActorRollout)" in src
+    assert str(Role.ActorRollout) != str(Role.ActorRolloutRef)
