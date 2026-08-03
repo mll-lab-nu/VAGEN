@@ -121,34 +121,3 @@ def traj_idx_for_interleaved_repeat(num_rows: int, num_traj_per_sample: int) -> 
             "the batch was not produced by an interleaved repeat"
         )
     return np.tile(np.arange(num_traj_per_sample), num_rows // num_traj_per_sample)
-
-
-def alignment_indices(target_uids, source_uids) -> list[int]:
-    """Row of ``source_uids`` to take for each row of ``target_uids``.
-
-    No-concat generation returns a variable number of rows per prompt and in no
-    particular order, so the columns that never went through generation (reward-model
-    keys and friends) have to be replicated to match. Indexing by uid handles variable
-    repetition and reordering in one step.
-
-    Duplicate uids in ``source_uids`` are a caller bug -- the mapping would be
-    ambiguous and one of the sources would be silently dropped.
-    """
-    lookup: dict[str, int] = {}
-    for idx, uid in enumerate(source_uids):
-        key = str(uid)
-        if key in lookup:
-            raise ValueError(f"uid {key!r} appears more than once in the source batch; alignment is ambiguous")
-        lookup[key] = idx
-
-    indices = []
-    for uid in target_uids:
-        key = str(uid)
-        if key not in lookup:
-            available = list(lookup)[:5]
-            raise ValueError(
-                f"uid {key!r} was generated but is absent from the source batch "
-                f"(first few available: {available}); the agent loop and the dataloader disagree"
-            )
-        indices.append(lookup[key])
-    return indices

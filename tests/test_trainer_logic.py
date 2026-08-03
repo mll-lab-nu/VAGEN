@@ -150,7 +150,7 @@ def test_pad_to_multiple_rejects_nonpositive():
 
 import numpy as np
 
-from vagen.trainer.logic import alignment_indices, traj_idx_for_interleaved_repeat
+from vagen.trainer.logic import traj_idx_for_interleaved_repeat
 
 
 def test_traj_idx_cycles_within_each_prompt_group():
@@ -175,34 +175,3 @@ def test_traj_idx_rejects_nonpositive_repeat():
         traj_idx_for_interleaved_repeat(6, 0)
 
 
-def test_alignment_handles_variable_counts_and_reordering():
-    """★ The documented case: generation returns a different number of rows per prompt,
-    in an order unrelated to the dataloader's."""
-    source = ["C", "B", "A"]
-    target = ["A", "A", "A", "B", "B", "C", "C", "C", "C"]
-
-    assert alignment_indices(target, source) == [2, 2, 2, 1, 1, 0, 0, 0, 0]
-
-
-def test_alignment_accepts_numpy_object_uids():
-    """uids arrive as numpy object arrays of uuid strings, not python lists."""
-    source = np.array(["x", "y"], dtype=object)
-    target = np.array(["y", "x", "y"], dtype=object)
-
-    assert alignment_indices(target, source) == [1, 0, 1]
-
-
-def test_alignment_rejects_an_unknown_uid():
-    with pytest.raises(ValueError, match="absent from the source batch"):
-        alignment_indices(["A", "Z"], ["A", "B"])
-
-
-def test_alignment_rejects_duplicate_source_uids():
-    """Two source rows with one uid makes the mapping ambiguous; picking either would
-    silently drop the other's columns."""
-    with pytest.raises(ValueError, match="more than once"):
-        alignment_indices(["A"], ["A", "A"])
-
-
-def test_alignment_of_an_empty_generation_is_empty():
-    assert alignment_indices([], ["A", "B"]) == []

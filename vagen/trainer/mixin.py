@@ -33,12 +33,7 @@ from verl.utils.debug import marked_timer
 from vagen.custom_advantage import needs_value_mask
 from vagen.custom_filter.filter import FILTER_REGISTRY
 from vagen.custom_metric.metric import METRIC_REGISTRY
-from vagen.trainer.logic import (
-    alignment_indices,
-    collect_registry_metrics,
-    traj_idx_for_interleaved_repeat,
-    value_mask_from_returns,
-)
+from vagen.trainer.logic import collect_registry_metrics, value_mask_from_returns
 
 
 class VagenLogicMixin:
@@ -50,6 +45,8 @@ class VagenLogicMixin:
         from vagen.utils.upload_hugging_face import HFUploadManager
 
         self._hf_upload_manager = HFUploadManager(self.config)
+        self._vagen_image_actors: dict = {}
+        self._vagen_image_futures: list = []
 
     # -------------------------------------------------------------- advantage
     def _vagen_after_advantage(self, batch):
@@ -103,35 +100,57 @@ class VagenLogicMixin:
             self._balance_batch(batch, metrics=self.metrics, logging_prefix="filtered_global_seqlen")
         return batch
 
-    # ------------------------------------------------------- no-concat indices
-    def _vagen_assign_group_and_traj_idx(self, gen_batch, num_traj_per_sample: int) -> None:
-        """Label each generated row with the prompt group and trajectory it belongs to.
+    # ----------------------------------------------------------- image dumps
+    def _vagen_dump_images(self, batch) -> None:
+        """Write this step's environment frames alongside verl's JSONL dump.
 
-        Turn-level GAE groups on ``(group_idx, traj_idx)`` and orders by ``turn_idx``
-        within a group, so these are what make a trajectory reconstructable after the
-        rows have been flattened.
+        verl dumps text only. Images arrive as an ``image_data`` column, put there by
+        the gym loops via ``extra_fields``.
+
+        Writing happens in a Ray actor because encoding PNGs on the driver would stall
+        the training loop, and the number of in-flight writes is capped: an environment
+        that renders every turn can otherwise queue frames faster than they are written.
         """
-        gen_batch.non_tensor_batch["group_idx"] = gen_batch.non_tensor_batch["uid"]
-        gen_batch.non_tensor_batch["traj_idx"] = traj_idx_for_interleaved_repeat(
-            len(gen_batch.non_tensor_batch["uid"]), num_traj_per_sample
+        cfg = self.config.trainer.get("log_image", {})
+        if not cfg.get("enable", False):
+            return
+        dump_path = self.config.trainer.get("rollout_data_dir", None)
+        images = batch.non_tensor_batch.get("image_data") if dump_path else None
+        if not dump_path or images is None:
+            return
+
+        import ray
+
+        from vagen.utils.image_dump_actor import ImageDumpActor
+
+        actor = self._vagen_image_actors.get(dump_path)
+        if actor is None:
+            actor = ImageDumpActor.remote(base_dir=dump_path)
+            self._vagen_image_actors[dump_path] = actor
+
+        self._vagen_image_futures.append(
+            actor.dump_images.remote(
+                step=self.global_steps,
+                images=list(images),
+                compress_level=cfg.get("png_compress_level", 0),
+            )
         )
 
-    def _vagen_align_no_concat_batch(self, batch, gen_batch_output):
-        """Replicate the input batch's rows to match the generated rows, then union.
+        max_pending = cfg.get("max_pending", 2)
+        if max_pending > 0 and len(self._vagen_image_futures) > max_pending:
+            done, rest = ray.wait(self._vagen_image_futures, num_returns=1)
+            ray.get(done)  # re-raises if the write failed
+            self._vagen_image_futures = rest
 
-        No-concat generation emits a variable number of rows per prompt, so columns
-        that never went through generation have to be stretched to match before the
-        two can be unioned.
-        """
-        gen_batch_output.non_tensor_batch["uid"] = gen_batch_output.non_tensor_batch["group_idx"]
-        indices = alignment_indices(
-            gen_batch_output.non_tensor_batch["uid"], batch.non_tensor_batch["uid"]
-        )
-        batch = batch.select_idxs(indices)
-        assert len(batch) == len(gen_batch_output), (
-            f"alignment produced {len(batch)} rows for {len(gen_batch_output)} generated rows"
-        )
-        return batch.union(gen_batch_output)
+    def _vagen_flush_images(self) -> None:
+        """Drain pending writes. Called before a checkpoint save, which may delete the
+        directory an in-flight write is still targeting."""
+        if not self._vagen_image_futures:
+            return
+        import ray
+
+        ray.get(self._vagen_image_futures)
+        self._vagen_image_futures = []
 
     # ------------------------------------------------------------ checkpoint
     def _vagen_should_upload_hf(self) -> bool:
@@ -168,6 +187,10 @@ class VagenV0Mixin(VagenLogicMixin):
         batch = super()._fit_compute_advantage(batch)
         return self._vagen_after_advantage(batch)
 
+    def _fit_dump_data(self, batch):
+        super()._fit_dump_data(batch)
+        self._vagen_dump_images(batch)
+
     def _fit_save_checkpoint(self, *args, **kwargs):
         """HF Hub upload on its own schedule, independent of ``trainer.save_freq``.
 
@@ -176,6 +199,10 @@ class VagenV0Mixin(VagenLogicMixin):
         duplicating verl's save condition (which would silently rot when upstream
         changes it), let ``super()`` decide and then check the filesystem.
         """
+        # Both the HF upload and the image writer read from the checkpoint directory,
+        # which a save may delete entries from.
+        self._vagen_flush_images()
+
         upload = self._vagen_should_upload_hf()
         if upload:
             # Before any save: with max_*_ckpt_to_keep set, saving deletes older
