@@ -13,6 +13,7 @@ import os
 import types
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
 import torch
 from omegaconf import OmegaConf
@@ -311,3 +312,45 @@ def test_base_init_models_expects_the_role_we_register():
     src = inspect.getsource(SeparateRayPPOTrainer._init_models)
     assert "Role.ActorRollout]" in src or "str(Role.ActorRollout)" in src
     assert str(Role.ActorRollout) != str(Role.ActorRolloutRef)
+
+
+def test_placeholder_prompt_tensors_leave_the_batch():
+    """★ verl 0.8 stopped popping input_ids/attention_mask/position_ids for generation.
+    Left in place, they collide with the generated tensors at
+    batch.union(gen_batch_output), which asserts shared keys are the same object."""
+    import torch
+    from verl import DataProto
+
+    from vagen.trainer.ppo_trainer import VagenPPOTrainer
+
+    batch = DataProto.from_single_dict(
+        {
+            "input_ids": torch.zeros(2, 1, dtype=torch.long),
+            "attention_mask": torch.zeros(2, 1, dtype=torch.long),
+            "position_ids": torch.zeros(2, 1, dtype=torch.long),
+            "uid": np.array(["a", "b"], dtype=object),
+            "env_name": np.array(["sokoban"] * 2, dtype=object),
+        }
+    )
+    gen = VagenPPOTrainer._get_gen_batch(object(), batch)
+
+    assert "input_ids" not in batch.batch, "placeholder survived; union will assert"
+    assert "input_ids" in gen.batch
+    # uid is a reward-model key: it stays behind so the batch can be realigned later,
+    # and is copied onto the gen batch so the loop can score in flight.
+    assert "uid" in batch.non_tensor_batch and "uid" in gen.non_tensor_batch
+    assert "env_name" in gen.non_tensor_batch and "env_name" not in batch.non_tensor_batch
+
+
+def test_get_gen_batch_tolerates_absent_placeholders():
+    """A dataset that supplies real prompts must not trip the pop."""
+    import torch
+    from verl import DataProto
+
+    from vagen.trainer.ppo_trainer import VagenPPOTrainer
+
+    batch = DataProto.from_single_dict(
+        {"input_ids": torch.zeros(2, 1, dtype=torch.long), "uid": np.array(["a", "b"], dtype=object)}
+    )
+    gen = VagenPPOTrainer._get_gen_batch(object(), batch)
+    assert "input_ids" in gen.batch
