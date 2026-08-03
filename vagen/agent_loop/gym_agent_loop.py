@@ -253,7 +253,10 @@ class GymAgentLoop(VagenGymAgentLoopBase):
                     **self.apply_chat_template_kwargs,
                 ),
             )
-            model_inputs = self.processor(text=[raw_prompt], images=agent_data.image_data or None, return_tensors="pt")
+            model_inputs = self.processor(
+                text=[raw_prompt], images=agent_data.image_data or None, return_tensors="pt",
+                **self._get_mm_processor_kwargs()
+            )
             agent_data.prompt_ids = model_inputs.pop("input_ids").squeeze(0).tolist()
         else:
             if agent_data.image_data:
@@ -364,7 +367,10 @@ class GymAgentLoop(VagenGymAgentLoopBase):
                     **self.apply_chat_template_kwargs,
                 ),
             )
-            model_inputs = self.processor(text=[raw_user_suffix], images=new_images or None, return_tensors="pt")
+            model_inputs = self.processor(
+                text=[raw_user_suffix], images=new_images or None, return_tensors="pt",
+                **self._get_mm_processor_kwargs()
+            )
             response_ids = model_inputs.pop("input_ids").squeeze(0).tolist()
         else:
             if new_images:
