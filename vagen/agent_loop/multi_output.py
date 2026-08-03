@@ -27,6 +27,7 @@ the dataset supplied.
 
 from __future__ import annotations
 
+import inspect
 from typing import Any
 
 import numpy as np
@@ -117,18 +118,56 @@ class MultiOutputAgentLoopManager(AgentLoopManager):
         base's next act is ``prompts.chunk(...)``. Doing it per worker instead would
         restart ``traj_idx`` at 0 whenever a chunk boundary fell inside a group.
 
+        Validation additionally gets the per-turn rows folded back into one row per
+        trajectory -- see :meth:`_vagen_merge_for_validation`.
+
         Left as a plain ``def``: the base is decorated with ``auto_await``, so it
-        returns a result to sync callers and an awaitable to async ones, and passing
-        that through unchanged keeps both working.
+        returns a result to sync callers and an awaitable to async ones. Both are
+        handled rather than assumed.
         """
         self._vagen_assign_indices(prompts)
-        return super().generate_sequences(prompts)
+        validating = bool(prompts.meta_info.get("validate", False))
+        result = super().generate_sequences(prompts)
+
+        if not validating:
+            return result
+        if inspect.isawaitable(result):
+
+            async def _merged():
+                return self._vagen_merge_for_validation(await result, prompts)
+
+            return _merged()
+        return self._vagen_merge_for_validation(result, prompts)
 
     def _vagen_assign_indices(self, prompts: DataProto) -> None:
         from vagen.trainer.logic import traj_idx_for_interleaved_repeat
 
         uid = prompts.non_tensor_batch["uid"]
         prompts.non_tensor_batch["group_idx"] = uid
-        prompts.non_tensor_batch["traj_idx"] = traj_idx_for_interleaved_repeat(
-            len(uid), self.rollout_config.n
-        )
+        n = self.rollout_config.val_kwargs.n if prompts.meta_info.get("validate") else self.rollout_config.n
+        prompts.non_tensor_batch["traj_idx"] = traj_idx_for_interleaved_repeat(len(uid), n)
+
+    def _vagen_merge_for_validation(self, output: DataProto, prompts: DataProto) -> DataProto:
+        """Fold each trajectory's per-turn rows back into a single row.
+
+        Validation, unlike training, wants whole episodes: verl unpads the generated
+        batch positionally against the padded input and then unions the two, both of
+        which require one output row per input row. Merging here keeps that contract,
+        so ``_validate`` needs no changes to work with the split layout.
+        """
+        from vagen.utils.concat_val_multi_turn import concat_val_multi_turn
+
+        return concat_val_multi_turn(output, prompts, self._vagen_tokenizer())
+
+    def _vagen_tokenizer(self):
+        """Cached; building it re-reads the model directory."""
+        if getattr(self, "_vagen_tokenizer_cache", None) is None:
+            from verl.utils import hf_tokenizer
+            from verl.utils.fs import copy_to_local
+
+            model_cfg = self.config.actor_rollout_ref.model
+            path = model_cfg.get("tokenizer_path") or model_cfg.path
+            self._vagen_tokenizer_cache = hf_tokenizer(
+                copy_to_local(path), trust_remote_code=model_cfg.get("trust_remote_code", False)
+            )
+        return self._vagen_tokenizer_cache
