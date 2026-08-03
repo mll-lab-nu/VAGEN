@@ -108,3 +108,27 @@ class MultiOutputAgentLoopManager(AgentLoopManager):
         # the value is only read later, by _init_agent_loop_workers.
         self.agent_loop_workers_class = ray.remote(MultiOutputAgentLoopWorker)
         super().__init__(*args, **kwargs)
+
+    def generate_sequences(self, prompts: DataProto):
+        """Label rows with their prompt group and trajectory, then generate.
+
+        This is the only point where the batch is both already repeated and not yet
+        split: ``_fit_generate`` repeats inside itself with no hook afterwards, and the
+        base's next act is ``prompts.chunk(...)``. Doing it per worker instead would
+        restart ``traj_idx`` at 0 whenever a chunk boundary fell inside a group.
+
+        Left as a plain ``def``: the base is decorated with ``auto_await``, so it
+        returns a result to sync callers and an awaitable to async ones, and passing
+        that through unchanged keeps both working.
+        """
+        self._vagen_assign_indices(prompts)
+        return super().generate_sequences(prompts)
+
+    def _vagen_assign_indices(self, prompts: DataProto) -> None:
+        from vagen.trainer.logic import traj_idx_for_interleaved_repeat
+
+        uid = prompts.non_tensor_batch["uid"]
+        prompts.non_tensor_batch["group_idx"] = uid
+        prompts.non_tensor_batch["traj_idx"] = traj_idx_for_interleaved_repeat(
+            len(uid), self.rollout_config.n
+        )
