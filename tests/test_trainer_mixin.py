@@ -34,8 +34,8 @@ class _FakeBase:
         self.calls.append("super_advantage")
         return batch
 
-    def _fit_save_checkpoint(self):
-        self.calls.append("super_save")
+    def _fit_save_checkpoint(self, force=False):
+        self.calls.append(f"super_save(force={force})")
 
     def _save_checkpoint(self):
         self.calls.append("forced_save")
@@ -189,7 +189,7 @@ def test_no_upload_leaves_save_to_verl():
     t = _Trainer(_cfg(), hf=hf)
     t._fit_save_checkpoint()
 
-    assert t.calls == ["super_save"]
+    assert t.calls == ["super_save(force=False)"]
     hf.flush.assert_not_called()
     hf.maybe_upload.assert_not_called()
 
@@ -200,7 +200,7 @@ def test_upload_forces_a_save_when_verl_did_not(tmp_path):
     t = _Trainer(_cfg(local_dir=str(tmp_path)), hf=hf)
     t._fit_save_checkpoint()
 
-    assert t.calls == ["super_save", "forced_save"]
+    assert t.calls == ["super_save(force=False)", "forced_save"]
     hf.maybe_upload.assert_called_once_with(7)
 
 
@@ -211,7 +211,7 @@ def test_upload_does_not_double_save_when_verl_already_saved(tmp_path):
 
     t._fit_save_checkpoint()
 
-    assert t.calls == ["super_save"], "must not save twice"
+    assert t.calls == ["super_save(force=False)"], "must not save twice"
     hf.maybe_upload.assert_called_once_with(7)
 
 
@@ -231,3 +231,15 @@ def test_flush_happens_before_save():
     t._fit_save_checkpoint()
 
     assert order[0] == "flush", f"flush must precede save, got {order}"
+
+
+def test_save_checkpoint_forwards_extra_arguments():
+    """★ FullyAsyncTrainer declares `_fit_save_checkpoint(self, force=False)` and calls
+    it with force=True. A fixed no-arg override sits earlier in the MRO and turns that
+    into a TypeError, so the mixin has to pass arguments through."""
+    hf = MagicMock(**{"should_upload.return_value": False})
+    t = _Trainer(_cfg(), hf=hf)
+
+    t._fit_save_checkpoint(force=True)
+
+    assert t.calls == ["super_save(force=True)"]

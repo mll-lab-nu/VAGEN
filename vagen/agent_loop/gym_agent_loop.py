@@ -10,13 +10,13 @@ from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from PIL import Image
-from verl.experimental.agent_loop.agent_loop import AgentLoopBase, AgentLoopOutput, register
+from verl.experimental.agent_loop.agent_loop import AgentLoopOutput, register
+from .base import VagenGymAgentLoopBase
 from verl.utils.profiler import simple_timer
 from verl.utils.rollout_trace import rollout_trace_op
 from ..envs.gym_image_env import GymImageEnv
 from omegaconf import OmegaConf
 import traceback
-import importlib
 logger = logging.getLogger(__file__)
 logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
 
@@ -151,51 +151,14 @@ def convert_obs_to_content(
 
 # -------------------- Gym Agent Loop --------------------
 
-class GymAgentLoop(AgentLoopBase):
-    @classmethod
-    def init_class(cls, config, tokenizer, processor, **kwargs):
-        if cls._class_initialized:
-            return
-        cls._class_initialized = True
-        print("Performing class-level GymAgentLoop initialization")
-
-        cls.tokenizer = tokenizer
-        cls.processor = processor
-        cls.multi_turn_cfg = config.actor_rollout_ref.rollout.multi_turn
-        
-        # Store module paths for lazy loading; environments are imported on first use
-        cls.env_registry_paths = dict(config.env_registry.items())
-        cls.env_registry = {}
-            
-        cls.apply_chat_template_kwargs = config.data.get("apply_chat_template_kwargs", {})
-        cls.prompt_length = config.actor_rollout_ref.rollout.prompt_length
-        cls.response_length = config.actor_rollout_ref.rollout.response_length
-      
-        _placeholder = [{"role": "system", "content": "placeholder"}]
-        if processor is not None:
-            _prefix_text = processor.apply_chat_template(
-                _placeholder, add_generation_prompt=False, tokenize=False, **cls.apply_chat_template_kwargs
-            )
-            cls.system_prompt_prefix = processor(text=[_prefix_text], return_tensors="pt")["input_ids"].squeeze(0).tolist()
-        else:
-            cls.system_prompt_prefix = tokenizer.apply_chat_template(
-                _placeholder, add_generation_prompt=False, tokenize=True, return_dict=False, **cls.apply_chat_template_kwargs
-            )
-
+class GymAgentLoop(VagenGymAgentLoopBase):
     @rollout_trace_op
     async def run(self, sampling_params: Dict[str, Any], **kwargs) -> AgentLoopOutput:
         metrics: Dict[str, Any] = {}
         request_id = uuid4().hex
 
-        # Build env (lazy import on first use)
         env_name = kwargs["env_name"]
-        if env_name not in self.env_registry:
-            if env_name not in self.env_registry_paths:
-                raise KeyError(f"Unknown env: {env_name}. Available: {list(self.env_registry_paths.keys())}")
-            module_path, class_name = self.env_registry_paths[env_name].rsplit(".", 1)
-            module = importlib.import_module(module_path)
-            self.env_registry[env_name] = getattr(module, class_name)
-        env_cls = self.env_registry[env_name]
+        env_cls = self.resolve_env_class(env_name)
         env_config = kwargs["config"]
         seed = kwargs["seed"]
         self.env_max_turns = kwargs.get("max_turns", None)
@@ -415,7 +378,7 @@ class GymAgentLoop(AgentLoopBase):
                     tokenize=True, return_dict=False, **self.apply_chat_template_kwargs
                 ),
             )
-        response_ids = response_ids[len(self.system_prompt_prefix):]
+        response_ids = response_ids[len(self.system_prompt_prefix_ids()):]
         agent_data.prompt_ids += response_ids
         agent_data.response_mask += [0] * len(response_ids)
         if agent_data.response_logprobs:
