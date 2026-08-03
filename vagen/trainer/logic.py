@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Mapping
 
+import numpy as np
 import torch
 
 # Sentinel written into `returns` at positions that carry no value supervision.
@@ -96,3 +97,57 @@ def pad_to_multiple(size: int, multiple: int) -> int:
     if multiple <= 0:
         raise ValueError(f"multiple must be positive, got {multiple}")
     return (-size) % multiple
+
+
+# ------------------------------------------------------------------ no-concat indices
+
+
+def traj_idx_for_interleaved_repeat(num_rows: int, num_traj_per_sample: int) -> np.ndarray:
+    """Trajectory index within each prompt group.
+
+    ``DataProto.repeat(interleave=True)`` lays rows out as ``[A A A B B B]``, so the
+    trajectory index cycles: ``[0 1 2 0 1 2]``. Turn-level GAE groups on
+    ``(group_idx, traj_idx)``, so getting this wrong silently merges the returns of
+    unrelated trajectories rather than failing.
+    """
+    if num_traj_per_sample <= 0:
+        raise ValueError(f"num_traj_per_sample must be positive, got {num_traj_per_sample}")
+    if num_rows % num_traj_per_sample:
+        # np.tile would otherwise return a short array and the assignment would either
+        # broadcast-fail or, worse, line up by accident.
+        raise ValueError(
+            f"{num_rows} rows is not a whole number of groups of {num_traj_per_sample}; "
+            "the batch was not produced by an interleaved repeat"
+        )
+    return np.tile(np.arange(num_traj_per_sample), num_rows // num_traj_per_sample)
+
+
+def alignment_indices(target_uids, source_uids) -> list[int]:
+    """Row of ``source_uids`` to take for each row of ``target_uids``.
+
+    No-concat generation returns a variable number of rows per prompt and in no
+    particular order, so the columns that never went through generation (reward-model
+    keys and friends) have to be replicated to match. Indexing by uid handles variable
+    repetition and reordering in one step.
+
+    Duplicate uids in ``source_uids`` are a caller bug -- the mapping would be
+    ambiguous and one of the sources would be silently dropped.
+    """
+    lookup: dict[str, int] = {}
+    for idx, uid in enumerate(source_uids):
+        key = str(uid)
+        if key in lookup:
+            raise ValueError(f"uid {key!r} appears more than once in the source batch; alignment is ambiguous")
+        lookup[key] = idx
+
+    indices = []
+    for uid in target_uids:
+        key = str(uid)
+        if key not in lookup:
+            available = list(lookup)[:5]
+            raise ValueError(
+                f"uid {key!r} was generated but is absent from the source batch "
+                f"(first few available: {available}); the agent loop and the dataloader disagree"
+            )
+        indices.append(lookup[key])
+    return indices
