@@ -133,7 +133,7 @@ class VagenV0Mixin(VagenLogicMixin):
         batch = super()._fit_compute_advantage(batch)
         return self._vagen_after_advantage(batch)
 
-    def _fit_save_checkpoint(self):
+    def _fit_save_checkpoint(self, *args, **kwargs):
         """HF Hub upload on its own schedule, independent of ``trainer.save_freq``.
 
         An upload-only step (hf_save_freq hits, save_freq does not) still needs a
@@ -147,7 +147,10 @@ class VagenV0Mixin(VagenLogicMixin):
             # checkpoints, which would race an in-flight upload reading one of them.
             self._vagen_flush_hf()
 
-        super()._fit_save_checkpoint()
+        # *args/**kwargs are forwarded rather than dropped: FullyAsyncTrainer
+        # declares `_fit_save_checkpoint(self, force=False)` and calls it with
+        # force=True, so a fixed no-arg signature here would break that composition.
+        super()._fit_save_checkpoint(*args, **kwargs)
 
         if upload:
             if not self._vagen_ckpt_exists_for_step():
