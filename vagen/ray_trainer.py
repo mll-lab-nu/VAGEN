@@ -64,6 +64,7 @@ from vagen.utils.image_validation_logger import ValidationGenerationsLogger
 from vagen.utils.concat_val_multi_turn import concat_val_multi_turn
 from vagen.utils.image_token_utils import replace_image_tokens_for_logging
 import vagen.custom_advantage
+from vagen.custom_advantage import needs_value_mask
 from vagen.custom_metric.metric import METRIC_REGISTRY
 from vagen.custom_filter.filter import FILTER_REGISTRY
 @dataclass
@@ -1513,7 +1514,14 @@ class RayPPOTrainer:
                             config=self.config.algorithm,
                         )
 
-                    if self.config.algorithm.adv_estimator in ["no_concat_gae_last", "no_concat_gae_first"]:
+                    # BUGFIX: this used to be a hard-coded list containing
+                    # "no_concat_gae_first", a name that has never been registered --
+                    # while every no-concat script passes "no_concat_gae". value_mask
+                    # was therefore never written and the critic regressed towards the
+                    # -100 sentinel (vf_loss 568 -> 1e-4, entropy collapse to 0.018).
+                    # needs_value_mask() reads the registry the estimators populate
+                    # themselves, so the predicate cannot drift from the registration.
+                    if needs_value_mask(self.config.algorithm.adv_estimator):
                         batch.batch["value_mask"] = compute_value_mask(batch)
 
                     # compute custom metrics
