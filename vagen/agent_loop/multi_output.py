@@ -100,7 +100,23 @@ class MultiOutputAgentLoopWorker(AgentLoopWorker):
             # which is the loud failure we want if the two ever drift apart.
             expanded = {key: np.repeat(val, counts, axis=0) for key, val in input_non_tensor_batch.items()}
 
-        return super()._postprocess(flat, input_non_tensor_batch=expanded, validate=validate)
+        output = super()._postprocess(flat, input_non_tensor_batch=expanded, validate=validate)
+        return self._vagen_restore_indices(output, expanded)
+
+    # Columns the trajectory estimators group on. The no-concat loop happens to emit
+    # them per turn via extra_fields, but the concat loop does not, and verl drops
+    # `input_non_tensor_batch` entirely when streaming reward is enabled -- so relying
+    # on either route makes the estimators work under one layout and not the other.
+    INDEX_COLUMNS = ("group_idx", "traj_idx")
+
+    def _vagen_restore_indices(self, output: DataProto, expanded: dict[str, Any] | None) -> DataProto:
+        """Put the trajectory index columns back if verl dropped them."""
+        if not expanded:
+            return output
+        for key in self.INDEX_COLUMNS:
+            if key not in output.non_tensor_batch and key in expanded:
+                output.non_tensor_batch[key] = expanded[key]
+        return output
 
 
 class MultiOutputAgentLoopManager(AgentLoopManager):
