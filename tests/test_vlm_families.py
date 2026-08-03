@@ -86,3 +86,23 @@ def test_gym_loops_forward_mm_processor_kwargs(repo, expects_mrope, expected_tok
         calls = src.count("self.processor(")
         forwards = src.count("**self._get_mm_processor_kwargs()")
         assert calls == forwards, f"{module.__name__}: {calls} processor calls, {forwards} forward the kwargs"
+
+        # The engine side needs the same settings; forwarding on only one side is what
+        # produced the mismatch. Checked on the parsed call rather than by substring,
+        # so a comment mentioning the name cannot pass for the argument.
+        import ast
+
+        generates = [
+            node
+            for node in ast.walk(ast.parse(src))
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "generate"
+        ]
+        assert generates, f"{module.__name__}: no generate() call found"
+        for call in generates:
+            names = {kw.arg for kw in call.keywords}
+            assert "mm_processor_kwargs" in names, (
+                f"{module.__name__}: generate() passes {sorted(n for n in names if n)} "
+                "but not mm_processor_kwargs"
+            )
