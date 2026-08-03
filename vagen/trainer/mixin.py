@@ -34,6 +34,7 @@ from vagen.custom_advantage import needs_value_mask
 from vagen.custom_filter.filter import FILTER_REGISTRY
 from vagen.custom_metric.metric import METRIC_REGISTRY
 from vagen.trainer.logic import collect_registry_metrics, value_mask_from_returns
+from vagen.utils.image_token_utils import replace_image_tokens_for_logging
 
 
 class VagenLogicMixin:
@@ -186,6 +187,19 @@ class VagenV0Mixin(VagenLogicMixin):
     def _fit_compute_advantage(self, batch):
         batch = super()._fit_compute_advantage(batch)
         return self._vagen_after_advantage(batch)
+
+    def _dump_generations(self, inputs, outputs, *args, **kwargs):
+        """Shorten image placeholder runs before verl writes the JSONL.
+
+        One frame expands to hundreds of repeats of the same token, which buries the
+        prompt in the dump. Overriding here rather than inside `_log_rollout_data`
+        covers the validation dump too, since both funnel through this method.
+        """
+        if self.config.trainer.get("replace_image_tokens_for_logging", True):
+            processor = getattr(self, "processor", None)
+            inputs = replace_image_tokens_for_logging(inputs, processor)
+            outputs = replace_image_tokens_for_logging(outputs, processor)
+        return super()._dump_generations(inputs, outputs, *args, **kwargs)
 
     def _fit_dump_data(self, batch):
         super()._fit_dump_data(batch)
