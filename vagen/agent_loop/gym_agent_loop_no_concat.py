@@ -147,7 +147,9 @@ class GymAgentLoop(VagenGymAgentLoopBase):
                     **self.apply_chat_template_kwargs,
                 ),
             )
-            model_inputs = self.processor(text=[raw_prompt], images=image_data, return_tensors="pt")
+            model_inputs = self.processor(
+                text=[raw_prompt], images=image_data, return_tensors="pt", **self._get_mm_processor_kwargs()
+            )
             agent_data.turn_prompt_ids = model_inputs.pop("input_ids").squeeze(0).tolist()
         else:
             if image_data:
