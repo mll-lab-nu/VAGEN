@@ -84,6 +84,16 @@ class MultiOutputAgentLoopWorker(AgentLoopWorker):
                 "train on -- check that the agent loop appends an AgentLoopOutput per turn"
             )
 
+        # How many rows each rollout produced is the one number that says whether the
+        # split layout is doing anything, and nothing downstream reveals it: every row
+        # reports num_turns=1 by construction, and the batch dimensions look the same
+        # as a single-turn run. Cheap enough to always emit -- one line per worker step.
+        spread = np.bincount(np.asarray(counts))
+        print(
+            f"[vagen] rollout -> rows: {len(groups)} rollouts produced {len(flat)} rows "
+            f"(counts {dict(enumerate(spread.tolist()))} as rows->rollouts)"
+        )
+
         expanded = None
         if input_non_tensor_batch:
             # np.repeat raises if a column's length disagrees with the rollout count,
