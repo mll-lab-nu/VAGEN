@@ -78,3 +78,38 @@ def test_every_sentinel_writing_estimator_is_declared():
         f"{offenders} write sentinel returns but register with plain @register_adv_est; "
         "use @register_sentinel_adv_est or the critic will train on the sentinel"
     )
+
+
+# --------------------------------------------------- verl 0.8 calling convention
+
+
+def test_estimators_match_the_dispatch_signature():
+    """★ verl 0.8 calls custom estimators with keyword tensors, not the DataProto:
+    token_level_rewards / response_mask / config, plus batch and non_tensor_batch for
+    estimators that name them. A stale `(data, gamma, lam)` signature only fails at the
+    first advantage computation, i.e. after a cluster is up and a rollout has run."""
+    import inspect
+
+    from vagen.custom_advantage import SENTINEL_RETURN_ESTIMATORS
+    from verl.trainer.ppo.core_algos import get_adv_estimator_fn
+
+    for name in sorted(SENTINEL_RETURN_ESTIMATORS):
+        params = inspect.signature(get_adv_estimator_fn(name)).parameters
+        assert "data" not in params, f"{name} still takes the DataProto"
+        # These group rows by trajectory and turn, so they need the raw containers.
+        assert "batch" in params and "non_tensor_batch" in params, f"{name} cannot reach its index columns"
+        assert any(p.kind is p.VAR_KEYWORD for p in params.values()), (
+            f"{name} must tolerate the extra kwargs verl passes (index, reward_baselines)"
+        )
+
+
+def test_dispatch_hands_over_the_containers_by_signature():
+    """The verl side of the contract: naming batch/non_tensor_batch is what opts an
+    estimator in. Pins it so a rebase that drops the branch is caught here."""
+    import inspect
+
+    from verl.trainer.ppo import ray_trainer
+
+    src = inspect.getsource(ray_trainer.compute_advantage)
+    assert '"non_tensor_batch" in _adv_params' in src
+    assert '"batch" in _adv_params' in src

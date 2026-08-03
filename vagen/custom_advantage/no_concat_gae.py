@@ -45,9 +45,9 @@ def _to_numpy_int64(x, factorize_if_non_numeric: bool = False):
 
 @register_sentinel_adv_est("no_concat_gae_last")
 def compute_gae_no_concat_advantage_return(
-    data,
-    gamma,
-    lam,
+    *,
+    batch,
+    non_tensor_batch,
     config=None,
     ignore_value: float = -100.0,
     **kwargs,
@@ -55,12 +55,15 @@ def compute_gae_no_concat_advantage_return(
     """
     Compute token-level advantages and returns for no-concat GAE.
     """
-    token_level_scores = data.batch["token_level_scores"]
-    values = data.batch.get("values", torch.zeros_like(token_level_scores))
-    response_mask = data.batch["response_mask"]
-    group_idx = data.non_tensor_batch["group_idx"]
-    turn_idx = data.non_tensor_batch["turn_idx"]
-    traj_idx = data.non_tensor_batch["traj_idx"]
+    # verl 0.8 hands estimators the raw containers plus the algorithm config instead
+    # of the whole DataProto; gamma/lam live on that config.
+    gamma, lam = config.gamma, config.lam
+    token_level_scores = batch["token_level_scores"]
+    values = batch.get("values", torch.zeros_like(token_level_scores))
+    response_mask = batch["response_mask"]
+    group_idx = non_tensor_batch["group_idx"]
+    turn_idx = non_tensor_batch["turn_idx"]
+    traj_idx = non_tensor_batch["traj_idx"]
 
     with torch.no_grad():
         device = token_level_scores.device
@@ -192,9 +195,9 @@ def compute_gae_no_concat_advantage_return(
 
 @register_sentinel_adv_est("no_concat_gae")
 def compute_gae_no_concat_advantage_return_firsttok(
-    data,
-    gamma,
-    lam,
+    *,
+    batch,
+    non_tensor_batch,
     config=None,
     ignore_value: float = -100.0,
     **kwargs,
@@ -213,12 +216,15 @@ def compute_gae_no_concat_advantage_return_firsttok(
       - token_level_scores, values, response_mask: (bs, L)
       - returns_full: (bs, L) filled with ignore_value except first valid token positions
     """
-    token_level_scores = data.batch["token_level_scores"]
-    values = data.batch.get("values", torch.zeros_like(token_level_scores))
-    response_mask = data.batch["response_mask"]
-    group_idx = data.non_tensor_batch["group_idx"]
-    turn_idx = data.non_tensor_batch["turn_idx"]
-    traj_idx = data.non_tensor_batch["traj_idx"]
+    # verl 0.8 hands estimators the raw containers plus the algorithm config instead
+    # of the whole DataProto; gamma/lam live on that config.
+    gamma, lam = config.gamma, config.lam
+    token_level_scores = batch["token_level_scores"]
+    values = batch.get("values", torch.zeros_like(token_level_scores))
+    response_mask = batch["response_mask"]
+    group_idx = non_tensor_batch["group_idx"]
+    turn_idx = non_tensor_batch["turn_idx"]
+    traj_idx = non_tensor_batch["traj_idx"]
 
     with torch.no_grad():
         device = token_level_scores.device
