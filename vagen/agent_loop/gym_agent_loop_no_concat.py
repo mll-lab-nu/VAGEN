@@ -187,6 +187,10 @@ class GymAgentLoop(VagenGymAgentLoopBase):
                 prompt_ids = agent_data.turn_prompt_ids,
                 sampling_params = sampling_params_for_turn,
                 image_data = image_data,
+                # Same tiling settings the prompt was built with: the engine
+                # re-processes the images, and a different tile count means a
+                # different number of placeholders than the prompt contains.
+                mm_processor_kwargs = self._get_mm_processor_kwargs() or None,
             )
 
 
