@@ -12,7 +12,7 @@ from uuid import uuid4
 from PIL import Image
 from verl.experimental.agent_loop.agent_loop import AgentLoopOutput, register
 from .base import VagenGymAgentLoopBase
-from .prompt_check import check_prompt_matches_engine
+from .prompt_check import check_prompt_matches_engine, engine_prompt_ids
 from verl.utils.profiler import simple_timer
 from verl.utils.rollout_trace import rollout_trace_op
 from ..envs.gym_image_env import GymImageEnv
@@ -193,9 +193,17 @@ class GymAgentLoop(VagenGymAgentLoopBase):
                 # different number of placeholders than the prompt contains.
                 mm_processor_kwargs = self._get_mm_processor_kwargs() or None,
             )
-        check_prompt_matches_engine(
-            agent_data.turn_prompt_ids, output, env_name=agent_data.env_name
-        )
+        # Adopt the prompt the engine ran, so the sequence trained on is the sequence
+        # sampled from whatever the model family's expansion rules are. Safe here
+        # because this loop rebuilds turn_prompt_ids from scratch every turn -- nothing
+        # downstream has been measured against the old token positions yet.
+        engine_ids = engine_prompt_ids(output)
+        if engine_ids is not None:
+            agent_data.turn_prompt_ids = engine_ids
+        else:
+            check_prompt_matches_engine(
+                agent_data.turn_prompt_ids, output, env_name=agent_data.env_name
+            )
 
 
         agent_data.turn_response_ids = output.token_ids
