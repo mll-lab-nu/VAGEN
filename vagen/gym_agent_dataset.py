@@ -204,6 +204,12 @@ class AgenticDataset(Dataset):
                         "response_length_per_turn": spec.response_length_per_turn,
                         "data_source": data_source,
                         "agent_name":"gym_agent",
+                        # verl's agent loop stores raw_prompt on every output and reads
+                        # it unconditionally. VAGEN builds the prompt inside the loop
+                        # from environment observations, so there is no dataset-side
+                        # chat to carry -- an empty list keeps the type consistent with
+                        # RLHFDataset, which puts the chat messages here.
+                        "raw_prompt": [],
                         "input_ids": torch.tensor([0]),  # dummy
                         "attention_mask": torch.tensor([0]),  # dummy
                         "position_ids": torch.tensor([0]),  # dummy

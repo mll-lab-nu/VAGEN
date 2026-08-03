@@ -10,6 +10,7 @@ Not covered here (needs a real rollout, tracked in Phase 1): that the gym no-con
 actually emits one output per environment turn, and end-to-end shapes through Ray.
 """
 
+import types
 from unittest.mock import patch
 
 import numpy as np
@@ -196,3 +197,45 @@ def test_manager_is_reachable_by_fqn():
 
     fqn = "vagen.agent_loop.multi_output.MultiOutputAgentLoopManager"
     assert load_class_from_fqn(fqn, "AgentLoopManager") is MultiOutputAgentLoopManager
+
+
+# --------------------------------------------------------- index assignment
+
+
+class _FakeProto:
+    def __init__(self, uids):
+        self.non_tensor_batch = {"uid": np.array(uids, dtype=object)}
+
+
+def _manager(rollout_n):
+    m = MultiOutputAgentLoopManager.__new__(MultiOutputAgentLoopManager)
+    m.rollout_config = types.SimpleNamespace(n=rollout_n)
+    return m
+
+
+def test_indices_follow_the_interleaved_repeat():
+    """★ gen_batch.repeat(interleave=True) lays rows out [A A B B]; traj_idx has to
+    cycle within each group, since turn-level GAE groups on (group_idx, traj_idx)."""
+    p = _FakeProto(["A", "A", "B", "B"])
+    _manager(2)._vagen_assign_indices(p)
+
+    assert p.non_tensor_batch["group_idx"].tolist() == ["A", "A", "B", "B"]
+    assert p.non_tensor_batch["traj_idx"].tolist() == [0, 1, 0, 1]
+
+
+def test_assignment_happens_before_the_chunking_call():
+    """★ Placement guard. The base's first act is prompts.chunk(...); labelling per
+    worker instead would restart traj_idx at 0 inside a split group."""
+    seen = {}
+
+    def fake(self, prompts):
+        seen["traj_idx"] = prompts.non_tensor_batch.get("traj_idx")
+        return "generated"
+
+    m = _manager(2)
+    p = _FakeProto(["A", "A"])
+    with patch.object(AgentLoopManager, "generate_sequences", fake):
+        assert m.generate_sequences(p) == "generated"
+
+    assert seen["traj_idx"] is not None, "indices must be set before delegating"
+    assert seen["traj_idx"].tolist() == [0, 1]
