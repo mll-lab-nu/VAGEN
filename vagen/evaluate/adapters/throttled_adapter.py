@@ -1,4 +1,3 @@
-# All comments are in English.
 from __future__ import annotations
 import asyncio
 import random
