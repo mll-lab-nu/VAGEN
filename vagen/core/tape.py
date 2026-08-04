@@ -1,0 +1,157 @@
+"""Token record for one conversation — one training row.
+
+Everything token-level lives behind the client (§7), and this is the part of it with no
+dependencies: no torch, no verl, no transformers. A conversation is a sequence of
+alternating spans — context we supplied, tokens the model produced — and the record
+exists to keep the mask describing exactly that, through the one operation that can
+disturb it.
+
+That operation is adopting the engine's prompt. The engine expands multimodal
+placeholders its own way, so the prompt it runs is not always the one it was handed;
+training on the locally tokenized version means computing log-probs over a sequence the
+model never saw. Both are well-formed, neither side sees both, and the loss stays finite,
+so nothing reports it. Adopting the engine's version removes the possibility, at the cost
+of having to move the mask with it.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+
+class MaskMisaligned(RuntimeError):
+    """The token record and its mask stopped describing the same sequence."""
+
+
+@dataclass
+class Row:
+    """What one conversation contributes to a training batch."""
+
+    prompt_ids: list[int]
+    response_ids: list[int]
+    response_mask: list[int]
+    logprobs: list[float]
+
+    def __post_init__(self):
+        if not (len(self.response_ids) == len(self.response_mask) == len(self.logprobs)):
+            raise MaskMisaligned(
+                f"row is inconsistent: {len(self.response_ids)} response tokens, "
+                f"{len(self.response_mask)} mask entries, {len(self.logprobs)} logprobs"
+            )
+
+
+@dataclass
+class Conversation:
+    """One conversation's tokens, and which of them the model produced.
+
+    ``prompt_len`` marks the end of the opening context. Everything after it is the
+    trainable region, whether the model produced it (mask 1) or we appended it as an
+    observation (mask 0).
+    """
+
+    conversation_id: str | None = None
+    token_ids: list[int] = field(default_factory=list)
+    mask: list[int] = field(default_factory=list)
+    logprobs: list[float] = field(default_factory=list)
+    prompt_len: int | None = None
+    # Length of the newest context span; the only region an adoption can resize.
+    _tail_context_len: int | None = None
+
+    # ------------------------------------------------------------------ writing
+    def add_context(self, ids: list[int]) -> None:
+        """Tokens we supplied: a rendered prompt, or an observation between turns."""
+        self.token_ids += list(ids)
+        if self.prompt_len is None:
+            # Still the opening context; the trainable region has not started.
+            self._tail_context_len = None
+            return
+        self.mask += [0] * len(ids)
+        self.logprobs += [0.0] * len(ids)
+        self._tail_context_len = len(ids)
+
+    def add_response(self, ids: list[int], logprobs: list[float] | None = None) -> None:
+        """Tokens the model produced."""
+        if self.prompt_len is None:
+            self.prompt_len = len(self.token_ids)
+        self.token_ids += list(ids)
+        self.mask += [1] * len(ids)
+        self.logprobs += list(logprobs) if logprobs else [0.0] * len(ids)
+        self._tail_context_len = 0
+
+    # ---------------------------------------------------------------- adopting
+    def adopt_prompt(self, engine_ids: list[int]) -> None:
+        """Replace what we tokenized with what the engine ran.
+
+        Only the newest context span can have changed length. Everything before it was
+        adopted on an earlier call and is therefore already in the engine's own form, and
+        re-expanding an already-expanded prompt is idempotent — the deduplication that
+        precedes the round trip is exactly the inverse of the expansion. So the whole
+        delta falls on a trailing run of zeros, and the mask can be corrected without
+        locating anything inside the token stream.
+
+        The assumption is asserted afterwards rather than trusted.
+        """
+        delta = len(engine_ids) - len(self.token_ids)
+
+        if delta and self._tail_context_len:
+            adjusted = self._tail_context_len + delta
+            if adjusted < 0:
+                raise MaskMisaligned(
+                    f"the engine's prompt is {-delta} tokens shorter than the {self._tail_context_len}-token "
+                    "context it re-expanded, so the change was not confined to it"
+                )
+            keep = len(self.mask) - self._tail_context_len
+            self.mask = self.mask[:keep] + [0] * adjusted
+            self.logprobs = self.logprobs[:keep] + [0.0] * adjusted
+            self._tail_context_len = adjusted
+
+        self.token_ids = list(engine_ids)
+
+        if self.prompt_len is None:
+            # Nothing trainable yet: the whole thing is still the opening context.
+            return
+        if len(self.token_ids) - len(self.mask) != self.prompt_len:
+            raise MaskMisaligned(
+                f"after adopting the engine's prompt, {len(self.token_ids)} tokens minus "
+                f"{len(self.mask)} masked is not the {self.prompt_len}-token opening context. "
+                "Some region other than the newest context was re-expanded."
+            )
+
+    # ------------------------------------------------------------------ reading
+    def is_trainable(self) -> bool:
+        """False for a conversation the model never spoke in — a new conversation
+        immediately followed by a terminal step. Such rows carry no gradient and are
+        dropped rather than padded."""
+        return self.prompt_len is not None and any(self.mask)
+
+    def row(self) -> Row:
+        if self.prompt_len is None:
+            raise MaskMisaligned("conversation has no model output; check is_trainable() first")
+        return Row(
+            prompt_ids=self.token_ids[: self.prompt_len],
+            response_ids=self.token_ids[self.prompt_len :],
+            response_mask=list(self.mask),
+            logprobs=list(self.logprobs),
+        )
+
+    def place_reward(self, reward: float | list[float]) -> list[float]:
+        """Spread the environment's reward over the trainable region.
+
+        A scalar lands on the last model-produced token, which is where an outcome reward
+        belongs; a vector must already be aligned to the response, and its length is
+        checked rather than assumed — an env that re-encoded the text to build it would
+        otherwise misalign silently.
+        """
+        scores = [0.0] * len(self.mask)
+        if isinstance(reward, (int, float)):
+            last = max((i for i, m in enumerate(self.mask) if m), default=None)
+            if last is not None:
+                scores[last] = float(reward)
+            return scores
+
+        if len(reward) != len(self.mask):
+            raise MaskMisaligned(
+                f"reward vector has {len(reward)} entries for a {len(self.mask)}-token response; "
+                "an env returning per-token rewards must align them to response_token_ids"
+            )
+        return [float(r) for r in reward]
