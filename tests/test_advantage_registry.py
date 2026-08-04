@@ -18,7 +18,7 @@ from vagen.custom_advantage import no_concat_gae as impl
 
 
 def test_known_estimators_are_registered():
-    assert SENTINEL_RETURN_ESTIMATORS == {"no_concat_gae", "no_concat_gae_last"}
+    assert SENTINEL_RETURN_ESTIMATORS == {"no_concat_gae", "no_concat_gae_last", "traj_turn_gae"}
 
 
 @pytest.mark.parametrize("name", ["no_concat_gae", "no_concat_gae_last"])

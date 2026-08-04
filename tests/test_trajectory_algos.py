@@ -298,3 +298,101 @@ def test_turn_boundaries_are_found_under_both_layouts():
     # only the row change distinguishes the turns. A gap test alone merges them.
     index = torch.tensor([[0, 1, 2, 3]])
     assert _is_turn_boundary(index, valid, width=2).tolist() == [[False, True, False, True]]
+
+
+# ----------------------------------------------------------------- turn-level GAE
+
+TURN_GAE = get_adv_estimator_fn("traj_turn_gae")
+OLD_TURN_GAE = get_adv_estimator_fn("no_concat_gae")
+
+
+def test_turn_gae_matches_the_implementation_it_replaces():
+    """★ The safety net for the replacement. The old estimator only handles the split
+    layout, so that is where they are compared -- and they must agree token for token,
+    not merely look similar."""
+    cfg = _Cfg()
+    cfg.gamma, cfg.lam = 1.0, 0.9
+
+    mask = [[1, 1], [1, 1], [1, 1]]
+    args = dict(
+        batch=_batch([[0.0, 0.0], [0.0, 0.5], [0.0, 1.0]], mask, [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]]),
+        non_tensor_batch=_nt(["g", "g", "g"], [0, 0, 0], [0, 1, 2]),
+    )
+    new_adv, new_ret = TURN_GAE(config=cfg, **args)
+    old_adv, old_ret = OLD_TURN_GAE(config=cfg, **args)
+
+    assert _tokens(new_adv, mask) == pytest.approx(_tokens(old_adv, mask), rel=1e-5)
+    flat = lambda tensor: [v for row in tensor.tolist() for v in row]
+    assert flat(new_ret) == pytest.approx(flat(old_ret), rel=1e-5)
+
+
+def test_turn_gae_writes_a_return_only_at_each_turns_first_token():
+    """★ V(s_t) is the value of the state the turn acts *from*, so the return belongs at
+    the position before any of the turn's tokens were emitted. Everything else stays at
+    the sentinel for value_mask to exclude."""
+    cfg = _Cfg()
+    mask = [[1, 1, 0, 1, 1]]
+    _, ret = TURN_GAE(
+        batch=_batch([[0.0, 0.0, 0.0, 0.0, 1.0]], mask, [[0.0] * 5]),
+        non_tensor_batch=_nt(["g"], [0], [0]),
+        config=cfg,
+    )
+
+    row = ret[0].tolist()
+    assert row[0] != -100.0 and row[3] != -100.0, "each turn's first token needs a return"
+    assert row[1] == -100.0 and row[4] == -100.0, "the rest must stay at the sentinel"
+
+
+def test_turn_gae_gives_every_token_of_a_turn_the_same_advantage():
+    """Broadcasting is exact, not an approximation: an autoregressive policy factorises,
+    so the per-token coefficient in the turn-level gradient is the turn's advantage."""
+    cfg = _Cfg()
+    mask = [[1, 1, 0, 1, 1]]
+    adv, _ = TURN_GAE(
+        batch=_batch([[0.0, 0.0, 0.0, 0.0, 1.0]], mask, [[0.1, 0.2, 9.0, 0.3, 0.4]]),
+        non_tensor_batch=_nt(["g"], [0], [0]),
+        config=cfg,
+    )
+
+    assert float(adv[0, 0]) == pytest.approx(float(adv[0, 1]))
+    assert float(adv[0, 3]) == pytest.approx(float(adv[0, 4]))
+
+
+def test_turn_gae_works_under_the_concat_layout():
+    """★ What the old one could not do. It assumed a row was a turn, so a concat episode
+    -- every turn in one row -- collapsed to a single decision."""
+    cfg = _Cfg()
+    mask = [[1, 1, 0, 1, 1]]
+    adv, ret = TURN_GAE(
+        batch=_batch([[0.0, 0.0, 0.0, 0.0, 1.0]], mask, [[0.1, 0.2, 9.0, 0.3, 0.4]]),
+        non_tensor_batch=_nt(["g"], [0], [0]),
+        config=cfg,
+    )
+
+    assert float(adv[0, 0]) != pytest.approx(float(adv[0, 3])), "the two turns were scored as one"
+    # Two turns in one row means two anchors, at each turn's first token.
+    assert [i for i, v in enumerate(ret[0].tolist()) if v != -100.0] == [0, 3]
+
+
+def test_turn_values_are_not_lost_to_a_scatter_collision():
+    """★ Several tokens map to one turn slot. A plain scatter keeps whichever is written
+    last -- a zero from a non-start token -- silently replacing the turn's value with 0
+    and changing every advantage upstream of it."""
+    cfg = _Cfg()
+    cfg.gamma, cfg.lam = 1.0, 1.0
+    mask = [[1, 1, 1]]
+    _, ret = TURN_GAE(
+        batch=_batch([[0.0, 0.0, 1.0]], mask, [[0.4, 9.0, 9.0]]),
+        non_tensor_batch=_nt(["g"], [0], [0]),
+        config=cfg,
+    )
+
+    # One turn: return = reward, and V(s) cancels. If the value were zeroed the
+    # advantage would be 1.0 and the return 1.0 rather than reward + V - V + V.
+    assert float(ret[0, 0]) == pytest.approx(1.0), "the turn's value came from the wrong token"
+
+
+def test_turn_gae_still_needs_a_value_mask():
+    from vagen.custom_advantage import needs_value_mask
+
+    assert needs_value_mask("traj_turn_gae") is True
