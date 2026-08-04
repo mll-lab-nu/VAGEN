@@ -8,14 +8,16 @@
 # Instruct-only on purpose: a thinking model would spend its budget reasoning about a
 # format conversion, on the critical path of every turn of every rollout.
 set -x
+# flashinfer compiles kernels on first use and needs ninja on PATH.
+export PATH=$HOME/miniconda3/envs/verl/bin:$PATH
 MODEL=${MODEL:-Qwen/Qwen3-4B-Instruct-2507}
 PORT=${PORT:-8123}
-GPU=${GPU:-0}
+GPU=${GPU:-4}
 
 CUDA_VISIBLE_DEVICES=$GPU $HOME/miniconda3/envs/verl/bin/python -m sglang.launch_server \
   --model-path $MODEL \
   --port $PORT \
-  --mem-fraction-static 0.25 \
+  --mem-fraction-static 0.10 \
   --max-running-requests 64 \
   --attention-backend flashinfer \
   --log-level warning

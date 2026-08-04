@@ -10,7 +10,7 @@ import types
 import pytest
 
 from vagen.core.client import BackendOutput, InferenceClient
-from vagen.core.harness import ConcatHarness, NoConcatHarness
+from vagen.harness import ConcatHarness, NoConcatHarness
 from vagen.core.runner import run_episode
 
 
@@ -168,7 +168,7 @@ async def test_a_concat_episode_accumulates_every_turn():
 async def test_a_budget_driven_harness_is_told_how_large_the_conversation_grew():
     """★ Without this the budget never moves and compaction never fires -- a harness
     that looks configured and silently behaves like plain concat."""
-    from vagen.core.harness import CompactHarness
+    from vagen.harness import CompactHarness
 
     seen = []
 
@@ -188,10 +188,26 @@ async def test_a_budget_driven_harness_is_told_how_large_the_conversation_grew()
 async def test_compaction_fires_and_splits_the_episode_into_rows():
     """★ End to end: a budget small enough to trip every turn must start a new
     conversation each time, which is what makes the rows."""
-    from vagen.core.harness import CompactHarness
+    from vagen.harness import CompactHarness
 
     env, client = Env(terminate_at=3), Client()
     await run_episode(env, CompactHarness(budget=1), client, max_turns=5)
 
     assert len(client.rows()) > 1, "compaction never started a second conversation"
     assert all(any(r.response_mask) for r in client.rows()), "a row with no model output survived"
+
+
+def test_the_environment_contract_is_written_down():
+    """★ It used to exist only at this call site and in prose, so an environment could
+    satisfy it by accident and fail in the one case nobody had written down."""
+    import inspect
+
+    from vagen.core.env import BaseEnv
+
+    step = inspect.signature(BaseEnv.step)
+    assert {"action", "response_token_ids", "tokenizer"} <= set(step.parameters)
+
+    doc = inspect.getdoc(BaseEnv.step)
+    # The two distinctions an implementer gets wrong silently.
+    assert "terminated" in doc and "truncated" in doc
+    assert "re-encoding" in doc or "re-encoded" in doc
