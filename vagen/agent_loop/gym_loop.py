@@ -25,13 +25,11 @@ from vagen.rewards import sokoban as sokoban_spec
 from vagen.rewards.judge import shared_judge
 from vagen.rewards.state_reward import TAGS, StateRewardWrapper
 from vagen.agent_loop.verl_client import VerlClient
-from vagen.core.harness import CompactHarness, ConcatHarness, NoConcatHarness
+from vagen.harness import HARNESSES, build_harness
 from vagen.core.runner import run_episode
 
 logger = logging.getLogger(__file__)
 logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
-
-HARNESSES = {"concat": ConcatHarness, "no_concat": NoConcatHarness, "compact": CompactHarness}
 
 # Environments that can score the agent's descriptions. Keyed by the registry name.
 STATE_REWARD_SPECS = {"Sokoban": sokoban_spec.SPEC}
@@ -156,11 +154,9 @@ class GymLoop(VagenGymAgentLoopBase):
             # Fall back to the flag the existing scripts set, so the same run
             # configuration selects the same layout as before.
             mode = "concat" if self.config.trainer.get("concat_multi_turn", True) else "no_concat"
-        if mode not in HARNESSES:
-            raise ValueError(f"unknown harness {mode!r}; choose from {sorted(HARNESSES)}")
         if mode == "compact":
-            return CompactHarness(budget=int(self.config.trainer.compact_budget))
-        return HARNESSES[mode]()
+            return build_harness(mode, budget=int(self.config.trainer.compact_budget))
+        return build_harness(mode)
 
     def _outputs(self, client, env, result, kwargs) -> list[AgentLoopOutput]:
         rows = client.rows()
