@@ -56,24 +56,30 @@ Text:
 JSON:"""
 
 
-INSTRUCTIONS = """Before acting, state what you see; after choosing, state what will follow.
+EXAMPLES = {
+    "state_estimation": (
+        "Before acting, state what you see:\n"
+        '<observation>[{"object_id":"box","vertical_relation":"below","horizontal_relation":"same"},'
+        '{"object_id":"target","vertical_relation":"below","horizontal_relation":"same"}]</observation>'
+    ),
+    "transition_prediction": (
+        "After choosing, state what will follow:\n"
+        '<prediction>[{"object_id":"box","vertical_relation":"below","horizontal_relation":"same"},'
+        '{"object_id":"target","vertical_relation":"same","horizontal_relation":"same"}]</prediction>'
+    ),
+}
 
-<observation>[{"object_id":"box","vertical_relation":"below","horizontal_relation":"same"},\
-{"object_id":"target","vertical_relation":"below","horizontal_relation":"same"}]</observation>
-<think>The box is directly below me and the target below it, so pushing down twice solves it.</think>
-<prediction>[{"object_id":"box","vertical_relation":"below","horizontal_relation":"same"},\
-{"object_id":"target","vertical_relation":"same","horizontal_relation":"same"}]</prediction>
-<answer>Down</answer>
-
-Relations are relative to you: vertical is above/below/same, horizontal is left/right/same.
-Both descriptions are scored against the real layout, so guessing costs more than it gains."""
+AXES = """Relations are relative to you: vertical is above/below/same, horizontal is left/right/same.
+Each description is scored against the real layout, so inventing objects costs more than
+omitting them, and describing something that is not there scores nothing for it."""
 
 
 SPEC = StateRewardSpec(
     relations=relations,
     judge_prompt=JUDGE_PROMPT,
-    # A target missed matters more than one box among several: the target is what the
-    # task is about, and boxes are numerous enough to score well by accident.
+    # A missed target matters as much as the boxes together: the target is what the task
+    # is about, while boxes are numerous enough to score well by accident.
     object_weights={"target": 0.5, "box": 0.5},
-    instructions=INSTRUCTIONS,
+    examples=EXAMPLES,
+    axes=AXES,
 )

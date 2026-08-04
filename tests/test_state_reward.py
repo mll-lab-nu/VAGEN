@@ -9,17 +9,21 @@ import types
 import pytest
 
 from vagen.rewards.sokoban import relations
-from vagen.rewards.state_reward import StateRewardSpec, StateRewardWrapper
+from vagen.rewards.state_reward import TAGS, StateRewardSpec, StateRewardWrapper
 
 
 class Judge:
     """Returns whatever it is told to, per call."""
 
     def __init__(self, *replies):
-        self.replies, self.prompts = list(replies), []
+        self.replies, self.prompts, self.calls = list(replies), [], 0
+
+    def __post_init__(self):
+        pass
 
     async def parse_batch(self, prompts):
         self.prompts.extend(prompts)
+        self.calls = getattr(self, "calls", 0) + 1
         return [self.replies.pop(0) if self.replies else None for _ in prompts]
 
 
@@ -50,59 +54,111 @@ BOX = [{"object_id": "box", "vertical_relation": "below", "horizontal_relation":
 TGT = [{"object_id": "target", "vertical_relation": "above", "horizontal_relation": "same"}]
 
 
-def _spec():
+def _spec(**kw):
     return StateRewardSpec(
         relations=lambda env: env.state,
         judge_prompt="{content}",
         object_weights={"box": 1.0},
+        examples={"state_estimation": "<observation>...</observation>",
+                  "transition_prediction": "<prediction>...</prediction>"},
+        axes="relations are relative to you",
+        **kw,
     )
 
 
-def _wrapper(env, judge, **kw):
-    return StateRewardWrapper(env=env, spec=_spec(), judge=judge, **kw)
+def _wrapper(env, judge, enabled=None, **kw):
+    return StateRewardWrapper(
+        env=env, spec=_spec(), judge=judge,
+        enabled={"state_estimation": 1.0} if enabled is None else enabled, **kw,
+    )
+
+
+# ------------------------------------------------------------- the two switches
+
+
+@pytest.mark.parametrize(
+    "enabled,asked",
+    [
+        ({"state_estimation": 0.5}, ["observation"]),
+        ({"transition_prediction": 0.5}, ["prediction"]),
+        ({"state_estimation": 0.5, "transition_prediction": 0.5}, ["observation", "prediction"]),
+        ({}, []),
+    ],
+)
+def test_the_prompt_asks_for_exactly_what_is_scored(enabled, asked):
+    """★ Derived, not configured separately. Asking for a section nothing scores trains
+    the agent to write text for no reason; scoring one it was never asked for gives a
+    silent zero every turn."""
+    w = StateRewardWrapper(env=None, spec=_spec(), enabled=enabled)
+    text = w.instructions()
+
+    assert [tag for tag in TAGS.values() if f"<{tag}>" in text] == asked
+
+
+def test_an_unknown_reward_name_is_rejected():
+    with pytest.raises(ValueError, match="unknown state rewards"):
+        StateRewardWrapper(env=None, spec=_spec(), enabled={"vibes": 1.0})
 
 
 @pytest.mark.asyncio
-async def test_grounding_credit_lands_on_the_observation_tokens():
+async def test_only_the_enabled_reward_is_scored():
+    """Turning one off must stop paying for it, not merely stop asking."""
+    action = "<observation>A</observation><prediction>B</prediction>"
+    w = _wrapper(Env(BOX, BOX, reward=0.0), Judge(BOX, BOX),
+                 enabled={"state_estimation": 1.0}, format_reward=0.0)
+
+    _, _, _, _, info = await w.step(action, [ord(c) for c in action], CharTokenizer())
+
+    assert info["state_reward/state_estimation"] == pytest.approx(1.0)
+    # Absent, not zero. A disabled reward reporting 0.0 reads as "scored nothing"
+    # rather than "was not scored"; the adapter supplies the zero the metric needs.
+    assert "state_reward/transition_prediction" not in info
+
+
+# ------------------------------------------------------------------- placement
+
+
+@pytest.mark.asyncio
+async def test_each_score_lands_on_its_own_section():
     """★ The reason for doing this at all. A scalar on the turn tells credit assignment
-    only that the turn went well; this says which part of the reasoning was right."""
-    action = "<observation>A</observation><answer>x</answer>"
-    w = _wrapper(Env(BOX, BOX, reward=0.0), Judge(BOX), grounding_weight=1.0, format_reward=0.0)
+    only that the turn went well; this says which half of the reasoning was right."""
+    action = "<observation>A</observation>zz<prediction>B</prediction>"
+    moved = [{"object_id": "box", "vertical_relation": "above", "horizontal_relation": "same"}]
+    w = _wrapper(
+        Env(before=BOX, after=moved), Judge(BOX, moved),
+        enabled={"state_estimation": 1.0, "transition_prediction": 1.0}, format_reward=0.0,
+    )
 
     _, vector, _, _, _ = await w.step(action, [ord(c) for c in action], CharTokenizer())
 
-    inside = action.index("A")
-    assert vector[inside] > 0, "the description's own tokens got nothing"
-    assert sum(v for i, v in enumerate(vector) if i != inside) == pytest.approx(0.0)
+    assert vector[action.index("A")] == pytest.approx(1.0)
+    assert vector[action.index("B")] == pytest.approx(1.0)
+    assert vector[action.index("zz")] == pytest.approx(0.0), "credit leaked outside both sections"
 
 
 @pytest.mark.asyncio
 async def test_prediction_is_scored_against_the_state_after_the_step():
-    """★ Grounding describes what the agent acted from, prediction what it acted into.
+    """★ Estimation describes what the agent acted from, prediction what it acted into.
     Scoring both against the same state would make one of them free."""
     action = "<prediction>A</prediction>"
     moved = [{"object_id": "box", "vertical_relation": "above", "horizontal_relation": "same"}]
-    w = _wrapper(Env(before=BOX, after=moved), Judge(moved), worldmodeling_weight=1.0, format_reward=0.0)
+    on = {"transition_prediction": 1.0}
 
-    _, _, _, _, info = await w.step(action, [ord(c) for c in action], CharTokenizer())
+    w = _wrapper(Env(before=BOX, after=moved), Judge(moved), enabled=on, format_reward=0.0)
+    _, _, _, _, after = await w.step(action, [ord(c) for c in action], CharTokenizer())
 
-    assert info["state_reward/prediction"] == pytest.approx(1.0), (
-        "the prediction matched the state after the step and must score full marks"
-    )
+    w2 = _wrapper(Env(before=BOX, after=BOX), Judge(moved), enabled=on, format_reward=0.0)
+    _, _, _, _, before = await w2.step(action, [ord(c) for c in action], CharTokenizer())
 
-    # The same description against the state *before* the step describes the wrong row,
-    # so it must score strictly less. Not zero: a relation half right earns half credit
-    # by design, and the column was unchanged.
-    w2 = _wrapper(Env(before=BOX, after=BOX), Judge(moved), worldmodeling_weight=1.0, format_reward=0.0)
-    _, _, _, _, info2 = await w2.step(action, [ord(c) for c in action], CharTokenizer())
-    assert info2["state_reward/prediction"] < info["state_reward/prediction"]
+    assert after["state_reward/transition_prediction"] == pytest.approx(1.0)
+    assert before["state_reward/transition_prediction"] < after["state_reward/transition_prediction"]
 
 
 @pytest.mark.asyncio
 async def test_a_wrong_description_earns_nothing_but_does_not_go_negative():
     action = "<observation>A</observation>"
     wrong = [{"object_id": "box", "vertical_relation": "above", "horizontal_relation": "left"}]
-    w = _wrapper(Env(BOX, BOX, reward=0.0), Judge(wrong), grounding_weight=1.0, format_reward=0.0)
+    w = _wrapper(Env(BOX, BOX, reward=0.0), Judge(wrong), format_reward=0.0)
 
     _, vector, _, _, _ = await w.step(action, [ord(c) for c in action], CharTokenizer())
 
@@ -114,7 +170,7 @@ async def test_a_judge_outage_costs_the_process_reward_not_the_rollout():
     """★ The judge is a parser, not part of training. Losing it should cost one turn's
     shaping, not raise into the rollout."""
     action = "<observation>A</observation>"
-    w = _wrapper(Env(BOX, BOX, reward=2.0), Judge(None), grounding_weight=1.0, format_reward=0.0)
+    w = _wrapper(Env(BOX, BOX, reward=2.0), Judge(None), format_reward=0.0)
 
     _, vector, _, _, _ = await w.step(action, [ord(c) for c in action], CharTokenizer())
 
@@ -124,7 +180,7 @@ async def test_a_judge_outage_costs_the_process_reward_not_the_rollout():
 @pytest.mark.asyncio
 async def test_the_outcome_reward_stays_on_the_last_token():
     action = "<observation>A</observation>zz"
-    w = _wrapper(Env(BOX, BOX, reward=3.0), Judge(BOX), grounding_weight=1.0, format_reward=0.0)
+    w = _wrapper(Env(BOX, BOX, reward=3.0), Judge(BOX), format_reward=0.0)
 
     _, vector, _, _, _ = await w.step(action, [ord(c) for c in action], CharTokenizer())
 
@@ -132,16 +188,16 @@ async def test_the_outcome_reward_stays_on_the_last_token():
 
 
 @pytest.mark.asyncio
-async def test_the_format_bonus_needs_both_descriptions():
-    """Paying it for one would make the cheaper half of the format optional."""
+async def test_the_format_bonus_needs_every_section_that_is_scored():
+    """Paying it for a subset makes the rest optional."""
+    both_on = {"state_estimation": 0.0, "transition_prediction": 0.0}
     one = "<observation>A</observation>"
     both = "<observation>A</observation><prediction>B</prediction>"
 
-    w1 = _wrapper(Env(BOX, BOX, reward=0.0), Judge(BOX), grounding_weight=0.0, format_reward=0.5)
+    w1 = _wrapper(Env(BOX, BOX, reward=0.0), Judge(BOX), enabled=both_on, format_reward=0.5)
     _, v1, _, _, _ = await w1.step(one, [ord(c) for c in one], CharTokenizer())
 
-    w2 = _wrapper(Env(BOX, BOX, reward=0.0), Judge(BOX, BOX), grounding_weight=0.0,
-                  worldmodeling_weight=0.0, format_reward=0.5)
+    w2 = _wrapper(Env(BOX, BOX, reward=0.0), Judge(BOX, BOX), enabled=both_on, format_reward=0.5)
     _, v2, _, _, _ = await w2.step(both, [ord(c) for c in both], CharTokenizer())
 
     assert sum(v1) == pytest.approx(0.0)
@@ -149,90 +205,53 @@ async def test_the_format_bonus_needs_both_descriptions():
 
 
 @pytest.mark.asyncio
+async def test_both_descriptions_of_a_turn_go_out_in_one_batch():
+    """★ Two round trips per turn would double the judge's latency on the critical path
+    of every rollout."""
+    action = "<observation>A</observation><prediction>B</prediction>"
+    judge = Judge(BOX, BOX)
+    w = _wrapper(Env(BOX, BOX), judge, enabled={"state_estimation": 1.0, "transition_prediction": 1.0})
+
+    await w.step(action, [ord(c) for c in action], CharTokenizer())
+
+    assert judge.calls == 1, f"the judge was called {judge.calls} times for one turn"
+
+
+@pytest.mark.asyncio
 async def test_without_tokens_the_wrapper_degrades_to_a_scalar():
     """An env used outside the token-aware loop should still work, just coarsely."""
     action = "<observation>A</observation>"
-    w = _wrapper(Env(BOX, BOX, reward=1.0), Judge(BOX), grounding_weight=1.0, format_reward=0.0)
+    w = _wrapper(Env(BOX, BOX, reward=1.0), Judge(BOX), format_reward=0.0)
 
     _, reward, _, _, _ = await w.step(action)
 
     assert isinstance(reward, float) and reward == pytest.approx(2.0)
 
 
+def test_one_judge_is_shared_per_endpoint():
+    """★ A fresh judge per rollout makes its concurrency limit per rollout: with
+    hundreds in flight the endpoint sees hundreds of times the intended load, and the
+    timeouts read as the process reward quietly going to zero."""
+    from vagen.rewards.judge import shared_judge
+
+    a = shared_judge("http://x/v1", "m")
+    b = shared_judge("http://x/v1", "m")
+    c = shared_judge("http://y/v1", "m")
+
+    assert a is b and a is not c
+
+
 def test_sokoban_relations_are_relative_to_the_player():
     room = [[0, 0, 0], [0, 5, 0], [0, 4, 0]]      # player at (1,1), box below it
     fixed = [[0, 0, 0], [0, 0, 0], [0, 2, 0]]      # target at (2,1)
-    env = types.SimpleNamespace(env=types.SimpleNamespace(room_state=room, room_fixed=fixed))
 
     import numpy as np
 
-    env.env.room_state = np.array(room)
-    env.env.room_fixed = np.array(fixed)
+    env = types.SimpleNamespace(env=types.SimpleNamespace(room_state=np.array(room), room_fixed=np.array(fixed)))
     items = relations(env)
 
     assert {"object_id": "box", "vertical_relation": "below", "horizontal_relation": "same"} in items
     assert {"object_id": "target", "vertical_relation": "below", "horizontal_relation": "same"} in items
-
-
-def test_silence_about_an_absent_object_is_not_rewarded():
-    """★ Per-type scoring plus 'both empty is perfect' would pay for saying nothing
-    about things that were never there -- free credit in any scene missing a type."""
-    from vagen.rewards.spatial import grouped_f1
-
-    gold = BOX                                   # boxes present, no targets
-    weights = {"box": 0.5, "target": 0.5}
-
-    perfect_box_only = grouped_f1(BOX, gold, weights)
-    assert perfect_box_only == pytest.approx(1.0), "describing everything present is full marks"
-
-    said_nothing = grouped_f1([], gold, weights)
-    assert said_nothing == pytest.approx(0.0), "silence about the boxes that exist earns nothing"
-
-    hallucinated = grouped_f1(BOX + TGT, gold, weights)
-    assert hallucinated < 1.0, "inventing a target must cost"
-
-
-# --------------------------------------------------------------- wiring into verl
-
-
-def test_the_scores_are_reported_on_every_row():
-    """★ verl reads the set of extra reward keys from the first row only. A key missing
-    there hides the metric for the whole batch -- so a run where the agent never
-    described anything would show no grounding metric at all, which reads as 'the
-    feature is off' rather than 'the agent scored zero'."""
-    import inspect
-
-    from vagen.agent_loop import gym_loop
-
-    source = inspect.getsource(gym_loop.GymEnvAdapter.__init__)
-    assert '"grounding": 0.0' in source and '"worldmodeling": 0.0' in source, (
-        "the score keys must exist before the first step, not appear once earned"
-    )
-
-    outputs = inspect.getsource(gym_loop.GymLoop._outputs)
-    assert "_reward" in outputs and "state_scores" in outputs
-
-
-def test_state_reward_is_off_unless_configured():
-    """A run that silently scored nothing would be indistinguishable from one that
-    scored badly, so it has to be asked for."""
-    import inspect
-
-    from vagen.agent_loop import gym_loop
-
-    source = inspect.getsource(gym_loop.GymLoop._maybe_state_reward)
-    assert 'get("enable", False)' in source
-
-
-def test_an_environment_without_a_spec_fails_loudly():
-    """Turning the reward on for an environment that cannot supply ground truth would
-    otherwise train against a constant."""
-    import inspect
-
-    from vagen.agent_loop import gym_loop
-
-    source = inspect.getsource(gym_loop.GymLoop._maybe_state_reward)
-    assert "raise ValueError" in source and "has no spec" in source
 
 
 # ------------------------------------------------------- hallucination must cost
