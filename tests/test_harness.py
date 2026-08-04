@@ -10,7 +10,7 @@ import types
 
 import pytest
 
-from vagen.core.harness import CompactHarness, ConcatHarness, NoConcatHarness
+from vagen.harness import CompactHarness, ConcatHarness, NoConcatHarness
 
 SYS = {"role": "system", "content": "sys"}
 
@@ -162,3 +162,39 @@ def test_every_harness_is_text_only(cls, kwargs):
 
     for forbidden in ("tokenizer", "token_ids", "client", "env.", "reward"):
         assert forbidden not in code, f"{cls.__name__} reaches for {forbidden}"
+
+
+# ------------------------------------------------------------------- the registry
+
+
+def test_every_policy_is_reachable_by_name():
+    """★ Which policy a run uses is a config value, so adding one must not mean editing
+    the agent loop -- the same reason advantage estimators are registered."""
+    from vagen.harness import HARNESSES, build_harness
+
+    assert set(HARNESSES) == {"concat", "no_concat", "compact"}
+    assert isinstance(build_harness("concat"), ConcatHarness)
+    assert isinstance(build_harness("compact", budget=10), CompactHarness)
+
+
+def test_an_unknown_name_lists_what_is_available():
+    """A bare KeyError leaves the reader guessing which spelling was wanted."""
+    from vagen.harness import build_harness
+
+    with pytest.raises(ValueError, match="choose from"):
+        build_harness("concatenate")
+
+
+def test_the_contract_holds_no_implementations():
+    """★ core/ is the contract and harness/ the implementations; letting one policy
+    live in the base module is how the split stops being real."""
+    import inspect
+
+    from vagen.core import harness as contract
+
+    classes = [
+        name
+        for name, obj in vars(contract).items()
+        if inspect.isclass(obj) and issubclass(obj, contract.BaseHarness) and obj is not contract.BaseHarness
+    ]
+    assert classes == [], f"{classes} belong in vagen/harness/"
