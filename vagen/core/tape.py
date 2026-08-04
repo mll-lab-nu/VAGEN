@@ -27,6 +27,7 @@ class MaskMisaligned(RuntimeError):
 class Row:
     """What one conversation contributes to a training batch."""
 
+    conversation_id: str | None
     prompt_ids: list[int]
     response_ids: list[int]
     response_mask: list[int]
@@ -137,6 +138,7 @@ class Conversation:
         if self.prompt_len is None:
             raise MaskMisaligned("conversation has no model output; check is_trainable() first")
         return Row(
+            conversation_id=self.conversation_id,
             prompt_ids=self.token_ids[: self.prompt_len],
             response_ids=self.token_ids[self.prompt_len :],
             response_mask=list(self.mask),
