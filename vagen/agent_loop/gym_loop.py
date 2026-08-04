@@ -21,6 +21,9 @@ from verl.utils.rollout_trace import rollout_trace_op
 
 from vagen.agent_loop.base import VagenGymAgentLoopBase
 from vagen.agent_loop.obs import _normalize_images, convert_obs_to_content, extract_success
+from vagen.rewards import sokoban as sokoban_spec
+from vagen.rewards.judge import StructuredJudge
+from vagen.rewards.state_reward import StateRewardWrapper
 from vagen.agent_loop.verl_client import VerlClient
 from vagen.core.harness import CompactHarness, ConcatHarness, NoConcatHarness
 from vagen.core.runner import run_episode
@@ -29,6 +32,9 @@ logger = logging.getLogger(__file__)
 logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
 
 HARNESSES = {"concat": ConcatHarness, "no_concat": NoConcatHarness, "compact": CompactHarness}
+
+# Environments that can score the agent's descriptions. Keyed by the registry name.
+STATE_REWARD_SPECS = {"Sokoban": sokoban_spec.SPEC}
 
 
 class GymEnvAdapter:
@@ -42,6 +48,10 @@ class GymEnvAdapter:
     def __init__(self, env, env_name: str, kwargs: dict):
         self.env, self.env_name, self.kwargs = env, env_name, kwargs
         self.success = False
+        # Summed over the episode. Reported on every row whether or not the agent ever
+        # produced a description: verl reads the set of extra keys from the first row,
+        # so a key missing there hides the metric for the whole batch.
+        self.state_scores: dict[str, float] = {"grounding": 0.0, "worldmodeling": 0.0, "format": 0.0}
 
     async def reset(self, seed=None):
         obs, info = await self.env.reset(seed=seed)
@@ -60,6 +70,8 @@ class GymEnvAdapter:
             return self._message({"obs_str": "Environment Error"}), 0.0, True, False, {"env_error": True}
 
         self.success = extract_success(info)
+        for key in self.state_scores:
+            self.state_scores[key] += float(info.get(f"state_reward/{key}", 0.0) or 0.0)
         return self._message(obs), reward, bool(done), False, info
 
     async def close(self):
@@ -77,7 +89,11 @@ class GymLoop(VagenGymAgentLoopBase):
     @rollout_trace_op
     async def run(self, sampling_params: dict[str, Any], **kwargs) -> list[AgentLoopOutput]:
         env_cls = self.resolve_env_class(kwargs["env_name"])
-        env = GymEnvAdapter(env_cls(env_config=kwargs["config"]), kwargs["env_name"], kwargs)
+        env = GymEnvAdapter(
+            self._maybe_state_reward(env_cls(env_config=kwargs["config"]), kwargs["env_name"]),
+            kwargs["env_name"],
+            kwargs,
+        )
 
         harness = self._build_harness()
         per_turn = min(int(kwargs.get("response_length_per_turn") or self.response_length), self.response_length)
@@ -104,6 +120,32 @@ class GymLoop(VagenGymAgentLoopBase):
             env, harness, client, seed=kwargs["seed"], max_turns=int(kwargs["max_turns"])
         )
         return self._outputs(client, env, result, kwargs)
+
+    def _maybe_state_reward(self, env, env_name: str):
+        """Wrap the environment so the reasoning is scored, if configured.
+
+        Off by default: it needs a judge endpoint, and a run that silently scored
+        nothing would be indistinguishable from one that scored badly.
+        """
+        cfg = self.config.trainer.get("state_reward", {}) or {}
+        if not cfg.get("enable", False):
+            return env
+
+        spec = STATE_REWARD_SPECS.get(env_name)
+        if spec is None:
+            raise ValueError(
+                f"state_reward is on but {env_name!r} has no spec; add one to STATE_REWARD_SPECS "
+                f"(available: {sorted(STATE_REWARD_SPECS)})"
+            )
+        judge = StructuredJudge(base_url=cfg["judge_base_url"], model=cfg["judge_model"])
+        return StateRewardWrapper(
+            env=env,
+            spec=spec,
+            judge=judge,
+            grounding_weight=float(cfg.get("grounding_weight", 0.5)),
+            worldmodeling_weight=float(cfg.get("worldmodeling_weight", 0.5)),
+            format_reward=float(cfg.get("format_reward", 0.1)),
+        )
 
     def _build_harness(self):
         mode = self.config.trainer.get("harness", None)
@@ -133,7 +175,12 @@ class GymLoop(VagenGymAgentLoopBase):
                     num_turns=1,
                     metrics={},
                     extra_fields={
-                        "reward_extra_info": {"traj_success": float(env.success)},
+                        "reward_extra_info": {
+                            "traj_success": float(env.success),
+                            # Always present, so the metric exists even in runs where the
+                            # agent never described anything.
+                            **{f"{k}_reward": v for k, v in env.state_scores.items()},
+                        },
                         "image_data": images,
                         "last_turn": turn_idx == len(rows) - 1,
                         "group_idx": kwargs["group_idx"],

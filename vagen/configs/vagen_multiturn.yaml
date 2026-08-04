@@ -47,6 +47,17 @@ trainer:
   max_actor_ckpt_to_keep: 1                # Max number of actor checkpoints to keep (saves disk space)
   max_critic_ckpt_to_keep: 1               # Max number of critic checkpoints to keep
   concat_multi_turn: True                 # Concatenate multi-turn messages for rollout and training
+  # Reward the reasoning as well as the outcome: the agent's <observation> and
+  # <prediction> are scored against the real layout and the scores are paid to the
+  # tokens that carry them. Needs a judge endpoint; see scripts/launch_judge.sh.
+  state_reward:
+    enable: False
+    judge_base_url: "http://127.0.0.1:8123/v1"
+    judge_model: "Qwen/Qwen2.5-3B-Instruct"
+    grounding_weight: 0.5
+    worldmodeling_weight: 0.5
+    format_reward: 0.1
+
   # Context policy. Defaults to concat_multi_turn when unset, so existing scripts
   # select the same layout as before.
   harness: null                    # concat | no_concat | compact

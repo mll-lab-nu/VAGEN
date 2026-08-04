@@ -190,3 +190,89 @@ def test_silence_about_an_absent_object_is_not_rewarded():
 
     hallucinated = grouped_f1(BOX + TGT, gold, weights)
     assert hallucinated < 1.0, "inventing a target must cost"
+
+
+# --------------------------------------------------------------- wiring into verl
+
+
+def test_the_scores_are_reported_on_every_row():
+    """★ verl reads the set of extra reward keys from the first row only. A key missing
+    there hides the metric for the whole batch -- so a run where the agent never
+    described anything would show no grounding metric at all, which reads as 'the
+    feature is off' rather than 'the agent scored zero'."""
+    import inspect
+
+    from vagen.agent_loop import gym_loop
+
+    source = inspect.getsource(gym_loop.GymEnvAdapter.__init__)
+    assert '"grounding": 0.0' in source and '"worldmodeling": 0.0' in source, (
+        "the score keys must exist before the first step, not appear once earned"
+    )
+
+    outputs = inspect.getsource(gym_loop.GymLoop._outputs)
+    assert "_reward" in outputs and "state_scores" in outputs
+
+
+def test_state_reward_is_off_unless_configured():
+    """A run that silently scored nothing would be indistinguishable from one that
+    scored badly, so it has to be asked for."""
+    import inspect
+
+    from vagen.agent_loop import gym_loop
+
+    source = inspect.getsource(gym_loop.GymLoop._maybe_state_reward)
+    assert 'get("enable", False)' in source
+
+
+def test_an_environment_without_a_spec_fails_loudly():
+    """Turning the reward on for an environment that cannot supply ground truth would
+    otherwise train against a constant."""
+    import inspect
+
+    from vagen.agent_loop import gym_loop
+
+    source = inspect.getsource(gym_loop.GymLoop._maybe_state_reward)
+    assert "raise ValueError" in source and "has no spec" in source
+
+
+# ------------------------------------------------------- hallucination must cost
+
+
+def _box(v="below", h="same"):
+    return {"object_id": "box", "vertical_relation": v, "horizontal_relation": h}
+
+
+def _target(v="above", h="same"):
+    return {"object_id": "target", "vertical_relation": v, "horizontal_relation": h}
+
+
+WEIGHTS = {"target": 0.5, "box": 0.5}
+
+
+def test_describing_extra_items_of_a_real_type_costs_precision():
+    """★ Inventing things has to be worse than not inventing them, or the cheapest way
+    to raise recall is to list every relation the grid could contain."""
+    from vagen.rewards.spatial import grouped_f1
+
+    gold = [_box(), _target()]
+    exact = grouped_f1(gold, gold, WEIGHTS)
+    one_extra = grouped_f1(gold + [_box("above", "left")], gold, WEIGHTS)
+    two_extra = grouped_f1(gold + [_box("above", "left"), _box("same", "right")], gold, WEIGHTS)
+
+    assert exact == pytest.approx(1.0)
+    assert two_extra < one_extra < exact, f"{two_extra} < {one_extra} < {exact}"
+
+
+def test_inventing_a_type_that_is_not_there_costs_more_than_silence():
+    """★ The 'absent from both' rule only skips a type when neither side mentions it.
+    Once the description mentions it, it counts -- with nothing to match against."""
+    from vagen.rewards.spatial import grouped_f1
+
+    gold = [_box()]                                   # no targets in this scene
+
+    silent_about_targets = grouped_f1([_box()], gold, WEIGHTS)
+    invented_a_target = grouped_f1([_box(), _target()], gold, WEIGHTS)
+
+    assert silent_about_targets == pytest.approx(1.0)
+    assert invented_a_target == pytest.approx(0.5)
+    assert invented_a_target < silent_about_targets
