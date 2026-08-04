@@ -16,7 +16,7 @@ import os
 from typing import Any
 from uuid import uuid4
 
-from verl.experimental.agent_loop.agent_loop import AgentLoopOutput, register
+from verl.experimental.agent_loop.agent_loop import AgentLoopOutput, cap_token_ids, register
 from verl.utils.rollout_trace import rollout_trace_op
 
 from vagen.agent_loop.base import VagenGymAgentLoopBase
@@ -163,13 +163,30 @@ class GymLoop(VagenGymAgentLoopBase):
         outputs = []
         for turn_idx, row in enumerate(rows):
             images = client.images(row.conversation_id)
+            # Both sides can carry image placeholders: the prompt holds the opening
+            # observation, and in concat mode the response region holds every later one,
+            # appended between turns as unmasked context. A raw slice of either can land
+            # inside a placeholder run while multi_modal_data still ships every image,
+            # and the model then dies in the attention on a shape that names neither.
+            # verl refuses to slice a multimodal sequence; we defer to the same rule
+            # rather than keeping a second, quieter policy here.
+            mm = bool(images)
+            prompt_ids = cap_token_ids(
+                row.prompt_ids, self.prompt_length, multimodal=mm, keep="tail",
+                what="prompt", budget_name="data.max_prompt_length",
+            )
+            response_ids = cap_token_ids(
+                row.response_ids, self.response_length, multimodal=mm, keep="head",
+                what="response", budget_name="data.max_response_length",
+            )
+            keep = len(response_ids)
             outputs.append(
                 AgentLoopOutput(
-                    prompt_ids=row.prompt_ids[-self.prompt_length :],
-                    response_ids=row.response_ids[: self.response_length],
-                    response_mask=row.response_mask[: self.response_length],
+                    prompt_ids=prompt_ids,
+                    response_ids=response_ids,
+                    response_mask=row.response_mask[:keep],
                     multi_modal_data={"image": images} if images else {},
-                    response_logprobs=row.logprobs[: self.response_length] or None,
+                    response_logprobs=row.logprobs[:keep] or None,
                     reward_score=float(sum(row.scores)),
                     num_turns=1,
                     metrics={},
