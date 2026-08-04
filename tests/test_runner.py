@@ -1,0 +1,145 @@
+"""Tests for the episode loop.
+
+The loop is short on purpose, so what is worth testing is what it refuses to do: act on
+a response the harness kept, credit the wrong conversation, or report a turn limit as a
+terminal state.
+"""
+
+import types
+
+import pytest
+
+from vagen.core.client import BackendOutput, InferenceClient
+from vagen.core.harness import ConcatHarness, NoConcatHarness
+from vagen.core.runner import run_episode
+
+
+class Env:
+    def __init__(self, steps=3, reward=1.0, terminate_at=None):
+        self.steps, self.reward, self.terminate_at = steps, reward, terminate_at
+        self.actions, self.closed = [], False
+
+    async def reset(self, seed=None):
+        return {"obs_str": "start"}, {}
+
+    async def system_prompt(self):
+        return {"role": "system", "content": "sys"}
+
+    async def step(self, action, response_token_ids=None, tokenizer=None):
+        self.actions.append(action)
+        done = self.terminate_at is not None and len(self.actions) >= self.terminate_at
+        return {"obs_str": f"obs{len(self.actions)}"}, self.reward, done, False, {}
+
+    async def close(self):
+        self.closed = True
+
+
+class Client(InferenceClient):
+    tokenizer = object()
+
+    def __init__(self):
+        super().__init__()
+        self.n = 0
+
+    def encode(self, messages):
+        return [ord(c) for m in messages for c in str(m.get("content", ""))]
+
+    async def generate(self, prompt_ids, **kwargs):
+        self.n += 1
+        return BackendOutput(text=f"act{self.n}", token_ids=[500 + self.n], prompt_token_ids=None)
+
+
+@pytest.mark.asyncio
+async def test_a_terminal_step_ends_the_episode():
+    env, client = Env(terminate_at=2), Client()
+    result = await run_episode(env, ConcatHarness(), client, max_turns=10)
+
+    assert result.turns == 2 and result.terminated and not result.truncated
+    assert env.closed
+
+
+@pytest.mark.asyncio
+async def test_running_out_of_turns_is_truncation_not_termination():
+    """★ The value function must bootstrap past a turn limit and must not past a real
+    ending; conflating them biases every episode that hits the cap."""
+    env, client = Env(terminate_at=None), Client()
+    result = await run_episode(env, ConcatHarness(), client, max_turns=3)
+
+    assert result.turns == 3 and result.truncated and not result.terminated
+
+
+@pytest.mark.asyncio
+async def test_concat_produces_one_row_and_no_concat_one_per_turn():
+    """★ The layout is entirely the harness's doing; the loop is identical."""
+    env, client = Env(terminate_at=3), Client()
+    await run_episode(env, ConcatHarness(), client, max_turns=10)
+    assert len(client.rows()) == 1
+
+    env2, client2 = Env(terminate_at=3), Client()
+    await run_episode(env2, NoConcatHarness(), client2, max_turns=10)
+    assert len(client2.rows()) == 3
+
+
+@pytest.mark.asyncio
+async def test_each_turns_reward_lands_on_that_turn():
+    env, client = Env(terminate_at=3, reward=1.0), Client()
+    await run_episode(env, ConcatHarness(), client, max_turns=10)
+
+    row = client.rows()[0]
+    assert sum(row.scores) == 3.0
+    assert [i for i, s in enumerate(row.scores) if s] == [
+        i for i, m in enumerate(row.response_mask) if m
+    ], "one unit of credit per model token, since each turn is one token here"
+
+
+@pytest.mark.asyncio
+async def test_a_response_the_harness_keeps_is_not_given_to_the_environment():
+    """★ Compaction's summary must not be stepped on. The loop asks again instead."""
+
+    class KeepsFirst(ConcatHarness):
+        def __init__(self):
+            super().__init__()
+            self.kept = 0
+
+        def accept(self, response):
+            if self.kept == 0:
+                self.kept += 1
+                return None
+            return super().accept(response)
+
+    env, client = Env(terminate_at=1), Client()
+    await run_episode(env, KeepsFirst(), client, max_turns=5)
+
+    assert env.actions == ["act2"], f"environment saw {env.actions}"
+    assert client.n == 2, "the loop must ask again rather than skip the turn"
+
+
+@pytest.mark.asyncio
+async def test_the_environment_receives_the_token_ids_and_tokenizer():
+    """An env that scores per token needs both; one that does not ignores them."""
+    seen = {}
+
+    class Recording(Env):
+        async def step(self, action, response_token_ids=None, tokenizer=None):
+            seen["ids"], seen["tok"] = response_token_ids, tokenizer
+            return await super().step(action)
+
+    client = Client()
+    await run_episode(Recording(terminate_at=1), ConcatHarness(), client, max_turns=3)
+
+    assert seen["ids"] == [501]
+    assert seen["tok"] is Client.tokenizer
+
+
+@pytest.mark.asyncio
+async def test_a_vector_reward_is_summed_for_reporting_but_kept_per_token():
+    class VectorEnv(Env):
+        async def step(self, action, response_token_ids=None, tokenizer=None):
+            obs, _, done, trunc, info = await super().step(action)
+            return obs, [0.25] * len(response_token_ids), done, trunc, info
+
+    client = Client()
+    result = await run_episode(VectorEnv(terminate_at=2), ConcatHarness(), client, max_turns=5)
+
+    assert result.total_reward == pytest.approx(0.5)
+    assert client.rows()[0].scores.count(0.25) == 2
