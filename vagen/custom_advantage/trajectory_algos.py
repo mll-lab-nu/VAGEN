@@ -141,3 +141,24 @@ def compute_traj_grpo(*, batch, non_tensor_batch, config=None, **kwargs):
         advantages = advantages * mask_f
 
         return view.broadcast(advantages), view.broadcast(advantages.clone())
+
+
+def _is_turn_boundary(index: torch.Tensor, valid: torch.Tensor, width: int) -> torch.Tensor:
+    """True at the last model-output token of each turn.
+
+    A turn ends either because the environment interrupts -- leaving a gap in the
+    positions within a row -- or because the trajectory continues in the next row. The
+    row change has to be tested explicitly: ``row * width + position`` runs on unbroken
+    across a row boundary whenever a row's model output reaches its end, so a gap test
+    alone silently merges two turns into one.
+    """
+    boundary = torch.zeros_like(valid)
+    gap = index[:, 1:] != index[:, :-1] + 1
+    new_row = index[:, 1:] // width != index[:, :-1] // width
+    boundary[:, :-1] = valid[:, 1:] & (gap | new_row)
+    # The last valid token of a trajectory ends the last turn.
+    last = valid & ~torch.roll(valid, shifts=-1, dims=1)
+    last[:, -1] = valid[:, -1]
+    return boundary | last
+
+

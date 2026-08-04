@@ -20,7 +20,7 @@ from verl.experimental.agent_loop.agent_loop import AgentLoopOutput, register
 from verl.utils.rollout_trace import rollout_trace_op
 
 from vagen.agent_loop.base import VagenGymAgentLoopBase
-from vagen.agent_loop.gym_agent_loop import _normalize_images, convert_obs_to_content, extract_success
+from vagen.agent_loop.obs import _normalize_images, convert_obs_to_content, extract_success
 from vagen.agent_loop.verl_client import VerlClient
 from vagen.core.harness import CompactHarness, ConcatHarness, NoConcatHarness
 from vagen.core.runner import run_episode
