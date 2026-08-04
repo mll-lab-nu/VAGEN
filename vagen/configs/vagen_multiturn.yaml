@@ -62,7 +62,10 @@ trainer:
       weight: 0.5
     format_reward: 0.1
     judge_base_url: "http://127.0.0.1:8123/v1"
-    judge_model: "Qwen/Qwen2.5-3B-Instruct"
+    # Qwen3 generation, instruct-only: the 2507 line has no thinking mode, which for a
+    # parser on the rollout's critical path is what you want. Qwen3.5 needs a newer
+    # transformers than verl is pinned to here.
+    judge_model: "Qwen/Qwen3-4B-Instruct-2507"
 
   # Context policy. Defaults to concat_multi_turn when unset, so existing scripts
   # select the same layout as before.
