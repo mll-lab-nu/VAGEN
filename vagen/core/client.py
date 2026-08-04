@@ -49,7 +49,6 @@ class InferenceClient(ABC):
 
     def __init__(self):
         self._conversations: dict[str, Conversation] = {}
-        self._sent: dict[str, int] = {}   # messages already rendered, per conversation
         self._counter = 0
 
     @property
@@ -71,12 +70,11 @@ class InferenceClient(ABC):
         conversation_id = self._open(conversation_id)
         conversation = self._conversations[conversation_id]
 
-        # Only what the harness added since last time. Re-rendering the whole history
-        # would produce a prefix in this tokenizer's form while the record holds the
-        # backend's, and the two need not agree token for token.
-        already = self._sent[conversation_id]
-        conversation.add_context(self.encode(messages[already:]))
-        self._sent[conversation_id] = len(messages)
+        # Encode exactly what the harness handed over. The harness already sends only
+        # what is new -- deduplicating again here silently dropped every observation
+        # after the first, since it sliced a one-message delta against a count of the
+        # messages already sent.
+        conversation.add_context(self.encode(messages))
 
         output = await self.generate(conversation.token_ids, **kwargs)
 
@@ -102,7 +100,6 @@ class InferenceClient(ABC):
         self._counter += 1
         new_id = f"c{self._counter}"
         self._conversations[new_id] = Conversation(conversation_id=new_id)
-        self._sent[new_id] = 0
         return new_id
 
     # ------------------------------------------------------------------ reading

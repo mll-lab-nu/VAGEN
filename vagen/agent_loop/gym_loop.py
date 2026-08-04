@@ -92,8 +92,16 @@ class GymLoop(VagenGymAgentLoopBase):
             response_limit=per_turn,
         )
 
+        # No silent default: falling back to a single turn would look like a working
+        # run whose episodes all stop after one step, which is nearly invisible --
+        # every row is well-formed, just short.
+        if not kwargs.get("max_turns"):
+            raise KeyError(
+                f"the dataset row for env {kwargs['env_name']!r} carries no max_turns; "
+                f"available keys: {sorted(kwargs)}"
+            )
         result = await run_episode(
-            env, harness, client, seed=kwargs["seed"], max_turns=int(kwargs.get("max_turns") or 1)
+            env, harness, client, seed=kwargs["seed"], max_turns=int(kwargs["max_turns"])
         )
         return self._outputs(client, env, result, kwargs)
 

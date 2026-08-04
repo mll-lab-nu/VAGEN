@@ -143,3 +143,22 @@ async def test_a_vector_reward_is_summed_for_reporting_but_kept_per_token():
 
     assert result.total_reward == pytest.approx(0.5)
     assert client.rows()[0].scores.count(0.25) == 2
+
+
+@pytest.mark.asyncio
+async def test_a_concat_episode_accumulates_every_turn():
+    """★ End to end across harness, client and record. Each layer's unit tests passed
+    while the two disagreed about who removes already-sent messages, so the observations
+    silently stopped entering the context. Only a test spanning them catches that."""
+    env, client = Env(terminate_at=4), Client()
+    await run_episode(env, ConcatHarness(), client, max_turns=10)
+
+    import itertools
+
+    row = client.rows()[0]
+    runs = [(value, len(list(group))) for value, group in itertools.groupby(row.response_mask)]
+
+    assert sum(row.response_mask) == 4, "one model token per turn"
+    # 1, obs, 1, obs, 1, obs, 1 -- the last turn is terminal, so no observation follows.
+    assert [value for value, _ in runs] == [1, 0, 1, 0, 1, 0, 1]
+    assert all(length > 0 for value, length in runs if value == 0), "an observation is empty"
