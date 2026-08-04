@@ -60,7 +60,7 @@ def test_a_conversation_the_model_never_spoke_in_is_dropped():
 
 def test_row_rejects_an_inconsistent_record():
     with pytest.raises(MaskMisaligned, match="inconsistent"):
-        Row(prompt_ids=[1], response_ids=[2, 3], response_mask=[1], logprobs=[0.0, 0.0], scores=[0.0, 0.0])
+        Row(conversation_id='c', prompt_ids=[1], response_ids=[2, 3], response_mask=[1], logprobs=[0.0, 0.0], scores=[0.0, 0.0])
 
 
 # ---------------------------------------------------------------------- adoption
