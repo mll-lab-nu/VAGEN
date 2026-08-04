@@ -95,6 +95,15 @@ class StateRewardWrapper:
 
     # ------------------------------------------------------------------- stepping
     async def step(self, action: str, response_token_ids=None, tokenizer=None):
+        """Score the descriptions, then return what the env it wraps returns.
+
+        Four values, not the five of ``BaseEnv``. This wrapper stands in for a plain gym
+        environment and is consumed by ``GymEnvAdapter``, which is the thing that speaks
+        the five-value contract, with this underneath it. Returning five made every step
+        raise "too many values to unpack (expected 4)" -- 1006 turns of it, reaching the
+        cluster as a model that earned zero reward rather than as a wrapper with the
+        wrong arity.
+        """
         before = self.spec.relations(self.env)
         obs, reward, done, info = await self.env.step(action)
         after = self.spec.relations(self.env)
@@ -105,9 +114,9 @@ class StateRewardWrapper:
 
         if response_token_ids is None or tokenizer is None:
             # Nothing to place anything on; degrade to a scalar rather than vanish.
-            return obs, float(reward) + sum(self.last_scores.values()), done, False, info
+            return obs, float(reward) + sum(self.last_scores.values()), done, info
 
-        return obs, self._place(scored, float(reward), response_token_ids, tokenizer), done, False, info
+        return obs, self._place(scored, float(reward), response_token_ids, tokenizer), done, info
 
     async def _score(self, action: str, gold: dict[str, list[dict]]) -> dict:
         spans = {name: tagged_span(action, tag) for name, tag in TAGS.items() if name in self.enabled}
