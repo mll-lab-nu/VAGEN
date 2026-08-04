@@ -157,8 +157,10 @@ async def test_reward_lands_on_the_conversation_it_belongs_to():
     first = await c.send(["ab"])
     second = await c.send(["cd"])
 
-    assert c.reward(second.conversation_id, 1.0) == [0.0, 1.0]
-    assert c.reward(first.conversation_id, 0.0) == [0.0, 0.0]
+    c.reward(second.conversation_id, 1.0)
+    rows = {conv.conversation_id: conv for conv in c.conversations()}
+    assert rows[second.conversation_id].scores == [0.0, 1.0]
+    assert rows[first.conversation_id].scores == [0.0, 0.0]
 
 
 @pytest.mark.asyncio
