@@ -64,7 +64,7 @@ async def test_images_accumulate_across_a_conversation():
     c = _client(server)
 
     r = await c.send([_msg("a", images=["img1"])])
-    await c.send([_msg("a", images=["img1"]), _msg("b", images=["img2"])], r.conversation_id)
+    await c.send([_msg("b", images=["img2"])], r.conversation_id)   # the delta
 
     assert server.calls[0]["images"] == ["img1"]
     assert server.calls[1]["images"] == ["img1", "img2"]
@@ -112,7 +112,7 @@ async def test_a_continuing_span_drops_the_template_preamble():
     c = _client(server)
 
     r = await c.send([_msg("a")])
-    await c.send([_msg("a"), _msg("b")], r.conversation_id)
+    await c.send([_msg("b")], r.conversation_id)
 
     second_span = server.calls[1]["prompt_ids"][len(server.calls[0]["prompt_ids"]) + 2 :]
     assert ord("|") not in second_span, "the template preamble leaked into a continuation"
