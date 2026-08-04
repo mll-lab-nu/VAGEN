@@ -35,6 +35,7 @@ from vagen.custom_filter.filter import FILTER_REGISTRY
 from vagen.custom_metric.metric import METRIC_REGISTRY
 from vagen.trainer.logic import collect_registry_metrics, value_mask_from_returns
 from vagen.utils.image_token_utils import replace_image_tokens_for_logging
+from vagen.utils.image_validation_logger import ValidationGenerationsLogger
 
 
 class VagenLogicMixin:
@@ -204,6 +205,42 @@ class VagenV0Mixin(VagenLogicMixin):
     def _fit_dump_data(self, batch):
         super()._fit_dump_data(batch)
         self._vagen_dump_images(batch)
+
+    def _maybe_log_val_generations(self, inputs, outputs, scores, images=None):
+        """Log validation samples with the frame the model was looking at.
+
+        verl's table is input / output / score, which for a rendered task leaves out
+        the thing being reasoned about. The logger here is the one on main; it lost its
+        caller when the vendored trainer was deleted, not its usefulness.
+
+        This exists as an override rather than a copy of ``_validate`` because that is
+        150 lines that would then rot against upstream -- the reason the vendored
+        trainer was deleted in the first place. Upstream collects the column and passes
+        it; the base ignores it.
+        """
+        n = self.config.trainer.get("log_val_generations", 0)
+        if not n:
+            return
+        if not images or all(img is None for img in images):
+            return super()._maybe_log_val_generations(inputs, outputs, scores)
+
+        if self.config.trainer.get("replace_image_tokens_for_logging", True):
+            processor = getattr(self, "processor", None)
+            inputs = replace_image_tokens_for_logging(inputs, processor)
+            outputs = replace_image_tokens_for_logging(outputs, processor)
+
+        samples = list(zip(inputs, outputs, scores, images, strict=True))
+        samples.sort(key=lambda s: s[0])
+        # Fixed seed so the same prompts are shown every step and the table reads as a
+        # progression rather than a fresh sample each time.
+        np.random.RandomState(42).shuffle(samples)
+
+        if getattr(self, "_vagen_val_logger", None) is None:
+            self._vagen_val_logger = ValidationGenerationsLogger(
+                project_name=self.config.trainer.project_name,
+                experiment_name=self.config.trainer.experiment_name,
+            )
+        self._vagen_val_logger.log(self.config.trainer.logger, samples[:n], self.global_steps)
 
     def _fit_save_checkpoint(self, *args, **kwargs):
         """HF Hub upload on its own schedule, independent of ``trainer.save_freq``.
