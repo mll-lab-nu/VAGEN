@@ -107,7 +107,7 @@ async def test_only_the_enabled_reward_is_scored():
     w = _wrapper(Env(BOX, BOX, reward=0.0), Judge(BOX, BOX),
                  enabled={"state_estimation": 1.0}, format_reward=0.0)
 
-    _, _, _, _, info = await w.step(action, [ord(c) for c in action], CharTokenizer())
+    _, _, _, info = await w.step(action, [ord(c) for c in action], CharTokenizer())
 
     assert info["state_reward/state_estimation"] == pytest.approx(1.0)
     # Absent, not zero. A disabled reward reporting 0.0 reads as "scored nothing"
@@ -129,7 +129,7 @@ async def test_each_score_lands_on_its_own_section():
         enabled={"state_estimation": 1.0, "transition_prediction": 1.0}, format_reward=0.0,
     )
 
-    _, vector, _, _, _ = await w.step(action, [ord(c) for c in action], CharTokenizer())
+    _, vector, _, _ = await w.step(action, [ord(c) for c in action], CharTokenizer())
 
     assert vector[action.index("A")] == pytest.approx(1.0)
     assert vector[action.index("B")] == pytest.approx(1.0)
@@ -145,10 +145,10 @@ async def test_prediction_is_scored_against_the_state_after_the_step():
     on = {"transition_prediction": 1.0}
 
     w = _wrapper(Env(before=BOX, after=moved), Judge(moved), enabled=on, format_reward=0.0)
-    _, _, _, _, after = await w.step(action, [ord(c) for c in action], CharTokenizer())
+    _, _, _, after = await w.step(action, [ord(c) for c in action], CharTokenizer())
 
     w2 = _wrapper(Env(before=BOX, after=BOX), Judge(moved), enabled=on, format_reward=0.0)
-    _, _, _, _, before = await w2.step(action, [ord(c) for c in action], CharTokenizer())
+    _, _, _, before = await w2.step(action, [ord(c) for c in action], CharTokenizer())
 
     assert after["state_reward/transition_prediction"] == pytest.approx(1.0)
     assert before["state_reward/transition_prediction"] < after["state_reward/transition_prediction"]
@@ -160,7 +160,7 @@ async def test_a_wrong_description_earns_nothing_but_does_not_go_negative():
     wrong = [{"object_id": "box", "vertical_relation": "above", "horizontal_relation": "left"}]
     w = _wrapper(Env(BOX, BOX, reward=0.0), Judge(wrong), format_reward=0.0)
 
-    _, vector, _, _, _ = await w.step(action, [ord(c) for c in action], CharTokenizer())
+    _, vector, _, _ = await w.step(action, [ord(c) for c in action], CharTokenizer())
 
     assert sum(vector) == pytest.approx(0.0)
 
@@ -172,7 +172,7 @@ async def test_a_judge_outage_costs_the_process_reward_not_the_rollout():
     action = "<observation>A</observation>"
     w = _wrapper(Env(BOX, BOX, reward=2.0), Judge(None), format_reward=0.0)
 
-    _, vector, _, _, _ = await w.step(action, [ord(c) for c in action], CharTokenizer())
+    _, vector, _, _ = await w.step(action, [ord(c) for c in action], CharTokenizer())
 
     assert sum(vector) == pytest.approx(2.0), "the environment's own reward must survive"
 
@@ -182,7 +182,7 @@ async def test_the_outcome_reward_stays_on_the_last_token():
     action = "<observation>A</observation>zz"
     w = _wrapper(Env(BOX, BOX, reward=3.0), Judge(BOX), format_reward=0.0)
 
-    _, vector, _, _, _ = await w.step(action, [ord(c) for c in action], CharTokenizer())
+    _, vector, _, _ = await w.step(action, [ord(c) for c in action], CharTokenizer())
 
     assert vector[-1] == pytest.approx(3.0)
 
@@ -195,10 +195,10 @@ async def test_the_format_bonus_needs_every_section_that_is_scored():
     both = "<observation>A</observation><prediction>B</prediction>"
 
     w1 = _wrapper(Env(BOX, BOX, reward=0.0), Judge(BOX), enabled=both_on, format_reward=0.5)
-    _, v1, _, _, _ = await w1.step(one, [ord(c) for c in one], CharTokenizer())
+    _, v1, _, _ = await w1.step(one, [ord(c) for c in one], CharTokenizer())
 
     w2 = _wrapper(Env(BOX, BOX, reward=0.0), Judge(BOX, BOX), enabled=both_on, format_reward=0.5)
-    _, v2, _, _, _ = await w2.step(both, [ord(c) for c in both], CharTokenizer())
+    _, v2, _, _ = await w2.step(both, [ord(c) for c in both], CharTokenizer())
 
     assert sum(v1) == pytest.approx(0.0)
     assert sum(v2) == pytest.approx(0.5)
@@ -223,7 +223,7 @@ async def test_without_tokens_the_wrapper_degrades_to_a_scalar():
     action = "<observation>A</observation>"
     w = _wrapper(Env(BOX, BOX, reward=1.0), Judge(BOX), format_reward=0.0)
 
-    _, reward, _, _, _ = await w.step(action)
+    _, reward, _, _ = await w.step(action)
 
     assert isinstance(reward, float) and reward == pytest.approx(2.0)
 

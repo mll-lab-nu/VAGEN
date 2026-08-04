@@ -11,6 +11,7 @@ contract, and turn the client's rows into ``AgentLoopOutput``.
 
 from __future__ import annotations
 
+import inspect
 import logging
 import os
 from typing import Any
@@ -33,6 +34,14 @@ logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
 
 # Environments that can score the agent's descriptions. Keyed by the registry name.
 STATE_REWARD_SPECS = {"Sokoban": sokoban_spec.SPEC}
+
+
+def _accepts_response(step) -> bool:
+    """Whether an env's ``step`` wants the response tokens and the tokenizer."""
+    try:
+        return "response_token_ids" in inspect.signature(step).parameters
+    except (TypeError, ValueError):
+        return False
 
 
 class GymEnvAdapter:
@@ -60,7 +69,15 @@ class GymEnvAdapter:
 
     async def step(self, action: str, response_token_ids=None, tokenizer=None):
         try:
-            obs, reward, done, info = await self.env.step(action)
+            # The response and tokenizer go through when the wrapped env asks for them.
+            # A plain gym env does not, and a reward wrapper that scores spans of the
+            # response cannot do its job without them -- dropping them here does not
+            # fail, it silently pays a scalar at the last token instead of placing the
+            # score on the tokens that earned it.
+            kwargs = {}
+            if _accepts_response(self.env.step):
+                kwargs = {"response_token_ids": response_token_ids, "tokenizer": tokenizer}
+            obs, reward, done, info = await self.env.step(action, **kwargs)
         except Exception as exc:  # noqa: BLE001 - one bad action must not kill the batch
             logger.error("environment %r failed on action %r: %s", self.env_name, action, exc)
             # Ends the episode rather than pretending the step happened. Reported as
