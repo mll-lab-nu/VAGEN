@@ -37,6 +37,11 @@ async def run_episode(env, harness, client, *, seed=None, max_turns: int = 10, *
         while action is None:
             call = harness.next_call()
             response = await client.send(call.messages, call.conversation_id, **send_kwargs)
+            # A budget-driven harness needs to know how large the conversation has
+            # grown. It receives a number, not tokens -- the count is the client's.
+            if hasattr(harness, "note_usage"):
+                harness.note_usage(client.usage(response.conversation_id))
+
             # None: the harness kept this one for itself, e.g. a summary. The
             # environment must not act on it -- that would advance the episode by a
             # turn that never happened.
