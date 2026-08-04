@@ -46,6 +46,10 @@ trainer:
   replace_image_tokens_for_logging: True    # By default, we want to convert a sequence of image tokens with readable placeholders in logs
   max_actor_ckpt_to_keep: 1                # Max number of actor checkpoints to keep (saves disk space)
   max_critic_ckpt_to_keep: 1               # Max number of critic checkpoints to keep
+  # Validation samples logged to wandb each round, as input / output / score / frame.
+  # Aggregate metrics cannot tell a model that learned nothing from a rollout whose
+  # format was rejected every turn, and both have happened here; this is how you look.
+  log_val_generations: 8
   concat_multi_turn: True                 # Concatenate multi-turn messages for rollout and training
   # Reward the reasoning as well as the outcome: the agent's <observation> and
   # <prediction> are scored against the real layout and the scores are paid to the
