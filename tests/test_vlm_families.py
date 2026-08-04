@@ -71,38 +71,43 @@ def test_image_token_is_discovered_per_family(repo, expects_mrope, expected_toke
     assert replace_image_tokens_for_logging(f"a {token}{token}{token} b", processor) == "a <image> b"
 
 
-def test_gym_loops_forward_mm_processor_kwargs(repo, expects_mrope, expected_token):
-    """★ The prompt is tokenized by the agent loop but the images are re-processed by
-    the inference engine, and both must agree on how an image is tiled. verl threads
-    data.mm_processor_kwargs to the engine; a loop that drops it on the tokenizing side
-    leaves the two disagreeing, which surfaces as a CUDA assert deep in the engine
-    rather than a config error."""
+def test_the_client_forwards_mm_processor_kwargs_both_ways(repo, expects_mrope, expected_token):
+    """★ The prompt is tokenized on one side and the images are re-processed by the
+    engine on the other, and the two must agree on how an image is tiled. Setting the
+    knob on one side only guarantees the mismatch, which surfaces as a CUDA assert deep
+    in the engine rather than as a configuration error.
+
+    Checked on the parsed call, so a comment mentioning the name cannot stand in for the
+    argument.
+    """
+    import ast
     import inspect
 
-    from vagen.agent_loop import gym_agent_loop, gym_agent_loop_no_concat
+    from vagen.agent_loop.verl_client import VerlClient
 
-    for module in (gym_agent_loop, gym_agent_loop_no_concat):
-        src = inspect.getsource(module)
-        calls = src.count("self.processor(")
-        forwards = src.count("**self._get_mm_processor_kwargs()")
-        assert calls == forwards, f"{module.__name__}: {calls} processor calls, {forwards} forward the kwargs"
+    source = inspect.getsource(VerlClient)
+    tree = ast.parse(source)
 
-        # The engine side needs the same settings; forwarding on only one side is what
-        # produced the mismatch. Checked on the parsed call rather than by substring,
-        # so a comment mentioning the name cannot pass for the argument.
-        import ast
+    # tokenizing side: every processor call carries them
+    processor_calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr in {"apply_chat_template"}
+    ]
+    assert processor_calls, "no chat-template call found"
+    for call in processor_calls:
+        assert any(kw.arg is None for kw in call.keywords), "a template call drops the kwargs"
 
-        generates = [
-            node
-            for node in ast.walk(ast.parse(src))
-            if isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and node.func.attr == "generate"
-        ]
-        assert generates, f"{module.__name__}: no generate() call found"
-        for call in generates:
-            names = {kw.arg for kw in call.keywords}
-            assert "mm_processor_kwargs" in names, (
-                f"{module.__name__}: generate() passes {sorted(n for n in names if n)} "
-                "but not mm_processor_kwargs"
-            )
+    # engine side: the generate call names them
+    generates = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "generate"
+    ]
+    assert generates, "no generate() call found"
+    for call in generates:
+        assert "mm_processor_kwargs" in {kw.arg for kw in call.keywords}, (
+            "generate() does not forward the tiling settings"
+        )
