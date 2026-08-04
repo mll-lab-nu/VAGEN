@@ -31,9 +31,10 @@ class Row:
     response_ids: list[int]
     response_mask: list[int]
     logprobs: list[float]
+    scores: list[float]
 
     def __post_init__(self):
-        if not (len(self.response_ids) == len(self.response_mask) == len(self.logprobs)):
+        if not (len(self.response_ids) == len(self.response_mask) == len(self.logprobs) == len(self.scores)):
             raise MaskMisaligned(
                 f"row is inconsistent: {len(self.response_ids)} response tokens, "
                 f"{len(self.response_mask)} mask entries, {len(self.logprobs)} logprobs"
@@ -53,7 +54,10 @@ class Conversation:
     token_ids: list[int] = field(default_factory=list)
     mask: list[int] = field(default_factory=list)
     logprobs: list[float] = field(default_factory=list)
+    scores: list[float] = field(default_factory=list)
     prompt_len: int | None = None
+    # Span of the most recent model output, so a turn's reward lands on that turn.
+    _last_response: tuple[int, int] | None = None
     # Length of the newest context span; the only region an adoption can resize.
     _tail_context_len: int | None = None
 
@@ -67,15 +71,19 @@ class Conversation:
             return
         self.mask += [0] * len(ids)
         self.logprobs += [0.0] * len(ids)
+        self.scores += [0.0] * len(ids)
         self._tail_context_len = len(ids)
 
     def add_response(self, ids: list[int], logprobs: list[float] | None = None) -> None:
         """Tokens the model produced."""
         if self.prompt_len is None:
             self.prompt_len = len(self.token_ids)
+        start = len(self.mask)
         self.token_ids += list(ids)
         self.mask += [1] * len(ids)
         self.logprobs += list(logprobs) if logprobs else [0.0] * len(ids)
+        self.scores += [0.0] * len(ids)
+        self._last_response = (start, len(self.mask))
         self._tail_context_len = 0
 
     # ---------------------------------------------------------------- adopting
@@ -103,6 +111,7 @@ class Conversation:
             keep = len(self.mask) - self._tail_context_len
             self.mask = self.mask[:keep] + [0] * adjusted
             self.logprobs = self.logprobs[:keep] + [0.0] * adjusted
+            self.scores = self.scores[:keep] + [0.0] * adjusted
             self._tail_context_len = adjusted
 
         self.token_ids = list(engine_ids)
@@ -132,26 +141,33 @@ class Conversation:
             response_ids=self.token_ids[self.prompt_len :],
             response_mask=list(self.mask),
             logprobs=list(self.logprobs),
+            scores=list(self.scores),
         )
 
-    def place_reward(self, reward: float | list[float]) -> list[float]:
-        """Spread the environment's reward over the trainable region.
+    def add_reward(self, reward: float | list[float]) -> None:
+        """Credit the most recent turn.
 
-        A scalar lands on the last model-produced token, which is where an outcome reward
-        belongs; a vector must already be aligned to the response, and its length is
-        checked rather than assumed — an env that re-encoded the text to build it would
-        otherwise misalign silently.
+        ★ Placed on *that turn's* last model token, not the conversation's. A concat
+        episode is many turns in one conversation, and summing them onto the final token
+        would erase which turn earned what -- the credit assignment the turn structure
+        exists to provide.
+
+        A vector must already be aligned to that turn's response; its length is checked
+        rather than assumed, because an env that re-encoded the text to build one would
+        otherwise misalign it silently.
         """
-        scores = [0.0] * len(self.mask)
-        if isinstance(reward, (int, float)):
-            last = max((i for i, m in enumerate(self.mask) if m), default=None)
-            if last is not None:
-                scores[last] = float(reward)
-            return scores
+        if self._last_response is None:
+            raise MaskMisaligned("no model output to credit; the environment acted on nothing")
+        start, end = self._last_response
 
-        if len(reward) != len(self.mask):
+        if isinstance(reward, (int, float)):
+            self.scores[end - 1] += float(reward)
+            return
+
+        if len(reward) != end - start:
             raise MaskMisaligned(
-                f"reward vector has {len(reward)} entries for a {len(self.mask)}-token response; "
+                f"reward vector has {len(reward)} entries for a {end - start}-token response; "
                 "an env returning per-token rewards must align them to response_token_ids"
             )
-        return [float(r) for r in reward]
+        for i, value in enumerate(reward):
+            self.scores[start + i] += float(value)

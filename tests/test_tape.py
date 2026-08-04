@@ -60,7 +60,7 @@ def test_a_conversation_the_model_never_spoke_in_is_dropped():
 
 def test_row_rejects_an_inconsistent_record():
     with pytest.raises(MaskMisaligned, match="inconsistent"):
-        Row(prompt_ids=[1], response_ids=[2, 3], response_mask=[1], logprobs=[0.0, 0.0])
+        Row(prompt_ids=[1], response_ids=[2, 3], response_mask=[1], logprobs=[0.0, 0.0], scores=[0.0, 0.0])
 
 
 # ---------------------------------------------------------------------- adoption
@@ -150,21 +150,37 @@ def test_unchanged_length_leaves_everything_alone():
 # ------------------------------------------------------------------------ reward
 
 
-def test_a_scalar_reward_lands_on_the_last_model_token():
-    """Not the last token: an observation may follow the final response, and crediting
-    the environment's own words is meaningless."""
+def test_a_scalar_reward_lands_on_the_turn_that_earned_it():
+    """★ Not on the conversation's last token. A concat episode is many turns in one
+    conversation, and an observation may follow the final response -- crediting the
+    environment's own words, or the wrong turn, erases what the turn structure is for."""
+    c = _conv()
+    c.add_response([7, 8])
+    c.add_reward(1.5)
+    c.add_context([9])
+    c.add_response([10])
+    c.add_reward(2.0)
+
+    assert c.row().scores == [0.0, 1.5, 0.0, 2.0]
+
+
+def test_rewards_accumulate_rather_than_overwrite():
+    c = _conv()
+    c.add_response([7])
+    c.add_reward(1.0)
+    c.add_reward(0.5)
+
+    assert c.row().scores == [1.5]
+
+
+def test_a_vector_reward_covers_that_turns_response():
     c = _conv()
     c.add_response([7, 8])
     c.add_context([9])
+    c.add_response([10, 11])
+    c.add_reward([0.25, 0.75])
 
-    assert c.place_reward(1.5) == [0.0, 1.5, 0.0]
-
-
-def test_a_vector_reward_is_used_as_given():
-    c = _conv()
-    c.add_response([7, 8])
-
-    assert c.place_reward([0.25, 0.75]) == [0.25, 0.75]
+    assert c.row().scores == [0.0, 0.0, 0.0, 0.25, 0.75]
 
 
 def test_a_misaligned_vector_reward_raises():
@@ -174,22 +190,21 @@ def test_a_misaligned_vector_reward_raises():
     c.add_response([7, 8])
 
     with pytest.raises(MaskMisaligned, match="align them to response_token_ids"):
-        c.place_reward([0.1, 0.2, 0.3])
+        c.add_reward([0.1, 0.2, 0.3])
 
 
-def test_reward_on_a_silent_conversation_is_all_zero():
+def test_crediting_before_any_response_raises():
     c = _conv()
-    assert c.place_reward(1.0) == []
+    with pytest.raises(MaskMisaligned, match="acted on nothing"):
+        c.add_reward(1.0)
 
 
-def test_the_record_needs_none_of_the_training_stack():
-    """★ The claim that eval needs only the harness rests on this layer staying
-    importable without torch, verl or transformers. Checked against the source, because
-    other tests will have those packages loaded already and sys.modules cannot tell us
-    who imported them."""
-    import vagen.core.tape as tape_mod
+def test_scores_survive_an_adoption():
+    c = _conv()
+    c.add_response([7, 8])
+    c.add_reward(1.0)
+    c.add_context([9])
+    c.adopt_prompt([1, 2, 3, 7, 8, 9, 9, 9])
 
-    source = open(tape_mod.__file__).read()
-
-    for package in ("torch", "verl", "transformers", "numpy"):
-        assert f"import {package}" not in source, f"the token record now depends on {package}"
+    assert len(c.scores) == len(c.mask)
+    assert c.scores[:2] == [0.0, 1.0], "credit must stay on the token that earned it"

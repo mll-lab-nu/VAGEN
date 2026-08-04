@@ -106,9 +106,9 @@ class InferenceClient(ABC):
         return new_id
 
     # ------------------------------------------------------------------ reading
-    def reward(self, conversation_id: str, value: float | list[float]) -> list[float]:
-        """Place the environment's reward on this conversation's tokens."""
-        return self._conversations[conversation_id].place_reward(value)
+    def reward(self, conversation_id: str, value: float | list[float]) -> None:
+        """Credit the turn that just happened in this conversation."""
+        self._conversations[conversation_id].add_reward(value)
 
     def rows(self) -> list[Row]:
         """One row per conversation the model spoke in.
