@@ -273,3 +273,28 @@ def test_token_gae_runs_without_a_turn_column():
     _, ret = TOKEN_GAE(batch=_batch([[0.0, 1.0]], [[1, 1]]), non_tensor_batch=nt, config=cfg)
 
     assert ret[0].tolist() == pytest.approx([1.0, 1.0])
+
+
+
+removed_estimator = get_adv_estimator_fn("traj_removed_estimator_gae")
+
+
+class _BiCfg(_Cfg):
+    def __init__(self, gamma=1.0, lam=1.0, lam_low=1.0):
+        self.gamma, self.lam, self.lam_low = gamma, lam, lam_low
+
+
+def test_turn_boundaries_are_found_under_both_layouts():
+    import torch
+
+    from vagen.custom_advantage.trajectory_algos import _is_turn_boundary
+
+    # one row of width 5, two turns: positions 0,1 then 3,4 -- the gap ends turn one
+    index = torch.tensor([[0, 1, 3, 4]])
+    valid = torch.ones_like(index, dtype=torch.bool)
+    assert _is_turn_boundary(index, valid, width=5).tolist() == [[False, True, False, True]]
+
+    # ★ two rows of width 2, both full: the flat positions run 0,1,2,3 with no gap, so
+    # only the row change distinguishes the turns. A gap test alone merges them.
+    index = torch.tensor([[0, 1, 2, 3]])
+    assert _is_turn_boundary(index, valid, width=2).tolist() == [[False, True, False, True]]
