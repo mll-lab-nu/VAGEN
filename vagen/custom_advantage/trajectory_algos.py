@@ -141,3 +141,99 @@ def compute_traj_grpo(*, batch, non_tensor_batch, config=None, **kwargs):
         advantages = advantages * mask_f
 
         return view.broadcast(advantages), view.broadcast(advantages.clone())
+
+
+def _is_turn_boundary(index: torch.Tensor, valid: torch.Tensor, width: int) -> torch.Tensor:
+    """True at the last model-output token of each turn.
+
+    A turn ends either because the environment interrupts -- leaving a gap in the
+    positions within a row -- or because the trajectory continues in the next row. The
+    row change has to be tested explicitly: ``row * width + position`` runs on unbroken
+    across a row boundary whenever a row's model output reaches its end, so a gap test
+    alone silently merges two turns into one.
+    """
+    boundary = torch.zeros_like(valid)
+    gap = index[:, 1:] != index[:, :-1] + 1
+    new_row = index[:, 1:] // width != index[:, :-1] // width
+    boundary[:, :-1] = valid[:, 1:] & (gap | new_row)
+    # The last valid token of a trajectory ends the last turn.
+    last = valid & ~torch.roll(valid, shifts=-1, dims=1)
+    last[:, -1] = valid[:, -1]
+    return boundary | last
+
+
+@register_adv_est("traj_bilevel_gae")
+def compute_traj_bilevel_gae(*, batch, non_tensor_batch, config=None, **kwargs):
+    """GAE with one lambda inside a turn and another across turns.
+
+    The two views of a multi-turn episode -- one step per token, one step per turn --
+    optimise the same objective when gamma is 1, so neither is more correct; they differ
+    in the bias/variance their lambda buys. Token-level GAE weights a turn by
+    ``lam ** turn_length``, which for variable-length turns cannot equal a fixed
+    per-turn weight, so the two are genuinely different estimators and there is room
+    between them.
+
+    This is a lambda-return with a position-dependent lambda (Sutton & Barto's variable
+    lambda), which is a legitimate lambda-return rather than two estimators added
+    together::
+
+        A_j = delta_j + gamma * lam_j * A_{j+1}
+        lam_j = lam_low   inside a turn
+                lam       at the token that ends one
+
+    Its limits are exact, which is what makes it testable rather than merely plausible:
+
+    * ``lam_low == lam`` reproduces token-level GAE token for token.
+    * ``lam_low == 1`` reproduces turn-level GAE at the first token of every turn. With
+      no intra-turn reward the deltas telescope:
+      ``sum_j delta_j = r_t + V(s_{t+1}) - V(s_t)``, which is the turn-level delta, so
+      the recursion becomes the turn-level one. Tokens after the first then carry the
+      same credit minus the value drift accumulated within the turn -- the refinement
+      the token level is there to add.
+
+    Unlike turn-level GAE this supervises every model-output token, so it emits no
+    sentinel returns and needs no ``value_mask``.
+    """
+    gamma = float(config.gamma)
+    lam_high = float(config.lam)
+    lam_low = float(config.get("lam_low", 1.0)) if hasattr(config, "get") else 1.0
+
+    scores = batch["token_level_scores"]
+    values = batch.get("values", torch.zeros_like(scores))
+    response_mask = batch["response_mask"]
+
+    with torch.no_grad():
+        view = TrajectoryView.build(response_mask, non_tensor_batch)
+        width = scores.shape[1]
+        rows_scores, rows_values = view.gather(scores), view.gather(values)
+        mask_f = view.mask.to(rows_scores.dtype)
+
+        index, valid = _sequence_index(view, width)
+        flat_scores, flat_values = rows_scores.reshape(-1), rows_values.reshape(-1)
+        zeros = torch.zeros_like(flat_values[index])
+        seq_r = torch.where(valid, flat_scores[index], zeros)
+        seq_v = torch.where(valid, flat_values[index], zeros)
+
+        seq_lam = torch.where(_is_turn_boundary(index, valid, width), lam_high, lam_low).to(seq_v.dtype)
+
+        n_traj, max_len = index.shape
+        seq_adv = torch.zeros_like(seq_v)
+        nextvalues = torch.zeros(n_traj, dtype=seq_v.dtype, device=seq_v.device)
+        lastgaelam = torch.zeros_like(nextvalues)
+
+        for t in reversed(range(max_len)):
+            live = valid[:, t]
+            delta = seq_r[:, t] + gamma * nextvalues - seq_v[:, t]
+            lastgaelam = torch.where(live, delta + gamma * seq_lam[:, t] * lastgaelam, lastgaelam)
+            seq_adv[:, t] = torch.where(live, lastgaelam, torch.zeros_like(lastgaelam))
+            nextvalues = torch.where(live, seq_v[:, t], nextvalues)
+
+        advantages = torch.zeros_like(rows_values).reshape(-1)
+        returns = torch.zeros_like(rows_values).reshape(-1)
+        advantages[index[valid]] = seq_adv[valid]
+        returns[index[valid]] = (seq_adv + seq_v)[valid]
+        advantages = advantages.view_as(rows_values)
+        returns = returns.view_as(rows_values)
+
+        advantages = verl_F.masked_whiten(advantages, mask_f) * mask_f
+        return view.broadcast(advantages), view.broadcast(returns)

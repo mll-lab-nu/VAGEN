@@ -273,3 +273,108 @@ def test_token_gae_runs_without_a_turn_column():
     _, ret = TOKEN_GAE(batch=_batch([[0.0, 1.0]], [[1, 1]]), non_tensor_batch=nt, config=cfg)
 
     assert ret[0].tolist() == pytest.approx([1.0, 1.0])
+
+
+# ------------------------------------------------------------------- bi-level GAE
+
+BILEVEL = get_adv_estimator_fn("traj_bilevel_gae")
+
+
+class _BiCfg(_Cfg):
+    def __init__(self, gamma=1.0, lam=1.0, lam_low=1.0):
+        self.gamma, self.lam, self.lam_low = gamma, lam, lam_low
+
+
+def test_bilevel_reduces_to_token_level_when_the_lambdas_agree():
+    """★ An exact limit, not a resemblance. With one lambda everywhere the recursion is
+    literally token-level GAE, so any divergence is a bug in the position-dependent
+    lambda rather than a modelling choice."""
+    cfg_token = _Cfg()
+    cfg_token.gamma, cfg_token.lam = 1.0, 0.7
+    cfg_bi = _BiCfg(gamma=1.0, lam=0.7, lam_low=0.7)
+
+    mask = [[1, 1, 0, 1, 1], [1, 1, 0, 1, 1]]
+    args = dict(
+        batch=_batch([[0.0, 0.0, 5.0, 0.0, 1.0]] * 2, mask, [[0.1, 0.2, 9.0, 0.3, 0.4]] * 2),
+        non_tensor_batch=_nt(["g", "g"], [0, 1], [0, 0]),
+    )
+    token_adv, token_ret = TOKEN_GAE(config=cfg_token, **args)
+    bi_adv, bi_ret = BILEVEL(config=cfg_bi, **args)
+
+    assert _tokens(bi_adv, mask) == pytest.approx(_tokens(token_adv, mask), rel=1e-6)
+    assert _tokens(bi_ret, mask) == pytest.approx(_tokens(token_ret, mask), rel=1e-6)
+
+
+def test_bilevel_with_lam_low_one_matches_turn_level_at_each_turns_first_token():
+    """★ The other exact limit. With no intra-turn reward the deltas telescope to the
+    turn-level delta, so the recursion at a turn's first token becomes the turn-level
+    one. Checked against returns, which are not whitened and so are comparable directly."""
+    cfg = _BiCfg(gamma=1.0, lam=0.5, lam_low=1.0)
+
+    # Two turns of two tokens in one row, an observation between them, reward at the end.
+    mask = [[1, 1, 0, 1, 1]]
+    values = [[0.1, 0.2, 9.0, 0.3, 0.4]]
+    _, ret = BILEVEL(
+        batch=_batch([[0.0, 0.0, 5.0, 0.0, 1.0]], mask, values),
+        non_tensor_batch=_nt(["g"], [0], [0]),
+        config=cfg,
+    )
+
+    # Turn-level recursion by hand: delta_2 = 1.0 + 0 - 0.3, delta_1 = 0 + 0.3 - 0.1
+    adv_turn2 = 1.0 - 0.3
+    adv_turn1 = (0.3 - 0.1) + 0.5 * adv_turn2
+    assert float(ret[0, 0]) == pytest.approx(adv_turn1 + 0.1, rel=1e-5)
+    assert float(ret[0, 3]) == pytest.approx(adv_turn2 + 0.3, rel=1e-5)
+
+
+def test_bilevel_is_layout_independent():
+    """The same trajectory split across rows must score the same as one row."""
+    cfg = _BiCfg(gamma=1.0, lam=0.5, lam_low=1.0)
+
+    concat_mask = [[1, 1, 0, 1, 1]]
+    concat = BILEVEL(
+        batch=_batch([[0.0, 0.0, 5.0, 0.0, 1.0]], concat_mask, [[0.1, 0.2, 9.0, 0.3, 0.4]]),
+        non_tensor_batch=_nt(["g"], [0], [0]),
+        config=cfg,
+    )
+    split_mask = [[1, 1], [1, 1]]
+    split = BILEVEL(
+        batch=_batch([[0.0, 0.0], [0.0, 1.0]], split_mask, [[0.1, 0.2], [0.3, 0.4]]),
+        non_tensor_batch=_nt(["g", "g"], [0, 0], [0, 1]),
+        config=cfg,
+    )
+
+    assert _tokens(concat[1], concat_mask) == pytest.approx(_tokens(split[1], split_mask), rel=1e-5)
+
+
+def test_bilevel_supervises_every_token_so_needs_no_value_mask():
+    """★ Turn-level leaves positions at a sentinel and needs value_mask; bi-level does
+    not, and registering it as a sentinel estimator would mask out real supervision."""
+    from vagen.custom_advantage import needs_value_mask
+
+    cfg = _BiCfg()
+    mask = [[1, 1, 0, 1, 1]]
+    _, ret = BILEVEL(
+        batch=_batch([[0.0, 0.0, 0.0, 0.0, 1.0]], mask, [[0.0] * 5]),
+        non_tensor_batch=_nt(["g"], [0], [0]),
+        config=cfg,
+    )
+
+    assert needs_value_mask("traj_bilevel_gae") is False
+    assert float(ret.min()) > -1.0, "a sentinel return leaked into the output"
+
+
+def test_turn_boundaries_are_found_under_both_layouts():
+    import torch
+
+    from vagen.custom_advantage.trajectory_algos import _is_turn_boundary
+
+    # one row of width 5, two turns: positions 0,1 then 3,4 -- the gap ends turn one
+    index = torch.tensor([[0, 1, 3, 4]])
+    valid = torch.ones_like(index, dtype=torch.bool)
+    assert _is_turn_boundary(index, valid, width=5).tolist() == [[False, True, False, True]]
+
+    # ★ two rows of width 2, both full: the flat positions run 0,1,2,3 with no gap, so
+    # only the row change distinguishes the turns. A gap test alone merges them.
+    index = torch.tensor([[0, 1, 2, 3]])
+    assert _is_turn_boundary(index, valid, width=2).tolist() == [[False, True, False, True]]
