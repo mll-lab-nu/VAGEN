@@ -47,6 +47,11 @@ trainer:
   max_actor_ckpt_to_keep: 1                # Max number of actor checkpoints to keep (saves disk space)
   max_critic_ckpt_to_keep: 1               # Max number of critic checkpoints to keep
   concat_multi_turn: True                 # Concatenate multi-turn messages for rollout and training
+  # Context policy. Defaults to concat_multi_turn when unset, so existing scripts
+  # select the same layout as before.
+  harness: null                    # concat | no_concat | compact
+  compact_budget: 4000             # tokens before CompactHarness summarises and restarts
+
   log_image:
     enable: false           # Whether to log environment-rendered images to logger (e.g. wandb)
     max_pending: 2          # Max pending async image dump tasks (prevents IO from blocking training)
