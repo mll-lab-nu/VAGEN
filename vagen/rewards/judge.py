@@ -81,6 +81,23 @@ class StructuredJudge:
         return list(await asyncio.gather(*(self._one(p) for p in prompts)))
 
 
+_SHARED: dict[tuple, "StructuredJudge"] = {}
+
+
+def shared_judge(base_url: str, model: str, **kwargs) -> "StructuredJudge":
+    """One judge per endpoint, per worker process.
+
+    ★ Not one per rollout. The semaphore bounds concurrency, and a fresh judge for every
+    episode means the bound is per episode -- with hundreds in flight the endpoint sees
+    hundreds of times the intended load and starts timing out, which shows up as the
+    process reward quietly going to zero.
+    """
+    key = (base_url, model, tuple(sorted(kwargs.items())))
+    if key not in _SHARED:
+        _SHARED[key] = StructuredJudge(base_url=base_url, model=model, **kwargs)
+    return _SHARED[key]
+
+
 class NullJudge:
     """Stands in when no judge is configured: every description scores nothing.
 

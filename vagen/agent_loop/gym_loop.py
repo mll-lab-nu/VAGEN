@@ -22,8 +22,8 @@ from verl.utils.rollout_trace import rollout_trace_op
 from vagen.agent_loop.base import VagenGymAgentLoopBase
 from vagen.agent_loop.obs import _normalize_images, convert_obs_to_content, extract_success
 from vagen.rewards import sokoban as sokoban_spec
-from vagen.rewards.judge import StructuredJudge
-from vagen.rewards.state_reward import StateRewardWrapper
+from vagen.rewards.judge import shared_judge
+from vagen.rewards.state_reward import TAGS, StateRewardWrapper
 from vagen.agent_loop.verl_client import VerlClient
 from vagen.core.harness import CompactHarness, ConcatHarness, NoConcatHarness
 from vagen.core.runner import run_episode
@@ -51,7 +51,7 @@ class GymEnvAdapter:
         # Summed over the episode. Reported on every row whether or not the agent ever
         # produced a description: verl reads the set of extra keys from the first row,
         # so a key missing there hides the metric for the whole batch.
-        self.state_scores: dict[str, float] = {"grounding": 0.0, "worldmodeling": 0.0, "format": 0.0}
+        self.state_scores: dict[str, float] = {name: 0.0 for name in (*TAGS, "format")}
 
     async def reset(self, seed=None):
         obs, info = await self.env.reset(seed=seed)
@@ -128,22 +128,25 @@ class GymLoop(VagenGymAgentLoopBase):
         nothing would be indistinguishable from one that scored badly.
         """
         cfg = self.config.trainer.get("state_reward", {}) or {}
-        if not cfg.get("enable", False):
+        enabled = {
+            name: float(cfg[name].get("weight", 0.5))
+            for name in TAGS
+            if (cfg.get(name) or {}).get("enable", False)
+        }
+        if not enabled:
             return env
 
         spec = STATE_REWARD_SPECS.get(env_name)
         if spec is None:
             raise ValueError(
-                f"state_reward is on but {env_name!r} has no spec; add one to STATE_REWARD_SPECS "
+                f"a state reward is on but {env_name!r} has no spec; add one to STATE_REWARD_SPECS "
                 f"(available: {sorted(STATE_REWARD_SPECS)})"
             )
-        judge = StructuredJudge(base_url=cfg["judge_base_url"], model=cfg["judge_model"])
         return StateRewardWrapper(
             env=env,
             spec=spec,
-            judge=judge,
-            grounding_weight=float(cfg.get("grounding_weight", 0.5)),
-            worldmodeling_weight=float(cfg.get("worldmodeling_weight", 0.5)),
+            judge=shared_judge(cfg["judge_base_url"], cfg["judge_model"]),
+            enabled=enabled,
             format_reward=float(cfg.get("format_reward", 0.1)),
         )
 
