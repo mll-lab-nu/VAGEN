@@ -162,3 +162,36 @@ async def test_a_concat_episode_accumulates_every_turn():
     # 1, obs, 1, obs, 1, obs, 1 -- the last turn is terminal, so no observation follows.
     assert [value for value, _ in runs] == [1, 0, 1, 0, 1, 0, 1]
     assert all(length > 0 for value, length in runs if value == 0), "an observation is empty"
+
+
+@pytest.mark.asyncio
+async def test_a_budget_driven_harness_is_told_how_large_the_conversation_grew():
+    """★ Without this the budget never moves and compaction never fires -- a harness
+    that looks configured and silently behaves like plain concat."""
+    from vagen.core.harness import CompactHarness
+
+    seen = []
+
+    class Watching(CompactHarness):
+        def note_usage(self, used):
+            seen.append(used)
+            super().note_usage(used)
+
+    env, client = Env(terminate_at=3), Client()
+    await run_episode(env, Watching(budget=10**9), client, max_turns=5)
+
+    assert seen and all(isinstance(u, int) for u in seen)
+    assert seen == sorted(seen), "a conversation only grows, so the figures must not go backwards"
+
+
+@pytest.mark.asyncio
+async def test_compaction_fires_and_splits_the_episode_into_rows():
+    """★ End to end: a budget small enough to trip every turn must start a new
+    conversation each time, which is what makes the rows."""
+    from vagen.core.harness import CompactHarness
+
+    env, client = Env(terminate_at=3), Client()
+    await run_episode(env, CompactHarness(budget=1), client, max_turns=5)
+
+    assert len(client.rows()) > 1, "compaction never started a second conversation"
+    assert all(any(r.response_mask) for r in client.rows()), "a row with no model output survived"

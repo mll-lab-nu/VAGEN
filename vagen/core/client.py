@@ -116,5 +116,14 @@ class InferenceClient(ABC):
         """
         return [c.row() for c in self._conversations.values() if c.is_trainable()]
 
+    def usage(self, conversation_id: str) -> int:
+        """How large this conversation has grown, in whatever unit the backend counts.
+
+        Tokens here; a closed API would report the prompt size from its own ``usage``,
+        counted by its own tokenizer, so a budget will trigger at slightly different
+        points than in training. Log where it actually fires.
+        """
+        return len(self._conversations[conversation_id].token_ids)
+
     def conversations(self) -> list[Conversation]:
         return list(self._conversations.values())
