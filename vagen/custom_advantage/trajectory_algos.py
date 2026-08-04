@@ -21,7 +21,9 @@ import torch
 import verl.utils.torch_functional as verl_F
 from verl.trainer.ppo.core_algos import register_adv_est
 
+from vagen.custom_advantage.registry import register_sentinel_adv_est
 from vagen.custom_advantage.trajectory import TrajectoryView, to_int64_codes
+from vagen.trainer.logic import IGNORE_RETURN
 
 
 def _sequence_index(view: TrajectoryView, width: int) -> tuple[torch.Tensor, torch.Tensor]:
@@ -162,3 +164,89 @@ def _is_turn_boundary(index: torch.Tensor, valid: torch.Tensor, width: int) -> t
     return boundary | last
 
 
+def compute_traj_turn_gae(*, batch, non_tensor_batch, config=None, ignore_value: float = IGNORE_RETURN, **kwargs):
+    """Turn-level GAE: one decision per turn, whatever rows the turn occupies.
+
+    The recursion runs over turns rather than tokens -- a turn's reward is everything it
+    collected, its value is the critic at its *first* model-output token -- and the
+    resulting advantage is broadcast to every token of that turn.
+
+    ★ First, not last. ``V(s_t)`` is the value of the state the turn acts from, which is
+    the position before any of its tokens have been emitted. The critic at the turn's
+    last token has already seen nearly the whole turn and is answering a different
+    question. That broadcast is not
+    an approximation: an autoregressive policy factorises as
+    ``log pi(turn) = sum_j log pi(token_j)``, so the per-token coefficient in the
+    turn-level policy gradient is exactly the turn's advantage.
+
+    Returns are written only at each turn's first token, the rest left at the sentinel,
+    because the critic is being asked for a turn-level value and only that position
+    carries one. ``value_mask`` is what stops it training on the rest.
+
+    Unlike ``no_concat_gae``, which this replaces, turns are found from the token stream
+    rather than assumed to be rows, so it works under either layout.
+    """
+    gamma, lam = float(config.gamma), float(config.lam)
+    scores = batch["token_level_scores"]
+    values = batch.get("values", torch.zeros_like(scores))
+    response_mask = batch["response_mask"]
+
+    with torch.no_grad():
+        view = TrajectoryView.build(response_mask, non_tensor_batch)
+        width = scores.shape[1]
+        rows_scores, rows_values = view.gather(scores), view.gather(values)
+        mask_f = view.mask.to(rows_scores.dtype)
+
+        index, valid = _sequence_index(view, width)
+        flat_scores, flat_values = rows_scores.reshape(-1), rows_values.reshape(-1)
+        zeros = torch.zeros_like(flat_values[index])
+        seq_r = torch.where(valid, flat_scores[index], zeros)
+        seq_v = torch.where(valid, flat_values[index], zeros)
+        boundary = _is_turn_boundary(index, valid, width) & valid
+
+        # Turn index of every token: how many turns ended strictly before it.
+        turn_of = (boundary.cumsum(dim=1) - boundary.long()).clamp(min=0)
+        # A turn's first token: the one after a boundary, plus the sequence's own start.
+        start = torch.zeros_like(boundary)
+        start[:, 1:] = boundary[:, :-1]
+        start[:, 0] = valid[:, 0]
+        start = start & valid
+        n_turns = int(boundary.sum(dim=1).max().item()) or 1
+        n_traj = index.shape[0]
+
+        turn_r = torch.zeros((n_traj, n_turns), dtype=seq_v.dtype, device=seq_v.device)
+        turn_r.scatter_add_(1, turn_of.clamp(max=n_turns - 1), seq_r)
+        # scatter_add_, not scatter_: with one index per token, several tokens land in
+        # the same turn slot and a plain scatter keeps whichever is written last -- a
+        # zero from a non-start token, overwriting the value that was wanted.
+        turn_v = torch.zeros_like(turn_r)
+        turn_v.scatter_add_(1, turn_of.clamp(max=n_turns - 1), torch.where(start, seq_v, torch.zeros_like(seq_v)))
+        turn_count = torch.zeros_like(turn_r)
+        turn_count.scatter_add_(1, turn_of.clamp(max=n_turns - 1), boundary.to(turn_r.dtype))
+        turn_alive = turn_count > 0
+
+        turn_adv = torch.zeros_like(turn_r)
+        nextvalue = torch.zeros(n_traj, dtype=seq_v.dtype, device=seq_v.device)
+        lastgaelam = torch.zeros_like(nextvalue)
+        for t in reversed(range(n_turns)):
+            live = turn_alive[:, t]
+            delta = turn_r[:, t] + gamma * nextvalue - turn_v[:, t]
+            lastgaelam = torch.where(live, delta + gamma * lam * lastgaelam, lastgaelam)
+            turn_adv[:, t] = torch.where(live, lastgaelam, torch.zeros_like(lastgaelam))
+            nextvalue = torch.where(live, turn_v[:, t], nextvalue)
+
+        seq_adv = torch.gather(turn_adv, 1, turn_of.clamp(max=n_turns - 1)) * valid
+        seq_ret = torch.gather(turn_adv + turn_v, 1, turn_of.clamp(max=n_turns - 1))
+
+        advantages = torch.zeros_like(rows_values).reshape(-1)
+        returns = torch.full_like(rows_values, float(ignore_value)).reshape(-1)
+        advantages[index[valid]] = seq_adv[valid]
+        # Only the turn's first token carries a turn-level return -- that is the state
+        # the value was asked about. The rest stay at the sentinel and are excluded from
+        # the critic loss by value_mask.
+        returns[index[start]] = seq_ret[start]
+        advantages = advantages.view_as(rows_values)
+        returns = returns.view_as(rows_values)
+
+        advantages = verl_F.masked_whiten(advantages, mask_f) * mask_f
+        return view.broadcast(advantages), view.broadcast(returns)
