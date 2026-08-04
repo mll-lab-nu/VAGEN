@@ -48,7 +48,7 @@ async def test_the_same_id_continues_one_conversation():
     """★ concat: one conversation for the whole episode, so one training row."""
     c = FakeClient()
     first = await c.send(["ab"])
-    await c.send(["ab", "cd"], first.conversation_id)
+    await c.send(["cd"], first.conversation_id)
 
     assert len(c.conversations()) == 1
     assert len(c.rows()) == 1
@@ -77,23 +77,36 @@ async def test_an_unknown_id_is_rejected():
 
 
 @pytest.mark.asyncio
-async def test_only_new_messages_are_encoded():
-    """★ Re-rendering the whole history each turn would produce a prefix in this
-    tokenizer's form while the record holds the backend's, and the two need not agree
-    token for token."""
+async def test_what_the_caller_hands_over_is_what_gets_encoded():
+    """★ The harness already sends only what is new. Deduplicating again here dropped
+    every observation after the first -- and each side's unit tests passed, because each
+    was written against its own idea of who deduplicates."""
     c = FakeClient()
     first = await c.send(["ab"])
-    await c.send(["ab", "cd"], first.conversation_id)
+    await c.send(["cd"], first.conversation_id)     # the delta, as a harness sends it
 
-    # second call sends: "ab" + reply + "cd"
     assert c.calls[1] == [ord("a"), ord("b")] + c.reply + [ord("c"), ord("d")]
+
+
+@pytest.mark.asyncio
+async def test_every_observation_reaches_the_context():
+    """The failure this guards against is quiet: the conversation keeps generating, the
+    rows stay well-formed, and the model simply never sees what the environment said."""
+    c = FakeClient()
+    first = await c.send(["ab"])
+    await c.send(["cd"], first.conversation_id)
+    await c.send(["ef"], first.conversation_id)
+
+    ids = c.conversations()[0].token_ids
+    for text in ("ab", "cd", "ef"):
+        assert all(ord(ch) in ids for ch in text), f"{text!r} never entered the context"
 
 
 @pytest.mark.asyncio
 async def test_the_model_output_is_the_masked_in_part():
     c = FakeClient()
     first = await c.send(["ab"])
-    await c.send(["ab", "cd"], first.conversation_id)
+    await c.send(["cd"], first.conversation_id)
 
     row = c.rows()[0]
     assert row.prompt_ids == [ord("a"), ord("b")]
@@ -120,7 +133,7 @@ async def test_adoption_repairs_the_seam_left_by_incremental_encoding():
     rendering them together; the correction lands on the span just added."""
     c = FakeClient(engine_prompt=lambda ids: list(ids) + [777])
     first = await c.send(["ab"])
-    await c.send(["ab", "cd"], first.conversation_id)
+    await c.send(["cd"], first.conversation_id)
 
     conversation = c.conversations()[0]
     assert len(conversation.token_ids) - len(conversation.mask) == conversation.prompt_len
