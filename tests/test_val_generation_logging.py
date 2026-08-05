@@ -140,7 +140,10 @@ def test_upstream_collects_and_forwards_what_regrouping_needs():
 
     src = inspect.getsource(RayPPOTrainer._validate)
     assert 'non_tensor_batch.get("image_data")' in src, "_validate no longer collects frames"
-    assert "extras=sample_extras" in src, "_validate no longer forwards the episode columns"
+    assert "extras=" in src, "_validate no longer forwards the episode columns"
+    assert "sample_extras" in src and "reward_extra_infos_dict}" in src, (
+        "_validate no longer forwards both the episode columns and the env's own metrics"
+    )
 
     sig = inspect.signature(RayPPOTrainer._maybe_log_val_generations)
     assert "images" in sig.parameters and "extras" in sig.parameters
