@@ -113,6 +113,12 @@ class GymLoop(VagenGymAgentLoopBase):
                 f"available keys: {sorted(kwargs)}"
             )
         max_turns = int(kwargs["max_turns"])
+        # The loop is the only thing that knows what one episode is: exactly this call.
+        # Identity was being taken from (group_idx, traj_idx), which is the dataset's
+        # axis, not ours -- measured at validation it was unique per row, so every row
+        # grouped as its own one-turn episode. Minted here, alongside conversation_id
+        # and turn_idx, so the three cannot disagree about what they identify.
+        episode_id = uuid4().hex
 
         env_cls = self.resolve_env_class(kwargs["env_name"])
         env = GymEnvAdapter(
@@ -231,6 +237,7 @@ class GymLoop(VagenGymAgentLoopBase):
                         },
                         "image_data": images,
                         "last_turn": turn_idx == len(rows) - 1,
+                        "episode_id": episode_id,
                         "group_idx": kwargs["group_idx"],
                         "traj_idx": kwargs["traj_idx"],
                         "turn_idx": turn_idx,
