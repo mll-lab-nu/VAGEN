@@ -117,9 +117,11 @@ def episode_rows(rows: list[dict]) -> list[dict]:
     for key, turns in group_turns(rows).items():
         scores = [t["score"] for t in turns if t.get("score") is not None]
         successes = [t["traj_success"] for t in turns if t.get("traj_success") is not None]
+        sources = [t.get("data_source") for t in turns if t.get("data_source")]
         out.append(
             {
                 "episode": f"{key[0]}/{key[1]}",
+                "data_source": sources[0] if sources else None,
                 "turns": len(turns),
                 # An episode spanning more than one conversation was compacted.
                 "conversations": len({t.get("conversation_id") for t in turns}),
@@ -130,3 +132,40 @@ def episode_rows(rows: list[dict]) -> list[dict]:
         )
     out.sort(key=lambda r: r["episode"])
     return out
+
+
+def select_episodes(episodes: list[dict], n: int) -> list[dict]:
+    """Pick ``n`` to log: successes and failures in balance, spread across sources.
+
+    Taking the first ``n`` shows whatever sorted first, and at a 12% success rate that
+    is eight failures -- a log you cannot learn anything from, because there is nothing
+    to compare a failure against. Half and half is the useful sample.
+
+    Round-robin over (source, succeeded) buckets. A bucket that runs out simply drops
+    out and the others fill the gap, so a run with no successes yet still logs ``n``
+    episodes rather than half a table.
+    """
+    if n <= 0 or not episodes:
+        return []
+
+    buckets: dict[tuple, list[dict]] = defaultdict(list)
+    for e in episodes:
+        buckets[(e.get("data_source"), bool(e.get("success")))].append(e)
+
+    # Deterministic order so the table reads the same way step to step: succeeded first
+    # within a source, sources in name order.
+    order = sorted(buckets, key=lambda k: (str(k[0]), not k[1]))
+    picked: list[dict] = []
+    while len(picked) < n:
+        took = False
+        for key in order:
+            if not buckets[key]:
+                continue
+            picked.append(buckets[key].pop(0))
+            took = True
+            if len(picked) == n:
+                break
+        if not took:  # every bucket exhausted
+            break
+    picked.sort(key=lambda r: (str(r.get("data_source")), not bool(r.get("success")), r["episode"]))
+    return picked
