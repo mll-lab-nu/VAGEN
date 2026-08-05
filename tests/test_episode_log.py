@@ -157,3 +157,60 @@ def test_a_large_frame_is_downscaled_before_encoding():
 def test_a_small_frame_is_not_upscaled():
     tiny = PIL.new("RGB", (16, 16), (1, 2, 3))
     assert "base64," in episode_html([_row(0, 0, 0, "x", images=[tiny])])
+
+
+# ------------------------------------------------------------------ sampling
+from vagen.utils.episode_log import select_episodes  # noqa: E402
+
+
+def _ep(name, success, source="s1"):
+    return {"episode": name, "success": success, "data_source": source, "html": "", "turns": 1}
+
+
+def test_the_sample_is_half_successes_half_failures():
+    """First-n at a 12% success rate is eight failures, and a log with nothing to
+    compare against teaches nothing."""
+    eps = [_ep(f"f{i}", 0.0) for i in range(20)] + [_ep(f"s{i}", 1.0) for i in range(20)]
+    got = select_episodes(eps, 8)
+    assert len(got) == 8
+    assert sum(1 for e in got if e["success"]) == 4
+
+
+def test_a_shortfall_of_one_class_is_filled_by_the_other():
+    """A run with almost no successes must still log a full table, not half of one."""
+    eps = [_ep(f"f{i}", 0.0) for i in range(20)] + [_ep("s0", 1.0)]
+    got = select_episodes(eps, 8)
+    assert len(got) == 8
+    assert sum(1 for e in got if e["success"]) == 1
+
+
+def test_no_successes_at_all_still_fills_the_table():
+    got = select_episodes([_ep(f"f{i}", 0.0) for i in range(20)], 6)
+    assert len(got) == 6
+
+
+def test_sources_are_sampled_across_not_from_the_first():
+    """With several validation sets, a table drawn entirely from whichever sorted first
+    hides the others completely."""
+    eps = ([_ep(f"a{i}", i % 2, "alpha") for i in range(20)]
+           + [_ep(f"b{i}", i % 2, "beta") for i in range(20)])
+    got = select_episodes(eps, 8)
+    assert {e["data_source"] for e in got} == {"alpha", "beta"}
+    assert sum(1 for e in got if e["data_source"] == "alpha") == 4
+
+
+def test_asking_for_more_than_exists_returns_what_exists():
+    assert len(select_episodes([_ep("a", 1.0), _ep("b", 0.0)], 50)) == 2
+
+
+def test_zero_and_empty():
+    assert select_episodes([_ep("a", 1.0)], 0) == []
+    assert select_episodes([], 5) == []
+
+
+def test_selection_is_deterministic():
+    """The table has to read the same way step to step to be a progression."""
+    eps = [_ep(f"f{i}", 0.0) for i in range(10)] + [_ep(f"s{i}", 1.0) for i in range(10)]
+    assert [e["episode"] for e in select_episodes(eps, 6)] == [
+        e["episode"] for e in select_episodes(list(eps), 6)
+    ]

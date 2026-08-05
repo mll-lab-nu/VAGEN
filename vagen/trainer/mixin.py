@@ -35,7 +35,7 @@ from vagen.custom_filter.filter import FILTER_REGISTRY
 from vagen.custom_metric.metric import METRIC_REGISTRY
 from vagen.trainer.logic import collect_registry_metrics, value_mask_from_returns
 from vagen.utils.image_token_utils import replace_image_tokens_for_logging
-from vagen.utils.episode_log import episode_rows
+from vagen.utils.episode_log import episode_rows, select_episodes
 from vagen.utils.image_validation_logger import ValidationGenerationsLogger
 
 
@@ -253,15 +253,18 @@ class VagenV0Mixin(VagenLogicMixin):
                 # extras; without reading it here the column is present and always empty,
                 # which is worse than absent -- it reads as "no episode succeeded".
                 "traj_success": su,
+                "data_source": ds,
             }
-            for inp, out, sc, im, g, t, ti, c, su in zip(
+            for inp, out, sc, im, g, t, ti, c, su, ds in zip(
                 inputs, outputs, scores, images or [None] * len(outputs),
                 col("group_idx"), col("traj_idx"), col("turn_idx"), col("conversation_id"),
-                col("traj_success"),
+                col("traj_success"), col("data_source"),
                 strict=True,
             )
         ]
-        episodes = episode_rows(rows)[:n]
+        # Balanced, not the first n. At a 12% success rate the first n are eight
+        # failures, and a log with nothing to compare against teaches nothing.
+        episodes = select_episodes(episode_rows(rows), n)
         if not episodes:
             return
 
