@@ -289,11 +289,10 @@ def concat_val_multi_turn(
         vals = [_pad_1d(v, max_len, k) for v in vals]
         stacked_batch[k] = torch.stack(vals, dim=0)
 
-    # Dynamic non-tensor keys copied from reward_extra_info
-    base_nt_keys = {
-        "group_idx", "traj_idx", "image_data", "reward_extra_info",
-        "episode_id", "episode_turns", "n_conversations", "data_source",
-    }
+    # Keys the stacking below writes explicitly. This is a *skip* list for the generic
+    # copy that follows, so adding a key here without also stacking it drops the column
+    # -- which is how the identity chain went missing twice.
+    base_nt_keys = {"group_idx", "traj_idx", "image_data", "reward_extra_info"}
     extra_keys: List[str] = []
     seen = set()
     for _, nte in concatenated:
