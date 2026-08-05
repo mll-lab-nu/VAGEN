@@ -103,9 +103,22 @@ class GymLoop(VagenGymAgentLoopBase):
 
     @rollout_trace_op
     async def run(self, sampling_params: dict[str, Any], **kwargs) -> list[AgentLoopOutput]:
+        # No silent default: falling back to a single turn would look like a working
+        # run whose episodes all stop after one step, which is nearly invisible --
+        # every row is well-formed, just short. Read here rather than at the call to
+        # run_episode because the auxiliary reward budget is divided by it.
+        if not kwargs.get("max_turns"):
+            raise KeyError(
+                f"the dataset row for env {kwargs['env_name']!r} carries no max_turns; "
+                f"available keys: {sorted(kwargs)}"
+            )
+        max_turns = int(kwargs["max_turns"])
+
         env_cls = self.resolve_env_class(kwargs["env_name"])
         env = GymEnvAdapter(
-            self._maybe_state_reward(env_cls(env_config=kwargs["config"]), kwargs["env_name"]),
+            self._maybe_state_reward(
+                env_cls(env_config=kwargs["config"]), kwargs["env_name"], max_turns
+            ),
             kwargs["env_name"],
             kwargs,
         )
@@ -123,20 +136,10 @@ class GymLoop(VagenGymAgentLoopBase):
             response_limit=per_turn,
         )
 
-        # No silent default: falling back to a single turn would look like a working
-        # run whose episodes all stop after one step, which is nearly invisible --
-        # every row is well-formed, just short.
-        if not kwargs.get("max_turns"):
-            raise KeyError(
-                f"the dataset row for env {kwargs['env_name']!r} carries no max_turns; "
-                f"available keys: {sorted(kwargs)}"
-            )
-        result = await run_episode(
-            env, harness, client, seed=kwargs["seed"], max_turns=int(kwargs["max_turns"])
-        )
+        result = await run_episode(env, harness, client, seed=kwargs["seed"], max_turns=max_turns)
         return self._outputs(client, env, result, kwargs)
 
-    def _maybe_state_reward(self, env, env_name: str):
+    def _maybe_state_reward(self, env, env_name: str, max_turns: int = 1):
         """Wrap the environment so the reasoning is scored, if configured.
 
         Off by default: it needs a judge endpoint, and a run that silently scored
@@ -150,6 +153,18 @@ class GymLoop(VagenGymAgentLoopBase):
         }
         if not enabled:
             return env
+
+        # The configured weights are relative; the budget sets the scale. A whole episode
+        # described perfectly is worth `budget` in total, against 1 for solving the level,
+        # so the auxiliary signal cannot outbid the task it exists to support. Measured
+        # before this: eight trajectories, every one with traj_success 0, scoring up to
+        # 2.25 -- all of it description.
+        #
+        # Derived rather than written down, because a per-turn constant silently doubles
+        # the episode's auxiliary total the day someone raises max_turns.
+        budget = float(cfg.get("budget", 1.0))
+        total = sum(enabled.values()) or 1.0
+        enabled = {n: budget * (w / total) / max(1, int(max_turns)) for n, w in enabled.items()}
 
         spec = STATE_REWARD_SPECS.get(env_name)
         if spec is None:
@@ -219,6 +234,11 @@ class GymLoop(VagenGymAgentLoopBase):
                         "group_idx": kwargs["group_idx"],
                         "traj_idx": kwargs["traj_idx"],
                         "turn_idx": turn_idx,
+                        # Which conversation this row belongs to. An episode can span
+                        # several: compaction ends one and opens the next, and the
+                        # episode log has to show them as one story with a seam, not as
+                        # unrelated rows.
+                        "conversation_id": row.conversation_id or "",
                     },
                 )
             )

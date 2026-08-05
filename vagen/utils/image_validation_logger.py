@@ -5,6 +5,31 @@ class ValidationGenerationsLogger:
     project_name: str = None
     experiment_name: str = None
 
+    # ------------------------------------------------------------- episodes
+    def log_episodes(self, loggers, episodes, step):
+        """One row per episode, the whole trajectory in a single readable cell.
+
+        A row-per-model-call table cannot show an episode: the turns arrive as separate
+        rows, and after a compaction they are separate conversations too, with nothing
+        tying them together. Each row here is one trajectory -- every turn in order, the
+        frames inline where the agent saw them, and the seam marked where the context
+        was compacted and the conversation restarted.
+
+        Logged fresh each step rather than appended. wandb keeps the history per step,
+        and an accumulating table of full transcripts grows without bound.
+        """
+        if "wandb" not in loggers:
+            return
+        import wandb
+
+        table = wandb.Table(columns=["step", "episode", "turns", "conversations", "score", "success", "rollout"])
+        for e in episodes:
+            table.add_data(
+                step, e["episode"], e["turns"], e["conversations"],
+                e["score"], e["success"], wandb.Html(e["html"]),
+            )
+        wandb.log({"val/episodes": table}, step=step)
+
     def log(self, loggers, samples, step):
         if "wandb" in loggers:
             self.log_generations_to_wandb(samples, step)
