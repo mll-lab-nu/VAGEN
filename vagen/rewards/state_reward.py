@@ -73,21 +73,33 @@ class StateRewardWrapper:
 
     async def system_prompt(self):
         prompt = await self.env.system_prompt()
-        block = self.instructions()
+        text = prompt.get("obs_str", "") if isinstance(prompt, dict) else str(prompt)
+        block = self.instructions(text)
         if not block:
             return prompt
-        text = prompt.get("obs_str", "") if isinstance(prompt, dict) else str(prompt)
         joined = f"{text}\n\n{block}"
         return {**prompt, "obs_str": joined} if isinstance(prompt, dict) else joined
 
-    def instructions(self) -> str:
-        """The response format, assembled from whichever rewards are on.
+    def instructions(self, existing: str = "") -> str:
+        """The response format, for whichever rewards are on and the env has not asked for.
+
+        Sections the environment's own prompt already requests are skipped. Sokoban's
+        "wm" format asks for <observation> and <prediction> in natural language, with
+        worked examples; appending a second set of instructions for the same tags does
+        not reinforce them, it competes with them. Adding a JSON example that way made
+        the agent emit the schema and the judge a re-parser of its own output; replacing
+        it with prose left two differently-worded blocks asking for one thing, and six
+        of eight episodes stopped producing a usable action at all.
 
         Built rather than selected from a table of combinations: with two independent
         switches a table has four entries that drift apart, and asking for a section
         that nothing scores trains the agent to write text for no reason.
         """
-        sections = [self.spec.examples[name] for name in TAGS if name in self.enabled and name in self.spec.examples]
+        sections = [
+            self.spec.examples[name]
+            for name, tag in TAGS.items()
+            if name in self.enabled and name in self.spec.examples and f"<{tag}>" not in existing
+        ]
         if not sections:
             return ""
         body = "\n".join(sections)

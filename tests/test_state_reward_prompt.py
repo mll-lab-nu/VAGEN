@@ -44,3 +44,54 @@ def test_the_judge_prompt_is_the_thing_that_knows_the_schema():
     """The schema belongs on the judge's side of the boundary, not the agent's."""
     for spec in STATE_REWARD_SPECS.values():
         assert "object_id" in spec.judge_prompt
+
+
+# --------------------------------------- the wrapper must not re-teach what the env asks
+import pytest as _pytest
+
+from vagen.rewards.state_reward import StateRewardWrapper
+
+
+class _Env:
+    def __init__(self, prompt):
+        self._prompt = prompt
+
+    async def system_prompt(self):
+        return {"obs_str": self._prompt}
+
+
+def _wrapper(env, **kw):
+    spec = STATE_REWARD_SPECS["Sokoban"]
+    return StateRewardWrapper(
+        env=env, spec=spec,
+        enabled=kw.get("enabled", {"state_estimation": 0.1, "transition_prediction": 0.1}),
+    )
+
+
+@_pytest.mark.asyncio
+async def test_nothing_is_appended_when_the_env_already_asks_for_the_tags():
+    """Sokoban's wm format already requests <observation> and <prediction> with worked
+    examples. A second block does not reinforce them, it competes: that is how six of
+    eight episodes stopped emitting a usable action."""
+    env_prompt = "... <observation>The box is above the player</observation> <prediction>x</prediction> ..."
+    w = _wrapper(_Env(env_prompt))
+    assert w.instructions(env_prompt) == ""
+    assert (await w.system_prompt())["obs_str"] == env_prompt
+
+
+@_pytest.mark.asyncio
+async def test_instructions_are_added_when_the_env_says_nothing():
+    """An environment with no world-model prompt still needs to be told what to write."""
+    env_prompt = "Push the boxes onto the targets. Reply with <answer>Up</answer>."
+    w = _wrapper(_Env(env_prompt))
+    block = w.instructions(env_prompt)
+    assert "<observation>" in block and "<prediction>" in block
+    assert (await w.system_prompt())["obs_str"].startswith(env_prompt)
+
+
+@_pytest.mark.asyncio
+async def test_only_the_missing_section_is_added():
+    env_prompt = "... <observation>already asked for</observation> ..."
+    block = _wrapper(_Env(env_prompt)).instructions(env_prompt)
+    assert "<prediction>" in block
+    assert "Before acting" not in block, "re-taught a section the env already requests"
