@@ -1,23 +1,36 @@
 #!/bin/bash
 # A small instruct model that turns the agent's descriptions into structured items.
 #
-# It is a parser, not part of training, so it gets one GPU and a small share of it --
-# the rollout and the critic need the rest. Reachable at the base_url the trainer's
-# state_reward config points at.
+# It shares every GPU with training rather than taking one for itself: sharded eight
+# ways a 4B model is about a gigabyte of weights per device, so reserving a whole card
+# to hold it wastes an eighth of the node. It takes a small fixed fraction and starts
+# first, leaving the rollout engine to size itself against what remains.
 #
 # Instruct-only on purpose: a thinking model would spend its budget reasoning about a
 # format conversion, on the critical path of every turn of every rollout.
-set -x
-# flashinfer compiles kernels on first use and needs ninja on PATH.
-export PATH=$HOME/miniconda3/envs/verl/bin:$PATH
+#
+# vllm, matching the MAST entrypoint. Two engines for one job is two sets of failures.
+set -eo pipefail
+ENV=${ENV:-$HOME/miniconda3/envs/verl}
 MODEL=${MODEL:-Qwen/Qwen3-4B-Instruct-2507}
 PORT=${PORT:-8123}
-GPU=${GPU:-4}
+TP=${TP:-8}
+MEM=${MEM:-0.10}
 
-CUDA_VISIBLE_DEVICES=$GPU $HOME/miniconda3/envs/verl/bin/python -m sglang.launch_server \
-  --model-path $MODEL \
-  --port $PORT \
-  --mem-fraction-static 0.10 \
-  --max-running-requests 64 \
-  --attention-backend flashinfer \
-  --log-level warning
+export PATH="$ENV/bin:$PATH"
+export CUDA_HOME="$ENV"
+# flashinfer JITs its sampling kernel on first use, and needs to find both the headers
+# and the runtime library. conda keeps headers under targets/ and the libraries in lib/;
+# without these the build dies as "cannot find -lcudart", several frames below a message
+# that only says "Engine core initialization failed".
+export CPLUS_INCLUDE_PATH="$ENV/targets/x86_64-linux/include:$ENV/include${CPLUS_INCLUDE_PATH:+:$CPLUS_INCLUDE_PATH}"
+export LIBRARY_PATH="$ENV/lib:$ENV/targets/x86_64-linux/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
+export LD_LIBRARY_PATH="$ENV/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+exec "$ENV/bin/python" -m vllm.entrypoints.openai.api_server \
+  --model "$MODEL" \
+  --port "$PORT" \
+  --tensor-parallel-size "$TP" \
+  --gpu-memory-utilization "$MEM" \
+  --max-model-len 4096 \
+  --disable-log-requests
