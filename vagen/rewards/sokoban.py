@@ -56,16 +56,21 @@ Text:
 JSON:"""
 
 
+# Plain sentences, deliberately. The judge exists to turn a description into structured
+# relations; showing the agent the structure instead makes it emit JSON, the judge a
+# re-parser of its own output format, and the score a measure of format compliance
+# rather than of whether the agent can see where things are. It also flatters the F1,
+# because none of the ambiguity the judge is there to absorb ever arises.
 EXAMPLES = {
     "state_estimation": (
-        "Before acting, state what you see:\n"
-        '<observation>[{"object_id":"box","vertical_relation":"below","horizontal_relation":"same"},'
-        '{"object_id":"target","vertical_relation":"below","horizontal_relation":"same"}]</observation>'
+        "Before acting, say in plain words what you see:\n"
+        "<observation>A box is directly below me in my column, and the target is also "
+        "below me, in that same column.</observation>"
     ),
     "transition_prediction": (
-        "After choosing, state what will follow:\n"
-        '<prediction>[{"object_id":"box","vertical_relation":"below","horizontal_relation":"same"},'
-        '{"object_id":"target","vertical_relation":"same","horizontal_relation":"same"}]</prediction>'
+        "After choosing, say in plain words what will follow:\n"
+        "<prediction>The box will still be below me in my column, and I will have moved "
+        "onto the target's row, so the target will be level with me.</prediction>"
     ),
 }
 
