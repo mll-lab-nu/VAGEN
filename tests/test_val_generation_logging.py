@@ -171,3 +171,34 @@ def test_the_environments_verdict_reaches_the_table():
     t._maybe_log_val_generations(i, o, s_, images=im, extras=ex)
     (_, episodes, _) = t._vagen_val_logger.episode_calls[0]
     assert {e["success"] for e in episodes} == {0.0, 1.0}, "verdict lost between upstream and the table"
+
+
+def test_a_column_of_nones_does_not_shadow_a_good_one():
+    """`a or b` prefers a list of Nones over a usable list, because any non-empty list is
+    truthy. That short-circuit sent every validation down the fallback path and logged
+    verl's flat table for three whole runs, while the episode columns were right there."""
+    t = _Trainer(log_val_generations=4)
+    i, o, s, im, ex = _episode_batch(n_episodes=2, turns_per=2)
+    ex["episode_id"] = [None] * len(o)      # absent, as after a merge that dropped it
+    t._maybe_log_val_generations(i, o, s, images=im, extras=ex)
+    assert t._vagen_val_logger.episode_calls, "fell back despite group_idx being present"
+    assert t.base_calls == []
+
+
+def test_episode_id_is_preferred_when_present():
+    t = _Trainer(log_val_generations=4)
+    i, o, s, im, ex = _episode_batch(n_episodes=2, turns_per=2)
+    ex["episode_id"] = [f"ep{j % 2}" for j in range(len(o))]
+    ex["group_idx"] = [None] * len(o)
+    t._maybe_log_val_generations(i, o, s, images=im, extras=ex)
+    assert t._vagen_val_logger.episode_calls, "episode_id alone was not enough"
+
+
+def test_with_neither_it_still_falls_back():
+    t = _Trainer(log_val_generations=4)
+    i, o, s, im, ex = _episode_batch(n_episodes=2, turns_per=2)
+    ex["episode_id"] = [None] * len(o)
+    ex["group_idx"] = [None] * len(o)
+    t._maybe_log_val_generations(i, o, s, images=im, extras=ex)
+    assert t._vagen_val_logger.episode_calls == []
+    assert len(t.base_calls) == 1
