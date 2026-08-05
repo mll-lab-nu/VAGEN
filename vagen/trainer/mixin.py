@@ -249,10 +249,15 @@ class VagenV0Mixin(VagenLogicMixin):
                 "traj_idx": t,
                 "turn_idx": ti,
                 "conversation_id": c,
+                # The environment's own verdict. Forwarded by upstream among the reward
+                # extras; without reading it here the column is present and always empty,
+                # which is worse than absent -- it reads as "no episode succeeded".
+                "traj_success": su,
             }
-            for inp, out, sc, im, g, t, ti, c in zip(
+            for inp, out, sc, im, g, t, ti, c, su in zip(
                 inputs, outputs, scores, images or [None] * len(outputs),
                 col("group_idx"), col("traj_idx"), col("turn_idx"), col("conversation_id"),
+                col("traj_success"),
                 strict=True,
             )
         ]
