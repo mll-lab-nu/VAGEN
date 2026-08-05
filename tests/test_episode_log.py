@@ -242,3 +242,32 @@ def test_compact_shape_several_conversations_many_turns():
     (e,) = episode_rows(rows)
     assert (e["turns"], e["conversations"]) == (6, 2)
     assert "new conversation" in e["html"], "the conversation restart is not marked"
+
+
+# ------------------------------------------------------- selection strategies
+def test_the_ratio_is_a_parameter_not_a_constant():
+    eps = ([_ep(f"s{i}", 1.0) for i in range(10)] + [_ep(f"f{i}", 0.0) for i in range(10)])
+    assert sum(1 for e in select_episodes(eps, 8, success_ratio=0.25) if e["success"]) == 2
+    assert sum(1 for e in select_episodes(eps, 8, success_ratio=0.75) if e["success"]) == 6
+    assert sum(1 for e in select_episodes(eps, 8, success_ratio=1.0) if e["success"]) == 8
+    assert sum(1 for e in select_episodes(eps, 8, success_ratio=0.0) if e["success"]) == 0
+
+
+@pytest.mark.parametrize("strategy", ["first", "failures", "successes", "worst", "best"])
+def test_every_named_strategy_returns_something(strategy):
+    eps = ([_ep(f"s{i}", 1.0) for i in range(5)] + [_ep(f"f{i}", 0.0) for i in range(5)])
+    for e, r in zip(eps, range(10)):
+        e["reward"] = float(r)
+    got = select_episodes(eps, 3, strategy)
+    assert 0 < len(got) <= 3
+
+
+def test_worst_and_best_are_opposite_ends():
+    eps = [dict(_ep(f"e{i}", i % 2), reward=float(i)) for i in range(6)]
+    assert [e["reward"] for e in select_episodes(eps, 2, "worst")] == [0.0, 1.0]
+    assert [e["reward"] for e in select_episodes(eps, 2, "best")] == [5.0, 4.0]
+
+
+def test_an_unknown_strategy_says_what_the_options_are():
+    with pytest.raises(ValueError, match="balanced"):
+        select_episodes([_ep("a", 1.0)], 1, "whatever-i-typed")
