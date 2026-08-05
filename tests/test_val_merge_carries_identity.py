@@ -87,3 +87,14 @@ def test_the_values_are_right_not_just_present():
     assert nt["episode_id"][0] == "EP-XYZ"
     assert nt["episode_turns"][0] == 3, "turn count lost; every episode reads as one turn"
     assert nt["n_conversations"][0] == 3, "conversation count lost; compaction invisible"
+
+
+def test_the_merge_does_not_supply_keys_the_input_batch_already_has():
+    """_validate unions the merged output with the input batch, and union asserts that a
+    key on both sides is the *same object*. Adding data_source here -- which the dataset
+    already provides -- failed every validation pass with an assertion naming only the
+    key, several frames from anything suggesting the merge."""
+    merged = concat_val_multi_turn(*_batch(3), _Tok())
+    assert "data_source" not in merged.non_tensor_batch, (
+        "the merge re-supplies a key the input batch owns; union will assert"
+    )
