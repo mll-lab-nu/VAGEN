@@ -109,8 +109,6 @@ class EpisodeTableLogger:
         import ray
 
         ready, rest = (self._pending, []) if block else ray.wait(self._pending, timeout=0)
-        if not block:
-            ready, rest = ready, rest
         for fut in ready:
             try:
                 self._publish(*ray.get(fut))
