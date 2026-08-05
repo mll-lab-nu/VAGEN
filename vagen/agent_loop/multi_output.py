@@ -130,7 +130,8 @@ class MultiOutputAgentLoopWorker(AgentLoopWorker):
     # between the rows of one rollout. Losing turn_idx does not fail -- it makes the
     # episode log sort every turn equal, so a transcript reads as a coherent episode
     # that never happened.
-    ROW_COLUMNS = ("episode_id", "turn_idx", "conversation_id", "episode_turns")
+    ROW_COLUMNS = ("episode_id", "turn_idx", "conversation_id", "episode_turns",
+                   "response_spans", "turns_here")
 
     def _vagen_restore_indices(self, output: DataProto, expanded: dict[str, Any] | None) -> DataProto:
         """Put the trajectory index columns back if verl dropped them."""
