@@ -238,7 +238,13 @@ class VagenV0Mixin(VagenLogicMixin):
         if not n:
             return
         extras = extras or {}
-        if not any(v is not None for v in (extras.get("episode_id") or extras.get("group_idx") or [])):
+        # Each checked on its own. `a or b` picks a list of Nones over a good list,
+        # because a non-empty list is truthy whatever is in it -- which sent this down
+        # the fallback path and logged verl's flat table instead of the episode one.
+        print(f"[vagen] val episodes <- {describe_columns(extras, len(outputs))}")
+        has_id = any(v is not None for v in (extras.get("episode_id") or []))
+        has_group = any(v is not None for v in (extras.get("group_idx") or []))
+        if not (has_id or has_group):
             # Nothing published episode ids, so there is nothing to regroup.
             return super()._maybe_log_val_generations(inputs, outputs, scores, images=images)
 
@@ -253,7 +259,6 @@ class VagenV0Mixin(VagenLogicMixin):
             self._vagen_val_logger = EpisodeTableLogger()
         # Grouping, balancing and rendering all happen inside; the driver hands over the
         # raw rows and moves on.
-        print(f"[vagen] val episodes <- {describe_columns(extras, len(outputs))}")
         self._vagen_val_logger.submit(
             rows_from_validation(inputs, outputs, scores, images, extras), n, self.global_steps
         )
