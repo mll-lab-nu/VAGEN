@@ -35,9 +35,9 @@ from vagen.custom_filter.filter import FILTER_REGISTRY
 from vagen.custom_metric.metric import METRIC_REGISTRY
 from vagen.trainer.logic import collect_registry_metrics, value_mask_from_returns
 from vagen.utils.image_token_utils import replace_image_tokens_for_logging
-from vagen.utils.episode_log import episode_rows, rows_from_validation, select_episodes
+from vagen.utils.episode_log import rows_from_validation
 from vagen.utils.image_validation_logger import ValidationGenerationsLogger
-from vagen.utils.wandb_episodes import log_episodes, make_logger
+from vagen.utils.wandb_episodes import EpisodeTableLogger
 
 
 class VagenLogicMixin:
@@ -233,21 +233,15 @@ class VagenV0Mixin(VagenLogicMixin):
             inputs = replace_image_tokens_for_logging(inputs, processor)
             outputs = replace_image_tokens_for_logging(outputs, processor)
 
-        rows = rows_from_validation(inputs, outputs, scores, images, extras)
-        # Balanced, not the first n. At a 12% success rate the first n are eight
-        # failures, and a log with nothing to compare against teaches nothing.
-        episodes = select_episodes(episode_rows(rows), n)
-        if not episodes or "wandb" not in self.config.trainer.logger:
+        if "wandb" not in self.config.trainer.logger:
             return
-
-        # Initialised independently: tying the queue's creation to the logger's meant any
-        # path that already had a logger -- a resumed run, a test -- reached the call with
-        # no queue at all.
-        if getattr(self, "_vagen_val_futures", None) is None:
-            self._vagen_val_futures = []
         if getattr(self, "_vagen_val_logger", None) is None:
-            self._vagen_val_logger = make_logger()
-        log_episodes(self._vagen_val_logger, episodes, self.global_steps, self._vagen_val_futures)
+            self._vagen_val_logger = EpisodeTableLogger()
+        # Grouping, balancing and rendering all happen inside; the driver hands over the
+        # raw rows and moves on.
+        self._vagen_val_logger.submit(
+            rows_from_validation(inputs, outputs, scores, images, extras), n, self.global_steps
+        )
 
     def _fit_save_checkpoint(self, *args, **kwargs):
         """HF Hub upload on its own schedule, independent of ``trainer.save_freq``.
