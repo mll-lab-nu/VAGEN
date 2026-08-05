@@ -101,13 +101,21 @@ class MultiOutputAgentLoopWorker(AgentLoopWorker):
             expanded = {key: np.repeat(val, counts, axis=0) for key, val in input_non_tensor_batch.items()}
 
         output = super()._postprocess(flat, input_non_tensor_batch=expanded, validate=validate)
-        return self._vagen_restore_indices(output, expanded)
+        output = self._vagen_restore_indices(output, expanded)
+        return self._vagen_restore_row_columns(output, flat)
 
     # Columns the trajectory estimators group on. The no-concat loop happens to emit
     # them per turn via extra_fields, but the concat loop does not, and verl drops
     # `input_non_tensor_batch` entirely when streaming reward is enabled -- so relying
     # on either route makes the estimators work under one layout and not the other.
     INDEX_COLUMNS = ("group_idx", "traj_idx")
+
+    # Per-row facts only the loop knows, restored from the outputs themselves. These
+    # cannot come from `input_non_tensor_batch`: that is per rollout, and these differ
+    # between the rows of one rollout. Losing turn_idx does not fail -- it makes the
+    # episode log sort every turn equal, so a transcript reads as a coherent episode
+    # that never happened.
+    ROW_COLUMNS = ("turn_idx", "conversation_id")
 
     def _vagen_restore_indices(self, output: DataProto, expanded: dict[str, Any] | None) -> DataProto:
         """Put the trajectory index columns back if verl dropped them."""
@@ -116,6 +124,19 @@ class MultiOutputAgentLoopWorker(AgentLoopWorker):
         for key in self.INDEX_COLUMNS:
             if key not in output.non_tensor_batch and key in expanded:
                 output.non_tensor_batch[key] = expanded[key]
+        return output
+
+    def _vagen_restore_row_columns(self, output: DataProto, flat: list) -> DataProto:
+        """Put back the per-row columns, reading them off the outputs."""
+        for key in self.ROW_COLUMNS:
+            if key in output.non_tensor_batch:
+                continue
+            values = [getattr(o, "extra_fields", {}).get(key) for o in flat]
+            if all(v is None for v in values):
+                continue
+            arr = np.empty(len(flat), dtype=object)
+            arr[:] = values
+            output.non_tensor_batch[key] = arr
         return output
 
 
