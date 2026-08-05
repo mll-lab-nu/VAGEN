@@ -143,7 +143,7 @@ class GymLoop(VagenGymAgentLoopBase):
         )
 
         result = await run_episode(env, harness, client, seed=kwargs["seed"], max_turns=max_turns)
-        return self._outputs(client, env, result, kwargs)
+        return self._outputs(client, env, result, kwargs, episode_id)
 
     def _maybe_state_reward(self, env, env_name: str, max_turns: int = 1):
         """Wrap the environment so the reasoning is scored, if configured.
@@ -196,7 +196,7 @@ class GymLoop(VagenGymAgentLoopBase):
             return build_harness(mode, budget=int(self.config.trainer.compact_budget))
         return build_harness(mode)
 
-    def _outputs(self, client, env, result, kwargs) -> list[AgentLoopOutput]:
+    def _outputs(self, client, env, result, kwargs, episode_id: str) -> list[AgentLoopOutput]:
         rows = client.rows()
         outputs = []
         for turn_idx, row in enumerate(rows):
