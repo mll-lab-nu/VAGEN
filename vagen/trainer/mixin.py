@@ -260,7 +260,11 @@ class VagenV0Mixin(VagenLogicMixin):
         # Grouping, balancing and rendering all happen inside; the driver hands over the
         # raw rows and moves on.
         self._vagen_val_logger.submit(
-            rows_from_validation(inputs, outputs, scores, images, extras), n, self.global_steps
+            rows_from_validation(inputs, outputs, scores, images, extras),
+            n,
+            self.global_steps,
+            self.config.trainer.get("val_log_select", "balanced"),
+            float(self.config.trainer.get("val_log_success_ratio", 0.5)),
         )
 
     def _fit_save_checkpoint(self, *args, **kwargs):

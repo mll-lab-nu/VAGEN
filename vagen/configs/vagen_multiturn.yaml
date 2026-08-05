@@ -50,6 +50,12 @@ trainer:
   # Aggregate metrics cannot tell a model that learned nothing from a rollout whose
   # format was rejected every turn, and both have happened here; this is how you look.
   log_val_generations: 32
+  # Which of them. "balanced" shows successes and failures side by side, in the ratio
+  # below: a log of failures alone has nothing to compare against, and one of successes
+  # alone hides what is going wrong. Others -- first, failures, successes, worst, best --
+  # are for looking at something specific while chasing it.
+  val_log_select: balanced
+  val_log_success_ratio: 0.5
   concat_multi_turn: True                 # Concatenate multi-turn messages for rollout and training
   # Reward the reasoning as well as the outcome: the agent's <observation> and
   # <prediction> are scored against the real layout and the scores are paid to the
