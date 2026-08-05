@@ -6,6 +6,12 @@ conversation, or start a new one, and seeded with what?
 
 That single axis is what separates the modes, so they are variations on this class
 rather than different mechanisms -- see ``vagen/harness/`` for the implementations.
+An **episode** is one agent/environment interaction; a **conversation** is one continuous
+exchange with the model; a **turn** is one model call. The policy is which shape you get:
+
+    concat      1 conversation per episode,  many turns in it
+    no_concat   many conversations,          1 turn each
+    compact     several conversations,       many turns each
 
 Because a harness only produces calls and consumes text, the same object drives a closed
 API for evaluation: a conversation id is ``previous_response_id`` on OpenAI's Responses

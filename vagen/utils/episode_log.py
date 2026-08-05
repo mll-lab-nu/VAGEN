@@ -1,12 +1,26 @@
 """One episode, rendered as one thing you can read.
 
-The validation table logs a row per model call. That is the wrong unit for looking at an
-agent: an episode is several calls, and when the context is compacted it is several
-*conversations*, so the same trajectory arrives as unrelated rows with no indication that
-they belong together or in what order.
+Three levels, and the words for them:
 
-This reassembles them -- turns in order, frames inline where the agent saw them, and a
-visible seam wherever the conversation restarted.
+* **episode** -- one whole agent/environment interaction, reset to terminal or turn cap.
+  Identified by ``(group_idx, traj_idx)``.
+* **conversation** -- one continuous exchange with the model.
+* **turn** -- one model call within a conversation.
+
+The context policy is exactly what shape an episode takes:
+
+    concat      1 conversation per episode,  many turns in it
+    no_concat   many conversations,          1 turn each
+    compact     several conversations,       many turns each
+
+"trajectory" is deliberately not one of these words: ``traj_idx`` upstream already means
+*which sampled rollout of a prompt*, which is the axis that identifies the episode -- so
+reusing it for the segment between compactions would collide with the thing doing the
+identifying.
+
+The validation table logs a row per turn, which is the wrong unit for looking at an
+agent under any of the three policies. This reassembles them: turns in order, frames
+inline where the agent saw them, and a visible seam wherever the conversation restarted.
 """
 
 from __future__ import annotations
@@ -122,7 +136,9 @@ def episode_rows(rows: list[dict]) -> list[dict]:
             {
                 "episode": f"{key[0]}/{key[1]}",
                 "data_source": sources[0] if sources else None,
-                "turns": len(turns),
+                # Turns the episode ran, as the loop counted them. len(turns) is the
+                # number of rows, which in concat mode is 1 for any episode however long.
+                "turns": next((t["episode_turns"] for t in turns if t.get("episode_turns")), len(turns)),
                 # An episode spanning more than one conversation was compacted.
                 "conversations": len({t.get("conversation_id") for t in turns}),
                 "score": round(sum(scores), 4) if scores else None,
@@ -169,3 +185,44 @@ def select_episodes(episodes: list[dict], n: int) -> list[dict]:
             break
     picked.sort(key=lambda r: (str(r.get("data_source")), not bool(r.get("success")), r["episode"]))
     return picked
+
+
+def rows_from_validation(inputs, outputs, scores, images, extras) -> list[dict]:
+    """One record per turn, from the parallel columns validation produces.
+
+    Here rather than in the trainer: the trainer's part is deciding to log, not knowing
+    the shape of a validation batch.
+    """
+    n = len(outputs)
+
+    def col(name):
+        v = list(extras.get(name) or [])
+        return v + [None] * (n - len(v))
+
+    return [
+        {
+            "input": inp,
+            "output": out,
+            "score": sc,
+            "images": im,
+            "group_idx": g,
+            "traj_idx": t,
+            "turn_idx": ti,
+            "conversation_id": c,
+            # The environment's own verdict, forwarded among the reward extras. Not
+            # reading it here left the column present and always empty, which reads as
+            # "no episode succeeded" rather than "this was never wired up".
+            "traj_success": su,
+            "data_source": ds,
+            # Turns the episode really ran. The per-row num_turns is 1 by construction,
+            # and in concat mode an episode is one row, so without this every episode
+            # looks like a single turn no matter how long it was.
+            "episode_turns": et,
+        }
+        for inp, out, sc, im, g, t, ti, c, su, ds, et in zip(
+            inputs, outputs, scores, images or [None] * n,
+            col("group_idx"), col("traj_idx"), col("turn_idx"), col("conversation_id"),
+            col("traj_success"), col("data_source"), col("episode_turns"),
+            strict=True,
+        )
+    ]
