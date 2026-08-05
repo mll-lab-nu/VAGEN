@@ -49,6 +49,30 @@ def parse_free_think(response: str, action_sep: str = ",", max_actions: int = 3)
         "format_correct": format_correct,
     }
 
+# A section, however the model chose to mark it: the tag it was asked for, or the
+# plain-text label small models fall back to from ReAct-style pretraining.
+_SECTION_ALIASES = {
+    "observation": ("observation",),
+    "think": ("think", "thought", "reasoning"),
+    "answer": ("answer", "action"),
+    "prediction": ("prediction",),
+}
+
+
+def _loose_section(response: str, name: str) -> str:
+    """Pull one section out on its own, tag or label, without requiring the others."""
+    for alias in _SECTION_ALIASES[name]:
+        m = re.search(rf"<{alias}>(.*?)</{alias}>", response, re.DOTALL | re.IGNORECASE)
+        if m:
+            return m.group(1).strip()
+    for alias in _SECTION_ALIASES[name]:
+        # `Action: Up, Left` -- to the end of the line, since the label form is not closed.
+        m = re.search(rf"^\s*{alias}\s*:\s*(.+)$", response, re.MULTILINE | re.IGNORECASE)
+        if m:
+            return m.group(1).strip()
+    return ""
+
+
 def parse_wm(response: str, action_sep: str = ",", max_actions: int = 3) -> Dict:
     """
     Parse wm_new format response:
@@ -56,6 +80,16 @@ def parse_wm(response: str, action_sep: str = ",", max_actions: int = 3) -> Dict
     <think>...</think>
     <answer>...</answer>
     <prediction>...</prediction>
+
+    The strict pattern above decides ``format_correct``, which is what the format metric
+    and any format reward read. Extraction is separate and forgiving: a response that
+    reasoned correctly and labelled it ``Action:`` instead of ``<answer>`` still yields
+    its action, so the episode continues instead of dying on syntax. Measured on the
+    base model, half of all episodes reached zero usable actions this way -- half the
+    batch discarded over punctuation, while the model was doing the task.
+
+    The two are deliberately not the same test. Executing the action keeps the data;
+    ``format_correct`` staying strict keeps the pressure to write the tags.
     """
     pattern = (
         r'<observation>(.*?)</observation>\s*'
@@ -68,11 +102,15 @@ def parse_wm(response: str, action_sep: str = ",", max_actions: int = 3) -> Dict
     format_correct = match is not None
 
     if not match:
-        observation_content = ""
-        think_content = ""
-        prediction_content = ""
-        action_content = ""
-        actions: List[str] = []
+        # Salvage what is there. format_correct stays False either way.
+        observation_content = _loose_section(response, "observation")
+        think_content = _loose_section(response, "think")
+        prediction_content = _loose_section(response, "prediction")
+        action_content = _loose_section(response, "answer")
+        actions = [a.strip().lower() for a in action_content.split(action_sep) if a.strip()]
+        if len(actions) > max_actions:
+            actions = actions[:max_actions]
+            action_content = action_sep.join(actions)
     else:
         observation_content = match.group(1).strip()
         think_content = match.group(2).strip()
