@@ -35,7 +35,7 @@ from vagen.custom_filter.filter import FILTER_REGISTRY
 from vagen.custom_metric.metric import METRIC_REGISTRY
 from vagen.trainer.logic import collect_registry_metrics, value_mask_from_returns
 from vagen.utils.image_token_utils import replace_image_tokens_for_logging
-from vagen.utils.episode_log import rows_from_validation
+from vagen.utils.episode_log import describe_columns, rows_from_validation
 from vagen.utils.image_validation_logger import ValidationGenerationsLogger
 from vagen.utils.wandb_episodes import EpisodeTableLogger
 
@@ -253,6 +253,7 @@ class VagenV0Mixin(VagenLogicMixin):
             self._vagen_val_logger = EpisodeTableLogger()
         # Grouping, balancing and rendering all happen inside; the driver hands over the
         # raw rows and moves on.
+        print(f"[vagen] val episodes <- {describe_columns(extras, len(outputs))}")
         self._vagen_val_logger.submit(
             rows_from_validation(inputs, outputs, scores, images, extras), n, self.global_steps
         )
