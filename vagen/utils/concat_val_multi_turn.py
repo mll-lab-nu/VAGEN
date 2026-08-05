@@ -120,6 +120,16 @@ def concat_val_multi_turn(
         turn_records: List[Dict[str, Any]] = []
 
         pad_id = tokenizer.pad_token_id
+        # Conversations numbered 0,1,2 in the order they were opened, whatever the ids
+        # upstream happen to be -- ints from the loop, opaque strings from a closed API.
+        # Deriving it here means the log reads the same either way.
+        conv_order: Dict[Any, int] = {}
+        if nt.get("conversation_id") is not None:
+            for _, i in turns:
+                cid = nt["conversation_id"][i]
+                if cid not in conv_order:
+                    conv_order[cid] = len(conv_order)
+
         for j, (_, i) in enumerate(turns):
             resp = test_output_gen_batch.batch["responses"][i]
 
@@ -159,15 +169,34 @@ def concat_val_multi_turn(
             if "image_data" in nt and nt["image_data"][i] is not None:
                 v = nt["image_data"][i]
                 turn_images = list(v) if isinstance(v, (list, tuple, np.ndarray)) else [v]
-            turn_records.append({
-                "turn_idx": int(turn_arr[i]) if turn_arr is not None else j,
-                "conversation_id": (
-                    nt["conversation_id"][i] if nt.get("conversation_id") is not None else None
-                ),
-                "images": turn_images,
-                "response": tokenizer.decode(resp[:r_len], skip_special_tokens=True),
-                "observation": observation_text,
-            })
+            # One batch row is one conversation, and a conversation holds several turns
+            # under concat. Split it by the spans the tape recorded so turn ids run 0,1,2
+            # *within* the conversation and restart in the next one -- rather than
+            # numbering conversations and calling them turns.
+            conversation = (
+                conv_order.get(nt["conversation_id"][i], j)
+                if nt.get("conversation_id") is not None else j
+            )
+            spans = nt["response_spans"][i] if nt.get("response_spans") is not None else None
+            pieces = []
+            if spans:
+                for (a, b) in spans:
+                    a, b = int(a), int(b)
+                    if 0 <= a < b <= r_len:
+                        pieces.append(tokenizer.decode(resp[a:b], skip_special_tokens=True))
+            if not pieces:
+                pieces = [tokenizer.decode(resp[:r_len], skip_special_tokens=True)]
+
+            for turn_id, text in enumerate(pieces):
+                turn_records.append({
+                    "conversation_id": conversation,
+                    "turn_id": turn_id,
+                    # The frames belong to the conversation's first turn: that is when
+                    # the agent was shown them.
+                    "images": turn_images if turn_id == 0 else [],
+                    "response": text,
+                    "observation": observation_text if turn_id == len(pieces) - 1 else "",
+                })
 
         concat_response = torch.cat(resp_parts, dim=0)
         concat_response_mask = torch.cat(mask_parts, dim=0)
@@ -228,9 +257,7 @@ def concat_val_multi_turn(
             "episode_turns": _first("episode_turns", len(turns)),
             # How many conversations the episode spanned: 1 for concat, one per turn for
             # no_concat, and however many compactions happened plus one for compact.
-            "n_conversations": len({
-                nt["conversation_id"][i] for _, i in turns
-            }) if nt.get("conversation_id") is not None else 1,
+            "n_conversations": len(conv_order) if conv_order else 1,
             # data_source is deliberately absent: the input batch already carries it, and
             # _validate unions the two. union asserts that a key present on both sides is
             # the same object, so supplying it here fails the whole validation pass.

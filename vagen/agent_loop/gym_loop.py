@@ -199,7 +199,12 @@ class GymLoop(VagenGymAgentLoopBase):
     def _outputs(self, client, env, result, kwargs, episode_id: str) -> list[AgentLoopOutput]:
         rows = client.rows()
         outputs = []
-        for turn_idx, row in enumerate(rows):
+        # One row is one conversation. Ordered from 0 in the order they were opened --
+        # group / episode ids only identify, but conversations and turns are a sequence,
+        # so they read as 0,1,2. Enumerating rows as "turn_idx" was the old bug: it
+        # numbered conversations and called them turns, which is only the same thing
+        # under no_concat.
+        for conversation_id, row in enumerate(rows):
             images = client.images(row.conversation_id)
             # Both sides can carry image placeholders: the prompt holds the opening
             # observation, and in concat mode the response region holds every later one,
@@ -236,16 +241,21 @@ class GymLoop(VagenGymAgentLoopBase):
                             **{f"{k}_reward": v for k, v in env.state_scores.items()},
                         },
                         "image_data": images,
-                        "last_turn": turn_idx == len(rows) - 1,
+                        "last_turn": conversation_id == len(rows) - 1,
                         "episode_id": episode_id,
                         "group_idx": kwargs["group_idx"],
                         "traj_idx": kwargs["traj_idx"],
-                        "turn_idx": turn_idx,
+                        "turn_idx": conversation_id,
                         # Which conversation this row belongs to. An episode can span
                         # several: compaction ends one and opens the next, and the
                         # episode log has to show them as one story with a seam, not as
                         # unrelated rows.
-                        "conversation_id": row.conversation_id or "",
+                        "conversation_id": conversation_id,
+                        #: (start, end) per turn within this conversation, so turn ids
+                        #: restart at 0 in each one rather than running on across the
+                        #: episode.
+                        "response_spans": list(row.response_spans),
+                        "turns_here": len(row.response_spans),
                         # How many turns the episode actually ran. num_turns above is 1
                         # per row by construction, and in concat mode an episode is one
                         # row -- so without this the only turn count anything can see

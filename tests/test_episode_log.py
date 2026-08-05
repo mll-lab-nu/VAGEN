@@ -59,13 +59,13 @@ def test_a_compaction_is_visible_as_a_seam():
         _row(0, 0, 1, "after", conversation="c1"),
     ])[(0, 0)]
     html = episode_html(turns)
-    assert "compacted" in html
-    assert html.index("before") < html.index("compacted") < html.index("after")
+    assert "new conversation" in html
+    assert html.index("before") < html.index("new conversation") < html.index("after")
 
 
 def test_no_seam_when_the_conversation_never_restarted():
     html = episode_html(group_turns([_row(0, 0, 0, "a"), _row(0, 0, 1, "b")])[(0, 0)])
-    assert "compacted" not in html
+    assert "new conversation" not in html
 
 
 def test_summary_counts_turns_and_conversations():
@@ -241,4 +241,4 @@ def test_compact_shape_several_conversations_many_turns():
         r["episode_turns"] = 6
     (e,) = episode_rows(rows)
     assert (e["turns"], e["conversations"]) == (6, 2)
-    assert "compacted" in e["html"], "the conversation restart is not marked"
+    assert "new conversation" in e["html"], "the conversation restart is not marked"
