@@ -207,7 +207,9 @@ def concat_val_multi_turn(
             "n_conversations": len({
                 nt["conversation_id"][i] for _, i in turns
             }) if nt.get("conversation_id") is not None else 1,
-            "data_source": _first("data_source"),
+            # data_source is deliberately absent: the input batch already carries it, and
+            # _validate unions the two. union asserts that a key present on both sides is
+            # the same object, so supplying it here fails the whole validation pass.
         }
 
         # Copy all reward_extra_info kv to top-level
