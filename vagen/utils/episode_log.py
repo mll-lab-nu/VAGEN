@@ -30,10 +30,19 @@ _STYLE = (
 
 
 def _img_tag(image: Any) -> str:
-    """A PIL image as an inline <img>, or nothing if it cannot be encoded."""
+    """A PIL image as an inline <img>, or nothing if it cannot be encoded.
+
+    Downscaled before encoding, not just styled down. The width below used to be a CSS
+    attribute only, so the payload was whatever the environment rendered -- invisible at
+    sokoban's 192px and a per-frame cost proportional to resolution for anything larger.
+    """
     try:
+        frame = image.convert("RGB")
+        if frame.width > _MAX_W:
+            height = max(1, round(frame.height * _MAX_W / frame.width))
+            frame = frame.resize((_MAX_W, height))
         buf = io.BytesIO()
-        image.convert("RGB").save(buf, format="PNG")
+        frame.save(buf, format="PNG", optimize=True)
         b64 = base64.b64encode(buf.getvalue()).decode()
     except Exception:  # noqa: BLE001 - a frame that will not encode must not lose the text
         return ""

@@ -139,3 +139,21 @@ def test_restore_does_not_clobber_columns_that_survived():
 
     out = W._vagen_restore_row_columns(W, _Batch(), [_Out()])
     assert list(out.non_tensor_batch["turn_idx"]) == [7], "overwrote the real column"
+
+
+def test_a_large_frame_is_downscaled_before_encoding():
+    """The width used to be CSS only, so the payload was full resolution.
+
+    Invisible at sokoban's 192px; for a renderer producing 1024px frames it is the
+    difference between a few KB and a few hundred per turn, every validation.
+    """
+    big = PIL.new("RGB", (1600, 900), (7, 7, 7))
+    small = PIL.new("RGB", (160, 90), (7, 7, 7))
+    big_len = len(episode_html([_row(0, 0, 0, "x", images=[big])]))
+    small_len = len(episode_html([_row(0, 0, 0, "x", images=[small])]))
+    assert big_len < 4 * small_len, f"large frame not downscaled: {big_len} vs {small_len}"
+
+
+def test_a_small_frame_is_not_upscaled():
+    tiny = PIL.new("RGB", (16, 16), (1, 2, 3))
+    assert "base64," in episode_html([_row(0, 0, 0, "x", images=[tiny])])
