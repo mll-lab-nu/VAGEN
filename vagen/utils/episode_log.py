@@ -187,6 +187,18 @@ def select_episodes(episodes: list[dict], n: int) -> list[dict]:
     return picked
 
 
+def describe_columns(extras: dict, n_rows: int) -> str:
+    """What actually arrived. The grouping depends on these and fails silently without
+    them: every row becomes its own episode, so a five-turn episode reads as five
+    one-turn ones -- or as one, once only n are shown."""
+    bits = []
+    for key in ("group_idx", "traj_idx", "turn_idx", "conversation_id", "episode_turns"):
+        vals = extras.get(key) or []
+        present = sum(1 for v in vals if v is not None)
+        bits.append(f"{key}={present}/{n_rows}u{len({str(v) for v in vals})}")
+    return " ".join(bits)
+
+
 def rows_from_validation(inputs, outputs, scores, images, extras) -> list[dict]:
     """One record per turn, from the parallel columns validation produces.
 
