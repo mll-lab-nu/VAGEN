@@ -180,11 +180,34 @@ def concat_val_multi_turn(
             "rm_scores": concat_rm_scores,
         }
 
+        # The identity chain, carried across the merge. Validation folds an episode's
+        # per-turn rows into one, so afterwards a row *is* an episode -- but only if the
+        # ids come with it. Dropping them left the episode log grouping merged rows by
+        # the dataset's axis, which is unique per row, so every episode read as one turn.
+        def _first(key, default=None):
+            arr = nt.get(key)
+            if arr is None:
+                return default
+            for _, i in turns:
+                if arr[i] is not None:
+                    return arr[i]
+            return default
+
         non_tensor_entry: Dict[str, Any] = {
             "group_idx": group_idx_str,
             "traj_idx": int(traj_idx),
             "image_data": merged_images,
             "reward_extra_info": reward_extra_info,
+            "episode_id": _first("episode_id"),
+            # Turns the episode ran. Prefer what the loop counted; fall back to the rows
+            # merged here, which is the same number under no_concat.
+            "episode_turns": _first("episode_turns", len(turns)),
+            # How many conversations the episode spanned: 1 for concat, one per turn for
+            # no_concat, and however many compactions happened plus one for compact.
+            "n_conversations": len({
+                nt["conversation_id"][i] for _, i in turns
+            }) if nt.get("conversation_id") is not None else 1,
+            "data_source": _first("data_source"),
         }
 
         # Copy all reward_extra_info kv to top-level
@@ -267,7 +290,10 @@ def concat_val_multi_turn(
         stacked_batch[k] = torch.stack(vals, dim=0)
 
     # Dynamic non-tensor keys copied from reward_extra_info
-    base_nt_keys = {"group_idx", "traj_idx", "image_data", "reward_extra_info"}
+    base_nt_keys = {
+        "group_idx", "traj_idx", "image_data", "reward_extra_info",
+        "episode_id", "episode_turns", "n_conversations", "data_source",
+    }
     extra_keys: List[str] = []
     seen = set()
     for _, nte in concatenated:
