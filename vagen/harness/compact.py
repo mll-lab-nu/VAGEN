@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from vagen.core.harness import BaseHarness, Call
+from vagen.core.harness import BaseHarness, Call, Msg
 
 
 class CompactHarness(BaseHarness):
