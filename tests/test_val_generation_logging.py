@@ -23,15 +23,16 @@ class _Cfg(dict):
 
 
 class _Recorder:
-    """Stands in for the utils logger: same shape, no wandb, no Ray."""
+    """Stands in for EpisodeTableLogger: renders in-process, records what it would log."""
 
     def __init__(self):
         self.calls = []
         self.episode_calls = []
 
-    def log(self, episodes, step):
-        self.episode_calls.append((["wandb"], episodes, step))
-        return len(episodes)
+    def submit(self, rows, n, step):
+        from vagen.utils.episode_log import episode_rows, select_episodes
+
+        self.episode_calls.append((["wandb"], select_episodes(episode_rows(rows), n), step))
 
 
 class _Base:
