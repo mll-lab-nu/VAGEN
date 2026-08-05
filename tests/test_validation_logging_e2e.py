@@ -127,7 +127,7 @@ def test_each_context_policy_logs_its_true_shape(monkeypatch, mode, want_turns, 
         assert row[table.columns.index(f"ep{i}_success")] is not None, f"{mode}: verdict missing"
     html = row[table.columns.index("ep0_html")]
     assert html.count("<b>turn") == want_turns, f"{mode}: expected {want_turns} turns, got {html.count(chr(60)+chr(98)+chr(62)+chr(116))}"
-    assert html.count("compacted") == want_convs - 1, f"{mode}: conversation seams wrong"
+    assert html.count("new conversation") == want_convs - 1, f"{mode}: conversation seams wrong"
 
 
 def test_the_sample_is_balanced_and_carries_frames(monkeypatch):
@@ -191,5 +191,5 @@ def test_conversation_boundaries_are_marked_between_turns():
         ],
     }]
     h = episode_html(turns)
-    assert h.index("BEFORE") < h.index("compacted") < h.index("AFTER")
+    assert h.index("BEFORE") < h.index("new conversation") < h.index("AFTER")
     assert h.count("<b>turn") == 2

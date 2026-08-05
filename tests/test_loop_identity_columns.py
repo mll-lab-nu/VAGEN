@@ -19,6 +19,7 @@ from vagen.agent_loop.gym_loop import GymLoop
 
 class _Row:
     conversation_id = "conv-1"
+    response_spans = [(0, 1), (1, 2)]   # two turns inside this conversation
     prompt_ids = [1, 2, 3]
     response_ids = [4, 5]
     response_mask = [1, 1]
@@ -60,11 +61,18 @@ def test_every_row_carries_the_whole_identity_chain():
         assert f["group_idx"] == "g-1"
 
 
-def test_turn_ids_are_distinct_and_ordered():
-    """Equal turn ids make the log sort every turn the same, which renders a coherent
-    transcript that never happened."""
-    ids = [o.extra_fields["turn_idx"] for o in _outputs()]
-    assert ids == sorted(ids) and len(set(ids)) == len(ids), ids
+def test_conversations_are_numbered_from_zero_in_order():
+    """group / episode ids only identify; conversations are a sequence and read as
+    0,1,2. Enumerating rows and calling the result turn_idx numbered conversations and
+    labelled them turns -- only the same thing under no_concat."""
+    ids = [o.extra_fields["conversation_id"] for o in _outputs()]
+    assert ids == list(range(len(ids))), ids
+
+
+def test_each_conversation_reports_the_turns_inside_it():
+    for out in _outputs():
+        assert out.extra_fields["turns_here"] == 2
+        assert out.extra_fields["response_spans"] == [(0, 1), (1, 2)]
 
 
 def test_the_real_turn_count_travels_with_the_rows():

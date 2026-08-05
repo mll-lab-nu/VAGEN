@@ -136,13 +136,13 @@ def episode_html(turns: list[dict]) -> str:
                 # Unmarked, the transcript reads as a model that inexplicably forgot.
                 parts.append(
                     '<hr style="border:0;border-top:2px dashed #c00;margin:14px 0 6px">'
-                    '<div style="color:#c00"><b>— context compacted, new conversation —</b></div>'
+                    f'<div style="color:#c00"><b>— new conversation {conversation} —</b></div>'
                 )
             elif position == 0:
-                parts.append(_label("conversation 1", "#888"))
+                parts.append(_label(f"conversation {conversation if conversation is not None else 0}", "#888"))
             prev_conversation = conversation
 
-        n = rec.get("turn_idx")
+        n = rec.get("turn_id", rec.get("turn_idx"))
         head = f"turn {n}" if n is not None else f"turn {position} (unlabelled)"
         parts.append(
             '<hr style="border:0;border-top:1px solid #ddd;margin:10px 0 4px">'

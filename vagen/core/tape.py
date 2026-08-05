@@ -33,6 +33,11 @@ class Row:
     response_mask: list[int]
     logprobs: list[float]
     scores: list[float]
+    #: (start, end) of each model output, as offsets into ``response_ids``. One entry per
+    #: turn: a conversation holds several under concat, exactly one under no_concat.
+    #: Without these a conversation is one undifferentiated blob and its turns cannot be
+    #: told apart, which is why turn numbering had silently become conversation numbering.
+    response_spans: list[tuple[int, int]] = field(default_factory=list)
 
     def __post_init__(self):
         if not (len(self.response_ids) == len(self.response_mask) == len(self.logprobs) == len(self.scores)):
@@ -59,6 +64,8 @@ class Conversation:
     prompt_len: int | None = None
     # Span of the most recent model output, so a turn's reward lands on that turn.
     _last_response: tuple[int, int] | None = None
+    #: Every model output so far, in order, as (start, end) into the trainable region.
+    response_spans: list[tuple[int, int]] = field(default_factory=list)
     # Length of the newest context span; the only region an adoption can resize.
     _tail_context_len: int | None = None
 
@@ -85,6 +92,7 @@ class Conversation:
         self.logprobs += list(logprobs) if logprobs else [0.0] * len(ids)
         self.scores += [0.0] * len(ids)
         self._last_response = (start, len(self.mask))
+        self.response_spans.append(self._last_response)
         self._tail_context_len = 0
 
     # ---------------------------------------------------------------- adopting
@@ -144,6 +152,7 @@ class Conversation:
             response_mask=list(self.mask),
             logprobs=list(self.logprobs),
             scores=list(self.scores),
+            response_spans=list(self.response_spans),
         )
 
     def add_reward(self, reward: float | list[float]) -> None:
