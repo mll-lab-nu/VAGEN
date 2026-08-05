@@ -97,3 +97,45 @@ def test_an_unencodable_frame_does_not_take_the_text_with_it():
 
     html = episode_html([_row(0, 0, 0, "the-text-still-matters", images=[Bad()])])
     assert "the-text-still-matters" in html
+
+
+# ------------------------------------------------- the columns must survive the batch
+def test_the_manager_restores_the_per_row_columns():
+    """turn_idx and conversation_id are per row, not per rollout.
+
+    They cannot be recovered from input_non_tensor_batch, which is per rollout and gets
+    repeated. If verl drops the extra_fields carrying them, every turn sorts equal and
+    the transcript reads as a coherent episode that never happened -- silently.
+    """
+    import numpy as np
+
+    from vagen.agent_loop.multi_output import MultiOutputAgentLoopWorker as W
+
+    class _Out:
+        def __init__(self, turn, conversation):
+            self.extra_fields = {"turn_idx": turn, "conversation_id": conversation}
+
+    class _Batch:
+        def __init__(self):
+            self.non_tensor_batch = {}
+
+    flat = [_Out(1, "c1"), _Out(0, "c0"), _Out(2, "c1")]
+    out = W._vagen_restore_row_columns(W, _Batch(), flat)
+    assert list(out.non_tensor_batch["turn_idx"]) == [1, 0, 2]
+    assert list(out.non_tensor_batch["conversation_id"]) == ["c1", "c0", "c1"]
+
+
+def test_restore_does_not_clobber_columns_that_survived():
+    import numpy as np
+
+    from vagen.agent_loop.multi_output import MultiOutputAgentLoopWorker as W
+
+    class _Out:
+        extra_fields = {"turn_idx": 99, "conversation_id": "x"}
+
+    class _Batch:
+        def __init__(self):
+            self.non_tensor_batch = {"turn_idx": np.array([7], dtype=object)}
+
+    out = W._vagen_restore_row_columns(W, _Batch(), [_Out()])
+    assert list(out.non_tensor_batch["turn_idx"]) == [7], "overwrote the real column"
