@@ -238,7 +238,7 @@ class VagenV0Mixin(VagenLogicMixin):
         if not n:
             return
         extras = extras or {}
-        if not any(v is not None for v in extras.get("group_idx", [])):
+        if not any(v is not None for v in (extras.get("episode_id") or extras.get("group_idx") or [])):
             # Nothing published episode ids, so there is nothing to regroup.
             return super()._maybe_log_val_generations(inputs, outputs, scores, images=images)
 

@@ -66,14 +66,24 @@ def _img_tag(image: Any) -> str:
 def group_turns(rows: list[dict]) -> dict[tuple, list[dict]]:
     """Group rows into episodes and order each one by turn.
 
-    Keyed by (group_idx, traj_idx). Rows missing those fall back to their own position,
-    so a loop that publishes no episode ids still logs one row per call rather than
-    silently collapsing everything into a single bogus episode.
+    Keyed on ``episode_id``, which the agent loop mints once per episode and stamps on
+    every row alongside ``conversation_id`` and ``turn_idx``. The three travel together
+    so they cannot disagree about what they identify.
+
+    ``(group_idx, traj_idx)`` is the fallback, and used to be the primary key -- but that
+    is the dataset's axis rather than the loop's, and measured at validation it was
+    unique per row, so every row grouped as its own one-turn episode. Rows with neither
+    fall back to their own position, which logs one entry per row rather than silently
+    collapsing everything into a single bogus episode.
     """
     episodes: dict[tuple, list[dict]] = defaultdict(list)
     for i, r in enumerate(rows):
-        g, t = r.get("group_idx"), r.get("traj_idx")
-        key = (g, t) if g is not None and t is not None else ("_row", i)
+        ep = r.get("episode_id")
+        if ep is not None:
+            key = ("ep", ep)
+        else:
+            g, t = r.get("group_idx"), r.get("traj_idx")
+            key = (g, t) if g is not None and t is not None else ("_row", i)
         episodes[key].append(r)
     for turns in episodes.values():
         turns.sort(key=lambda r: (r.get("turn_idx") if r.get("turn_idx") is not None else 0))
@@ -134,13 +144,18 @@ def episode_rows(rows: list[dict]) -> list[dict]:
         sources = [t.get("data_source") for t in turns if t.get("data_source")]
         out.append(
             {
-                "episode": f"{key[0]}/{key[1]}",
+                "episode": str(key[1]) if key[0] == "ep" else f"{key[0]}/{key[1]}",
                 "data_source": sources[0] if sources else None,
                 # Turns the episode ran, as the loop counted them. len(turns) is the
                 # number of rows, which in concat mode is 1 for any episode however long.
                 "turns": next((t["episode_turns"] for t in turns if t.get("episode_turns")), len(turns)),
-                # An episode spanning more than one conversation was compacted.
-                "conversations": len({t.get("conversation_id") for t in turns}),
+                # An episode spanning more than one conversation was compacted. After
+                # the validation merge a row is a whole episode, so the per-turn
+                # conversation ids are gone and the count comes across pre-computed.
+                "conversations": next(
+                    (t["n_conversations"] for t in turns if t.get("n_conversations")),
+                    len({t.get("conversation_id") for t in turns}),
+                ),
                 "score": round(sum(scores), 4) if scores else None,
                 "success": max(successes) if successes else None,
                 "html": episode_html(turns),
@@ -192,7 +207,8 @@ def describe_columns(extras: dict, n_rows: int) -> str:
     them: every row becomes its own episode, so a five-turn episode reads as five
     one-turn ones -- or as one, once only n are shown."""
     bits = []
-    for key in ("group_idx", "traj_idx", "turn_idx", "conversation_id", "episode_turns"):
+    for key in ("episode_id", "group_idx", "turn_idx", "conversation_id", "episode_turns",
+                "n_conversations"):
         vals = extras.get(key) or []
         present = sum(1 for v in vals if v is not None)
         bits.append(f"{key}={present}/{n_rows}u{len({str(v) for v in vals})}")
@@ -217,6 +233,7 @@ def rows_from_validation(inputs, outputs, scores, images, extras) -> list[dict]:
             "output": out,
             "score": sc,
             "images": im,
+            "episode_id": ep,
             "group_idx": g,
             "traj_idx": t,
             "turn_idx": ti,
@@ -230,11 +247,13 @@ def rows_from_validation(inputs, outputs, scores, images, extras) -> list[dict]:
             # and in concat mode an episode is one row, so without this every episode
             # looks like a single turn no matter how long it was.
             "episode_turns": et,
+            "n_conversations": nc,
         }
-        for inp, out, sc, im, g, t, ti, c, su, ds, et in zip(
+        for inp, out, sc, im, ep, g, t, ti, c, su, ds, et, nc in zip(
             inputs, outputs, scores, images or [None] * n,
-            col("group_idx"), col("traj_idx"), col("turn_idx"), col("conversation_id"),
-            col("traj_success"), col("data_source"), col("episode_turns"),
+            col("episode_id"), col("group_idx"), col("traj_idx"), col("turn_idx"),
+            col("conversation_id"), col("traj_success"), col("data_source"), col("episode_turns"),
+            col("n_conversations"),
             strict=True,
         )
     ]

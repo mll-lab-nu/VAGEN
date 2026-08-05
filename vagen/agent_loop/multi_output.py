@@ -101,8 +101,23 @@ class MultiOutputAgentLoopWorker(AgentLoopWorker):
             expanded = {key: np.repeat(val, counts, axis=0) for key, val in input_non_tensor_batch.items()}
 
         output = super()._postprocess(flat, input_non_tensor_batch=expanded, validate=validate)
+        before = set(output.non_tensor_batch)
         output = self._vagen_restore_indices(output, expanded)
-        return self._vagen_restore_row_columns(output, flat)
+        output = self._vagen_restore_row_columns(output, flat)
+        # What the batch leaves here carrying. Everything downstream depends on these
+        # surviving, and their absence is silent -- the episode log just groups every
+        # row on its own and reports one turn each.
+        want = (*self.INDEX_COLUMNS, *self.ROW_COLUMNS)
+        print(
+            f"[vagen] postprocess(validate={validate}) rows={len(flat)} "
+            + " ".join(
+                f"{k}={'y' if k in output.non_tensor_batch else 'N'}"
+                f"{'*' if k in output.non_tensor_batch and k not in before else ''}"
+                f"u{len({str(v) for v in output.non_tensor_batch[k]}) if k in output.non_tensor_batch else 0}"
+                for k in want
+            )
+        )
+        return output
 
     # Columns the trajectory estimators group on. The no-concat loop happens to emit
     # them per turn via extra_fields, but the concat loop does not, and verl drops
@@ -115,7 +130,7 @@ class MultiOutputAgentLoopWorker(AgentLoopWorker):
     # between the rows of one rollout. Losing turn_idx does not fail -- it makes the
     # episode log sort every turn equal, so a transcript reads as a coherent episode
     # that never happened.
-    ROW_COLUMNS = ("turn_idx", "conversation_id", "episode_turns")
+    ROW_COLUMNS = ("episode_id", "turn_idx", "conversation_id", "episode_turns")
 
     def _vagen_restore_indices(self, output: DataProto, expanded: dict[str, Any] | None) -> DataProto:
         """Put the trajectory index columns back if verl dropped them."""
