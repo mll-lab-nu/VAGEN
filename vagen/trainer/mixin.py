@@ -35,6 +35,7 @@ from vagen.custom_filter.filter import FILTER_REGISTRY
 from vagen.custom_metric.metric import METRIC_REGISTRY
 from vagen.trainer.logic import collect_registry_metrics, value_mask_from_returns
 from vagen.utils.image_token_utils import replace_image_tokens_for_logging
+from vagen.utils.episode_log import episode_rows
 from vagen.utils.image_validation_logger import ValidationGenerationsLogger
 
 
@@ -206,41 +207,67 @@ class VagenV0Mixin(VagenLogicMixin):
         super()._fit_dump_data(batch)
         self._vagen_dump_images(batch)
 
-    def _maybe_log_val_generations(self, inputs, outputs, scores, images=None):
-        """Log validation samples with the frame the model was looking at.
+    def _maybe_log_val_generations(self, inputs, outputs, scores, images=None, extras=None):
+        """Log validation episodes: every turn of one trajectory, as one readable thing.
 
-        verl's table is input / output / score, which for a rendered task leaves out
-        the thing being reasoned about. The logger here is the one on main; it lost its
-        caller when the vendored trainer was deleted, not its usefulness.
+        verl's table is one row per model call, which is the wrong unit for looking at an
+        agent. An episode is several calls, and once the context is compacted it is
+        several conversations, so the same trajectory arrives as unrelated rows with
+        nothing saying they belong together or in what order.
 
-        This exists as an override rather than a copy of ``_validate`` because that is
-        150 lines that would then rot against upstream -- the reason the vendored
-        trainer was deleted in the first place. Upstream collects the column and passes
-        it; the base ignores it.
+        Rows are regrouped here into one entry per episode, frames inline where the agent
+        saw them and a visible seam wherever the conversation restarted. Falls back to
+        verl's table when the loop published no episode ids.
+
+        An override rather than a copy of ``_validate``, which is 150 lines that would
+        then rot against upstream -- the reason the vendored trainer was deleted at all.
         """
         n = self.config.trainer.get("log_val_generations", 0)
         if not n:
             return
-        if not images or all(img is None for img in images):
-            return super()._maybe_log_val_generations(inputs, outputs, scores)
+        extras = extras or {}
+        have_episodes = any(v is not None for v in extras.get("group_idx", []))
+        if not have_episodes:
+            return super()._maybe_log_val_generations(inputs, outputs, scores, images=images)
 
         if self.config.trainer.get("replace_image_tokens_for_logging", True):
             processor = getattr(self, "processor", None)
             inputs = replace_image_tokens_for_logging(inputs, processor)
             outputs = replace_image_tokens_for_logging(outputs, processor)
 
-        samples = list(zip(inputs, outputs, scores, images, strict=True))
-        samples.sort(key=lambda s: s[0])
-        # Fixed seed so the same prompts are shown every step and the table reads as a
-        # progression rather than a fresh sample each time.
-        np.random.RandomState(42).shuffle(samples)
+        def col(name):
+            v = extras.get(name) or []
+            return list(v) + [None] * (len(outputs) - len(v))
+
+        rows = [
+            {
+                "input": inp,
+                "output": out,
+                "score": sc,
+                "images": im,
+                "group_idx": g,
+                "traj_idx": t,
+                "turn_idx": ti,
+                "conversation_id": c,
+            }
+            for inp, out, sc, im, g, t, ti, c in zip(
+                inputs, outputs, scores, images or [None] * len(outputs),
+                col("group_idx"), col("traj_idx"), col("turn_idx"), col("conversation_id"),
+                strict=True,
+            )
+        ]
+        episodes = episode_rows(rows)[:n]
+        if not episodes:
+            return
 
         if getattr(self, "_vagen_val_logger", None) is None:
             self._vagen_val_logger = ValidationGenerationsLogger(
                 project_name=self.config.trainer.project_name,
                 experiment_name=self.config.trainer.experiment_name,
             )
-        self._vagen_val_logger.log(self.config.trainer.logger, samples[:n], self.global_steps)
+        self._vagen_val_logger.log_episodes(
+            self.config.trainer.logger, episodes, self.global_steps
+        )
 
     def _fit_save_checkpoint(self, *args, **kwargs):
         """HF Hub upload on its own schedule, independent of ``trainer.save_freq``.

@@ -125,7 +125,12 @@ class StateRewardWrapper:
         scores: dict[str, Any] = {"spans": spans, "format": 0.0}
         for name in self.enabled:
             scores[name] = 0.0
-        if not present:
+
+        # Format is a gate, not a line item: a turn that did not write every section it
+        # was asked for scores nothing for the ones it did write. Paying per-section
+        # makes the rest optional, and an agent that learns to describe well while
+        # skipping a section has learned to farm the auxiliary reward.
+        if len(present) < len(self.enabled):
             return scores
 
         # Both descriptions of a turn go out together, so a turn costs one round trip
@@ -140,9 +145,7 @@ class StateRewardWrapper:
             scores[name] = (
                 0.0 if items is None else self.enabled[name] * grouped_f1(items, gold[name], self.spec.object_weights)
             )
-        # Paid only when every section that is scored was written: paying for a subset
-        # makes the rest optional.
-        scores["format"] = self.format_reward if len(present) == len(self.enabled) else 0.0
+        scores["format"] = self.format_reward
         return scores
 
     def _place(self, scored: dict, outcome: float, token_ids, tokenizer) -> list[float]:

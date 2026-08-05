@@ -137,3 +137,58 @@ def test_the_forwarding_predicate_reads_the_signature():
     assert _accepts_response(StateRewardWrapper.step) is True
     assert _accepts_response(_Env.step) is False
     assert _accepts_response(None) is False       # never raise while deciding
+
+
+# ---------------------------------------------------------------- reward budget
+class _Loop:
+    """Just enough of GymLoop to exercise the budget arithmetic."""
+
+    def __init__(self, **state_reward):
+        from vagen.agent_loop.gym_loop import GymLoop
+
+        cfg = {"state_estimation": {"enable": True, "weight": 0.5},
+               "transition_prediction": {"enable": True, "weight": 0.5},
+               "budget": 1.0, "format_reward": 0.0,
+               "judge_base_url": "http://127.0.0.1:1/v1", "judge_model": "m"}
+        cfg.update(state_reward)
+        self.config = _Cfg(trainer=_Cfg(state_reward=cfg))
+        self._maybe_state_reward = GymLoop._maybe_state_reward.__get__(self)
+
+
+class _Cfg(dict):
+    def __getattr__(self, k):
+        try:
+            return self[k]
+        except KeyError as e:
+            raise AttributeError(k) from e
+
+
+def test_a_perfect_episode_is_worth_exactly_the_budget():
+    """Auxiliary reward must not outbid the task. Solving is 1; describing is `budget`."""
+    for max_turns in (1, 5, 10):
+        w = _Loop()._maybe_state_reward(_Env(), "Sokoban", max_turns)
+        per_turn = sum(w.enabled.values())
+        assert per_turn * max_turns == pytest.approx(1.0), f"max_turns={max_turns}"
+
+
+def test_raising_max_turns_does_not_inflate_the_budget():
+    """The bug this replaces: a fixed per-turn weight doubles the episode total when
+    someone doubles max_turns, silently."""
+    a = _Loop()._maybe_state_reward(_Env(), "Sokoban", 5)
+    b = _Loop()._maybe_state_reward(_Env(), "Sokoban", 10)
+    assert sum(a.enabled.values()) == pytest.approx(2 * sum(b.enabled.values()))
+
+
+def test_relative_weights_are_respected_within_the_budget():
+    loop = _Loop(state_estimation={"enable": True, "weight": 3.0},
+                 transition_prediction={"enable": True, "weight": 1.0})
+    w = loop._maybe_state_reward(_Env(), "Sokoban", 4)
+    e, t = w.enabled["state_estimation"], w.enabled["transition_prediction"]
+    assert e == pytest.approx(3 * t)
+    assert (e + t) * 4 == pytest.approx(1.0)
+
+
+def test_one_reward_alone_still_gets_the_whole_budget():
+    loop = _Loop(transition_prediction={"enable": False, "weight": 0.5})
+    w = loop._maybe_state_reward(_Env(), "Sokoban", 5)
+    assert sum(w.enabled.values()) * 5 == pytest.approx(1.0)
