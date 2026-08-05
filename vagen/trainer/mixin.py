@@ -208,6 +208,20 @@ class VagenV0Mixin(VagenLogicMixin):
         super()._fit_dump_data(batch)
         self._vagen_dump_images(batch)
 
+    def _fit_validate(self, *args, **kwargs):
+        """Validate, then make sure whatever it queued for wandb actually goes out.
+
+        The episode table is rendered off-thread, so a submit only queues. Without a
+        drain here a run whose validation happens once -- every short run, and the last
+        validation of every long one -- finishes with the table still in the queue and
+        nothing logged.
+        """
+        out = super()._fit_validate(*args, **kwargs)
+        logger_ = getattr(self, "_vagen_val_logger", None)
+        if logger_ is not None:
+            logger_.flush()
+        return out
+
     def _maybe_log_val_generations(self, inputs, outputs, scores, images=None, extras=None):
         """Hand validation episodes to the logger. The assembling lives in utils.
 
