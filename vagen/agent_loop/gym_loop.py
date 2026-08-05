@@ -239,6 +239,11 @@ class GymLoop(VagenGymAgentLoopBase):
                         # episode log has to show them as one story with a seam, not as
                         # unrelated rows.
                         "conversation_id": row.conversation_id or "",
+                        # How many turns the episode actually ran. num_turns above is 1
+                        # per row by construction, and in concat mode an episode is one
+                        # row -- so without this the only turn count anything can see
+                        # says every episode was a single turn.
+                        "episode_turns": int(result.turns),
                     },
                 )
             )

@@ -23,15 +23,15 @@ class _Cfg(dict):
 
 
 class _Recorder:
+    """Stands in for the utils logger: same shape, no wandb, no Ray."""
+
     def __init__(self):
         self.calls = []
         self.episode_calls = []
 
-    def log(self, loggers, samples, step):
-        self.calls.append((loggers, samples, step))
-
-    def log_episodes(self, loggers, episodes, step):
-        self.episode_calls.append((loggers, episodes, step))
+    def log(self, episodes, step):
+        self.episode_calls.append((["wandb"], episodes, step))
+        return len(episodes)
 
 
 class _Base:

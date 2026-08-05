@@ -214,3 +214,31 @@ def test_selection_is_deterministic():
     assert [e["episode"] for e in select_episodes(eps, 6)] == [
         e["episode"] for e in select_episodes(list(eps), 6)
     ]
+
+
+# ------------------------------------------------ the three context policies
+def test_concat_shape_one_conversation_many_turns():
+    """concat: the whole episode is one conversation, and one row."""
+    rows = [_row(0, 0, 0, "everything", conversation="c0")]
+    rows[0]["episode_turns"] = 5
+    (e,) = episode_rows(rows)
+    assert (e["turns"], e["conversations"]) == (5, 1), (
+        "concat episode reported as a single turn: the row count is not the turn count"
+    )
+
+
+def test_no_concat_shape_many_conversations_one_turn_each():
+    rows = [_row(0, 0, i, f"t{i}", conversation=f"c{i}") for i in range(4)]
+    for r in rows:
+        r["episode_turns"] = 4
+    (e,) = episode_rows(rows)
+    assert (e["turns"], e["conversations"]) == (4, 4)
+
+
+def test_compact_shape_several_conversations_many_turns():
+    rows = [_row(0, 0, i, f"t{i}", conversation="c0" if i < 3 else "c1") for i in range(6)]
+    for r in rows:
+        r["episode_turns"] = 6
+    (e,) = episode_rows(rows)
+    assert (e["turns"], e["conversations"]) == (6, 2)
+    assert "compacted" in e["html"], "the conversation restart is not marked"
