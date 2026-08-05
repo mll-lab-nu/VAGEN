@@ -35,8 +35,9 @@ from vagen.custom_filter.filter import FILTER_REGISTRY
 from vagen.custom_metric.metric import METRIC_REGISTRY
 from vagen.trainer.logic import collect_registry_metrics, value_mask_from_returns
 from vagen.utils.image_token_utils import replace_image_tokens_for_logging
-from vagen.utils.episode_log import episode_rows, select_episodes
+from vagen.utils.episode_log import episode_rows, rows_from_validation, select_episodes
 from vagen.utils.image_validation_logger import ValidationGenerationsLogger
+from vagen.utils.wandb_episodes import log_episodes, make_logger
 
 
 class VagenLogicMixin:
@@ -208,16 +209,13 @@ class VagenV0Mixin(VagenLogicMixin):
         self._vagen_dump_images(batch)
 
     def _maybe_log_val_generations(self, inputs, outputs, scores, images=None, extras=None):
-        """Log validation episodes: every turn of one trajectory, as one readable thing.
+        """Hand validation episodes to the logger. The assembling lives in utils.
 
         verl's table is one row per model call, which is the wrong unit for looking at an
-        agent. An episode is several calls, and once the context is compacted it is
-        several conversations, so the same trajectory arrives as unrelated rows with
-        nothing saying they belong together or in what order.
-
-        Rows are regrouped here into one entry per episode, frames inline where the agent
-        saw them and a visible seam wherever the conversation restarted. Falls back to
-        verl's table when the loop published no episode ids.
+        agent: an episode is several calls, and once the context is compacted it is
+        several conversations. Regrouping, selecting and rendering are in
+        ``vagen/utils/episode_log.py`` and ``vagen/utils/wandb_episodes.py``; what belongs
+        here is only the decision to log and where the columns come from.
 
         An override rather than a copy of ``_validate``, which is 150 lines that would
         then rot against upstream -- the reason the vendored trainer was deleted at all.
@@ -226,8 +224,8 @@ class VagenV0Mixin(VagenLogicMixin):
         if not n:
             return
         extras = extras or {}
-        have_episodes = any(v is not None for v in extras.get("group_idx", []))
-        if not have_episodes:
+        if not any(v is not None for v in extras.get("group_idx", [])):
+            # Nothing published episode ids, so there is nothing to regroup.
             return super()._maybe_log_val_generations(inputs, outputs, scores, images=images)
 
         if self.config.trainer.get("replace_image_tokens_for_logging", True):
@@ -235,47 +233,21 @@ class VagenV0Mixin(VagenLogicMixin):
             inputs = replace_image_tokens_for_logging(inputs, processor)
             outputs = replace_image_tokens_for_logging(outputs, processor)
 
-        def col(name):
-            v = extras.get(name) or []
-            return list(v) + [None] * (len(outputs) - len(v))
-
-        rows = [
-            {
-                "input": inp,
-                "output": out,
-                "score": sc,
-                "images": im,
-                "group_idx": g,
-                "traj_idx": t,
-                "turn_idx": ti,
-                "conversation_id": c,
-                # The environment's own verdict. Forwarded by upstream among the reward
-                # extras; without reading it here the column is present and always empty,
-                # which is worse than absent -- it reads as "no episode succeeded".
-                "traj_success": su,
-                "data_source": ds,
-            }
-            for inp, out, sc, im, g, t, ti, c, su, ds in zip(
-                inputs, outputs, scores, images or [None] * len(outputs),
-                col("group_idx"), col("traj_idx"), col("turn_idx"), col("conversation_id"),
-                col("traj_success"), col("data_source"),
-                strict=True,
-            )
-        ]
+        rows = rows_from_validation(inputs, outputs, scores, images, extras)
         # Balanced, not the first n. At a 12% success rate the first n are eight
         # failures, and a log with nothing to compare against teaches nothing.
         episodes = select_episodes(episode_rows(rows), n)
-        if not episodes:
+        if not episodes or "wandb" not in self.config.trainer.logger:
             return
 
+        # Initialised independently: tying the queue's creation to the logger's meant any
+        # path that already had a logger -- a resumed run, a test -- reached the call with
+        # no queue at all.
+        if getattr(self, "_vagen_val_futures", None) is None:
+            self._vagen_val_futures = []
         if getattr(self, "_vagen_val_logger", None) is None:
-            self._vagen_val_logger = ValidationGenerationsLogger(
-                project_name=self.config.trainer.project_name,
-                experiment_name=self.config.trainer.experiment_name,
-            )
-        self._vagen_val_logger.log_episodes(
-            self.config.trainer.logger, episodes, self.global_steps
-        )
+            self._vagen_val_logger = make_logger()
+        log_episodes(self._vagen_val_logger, episodes, self.global_steps, self._vagen_val_futures)
 
     def _fit_save_checkpoint(self, *args, **kwargs):
         """HF Hub upload on its own schedule, independent of ``trainer.save_freq``.
