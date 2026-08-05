@@ -200,39 +200,82 @@ def episode_rows(rows: list[dict]) -> list[dict]:
     return out
 
 
-def select_episodes(episodes: list[dict], n: int) -> list[dict]:
-    """Pick ``n`` to log: successes and failures in balance, spread across sources.
+#: How to choose which episodes get logged. A name from here goes in the config; the
+#: default shows successes and failures side by side, because a log of failures alone
+#: has nothing to compare against and one of successes alone hides what is going wrong.
+#: Each takes the episodes of one validation round and returns them in preference order;
+#: `select_episodes` then takes as many as asked for.
+def _by_reward(episodes, *, worst_first):
+    return sorted(episodes, key=lambda e: (e.get("reward") is None, e.get("reward") or 0.0),
+                  reverse=not worst_first)
 
-    Taking the first ``n`` shows whatever sorted first, and at a 12% success rate that
-    is eight failures -- a log you cannot learn anything from, because there is nothing
-    to compare a failure against. Half and half is the useful sample.
 
-    Round-robin over (source, succeeded) buckets. A bucket that runs out simply drops
-    out and the others fill the gap, so a run with no successes yet still logs ``n``
-    episodes rather than half a table.
+SELECTORS = {
+    # Alternating succeeded / failed, spread across data sources. See select_episodes.
+    "balanced": None,                                       # handled inline
+    "first": lambda eps: list(eps),
+    "failures": lambda eps: [e for e in eps if not e.get("success")],
+    "successes": lambda eps: [e for e in eps if e.get("success")],
+    "worst": lambda eps: _by_reward(eps, worst_first=True),
+    "best": lambda eps: _by_reward(eps, worst_first=False),
+}
+
+
+def select_episodes(
+    episodes: list[dict],
+    n: int,
+    strategy: str = "balanced",
+    success_ratio: float = 0.5,
+) -> list[dict]:
+    """Pick ``n`` episodes to log, by the named strategy.
+
+    ``balanced`` (the default) alternates succeeded and failed in the proportion
+    ``success_ratio``, spread across data sources. Taking whatever sorted first is not
+    a sample: at a 12% success rate it is n failures, and a log with nothing to compare
+    against teaches nothing.
+
+    A class that runs out simply stops contributing and the others fill the gap, so a
+    run with no successes yet still logs ``n`` episodes rather than a half-empty table.
+
+    Other strategies are for looking at something specific -- ``failures`` while chasing
+    a format problem, ``worst`` while chasing a reward bug -- and are selected by name
+    from ``SELECTORS`` rather than by editing this.
     """
     if n <= 0 or not episodes:
         return []
+    if strategy != "balanced":
+        try:
+            chosen = SELECTORS[strategy](episodes)
+        except KeyError:
+            raise ValueError(
+                f"unknown val log strategy {strategy!r}; choose from {sorted(SELECTORS)}"
+            ) from None
+        return chosen[:n]
 
+    want_success = max(0, min(n, round(n * success_ratio)))
     buckets: dict[tuple, list[dict]] = defaultdict(list)
     for e in episodes:
         buckets[(e.get("data_source"), bool(e.get("success")))].append(e)
 
-    # Deterministic order so the table reads the same way step to step: succeeded first
-    # within a source, sources in name order.
+    # Deterministic order so the table reads the same way step to step.
     order = sorted(buckets, key=lambda k: (str(k[0]), not k[1]))
+    quota = {True: want_success, False: n - want_success}
     picked: list[dict] = []
-    while len(picked) < n:
-        took = False
-        for key in order:
-            if not buckets[key]:
-                continue
-            picked.append(buckets[key].pop(0))
-            took = True
-            if len(picked) == n:
-                break
-        if not took:  # every bucket exhausted
-            break
+    for pass_respects_quota in (True, False):
+        while len(picked) < n:
+            took = False
+            for key in order:
+                if not buckets[key]:
+                    continue
+                if pass_respects_quota and quota[key[1]] <= 0:
+                    continue
+                picked.append(buckets[key].pop(0))
+                quota[key[1]] -= 1
+                took = True
+                if len(picked) == n:
+                    break
+            if not took:
+                break   # this pass can give no more; the second ignores the quota
     picked.sort(key=lambda r: (str(r.get("data_source")), not bool(r.get("success")), r["episode"]))
     return picked
 
@@ -243,10 +286,10 @@ def describe_columns(extras: dict, n_rows: int) -> str:
     one-turn ones -- or as one, once only n are shown."""
     bits = []
     for key in ("episode_id", "group_idx", "turn_idx", "conversation_id", "episode_turns",
-                "n_conversations"):
+                "n_conversations", "turn_records"):
         vals = extras.get(key) or []
         present = sum(1 for v in vals if v is not None)
-        bits.append(f"{key}={present}/{n_rows}u{len({str(v) for v in vals})}")
+        bits.append(f"{key}={present}/{n_rows}")
     return " ".join(bits)
 
 

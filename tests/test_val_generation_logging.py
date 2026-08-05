@@ -29,10 +29,12 @@ class _Recorder:
         self.calls = []
         self.episode_calls = []
 
-    def submit(self, rows, n, step):
+    def submit(self, rows, n, step, strategy="balanced", success_ratio=0.5):
         from vagen.utils.episode_log import episode_rows, select_episodes
 
-        self.episode_calls.append((["wandb"], select_episodes(episode_rows(rows), n), step))
+        self.episode_calls.append(
+            (["wandb"], select_episodes(episode_rows(rows), n, strategy, success_ratio), step)
+        )
 
 
 class _Base:

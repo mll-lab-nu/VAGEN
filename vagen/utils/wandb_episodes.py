@@ -34,10 +34,10 @@ _PER_EPISODE = ("episode", "reward", "success", "html")
 class _Renderer:
     """Turns rows into episode records with HTML. No wandb here -- see the module note."""
 
-    def render(self, rows: list[dict], n: int, step: int) -> tuple[list[dict], int]:
+    def render(self, rows, n, step, strategy="balanced", success_ratio=0.5):
         from vagen.utils.episode_log import episode_rows, select_episodes
 
-        return select_episodes(episode_rows(rows), n), step
+        return select_episodes(episode_rows(rows), n, strategy, success_ratio), step
 
 
 def make_renderer(use_ray: bool = True):
@@ -85,19 +85,21 @@ class EpisodeTableLogger:
         self._pending: list = []
         self._table = None
 
-    def submit(self, rows: list[dict], n: int, step: int) -> None:
+    def submit(self, rows, n, step, strategy="balanced", success_ratio=0.5) -> None:
         """Queue a render, and publish whatever finished since last time."""
         self._drain(block=False)
         if not rows or n <= 0:
             return
         if hasattr(self._renderer, "render") and hasattr(self._renderer.render, "remote"):
-            self._pending.append(self._renderer.render.remote(rows, n, step))
+            self._pending.append(
+                self._renderer.render.remote(rows, n, step, strategy, success_ratio)
+            )
             # One render in flight is enough; a second means the driver is outrunning
             # the actor, and waiting here is cheaper than an unbounded queue.
             if len(self._pending) > 1:
                 self._drain(block=True)
         else:
-            self._publish(*self._renderer.render(rows, n, step))
+            self._publish(*self._renderer.render(rows, n, step, strategy, success_ratio))
 
     def flush(self) -> None:
         """Publish everything outstanding. For the end of a run."""
