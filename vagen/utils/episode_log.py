@@ -67,7 +67,7 @@ def episode_html(turns: list[dict]) -> str:
         parts.append('<div style="color:#666"><b>prompt</b></div>')
         parts.append(f'<div style="color:#444">{html.escape(str(first["input"]))}</div>')
 
-    for turn in turns:
+    for position, turn in enumerate(turns):
         conversation = turn.get("conversation_id")
         if conversation != prev_conversation:
             if prev_conversation is not _UNSET:
@@ -80,8 +80,12 @@ def episode_html(turns: list[dict]) -> str:
                 )
             prev_conversation = conversation
 
+        # Position within the episode when the loop did not label the turn. The label is
+        # for reading; ordering still depends on turn_idx, and a batch that lost it is a
+        # separate problem that this must not paper over -- so an unlabelled turn is
+        # marked, rather than silently numbered as though it were known.
         n = turn.get("turn_idx")
-        head = f"turn {n}" if n is not None else "turn"
+        head = f"turn {n}" if n is not None else f"turn {position} (unlabelled)"
         bits = []
         for key, label in (("score", "score"), ("traj_success", "success")):
             if turn.get(key) is not None:

@@ -73,7 +73,8 @@ def _episode_batch(n_episodes=3, turns_per=2):
             t.append(ep)
             ti.append(turn)
             c.append(f"conv{ep}")
-    extras = {"group_idx": g, "traj_idx": t, "turn_idx": ti, "conversation_id": c}
+    extras = {"group_idx": g, "traj_idx": t, "turn_idx": ti, "conversation_id": c,
+              "traj_success": [1.0 if ep == 0 else 0.0 for _ in range(len(g))]}
     return inputs, outputs, scores, images, extras
 
 
@@ -158,3 +159,14 @@ def test_the_agent_loop_publishes_the_columns_the_logger_regroups_on():
     src = inspect.getsource(gym_loop.GymLoop._outputs)
     for col in ("group_idx", "traj_idx", "turn_idx", "conversation_id"):
         assert f'"{col}"' in src, f"the loop stopped publishing {col}"
+
+
+def test_the_environments_verdict_reaches_the_table():
+    """success was forwarded by upstream and then dropped here, so the column existed
+    and was always empty -- which reads as "nothing ever succeeded"."""
+    t = _Trainer(log_val_generations=10)
+    i, o, s_, im, ex = _episode_batch(n_episodes=2, turns_per=2)
+    ex["traj_success"] = [0.0, 1.0, 0.0, 1.0]
+    t._maybe_log_val_generations(i, o, s_, images=im, extras=ex)
+    (_, episodes, _) = t._vagen_val_logger.episode_calls[0]
+    assert {e["success"] for e in episodes} == {0.0, 1.0}, "verdict lost between upstream and the table"
