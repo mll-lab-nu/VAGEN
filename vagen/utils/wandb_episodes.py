@@ -26,7 +26,9 @@ from typing import Any
 logger = logging.getLogger(__file__)
 
 # Fields shown per episode, in order. Keep in step with `build_table`.
-_PER_EPISODE = ("rollout", "success", "score", "turns", "conversations")
+# What each example shows. episode is its id, so a row can be traced back to the
+# rollout it came from.
+_PER_EPISODE = ("episode", "reward", "success", "html")
 
 
 class _Renderer:
@@ -66,11 +68,10 @@ def build_table(episodes: list[dict], step: int, previous=None):
     row: list[Any] = [step]
     for e in episodes:
         row += [
-            wandb.Html(e["html"]),
+            e.get("episode"),
+            e.get("reward", e.get("score")),
             e.get("success"),
-            e.get("score"),
-            e.get("turns"),
-            e.get("conversations"),
+            wandb.Html(e["html"]),
         ]
     table.add_data(*row)
     return table

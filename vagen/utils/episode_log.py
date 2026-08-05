@@ -91,48 +91,82 @@ def group_turns(rows: list[dict]) -> dict[tuple, list[dict]]:
 
 
 def episode_html(turns: list[dict]) -> str:
-    """Render one episode: prompt, then each turn's frames and text, in order."""
+    """Lay an episode out in the order it happened.
+
+        system + initial prompt
+        [conversation 1]
+          turn 0:  frame(s) the agent saw  ->  what it wrote
+          turn 1:  frame(s)                ->  response
+        [conversation 2]   (compaction restarted the context)
+          turn 2:  ...
+
+    Text and images interleaved, not text in one place and a gallery in another: what a
+    turn wrote only means something next to what it was looking at.
+
+    Prefers ``turn_records``, which the validation merge builds while it still knows
+    where each turn began. Falls back to one block per row for callers that pass raw
+    per-turn rows (training-side, or before the merge).
+    """
     parts = [f'<div style="{_STYLE}">']
-    prev_conversation = _UNSET
 
     first = turns[0]
     if first.get("input"):
-        parts.append('<div style="color:#666"><b>prompt</b></div>')
+        parts.append(_label("prompt", "#666"))
         parts.append(f'<div style="color:#444">{html.escape(str(first["input"]))}</div>')
 
-    for position, turn in enumerate(turns):
-        conversation = turn.get("conversation_id")
+    records = first.get("turn_records") or []
+    if not records:
+        records = [
+            {
+                "turn_idx": t.get("turn_idx"),
+                "conversation_id": t.get("conversation_id"),
+                "images": t.get("images") or [],
+                "response": t.get("output") or "",
+                "observation": "",
+            }
+            for t in turns
+        ]
+
+    prev_conversation = _UNSET
+    for position, rec in enumerate(records):
+        conversation = rec.get("conversation_id")
         if conversation != prev_conversation:
             if prev_conversation is not _UNSET:
-                # The context was compacted: what follows is a fresh conversation that
-                # continues the same episode. Without the seam the transcript reads as a
-                # model that inexplicably forgot everything.
+                # Compaction: the context was summarised and a fresh conversation opened.
+                # Unmarked, the transcript reads as a model that inexplicably forgot.
                 parts.append(
-                    '<hr style="border:0;border-top:2px dashed #c00;margin:12px 0">'
-                    '<div style="color:#c00"><b>— context compacted, conversation restarted —</b></div>'
+                    '<hr style="border:0;border-top:2px dashed #c00;margin:14px 0 6px">'
+                    '<div style="color:#c00"><b>— context compacted, new conversation —</b></div>'
                 )
+            elif position == 0:
+                parts.append(_label("conversation 1", "#888"))
             prev_conversation = conversation
 
-        # Position within the episode when the loop did not label the turn. The label is
-        # for reading; ordering still depends on turn_idx, and a batch that lost it is a
-        # separate problem that this must not paper over -- so an unlabelled turn is
-        # marked, rather than silently numbered as though it were known.
-        n = turn.get("turn_idx")
+        n = rec.get("turn_idx")
         head = f"turn {n}" if n is not None else f"turn {position} (unlabelled)"
-        bits = []
-        for key, label in (("score", "score"), ("traj_success", "success")):
-            if turn.get(key) is not None:
-                bits.append(f"{label}={turn[key]}")
-        parts.append(f'<div style="color:#06c;margin-top:10px"><b>{head}</b> {" ".join(bits)}</div>')
+        parts.append(
+            '<hr style="border:0;border-top:1px solid #ddd;margin:10px 0 4px">'
+            if position else ""
+        )
+        parts.append(_label(head, "#06c"))
 
-        for image in turn.get("images") or []:
+        for image in rec.get("images") or []:
             tag = _img_tag(image)
             if tag:
                 parts.append(tag)
-        parts.append(f'<div>{html.escape(str(turn.get("output") or ""))}</div>')
+        if rec.get("response"):
+            parts.append(f'<div>{html.escape(str(rec["response"]))}</div>')
+        if rec.get("observation"):
+            parts.append(
+                f'<div style="color:#070;margin-top:4px">{html.escape(str(rec["observation"]))}</div>'
+            )
 
     parts.append("</div>")
     return "".join(parts)
+
+
+def _label(text: str, color: str) -> str:
+    return f'<div style="color:{color};margin-top:8px"><b>{html.escape(text)}</b></div>'
 
 
 def episode_rows(rows: list[dict]) -> list[dict]:
@@ -149,6 +183,7 @@ def episode_rows(rows: list[dict]) -> list[dict]:
                 # Turns the episode ran, as the loop counted them. len(turns) is the
                 # number of rows, which in concat mode is 1 for any episode however long.
                 "turns": next((t["episode_turns"] for t in turns if t.get("episode_turns")), len(turns)),
+                "reward": round(sum(scores), 4) if scores else None,
                 # An episode spanning more than one conversation was compacted. After
                 # the validation merge a row is a whole episode, so the per-turn
                 # conversation ids are gone and the count comes across pre-computed.
@@ -248,12 +283,13 @@ def rows_from_validation(inputs, outputs, scores, images, extras) -> list[dict]:
             # looks like a single turn no matter how long it was.
             "episode_turns": et,
             "n_conversations": nc,
+            "turn_records": tr,
         }
-        for inp, out, sc, im, ep, g, t, ti, c, su, ds, et, nc in zip(
+        for inp, out, sc, im, ep, g, t, ti, c, su, ds, et, nc, tr in zip(
             inputs, outputs, scores, images or [None] * n,
             col("episode_id"), col("group_idx"), col("traj_idx"), col("turn_idx"),
             col("conversation_id"), col("traj_success"), col("data_source"), col("episode_turns"),
-            col("n_conversations"),
+            col("n_conversations"), col("turn_records"),
             strict=True,
         )
     ]
