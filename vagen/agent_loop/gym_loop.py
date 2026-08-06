@@ -309,7 +309,8 @@ class GymLoop(VagenGymAgentLoopBase):
         # so they read as 0,1,2. Enumerating rows as "turn_idx" was the old bug: it
         # numbered conversations and called them turns, which is only the same thing
         # under no_concat.
-        for conversation_id, row in enumerate(rows):
+        for row in rows:
+            conversation_id = row.ordinal
             images = client.images(row.conversation_id)
             # Both sides can carry image placeholders: the prompt holds the opening
             # observation, and in concat mode the response region holds every later one,
