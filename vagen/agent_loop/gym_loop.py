@@ -15,6 +15,7 @@ import inspect
 import logging
 import os
 from typing import Any
+from dataclasses import replace
 from uuid import uuid4
 
 from verl.experimental.agent_loop.agent_loop import AgentLoopOutput, cap_token_ids, register
@@ -27,7 +28,10 @@ from vagen.rewards.judge import shared_judge
 from vagen.rewards.state_reward import TAGS, StateRewardWrapper
 from vagen.agent_loop.verl_client import VerlClient
 from vagen.harness import HARNESSES, build_harness
-from vagen.harness.budget import Budgets, check as check_budgets, default_summary_budget
+from vagen.harness.budget import (
+    Budgets, check as check_budgets, context_limits, default_env_response,
+    default_summary_budget,
+)
 from vagen.harness.compact import CompactHarness
 from vagen.core.runner import run_episode
 
@@ -142,8 +146,12 @@ class GymLoop(VagenGymAgentLoopBase):
         )
 
         per_turn = min(int(kwargs.get("response_length_per_turn") or self.response_length), self.response_length)
-        harness = self._build_harness(per_turn, max_turns,
-                                      per_turn_configured=bool(kwargs.get("response_length_per_turn")))
+        harness, budgets = self._build_harness(
+            per_turn, max_turns,
+            env_response=kwargs.get("env_response_length"),
+            per_turn_configured=bool(kwargs.get("response_length_per_turn")),
+        )
+        opening_limit, continuation_limit = context_limits(self._harness_mode(), budgets)
         client = VerlClient(
             self.server_manager,
             self.tokenizer,
@@ -154,6 +162,10 @@ class GymLoop(VagenGymAgentLoopBase):
             request_id=uuid4().hex,
             response_limit=per_turn,
         )
+        # What one call may hand the model that it did not generate. Enforced here rather
+        # than left to the end of the episode, where an observation that did not fit shows
+        # up as a truncated row and not as an oversized observation.
+        client.opening_limit, client.continuation_limit = opening_limit, continuation_limit
 
         result = await run_episode(env, harness, client, seed=kwargs["seed"], max_turns=max_turns)
         return self._outputs(client, env, result, kwargs, episode_id)
@@ -226,7 +238,8 @@ class GymLoop(VagenGymAgentLoopBase):
             "concat" if self.config.trainer.get("concat_multi_turn", True) else "no_concat"
         )
 
-    def _build_harness(self, per_turn: int, max_turns: int, per_turn_configured: bool = True):
+    def _build_harness(self, per_turn: int, max_turns: int, env_response=None,
+                       per_turn_configured: bool = True):
         """The policy, plus a check that the numbers it was given can produce an episode.
 
         Checked here rather than at startup because two of them -- ``max_turns`` and the
@@ -237,27 +250,32 @@ class GymLoop(VagenGymAgentLoopBase):
         expensive version of another one and reports nothing at all.
         """
         mode = self._harness_mode()
+        m = int(self.config.trainer.compact_budget) if mode == "compact" else None
         summary_budget = None
         if mode == "compact":
-            m = int(self.config.trainer.compact_budget)
             configured = self.config.trainer.get("compact_summary_budget", None)
             summary_budget = int(configured) if configured else default_summary_budget(m, per_turn)
 
-        check_budgets(mode, Budgets(
+        b = Budgets(
             prompt_len=self.prompt_length,
             response_len=self.response_length,
             per_turn=per_turn,
             max_turns=max_turns,
+            context=self.config.actor_rollout_ref.rollout.get("max_model_len", None),
             per_turn_configured=per_turn_configured,
-            compact_budget=int(self.config.trainer.compact_budget) if mode == "compact" else None,
+            compact_budget=m,
             summary_budget=summary_budget,
             summary_request_len=len(self.tokenizer.encode(CompactHarness.SUMMARY_REQUEST)),
-        ))
+        )
+        # Derived from what the mode has left rather than defaulted to a constant, so an
+        # env config that does not declare it is still bounded -- by the largest value
+        # that would have passed the checks below.
+        b = replace(b, env_response=int(env_response) if env_response else default_env_response(mode, b))
+        check_budgets(mode, b)
 
         if mode == "compact":
-            return build_harness(mode, budget=int(self.config.trainer.compact_budget),
-                                 summary_budget=summary_budget)
-        return build_harness(mode)
+            return build_harness(mode, budget=m, summary_budget=summary_budget), b
+        return build_harness(mode), b
 
     def _outputs(self, client, env, result, kwargs, episode_id: str) -> list[AgentLoopOutput]:
         rows = client.rows()
