@@ -16,7 +16,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+import logging
+
 from vagen.core.tape import Conversation, Row
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -103,7 +107,7 @@ class InferenceClient(ABC):
         self._check_context(context, opening=opening)
         conversation.add_context(context)
 
-        output = await self.generate(conversation.token_ids, **kwargs)
+        output = await self._generate_nonempty(conversation, **kwargs)
 
         # Adopt what the backend ran, so the sequence trained on is the sequence sampled
         # from. This is also what repairs any seam left by rendering messages
@@ -118,6 +122,41 @@ class InferenceClient(ABC):
             token_ids=output.token_ids,
             logprobs=output.logprobs,
         )
+
+    #: How many times to re-ask when a generation comes back with no tokens. See
+    #: ``_generate_nonempty``. Zero disables the retry and lets the empty result through.
+    empty_generation_retries: int = 3
+
+    async def _generate_nonempty(self, conversation, **kwargs) -> BackendOutput:
+        """Generate, re-asking if the engine returns nothing.
+
+        A generation with no tokens is an interruption, not an answer -- an aborted or
+        pre-empted request. Retrying is safe *because* it is empty: the environment is
+        stepped on the action this call returns, so if there is no action there was no
+        step, and the state being re-asked about is the state that was asked about. In
+        compaction the retry re-sends the summary that opened this conversation, for the
+        same reason: nothing downstream of it happened.
+
+        That safety is a property of the caller's order, not of this function, and it
+        only holds while an empty response cannot reach ``env.step``. It could: ``accept``
+        forwards ``response.text``, which is ``""`` and not ``None``, so the episode used
+        to advance a turn on an empty action and the environment did move. Retrying here
+        is what keeps the premise true.
+
+        verl's fully-async client does the same thing a layer below (resuming from
+        ``prompt_ids + token_ids`` rather than re-asking), so under that configuration
+        this never fires. It is for every other configuration, where nothing does.
+        """
+        for attempt in range(self.empty_generation_retries + 1):
+            output = await self.generate(conversation.token_ids, **kwargs)
+            if output.token_ids or attempt == self.empty_generation_retries:
+                return output
+            logger.warning(
+                "generation %d/%d returned no tokens (interrupted); re-asking. The "
+                "environment has not been stepped, so the state is unchanged.",
+                attempt + 1, self.empty_generation_retries,
+            )
+        raise AssertionError("unreachable")
 
     def _open(self, conversation_id: str | None) -> str:
         if conversation_id is not None:

@@ -202,3 +202,57 @@ def test_an_environment_is_closed_even_when_the_episode_raises():
     with pytest.raises(ContextTooLarge):
         asyncio.run(run_episode(env, build_harness("concat"), c, max_turns=3))
     assert getattr(env, "closed", False), "the environment was left open"
+
+
+# ------------------------------------------- an interrupted generation is not an answer
+def test_an_interrupted_generation_is_re_asked_and_the_environment_never_sees_it():
+    """A generation with no tokens is an interruption, so the turn has not happened yet.
+
+    Retrying is safe precisely because it is empty: the environment steps on the action
+    the call returns, so no action means no step, and the state being re-asked about is
+    the state that was asked about. Under compaction the retry re-sends the summary that
+    opened the conversation -- nothing downstream of it happened either.
+
+    That premise was false before this. ``accept`` forwards ``response.text``, which is
+    ``""`` and not ``None``, so the episode advanced a turn on an empty action, the
+    environment moved, and the turn's reward had nowhere to land.
+    """
+    class _Interrupting(_Client):
+        async def generate(self, prompt_ids, **kw):
+            self.i += 1
+            if self.i == 3:
+                return BackendOutput(text="", token_ids=[])
+            return BackendOutput(text="act", token_ids=[1] * 8)
+
+    class _Watching(_Env):
+        def __init__(self, *a):
+            super().__init__(*a)
+            self.actions = []
+
+        async def step(self, action, **kw):
+            self.actions.append(action)
+            self.i += 1
+            return {"obs_str": "o" * self.obs(self.i)}, float(self.i), False, False, {}
+
+    env, c = _Watching(20, lambda i: 10), _Interrupting(lambda i: 8, 64)
+    res = asyncio.run(run_episode(env, build_harness("no_concat"), c, max_turns=6))
+
+    assert "" not in env.actions, f"the environment was stepped on an empty action: {env.actions}"
+    assert len(env.actions) == 6, f"a turn went missing: {env.actions}"
+    assert len(c.rows()) == 6, "a conversation was dropped, so the retry did not happen"
+    assert sum(sum(r.scores) for r in c.rows()) == res.total_reward, (
+        "reward the environment paid did not all reach the rows"
+    )
+
+
+def test_a_persistently_empty_generation_is_not_retried_forever():
+    """Bounded, or an engine that has genuinely stopped answering hangs the rollout."""
+    class _Never(_Client):
+        async def generate(self, prompt_ids, **kw):
+            self.i += 1
+            return BackendOutput(text="", token_ids=[])
+
+    c = _Never(lambda i: 8, 64)
+    c.empty_generation_retries = 2
+    asyncio.run(run_episode(_Env(20, lambda i: 10), build_harness("no_concat"), c, max_turns=1))
+    assert c.i == 3, f"expected 1 attempt plus 2 retries, got {c.i}"
