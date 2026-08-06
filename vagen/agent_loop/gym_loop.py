@@ -228,7 +228,13 @@ class GymLoop(VagenGymAgentLoopBase):
                     prompt_ids=prompt_ids,
                     response_ids=response_ids,
                     response_mask=row.response_mask[:keep],
-                    multi_modal_data={"image": images} if images else {},
+                    # "images", plural. Upstream renamed this key; the singular form is
+                    # silently ignored, so the processor is handed no pictures, the
+                    # forward pass gets image-pad tokens with no vision features and
+                    # text position ids, and Qwen skips the masked_scatter rather than
+                    # complaining. The rollout still sees the frames -- only the model
+                    # being optimised is blind.
+                    multi_modal_data={"images": images} if images else {},
                     response_logprobs=row.logprobs[:keep] or None,
                     # The sum is what verl's own metrics read; the vector below is what
                     # actually trains. Both, because they answer different questions.
