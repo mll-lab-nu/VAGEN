@@ -44,7 +44,15 @@ class BaseHarness(ABC):
 
     # ------------------------------------------------------------------ input
     def begin(self, system: Msg, init_obs: Msg) -> None:
+        """Start an episode. Resets the conversation too.
+
+        Leaving ``_conversation_id`` set would make the first call of a new episode a
+        continuation of the last one's conversation -- appending a fresh initial
+        observation to a finished episode's context. Not reachable today, since the loop
+        builds a harness per episode, but the class should not depend on that.
+        """
         self._system, self._msgs = system, [init_obs]
+        self._conversation_id = None
 
     def add_observation(self, obs: Msg) -> None:
         self._msgs.append(obs)
