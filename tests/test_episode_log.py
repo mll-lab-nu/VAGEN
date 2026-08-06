@@ -51,9 +51,10 @@ def test_every_turns_text_reaches_the_cell():
 
 def test_frames_are_embedded_not_dropped():
     html = episode_html([{"conversations": [{
-        "conversation_id": 0, "prompt": "p", "prompt_image": _frame(),
-        "turns": [{"turn_id": 0, "response": "r", "observation": "o",
-                   "observation_image": _frame((99, 0, 0))}]}]}])
+        "conversation_id": 0,
+        "prompt": [{"text": "p"}, {"image": _frame()}],
+        "turns": [{"turn_id": 0, "response": [{"text": "r"}],
+                   "observation": [{"text": "o"}, {"image": _frame((99, 0, 0))}]}]}]}])
     assert html.count("data:image/png;base64,") == 2
 
 
@@ -87,9 +88,9 @@ def test_an_unencodable_frame_does_not_take_the_text_with_it():
             raise RuntimeError("not an image")
 
     html = episode_html([{"conversations": [{
-        "conversation_id": 0, "prompt": "p", "prompt_image": Bad(),
-        "turns": [{"turn_id": 0, "response": "the-text-still-matters",
-                   "observation": "", "observation_image": None}]}]}])
+        "conversation_id": 0, "prompt": [{"image": Bad()}],
+        "turns": [{"turn_id": 0, "response": [{"text": "the-text-still-matters"}],
+                   "observation": []}]}]}])
     assert "the-text-still-matters" in html
 
 
@@ -136,8 +137,8 @@ def test_restore_does_not_clobber_columns_that_survived():
 
 
 def _one_frame_html(img):
-    return episode_html([{"conversations": [{"conversation_id": 0, "prompt": "x",
-                                             "prompt_image": img, "turns": []}]}])
+    return episode_html([{"conversations": [{"conversation_id": 0,
+                                             "prompt": [{"image": img}], "turns": []}]}])
 
 
 def test_a_large_frame_is_downscaled_before_encoding():
@@ -155,8 +156,8 @@ def test_a_large_frame_is_downscaled_before_encoding():
 
 def test_a_small_frame_is_not_upscaled():
     tiny = PIL.new("RGB", (16, 16), (1, 2, 3))
-    h = episode_html([{"conversations": [{"conversation_id": 0, "prompt": "p",
-                                          "prompt_image": tiny, "turns": []}]}])
+    h = episode_html([{"conversations": [{"conversation_id": 0,
+                                          "prompt": [{"image": tiny}], "turns": []}]}])
     assert "base64," in h
 
 
@@ -339,38 +340,34 @@ def test_an_absent_observation_prints_no_empty_user_block():
     assert h.count("<div>") == 2, "an empty block was rendered"
 
 
-def test_the_generation_cue_is_kept_and_the_frame_goes_before_it():
-    """The cue is real tokens in the training sequence, carried at mask 0, and this view
-    exists to show what was trained on -- so it is not removed. It is only used to place
-    the frame: the picture is part of what the model was shown, so it belongs before the
-    marker where the model's own writing starts.
-
-    Deleting it instead was the wrong fix: making the picture look right by hiding part
-    of the sequence."""
+def test_the_frame_sits_where_its_placeholder_was():
+    """The merge splits a span at its placeholder run and puts the picture there, so the
+    renderer has nothing to decide. The decoder cue is ordinary text on either side."""
     h = episode_html([{"conversations": [{
         "conversation_id": 0,
-        "prompt": "system\nrules\nuser\n[obs]\n\nassistant",
-        "prompt_image": _frame(),
-        "turns": [{"turn_id": 0, "response": "<answer>Up</answer>",
-                   "observation": "user\nnext obs\n\nassistant",
-                   "observation_image": _frame((5, 5, 5))}],
+        "prompt": [{"text": "system\nrules\nuser\n[obs]"}, {"image": _frame()},
+                   {"text": "\n\nassistant"}],
+        "turns": [{"turn_id": 0, "response": [{"text": "<answer>Up</answer>"}],
+                   "observation": []}],
     }]}])
-    assert "[obs]" in h and "next obs" in h
-    assert h.count("assistant") == 2, "the decoder cue was removed from the transcript"
+    assert h.index("[obs]") < h.index("base64,") < h.index("assistant")
+    assert "assistant" in h, "the decoder cue is part of the sequence and stays"
 
 
-def test_the_frame_closes_the_user_turn_and_precedes_the_response():
-    """The frame is what the assistant was looking at, so it belongs at the end of the
-    turn that showed it -- immediately above the response that reasons about it."""
+def test_a_frame_appears_between_the_texts_that_surrounded_its_placeholder():
+    """Position comes from the sequence, so the renderer only walks the parts in order.
+
+    Superseded the previous version of this test, which asserted that a frame was
+    appended at the end of a turn -- a rule that existed only because the position had
+    been thrown away by decoding.
+    """
     h = episode_html([{"conversations": [{
-        "conversation_id": 0, "prompt": "PROMPT", "prompt_image": _frame(),
-        "turns": [{"turn_id": 0, "response": "RESPONSE-ZERO",
-                   "observation": "OBSERVATION", "observation_image": _frame((9, 9, 9))},
-                  {"turn_id": 1, "response": "RESPONSE-ONE",
-                   "observation": "", "observation_image": None}],
+        "conversation_id": 0,
+        "prompt": [{"text": "BEFORE-FRAME"}, {"image": _frame()}, {"text": "AFTER-FRAME"}],
+        "turns": [{"turn_id": 0, "response": [{"text": "RESPONSE"}], "observation": []}],
     }]}])
-    assert h.index("PROMPT") < h.index("base64,") < h.index("RESPONSE-ZERO")
-    assert h.index("OBSERVATION") < h.rindex("base64,") < h.index("RESPONSE-ONE")
+    assert h.index("BEFORE-FRAME") < h.index("base64,") < h.index("AFTER-FRAME")
+    assert h.index("AFTER-FRAME") < h.index("RESPONSE")
 
 
 def test_a_block_with_no_frame_is_left_whole():
