@@ -220,7 +220,27 @@ class MultiOutputAgentLoopManager(AgentLoopManager):
         """
         from vagen.utils.concat_val_multi_turn import concat_val_multi_turn
 
-        return concat_val_multi_turn(output, prompts, self._vagen_tokenizer())
+        return concat_val_multi_turn(output, prompts, self._vagen_tokenizer(), self._vagen_processor())
+
+    def _vagen_processor(self):
+        """The processor, which is what declares the image placeholder ids.
+
+        Cached alongside the tokenizer. Absent for a text-only model, and then there are
+        no placeholders to find either.
+        """
+        if getattr(self, "_vagen_processor_cache", "unset") == "unset":
+            from verl.utils import hf_processor
+            from verl.utils.fs import copy_to_local
+
+            model_cfg = self.config.actor_rollout_ref.model
+            path = model_cfg.get("processor_path") or model_cfg.path
+            try:
+                self._vagen_processor_cache = hf_processor(
+                    copy_to_local(path), trust_remote_code=model_cfg.get("trust_remote_code", False)
+                )
+            except Exception:  # noqa: BLE001 - a text-only model has none
+                self._vagen_processor_cache = None
+        return self._vagen_processor_cache
 
     def _vagen_tokenizer(self):
         """Cached; building it re-reads the model directory."""

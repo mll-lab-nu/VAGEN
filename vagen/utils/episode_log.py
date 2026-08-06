@@ -94,16 +94,15 @@ def group_turns(rows: list[dict]) -> dict[tuple, list[dict]]:
 def episode_html(turns: list[dict]) -> str:
     """The episode as it was spoken, with one thing added: where a conversation starts.
 
-    Nothing else is labelled. The decoded text already carries the template's own
-    ``system`` / ``user`` / ``assistant`` markers, so adding our own put two of each on
-    the screen -- and ours were a guess at what the block contained, while the
-    template's are what the model actually read. Turn boundaries are visible in the text
-    for the same reason.
+    Text and pictures appear where they appear in the token sequence. A frame replaces
+    the run of placeholder tokens that stands for it, rather than being appended near
+    where it probably belongs -- which is what the sequence says, and it removes the
+    guessing that put frames after the marker starting the model's own reply.
 
-    A conversation boundary is the exception: it is the one thing the text cannot show,
-    because from inside the transcript a compaction looks like a model that forgot.
-
-    Padding never appears: the merge decodes each span from the real tokens.
+    Nothing else is labelled: the decoded text already carries the template's own
+    ``system`` / ``user`` / ``assistant`` markers. A conversation boundary is the
+    exception, being the one thing the text cannot show -- from inside a transcript a
+    compaction looks like a model that forgot.
     """
     parts = [f'<div style="{_STYLE}">']
     first = turns[0]
@@ -114,12 +113,8 @@ def episode_html(turns: list[dict]) -> str:
         conversations = [{
             "conversation_id": 0,
             "prompt": first.get("input") or "",
-            "prompt_image": None,
-            "turns": [
-                {"turn_id": i, "response": t.get("output") or "", "observation": "",
-                 "observation_image": None}
-                for i, t in enumerate(turns)
-            ],
+            "turns": [{"turn_id": i, "response": t.get("output") or "", "observation": ""}
+                      for i, t in enumerate(turns)],
         }]
 
     for n, conversation in enumerate(conversations):
@@ -129,45 +124,33 @@ def episode_html(turns: list[dict]) -> str:
             f'<div style="color:#c00;font-size:13px"><b>conversation '
             f'{conversation.get("conversation_id", n)}</b></div>'
         )
-        _text(parts, conversation.get("prompt"), conversation.get("prompt_image"))
-
+        _render(parts, conversation.get("prompt"))
         for turn in conversation.get("turns", []):
-            _text(parts, turn.get("response"))
-            _text(parts, turn.get("observation"), turn.get("observation_image"))
+            _render(parts, turn.get("response"))
+            _render(parts, turn.get("observation"))
 
     parts.append("</div>")
     return "".join(parts)
 
 
-#: The template's cue for the decoder to start writing, at the end of a rendered turn.
-#: Real tokens in the sequence, carried at mask 0 -- so they are shown, not hidden. What
-#: they are useful for here is placement: a frame belongs before the cue, since it is
-#: part of what the model was shown, and the cue is where its own writing begins.
-_GENERATION_CUE = re.compile(r"((?:\n)?(?:assistant|model)\n?)\s*$", re.IGNORECASE)
+def _render(parts: list[str], content) -> None:
+    """A span, as the alternating text and image parts the merge produced.
 
-
-def _text(parts: list[str], text, frame=None) -> None:
-    """One block of the transcript, with its frame placed inside it.
-
-    Nothing is removed. The block is only split where the decoder cue begins, so the
-    frame lands at the end of what the model was shown rather than after the marker that
-    starts its reply -- which read as though the picture were the assistant's own.
+    A plain string is still accepted, for callers upstream of the merge that never had
+    the token sequence to split.
     """
-    if not text:
-        if frame is not None:
-            parts.append(_img_tag(frame))
+    if not content:
         return
-    body = str(text)
-    cue = ""
-    match = _GENERATION_CUE.search(body)
-    if match and frame is not None:
-        body, cue = body[: match.start()], match.group(1)
-    if body:
-        parts.append(f'<div>{html.escape(body)}</div>')
-    if frame is not None:
-        parts.append(_img_tag(frame))
-    if cue:
-        parts.append(f'<div>{html.escape(cue)}</div>')
+    if isinstance(content, str):
+        parts.append(f'<div>{html.escape(content)}</div>')
+        return
+    for part in content:
+        if "image" in part:
+            tag = _img_tag(part["image"])
+            if tag:
+                parts.append(tag)
+        elif part.get("text"):
+            parts.append(f'<div>{html.escape(part["text"])}</div>')
 
 
 def episode_rows(rows: list[dict]) -> list[dict]:
