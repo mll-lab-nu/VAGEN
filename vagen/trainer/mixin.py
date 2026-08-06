@@ -207,13 +207,19 @@ class VagenV0Mixin(VagenLogicMixin):
     #: verl: these are our columns, produced by our agent loop and our validation merge,
     #: and adding one should not touch the dependency. Eight separate upstream commits
     #: went into this list before it moved.
+    #
+    # ``turn_idx`` and ``conversation_id`` are deliberately absent. They identify a *row*,
+    # and the validation merge folds an episode's rows into one -- so an episode has many
+    # of each and no single value, and the merge drops them. Requesting them anyway made
+    # the diagnostic report "turn_idx=0/256 conversation_id=0/256" every validation, which
+    # reads as a failure and is not one: the per-turn structure is inside ``conversations``,
+    # which is 256/256. Where they still identify one thing is the training path, and that
+    # does not come through here.
     val_log_columns = (
         "image_data",        # the frames the model was shown
         "episode_id",        # identity: episode > conversation > turn
         "group_idx",
         "traj_idx",
-        "turn_idx",
-        "conversation_id",
         "data_source",
         "episode_turns",     # counts the merge computes while it still can
         "n_conversations",

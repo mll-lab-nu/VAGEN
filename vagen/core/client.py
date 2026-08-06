@@ -31,6 +31,8 @@ class Response:
     conversation_id: str
     token_ids: Optional[list[int]] = None
     logprobs: Optional[list[float]] = None
+    stop_reason: Optional[str] = None
+    weights_version: Optional[tuple[int, int]] = None
 
 
 @dataclass
@@ -43,6 +45,15 @@ class BackendOutput:
     # The prompt the backend actually ran. Multimodal placeholders are expanded by the
     # backend, so this is not always the prompt it was handed -- see Conversation.
     prompt_token_ids: Optional[list[int]] = None
+    #: "completed", "aborted", or None. Under partial rollout the resuming client absorbs
+    #: aborts below this layer, so what arrives here is the outcome of the whole retry.
+    stop_reason: Optional[str] = None
+    #: The policy versions this response was generated across. They differ when a partial
+    #: rollout resumed after a weight update, and then the response is on-policy for
+    #: neither -- which is the only thing that says so. Carried rather than used: nothing
+    #: reads them yet, and an off-policy correction that wanted to would otherwise have to
+    #: reach back into the client to add them.
+    weights_version: Optional[tuple[int, int]] = None
 
 
 class ContextTooLarge(ValueError):
@@ -121,6 +132,8 @@ class InferenceClient(ABC):
             conversation_id=conversation_id,
             token_ids=output.token_ids,
             logprobs=output.logprobs,
+            stop_reason=output.stop_reason,
+            weights_version=output.weights_version,
         )
 
     #: How many times to re-ask when a generation comes back with no tokens. See
