@@ -256,3 +256,55 @@ def test_a_persistently_empty_generation_is_not_retried_forever():
     c.empty_generation_retries = 2
     asyncio.run(run_episode(_Env(20, lambda i: 10), build_harness("no_concat"), c, max_turns=1))
     assert c.i == 3, f"expected 1 attempt plus 2 retries, got {c.i}"
+
+
+def test_asking_for_zero_tokens_is_refused_not_silently_maximised():
+    """`or` treats 0 as absent, so the one case where the answer matters most inverts.
+
+    A budget with no room left computes max_new_tokens=0. Under `x or limit` that becomes
+    the *whole* limit -- the opposite of what was asked -- and the conversation overflows
+    by a full generation. A negative passes through untouched.
+    """
+    from vagen.agent_loop.verl_client import VerlClient
+
+    c = VerlClient.__new__(VerlClient)
+    c.sampling_params, c.response_limit = {}, 512
+    c.server_manager = c.tokenizer = c.processor = None
+    c.mm_processor_kwargs, c.apply_chat_template_kwargs, c.request_id = {}, {}, "r"
+    c._images, c._active = {}, None
+
+    for asked in (0, -5):
+        with pytest.raises(ValueError, match="no room left to generate"):
+            asyncio.run(c.generate([1, 2, 3], sampling_params={"max_new_tokens": asked}))
+
+
+def test_a_persistently_empty_generation_ends_the_episode_rather_than_faking_an_action():
+    """After the retries, an empty response is an engine that has stopped answering.
+
+    `accept` returns "" -- not None -- so the loop would take it for an action and step
+    the environment on nothing. Measured before this: three env steps on '' and zero
+    trainable rows, the whole episode gone from the batch while the environment moved
+    three times.
+    """
+    class _Never(_Client):
+        async def generate(self, prompt_ids, **kw):
+            self.i += 1
+            return BackendOutput(text="", token_ids=[])
+
+    class _Watch(_Env):
+        def __init__(self, *a):
+            super().__init__(*a)
+            self.actions = []
+
+        async def step(self, action, **kw):
+            self.actions.append(action)
+            self.i += 1
+            return {"obs_str": "o" * 10}, 1.0, False, False, {}
+
+    c = _Never(lambda i: 8, 64)
+    c.empty_generation_retries = 2
+    env = _Watch(20, lambda i: 10)
+    res = asyncio.run(run_episode(env, build_harness("no_concat"), c, max_turns=3))
+
+    assert env.actions == [], f"the environment was stepped on an empty action: {env.actions}"
+    assert res.truncated, "an episode cut short by a dead engine must not look terminal"

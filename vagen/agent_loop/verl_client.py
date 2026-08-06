@@ -128,7 +128,20 @@ class VerlClient(InferenceClient):
         params = dict(self.sampling_params)
         params.update(kwargs.pop("sampling_params", {}) or {})
         if self.response_limit:
-            params["max_new_tokens"] = min(params.get("max_new_tokens") or self.response_limit, self.response_limit)
+            # `or` would be wrong here: 0 is falsy, so a caller asking for zero tokens --
+            # which is what a budget with no room left computes to -- would silently be
+            # given the whole limit instead. The one case where the answer matters most
+            # inverts into its opposite. A negative would pass through untouched.
+            asked = params.get("max_new_tokens")
+            if asked is None:
+                asked = self.response_limit
+            if asked <= 0:
+                raise ValueError(
+                    f"max_new_tokens={asked}: there is no room left to generate in. The "
+                    f"caller has to decide what to do about that -- compact, or end the "
+                    f"conversation -- rather than asking for a generation that cannot happen."
+                )
+            params["max_new_tokens"] = min(asked, self.response_limit)
 
         output = await self.server_manager.generate(
             request_id=self.request_id,
