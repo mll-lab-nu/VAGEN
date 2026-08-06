@@ -28,6 +28,9 @@ data:
   apply_chat_template_kwargs:
     enable_thinking: False                # Whether to apply a chat template that encourages chain-of-thought style reasoning in the assistant's responses
   custom_cls:
+    # Relative, so like hydra.searchpath above it resolves against the working directory
+    # and only works when that is the repo root. Every caller overrides it with an
+    # absolute one; this is the fallback, not the mechanism.
     path: "vagen/gym_agent_dataset.py"  
     name: AgenticDataset                
 
