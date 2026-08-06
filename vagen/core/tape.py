@@ -38,6 +38,13 @@ class Row:
     #: Without these a conversation is one undifferentiated blob and its turns cannot be
     #: told apart, which is why turn numbering had silently become conversation numbering.
     response_spans: list[tuple[int, int]] = field(default_factory=list)
+    #: Which conversation this is, counting from 0 in the order they were opened.
+    #:
+    #: Not the position in ``rows()``. A conversation the model never spoke in is dropped
+    #: there, and numbering the survivors moves everything after the gap down by one --
+    #: with no hole to notice, since the ids stay contiguous. Under no_concat the id *is*
+    #: the environment step, so that would record turn n+1's behaviour against turn n.
+    ordinal: int = 0
 
     def __post_init__(self):
         if not (len(self.response_ids) == len(self.response_mask) == len(self.logprobs) == len(self.scores)):
@@ -57,6 +64,8 @@ class Conversation:
     """
 
     conversation_id: str | None = None
+    #: Which conversation this is, from 0, in the order they were opened.
+    ordinal: int = 0
     token_ids: list[int] = field(default_factory=list)
     mask: list[int] = field(default_factory=list)
     logprobs: list[float] = field(default_factory=list)
@@ -172,6 +181,7 @@ class Conversation:
         if self.prompt_len is None:
             raise MaskMisaligned("conversation has no model output; check is_trainable() first")
         return Row(
+            ordinal=self.ordinal,
             conversation_id=self.conversation_id,
             prompt_ids=self.token_ids[: self.prompt_len],
             response_ids=self.token_ids[self.prompt_len :],

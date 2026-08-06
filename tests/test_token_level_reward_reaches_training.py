@@ -15,6 +15,9 @@ torch = pytest.importorskip("torch")
 
 
 class _Row:
+    # Numbered where the conversation was opened, not by position among the rows
+    # that survive -- see Conversation.ordinal.
+    ordinal = 0
     conversation_id = "c"
     prompt_ids = [1, 2]
     response_ids = [10, 11, 12, 13]
