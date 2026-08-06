@@ -54,7 +54,7 @@ def _output():
 
 def test_the_vector_is_published_not_only_its_sum():
     out = _output()
-    assert out.extra_fields.get("token_level_scores") == [0.0, 1.0, 0.0, 2.0], (
+    assert out.extra_fields.get("per_token_reward") == [0.0, 1.0, 0.0, 2.0], (
         "only the sum survives; span-level credit is erased"
     )
     assert out.reward_score == 3.0, "the scalar is still needed for verl's own metrics"
@@ -69,8 +69,8 @@ def test_the_vector_is_capped_with_the_response_it_indexes():
     loop.response_length = 2          # cap below the response length
     out = GymLoop._outputs(loop, _Client(), _Env(), _Result(),
                            {"group_idx": "g", "traj_idx": 0}, "ep")[0]
-    assert len(out.extra_fields["token_level_scores"]) == len(out.response_ids)
-    assert out.reward_score == pytest.approx(sum(out.extra_fields["token_level_scores"]))
+    assert len(out.extra_fields["per_token_reward"]) == len(out.response_ids)
+    assert out.reward_score == pytest.approx(sum(out.extra_fields["per_token_reward"]))
 
 
 def test_upstream_writes_the_vector_rather_than_one_scalar():
@@ -80,5 +80,27 @@ def test_upstream_writes_the_vector_rather_than_one_scalar():
     from verl.experimental.agent_loop.agent_loop import AgentLoopWorker
 
     src = inspect.getsource(AgentLoopWorker._postprocess)
-    assert "token_level_scores" in src, "verl no longer reads the per-token vector"
+    assert "per_token_reward" in src, "verl no longer reads the per-token vector"
     assert "rm_scores[b, :width]" in src, "verl no longer writes it across positions"
+
+
+def test_the_key_does_not_collide_with_a_tensor_verl_already_has():
+    """extra_fields become non-tensor columns. verl has a *tensor* called
+    token_level_scores, and DataProto.to_tensordict asserts the two namespaces are
+    disjoint -- so naming the vector that killed every run at the critic update, three
+    modes in a row, with an assertion that names only the key."""
+    from verl.protocol import DataProto
+
+    import inspect
+
+    from vagen.agent_loop import gym_loop
+
+    src = inspect.getsource(gym_loop.GymLoop._outputs)
+    tensor_names = {"token_level_scores", "token_level_rewards", "responses",
+                    "response_mask", "advantages", "returns", "values", "old_log_probs"}
+    for name in tensor_names:
+        assert f'"{name}":' not in src, (
+            f"the loop publishes an extra_field named {name!r}, which is also a tensor "
+            f"key; to_tensordict will refuse the batch"
+        )
+    assert '"per_token_reward":' in src
