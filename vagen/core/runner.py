@@ -10,8 +10,11 @@ forwarding, which is what ``accept`` returning ``None`` means.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -45,6 +48,24 @@ async def run_episode(env, harness, client, *, seed=None, max_turns: int = 10, *
                 # grown. It receives a number, not tokens -- the count is the client's.
                 if hasattr(harness, "note_usage"):
                     harness.note_usage(client.usage(response.conversation_id))
+
+                if not response.token_ids and response.token_ids is not None:
+                    # Still empty after the client's retries. That is no longer an
+                    # interruption, it is an engine that has stopped answering, and the
+                    # episode cannot continue: `accept` would return "" -- which is not
+                    # None -- so the loop would take it for an action and step the
+                    # environment on nothing. Measured before this: three env steps on
+                    # '' and zero trainable rows, the whole episode gone from the batch
+                    # while the environment had moved three times.
+                    #
+                    # Ending here rather than raising. The turns already collected are
+                    # real and worth training on, and one engine hiccup should not take
+                    # the batch down with it.
+                    logger.warning("generation still empty after retries; ending the "
+                                   "episode at turn %d rather than stepping the "
+                                   "environment on an empty action", result.turns)
+                    result.truncated = True
+                    return result
 
                 # None: the harness kept this one for itself, e.g. a summary. The
                 # environment must not act on it -- that would advance the episode by a
