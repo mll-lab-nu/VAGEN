@@ -130,7 +130,7 @@ def test_each_context_policy_logs_its_true_shape(monkeypatch, mode, want_turns, 
         assert row[table.columns.index(f"ep{i}_reward")] is not None, f"{mode}: reward missing"
         assert row[table.columns.index(f"ep{i}_success")] is not None, f"{mode}: verdict missing"
     html = row[table.columns.index("ep0_html")]
-    assert html.count("·  assistant") == want_turns, f"{mode}: expected {want_turns} turns"
+    assert html.count(">assistant<") == want_turns, f"{mode}: expected {want_turns} turns"
     assert html.count("<b>conversation") == want_convs, f"{mode}: expected {want_convs} conversations"
 
 

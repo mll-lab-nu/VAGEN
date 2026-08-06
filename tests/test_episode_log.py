@@ -293,12 +293,12 @@ def test_a_conversation_heading_precedes_its_own_system_prompt():
     assert h.index("R0") < h.index("conversation 1") < h.index("SYSTEM-ONE") < h.index("R1")
 
 
-def test_turn_ids_restart_inside_each_conversation():
+def test_each_turn_shows_as_an_assistant_block():
     h = episode_html([{"conversations": [
         _conv(0, "S0", [("a", ""), ("b", "")]),
         _conv(1, "S1", [("c", "")]),
     ]}])
-    assert [int(x) for x in re.findall(r"turn (\d+)", h)] == [0, 1, 0]
+    assert h.count(">assistant<") == 3, "one assistant block per turn"
 
 
 def test_the_summary_exchange_is_just_the_last_turn_of_its_conversation():
@@ -314,3 +314,22 @@ def test_the_summary_exchange_is_just_the_last_turn_of_its_conversation():
 def test_a_single_conversation_episode_still_gets_one_heading():
     h = episode_html([{"conversations": [_conv(0, "S", [("a", ""), ("b", "")])]}])
     assert h.count("conversation 0") == 1 and "conversation 1" not in h
+
+
+def test_the_transcript_adds_only_roles_and_conversation_rules():
+    """It should read like the sequence that was trained on. Turn numbers and per-turn
+    rules are inferable from the text; where a conversation restarts is not."""
+    h = episode_html([{"conversations": [
+        _conv(0, "SYS", [("a", "obs")]),
+        _conv(1, "SYS2", [("b", "")]),
+    ]}])
+    assert "turn 0" not in h and "turn 1" not in h
+    assert h.count("conversation 0") == 1 and h.count("conversation 1") == 1
+    for role in (">system + user<", ">assistant<", ">user<"):
+        assert role in h, f"missing {role}"
+
+
+def test_an_absent_observation_prints_no_empty_user_block():
+    h = episode_html([{"conversations": [_conv(0, "SYS", [("only-response", "")])]}])
+    assert h.count(">user<") == 0, "an empty user turn was rendered"
+    assert "only-response" in h
