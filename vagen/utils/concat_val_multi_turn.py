@@ -136,18 +136,40 @@ def concat_val_multi_turn(
                 mask = torch.ones_like(resp)
 
             rm = test_output_gen_batch.batch["rm_scores"][i]
+            # Length from the mask when there is one, not from token values. The pad id
+            # is a stop token on this model family -- Qwen2.5-VL lists <|endoftext|>,
+            # which is also pad, among its eos ids -- so a turn that stops on it has a
+            # real final token indistinguishable by value from padding. Trimming by
+            # value drops that token, and with it the turn's reward: verl writes the
+            # whole row's score at the last real position, computed from the attention
+            # mask, so the score lands exactly on the token the value-based trim cuts.
             r_len = _real_len_right(resp, pad_id)
-            resp_parts.append(resp[:r_len])
-            mask_parts.append(mask[:r_len])
-            rm_parts.append(rm[:r_len])
+            if "attention_mask" in test_output_gen_batch.batch:
+                plen = test_output_gen_batch.batch["prompts"].shape[1]
+                r_len = int(test_output_gen_batch.batch["attention_mask"][i, plen:].sum().item())
+            elif "response_mask" in test_output_gen_batch.batch:
+                nz = (mask != 0).nonzero()
+                if nz.numel():
+                    r_len = max(r_len, int(nz.max().item()) + 1)
 
             this_prompt = test_output_gen_batch.batch["prompts"][i]
             p_start = _real_start_left(this_prompt, pad_id)
+
+            # A turn's prompt comes BEFORE the response it elicited. Emitting the
+            # response first and the prompt after produces the same tokens in the wrong
+            # order -- r0 r1 p1 r2 p2 instead of r0 p1 r1 p2 r2 -- which nothing
+            # downstream shape-checks, because it is a permutation of the same length.
+            # Every log-prob on such a row is then conditioned on context the model
+            # never saw in that position.
             if j:
                 prompt_seg = this_prompt[p_start:]
                 resp_parts.append(prompt_seg)
                 mask_parts.append(torch.zeros_like(prompt_seg))
                 rm_parts.append(torch.zeros(prompt_seg.shape[0], dtype=rm.dtype, device=rm.device))
+
+            resp_parts.append(resp[:r_len])
+            mask_parts.append(mask[:r_len])
+            rm_parts.append(rm[:r_len])
 
             frames = []
             if "image_data" in nt and nt["image_data"][i] is not None:
