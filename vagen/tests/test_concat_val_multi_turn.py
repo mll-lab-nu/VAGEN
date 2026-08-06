@@ -34,7 +34,13 @@ PROMPT_W = 24   # stand-in for rollout.prompt_length
 RESP_W = 16     # stand-in for rollout.response_length
 
 
-class FakeTok:
+class _DecodeMixin:
+    def decode(self, ids, **kw):
+        """Enough for the display payload; the tests assert on tensors, not text."""
+        return " ".join(str(int(i)) for i in ids)
+
+
+class FakeTok(_DecodeMixin):
     pad_token_id = PAD
 
 
