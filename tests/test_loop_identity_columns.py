@@ -18,7 +18,6 @@ from vagen.agent_loop.gym_loop import GymLoop
 
 
 class _Row:
-    conversation_id = "conv-1"
     response_spans = [(0, 1), (1, 2)]   # two turns inside this conversation
     prompt_ids = [1, 2, 3]
     response_ids = [4, 5]
@@ -26,10 +25,17 @@ class _Row:
     logprobs = [0.0, 0.0]
     scores = [0.5, 0.5]
 
+    def __init__(self, ordinal):
+        # Carried on the row because it is decided when the conversation is opened. Read
+        # off the position in rows() instead, a conversation the model never spoke in --
+        # dropped there -- would renumber every one after it, with no hole to notice.
+        self.ordinal = ordinal
+        self.conversation_id = f"conv-{ordinal + 1}"
+
 
 class _Client:
     def rows(self):
-        return [_Row(), _Row()]
+        return [_Row(0), _Row(1)]
 
     def images(self, conversation_id):
         return []
@@ -89,3 +95,30 @@ def test_one_episode_id_for_all_rows_of_an_episode():
 def test_last_turn_is_marked_once():
     flags = [o.extra_fields["last_turn"] for o in _outputs()]
     assert flags == [False, True], flags
+
+
+def test_a_dropped_conversation_does_not_renumber_the_ones_after_it():
+    """The id says which conversation this is, so it cannot be the array index.
+
+    A conversation the model never spoke in is dropped from ``rows()`` -- correctly, it
+    carries no gradient. Numbering the survivors by position then moves everything after
+    the gap down by one, and nothing reveals it: the ids stay contiguous, so there is no
+    hole to notice. Under no_concat the id *is* the environment step, so turn n+1's
+    behaviour would be recorded against turn n.
+
+    Not reachable on today's configuration -- a row is only empty when a generation
+    returns no tokens, which needs an abort, and fully-async absorbs those a layer below
+    the agent loop (FullyAsyncLLMServerClient resumes from prompt_ids + token_ids). This
+    pins the invariant rather than a live failure.
+    """
+    class _Dropping(_Client):
+        def rows(self):
+            # c2 produced nothing and was dropped; c1, c3, c4 survive.
+            return [_Row(0), _Row(2), _Row(3)]
+
+    loop = GymLoop.__new__(GymLoop)
+    loop.prompt_length = loop.response_length = 100
+    outs = GymLoop._outputs(loop, _Dropping(), _Env(), _Result(),
+                            {"group_idx": "g-1", "traj_idx": 0}, "ep-abc")
+    ids = [o.extra_fields["conversation_id"] for o in outs]
+    assert ids == [0, 2, 3], f"the gap was closed up and everything after it renumbered: {ids}"

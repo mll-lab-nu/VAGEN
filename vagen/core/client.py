@@ -124,9 +124,13 @@ class InferenceClient(ABC):
             if conversation_id not in self._conversations:
                 raise KeyError(f"unknown conversation {conversation_id!r}; pass None to start one")
             return conversation_id
+        new_id = f"c{self._counter + 1}"
+        # Numbered here, where the order is what actually happened. Numbering them at the
+        # far end by position in ``rows()`` would be a different thing: a conversation the
+        # model never spoke in is dropped there, and the survivors after the gap would
+        # each move down one -- with no hole to notice, since the ids stay contiguous.
+        self._conversations[new_id] = Conversation(conversation_id=new_id, ordinal=self._counter)
         self._counter += 1
-        new_id = f"c{self._counter}"
-        self._conversations[new_id] = Conversation(conversation_id=new_id)
         return new_id
 
     # ------------------------------------------------------------------ reading
