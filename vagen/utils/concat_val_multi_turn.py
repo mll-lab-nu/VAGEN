@@ -113,22 +113,19 @@ def concat_val_multi_turn(
         resp_parts: List[torch.Tensor] = []
         mask_parts: List[torch.Tensor] = []
         rm_parts: List[torch.Tensor] = []
-        # One record per turn, in order, so the log can lay an episode out the way it
-        # happened -- observation, response, observation, response -- instead of showing
-        # the concatenated blob this function also produces. Only this loop still knows
-        # where one turn ends and the next begins.
-        turn_records: List[Dict[str, Any]] = []
+
 
         pad_id = tokenizer.pad_token_id
-        # Conversations numbered 0,1,2 in the order they were opened, whatever the ids
-        # upstream happen to be -- ints from the loop, opaque strings from a closed API.
-        # Deriving it here means the log reads the same either way.
-        conv_order: Dict[Any, int] = {}
-        if nt.get("conversation_id") is not None:
-            for _, i in turns:
-                cid = nt["conversation_id"][i]
-                if cid not in conv_order:
-                    conv_order[cid] = len(conv_order)
+        # One batch row is one conversation. Rebuild each as it was actually spoken:
+        #
+        #   conversation 0   system + first observation, then response / observation ...
+        #   conversation 1   system + observation carrying the summary, then ...
+        #
+        # A conversation's own prompt belongs at its *start*. Attaching it to the
+        # previous turn as an "observation" -- which is where the next row's prompt
+        # naturally falls when you walk the batch -- put each new system prompt after
+        # the response before it, so the boundary marker landed a whole turn early.
+        conversations: List[Dict[str, Any]] = []
 
         for j, (_, i) in enumerate(turns):
             resp = test_output_gen_batch.batch["responses"][i]
@@ -139,64 +136,50 @@ def concat_val_multi_turn(
                 mask = torch.ones_like(resp)
 
             rm = test_output_gen_batch.batch["rm_scores"][i]
-
-            # Strip the right-padding of this turn's response before concatenating.
-            # Each per-turn tensor is individually padded (response right-padded to
-            # response_length, prompts left-padded to prompt_length); concatenating
-            # them as-is would bury pad tokens *inside* the sequence, which then
-            # breaks the trailing-pad assumption of the `s[:l]` decode in _validate
-            # (later turns get truncated from the logged text while image_data keeps
-            # every turn's image -> "N images but fewer visible turns").
             r_len = _real_len_right(resp, pad_id)
             resp_parts.append(resp[:r_len])
             mask_parts.append(mask[:r_len])
             rm_parts.append(rm[:r_len])
 
-            observation_text = ""
-            # insert next prompt segment (left-padding stripped, marked mask/rm = 0)
-            if j < len(turns) - 1:
-                next_i = turns[j + 1][1]
-                next_prompt = test_output_gen_batch.batch["prompts"][next_i]
-
-                p_start = _real_start_left(next_prompt, pad_id)
-                prompt_seg = next_prompt[p_start:]
+            this_prompt = test_output_gen_batch.batch["prompts"][i]
+            p_start = _real_start_left(this_prompt, pad_id)
+            if j:
+                prompt_seg = this_prompt[p_start:]
                 resp_parts.append(prompt_seg)
                 mask_parts.append(torch.zeros_like(prompt_seg))
                 rm_parts.append(torch.zeros(prompt_seg.shape[0], dtype=rm.dtype, device=rm.device))
-                observation_text = tokenizer.decode(prompt_seg, skip_special_tokens=True)
 
-            turn_images = []
+            frames = []
             if "image_data" in nt and nt["image_data"][i] is not None:
                 v = nt["image_data"][i]
-                turn_images = list(v) if isinstance(v, (list, tuple, np.ndarray)) else [v]
-            # One batch row is one conversation, and a conversation holds several turns
-            # under concat. Split it by the spans the tape recorded so turn ids run 0,1,2
-            # *within* the conversation and restart in the next one -- rather than
-            # numbering conversations and calling them turns.
-            conversation = (
-                conv_order.get(nt["conversation_id"][i], j)
-                if nt.get("conversation_id") is not None else j
-            )
-            spans = nt["response_spans"][i] if nt.get("response_spans") is not None else None
-            pieces = []
-            if spans:
-                for (a, b) in spans:
-                    a, b = int(a), int(b)
-                    if 0 <= a < b <= r_len:
-                        pieces.append(tokenizer.decode(resp[a:b], skip_special_tokens=True))
-            if not pieces:
-                pieces = [tokenizer.decode(resp[:r_len], skip_special_tokens=True)]
+                frames = list(v) if isinstance(v, (list, tuple, np.ndarray)) else [v]
 
-            for turn_id, text in enumerate(pieces):
-                turn_records.append({
-                    "conversation_id": conversation,
-                    "turn_id": turn_id,
-                    # The frames belong to the conversation's first turn: that is when
-                    # the agent was shown them.
-                    "images": turn_images if turn_id == 0 else [],
-                    "response": text,
-                    "observation": observation_text if turn_id == len(pieces) - 1 else "",
+            # Split the conversation into its turns using the spans the tape recorded.
+            # What sits between two responses is the observation that came back.
+            spans = nt["response_spans"][i] if nt.get("response_spans") is not None else None
+            spans = [(int(x), int(y)) for x, y in spans] if spans else [(0, r_len)]
+            spans = [(x, y) for x, y in spans if 0 <= x < y <= r_len] or [(0, r_len)]
+
+            turn_list = []
+            for k, (start, end) in enumerate(spans):
+                nxt = spans[k + 1][0] if k + 1 < len(spans) else r_len
+                turn_list.append({
+                    "turn_id": k,
+                    "response": tokenizer.decode(resp[start:end], skip_special_tokens=True),
+                    "observation": (
+                        tokenizer.decode(resp[end:nxt], skip_special_tokens=True) if nxt > end else ""
+                    ),
+                    # Frame 0 came with the prompt; frame k+1 with the observation after
+                    # turn k.
+                    "observation_image": frames[k + 1] if k + 1 < len(frames) else None,
                 })
+
+            conversations.append({
+                "conversation_id": j,
+                "prompt": tokenizer.decode(this_prompt[p_start:], skip_special_tokens=True),
+                "prompt_image": frames[0] if frames else None,
+                "turns": turn_list,
+            })
 
         concat_response = torch.cat(resp_parts, dim=0)
         concat_response_mask = torch.cat(mask_parts, dim=0)
@@ -249,15 +232,15 @@ def concat_val_multi_turn(
             "image_data": merged_images,
             "reward_extra_info": reward_extra_info,
             "episode_id": _first("episode_id"),
-            # The episode laid out turn by turn. The concatenated response above is what
-            # gets trained on; this is what gets read.
-            "turn_records": turn_records,
+            # The episode as it was spoken, conversation by conversation. The
+            # concatenated response above is what gets trained on; this is what gets read.
+            "conversations": conversations,
             # Turns the episode ran. Prefer what the loop counted; fall back to the rows
             # merged here, which is the same number under no_concat.
-            "episode_turns": _first("episode_turns", len(turns)),
+            "episode_turns": sum(len(c["turns"]) for c in conversations) or len(turns),
             # How many conversations the episode spanned: 1 for concat, one per turn for
             # no_concat, and however many compactions happened plus one for compact.
-            "n_conversations": len(conv_order) if conv_order else 1,
+            "n_conversations": len(conversations),
             # data_source is deliberately absent: the input batch already carries it, and
             # _validate unions the two. union asserts that a key present on both sides is
             # the same object, so supplying it here fails the whole validation pass.

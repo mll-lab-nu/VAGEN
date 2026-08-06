@@ -8,6 +8,8 @@ ordering, and that the frames the agent saw actually make it into the cell.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from vagen.utils.episode_log import episode_html, episode_rows, group_turns
@@ -48,24 +50,13 @@ def test_every_turns_text_reaches_the_cell():
 
 
 def test_frames_are_embedded_not_dropped():
-    html = episode_html([_row(0, 0, 0, "x", images=[_frame(), _frame((99, 0, 0))])])
+    html = episode_html([{"conversations": [{
+        "conversation_id": 0, "prompt": "p", "prompt_image": _frame(),
+        "turns": [{"turn_id": 0, "response": "r", "observation": "o",
+                   "observation_image": _frame((99, 0, 0))}]}]}])
     assert html.count("data:image/png;base64,") == 2
 
 
-def test_a_compaction_is_visible_as_a_seam():
-    """Without the marker the transcript reads as a model that inexplicably forgot."""
-    turns = group_turns([
-        _row(0, 0, 0, "before", conversation="c0"),
-        _row(0, 0, 1, "after", conversation="c1"),
-    ])[(0, 0)]
-    html = episode_html(turns)
-    assert "new conversation" in html
-    assert html.index("before") < html.index("new conversation") < html.index("after")
-
-
-def test_no_seam_when_the_conversation_never_restarted():
-    html = episode_html(group_turns([_row(0, 0, 0, "a"), _row(0, 0, 1, "b")])[(0, 0)])
-    assert "new conversation" not in html
 
 
 def test_summary_counts_turns_and_conversations():
@@ -95,7 +86,10 @@ def test_an_unencodable_frame_does_not_take_the_text_with_it():
         def convert(self, mode):
             raise RuntimeError("not an image")
 
-    html = episode_html([_row(0, 0, 0, "the-text-still-matters", images=[Bad()])])
+    html = episode_html([{"conversations": [{
+        "conversation_id": 0, "prompt": "p", "prompt_image": Bad(),
+        "turns": [{"turn_id": 0, "response": "the-text-still-matters",
+                   "observation": "", "observation_image": None}]}]}])
     assert "the-text-still-matters" in html
 
 
@@ -141,6 +135,11 @@ def test_restore_does_not_clobber_columns_that_survived():
     assert list(out.non_tensor_batch["turn_idx"]) == [7], "overwrote the real column"
 
 
+def _one_frame_html(img):
+    return episode_html([{"conversations": [{"conversation_id": 0, "prompt": "x",
+                                             "prompt_image": img, "turns": []}]}])
+
+
 def test_a_large_frame_is_downscaled_before_encoding():
     """The width used to be CSS only, so the payload was full resolution.
 
@@ -149,14 +148,16 @@ def test_a_large_frame_is_downscaled_before_encoding():
     """
     big = PIL.new("RGB", (1600, 900), (7, 7, 7))
     small = PIL.new("RGB", (160, 90), (7, 7, 7))
-    big_len = len(episode_html([_row(0, 0, 0, "x", images=[big])]))
-    small_len = len(episode_html([_row(0, 0, 0, "x", images=[small])]))
+    big_len = len(_one_frame_html(big))
+    small_len = len(_one_frame_html(small))
     assert big_len < 4 * small_len, f"large frame not downscaled: {big_len} vs {small_len}"
 
 
 def test_a_small_frame_is_not_upscaled():
     tiny = PIL.new("RGB", (16, 16), (1, 2, 3))
-    assert "base64," in episode_html([_row(0, 0, 0, "x", images=[tiny])])
+    h = episode_html([{"conversations": [{"conversation_id": 0, "prompt": "p",
+                                          "prompt_image": tiny, "turns": []}]}])
+    assert "base64," in h
 
 
 # ------------------------------------------------------------------ sampling
@@ -241,7 +242,6 @@ def test_compact_shape_several_conversations_many_turns():
         r["episode_turns"] = 6
     (e,) = episode_rows(rows)
     assert (e["turns"], e["conversations"]) == (6, 2)
-    assert "new conversation" in e["html"], "the conversation restart is not marked"
 
 
 # ------------------------------------------------------- selection strategies
@@ -271,3 +271,46 @@ def test_worst_and_best_are_opposite_ends():
 def test_an_unknown_strategy_says_what_the_options_are():
     with pytest.raises(ValueError, match="balanced"):
         select_episodes([_ep("a", 1.0)], 1, "whatever-i-typed")
+
+
+# ---------------------------------------------- the conversation-first layout
+def _conv(cid, prompt, turns):
+    return {"conversation_id": cid, "prompt": prompt, "prompt_image": None,
+            "turns": [{"turn_id": i, "response": r, "observation": o,
+                       "observation_image": None} for i, (r, o) in enumerate(turns)]}
+
+
+def test_a_conversation_heading_precedes_its_own_system_prompt():
+    """The heading marks where a conversation starts, so it goes before that
+    conversation's system prompt -- not after the response that preceded it. Walking the
+    batch attaches the next row's prompt to the previous turn, which is what put each new
+    system prompt a whole turn late."""
+    h = episode_html([{"conversations": [
+        _conv(0, "SYSTEM-ZERO", [("R0", "")]),
+        _conv(1, "SYSTEM-ONE", [("R1", "")]),
+    ]}])
+    assert h.index("conversation 0") < h.index("SYSTEM-ZERO") < h.index("R0")
+    assert h.index("R0") < h.index("conversation 1") < h.index("SYSTEM-ONE") < h.index("R1")
+
+
+def test_turn_ids_restart_inside_each_conversation():
+    h = episode_html([{"conversations": [
+        _conv(0, "S0", [("a", ""), ("b", "")]),
+        _conv(1, "S1", [("c", "")]),
+    ]}])
+    assert [int(x) for x in re.findall(r"turn (\d+)", h)] == [0, 1, 0]
+
+
+def test_the_summary_exchange_is_just_the_last_turn_of_its_conversation():
+    """Compaction is an ordinary user/assistant pair: 'summarise' then the summary. It
+    needs no special rendering, and inventing one would misrepresent what happened."""
+    h = episode_html([{"conversations": [
+        _conv(0, "S0", [("act", "please summarise"), ("THE-SUMMARY", "")]),
+        _conv(1, "S1 carrying THE-SUMMARY", [("next act", "")]),
+    ]}])
+    assert h.index("please summarise") < h.index("THE-SUMMARY") < h.index("conversation 1")
+
+
+def test_a_single_conversation_episode_still_gets_one_heading():
+    h = episode_html([{"conversations": [_conv(0, "S", [("a", ""), ("b", "")])]}])
+    assert h.count("conversation 0") == 1 and "conversation 1" not in h

@@ -91,75 +91,66 @@ def group_turns(rows: list[dict]) -> dict[tuple, list[dict]]:
 
 
 def episode_html(turns: list[dict]) -> str:
-    """Lay an episode out in the order it happened.
+    """Lay an episode out the way it was spoken.
 
-        system + initial prompt
-        [conversation 1]
-          turn 0:  frame(s) the agent saw  ->  what it wrote
-          turn 1:  frame(s)                ->  response
-        [conversation 2]   (compaction restarted the context)
-          turn 2:  ...
+        conversation 0
+          system + first observation      (frame)
+          turn 0   response  ->  observation  (frame)
+          turn 1   response  ->  "summarise the conversation so far"
+          turn 2   the summary itself
+        conversation 1
+          system + observation carrying the summary   (frame)
+          turn 0   response  ->  ...
 
-    Text and images interleaved, not text in one place and a gallery in another: what a
-    turn wrote only means something next to what it was looking at.
+    A conversation's own prompt belongs at its start, under its own heading. Walking the
+    batch naturally attaches the next row's prompt to the previous turn, which put each
+    new system prompt after the response before it and left the boundary a turn early.
 
-    Prefers ``turn_records``, which the validation merge builds while it still knows
-    where each turn began. Falls back to one block per row for callers that pass raw
-    per-turn rows (training-side, or before the merge).
+    Prefers the ``conversations`` payload the validation merge builds while it still
+    knows where each conversation and turn began; falls back to one block per row.
     """
     parts = [f'<div style="{_STYLE}">']
-
     first = turns[0]
-    if first.get("input"):
-        parts.append(_label("prompt", "#666"))
-        parts.append(f'<div style="color:#444">{html.escape(str(first["input"]))}</div>')
+    conversations = first.get("conversations")
 
-    records = first.get("turn_records") or []
-    if not records:
-        records = [
-            {
-                "turn_idx": t.get("turn_idx"),
-                "conversation_id": t.get("conversation_id"),
-                "images": t.get("images") or [],
-                "response": t.get("output") or "",
-                "observation": "",
-            }
-            for t in turns
-        ]
+    if not conversations:
+        # Pre-merge callers: one row per turn, no conversation structure to recover.
+        conversations = [{
+            "conversation_id": 0,
+            "prompt": first.get("input") or "",
+            "prompt_image": None,
+            "turns": [
+                {"turn_id": i, "response": t.get("output") or "", "observation": "",
+                 "observation_image": None}
+                for i, t in enumerate(turns)
+            ],
+        }]
 
-    prev_conversation = _UNSET
-    for position, rec in enumerate(records):
-        conversation = rec.get("conversation_id")
-        if conversation != prev_conversation:
-            if prev_conversation is not _UNSET:
-                # Compaction: the context was summarised and a fresh conversation opened.
-                # Unmarked, the transcript reads as a model that inexplicably forgot.
-                parts.append(
-                    '<hr style="border:0;border-top:2px dashed #c00;margin:14px 0 6px">'
-                    f'<div style="color:#c00"><b>— new conversation {conversation} —</b></div>'
-                )
-            elif position == 0:
-                parts.append(_label(f"conversation {conversation if conversation is not None else 0}", "#888"))
-            prev_conversation = conversation
-
-        n = rec.get("turn_id", rec.get("turn_idx"))
-        head = f"turn {n}" if n is not None else f"turn {position} (unlabelled)"
+    for conversation in conversations:
         parts.append(
-            '<hr style="border:0;border-top:1px solid #ddd;margin:10px 0 4px">'
-            if position else ""
+            '<hr style="border:0;border-top:2px solid #c00;margin:16px 0 4px">'
+            f'<div style="color:#c00;font-size:13px"><b>conversation '
+            f'{conversation.get("conversation_id", 0)}</b></div>'
         )
-        parts.append(_label(head, "#06c"))
-
-        for image in rec.get("images") or []:
-            tag = _img_tag(image)
-            if tag:
-                parts.append(tag)
-        if rec.get("response"):
-            parts.append(f'<div>{html.escape(str(rec["response"]))}</div>')
-        if rec.get("observation"):
+        if conversation.get("prompt"):
+            parts.append(_label("system + user", "#888"))
             parts.append(
-                f'<div style="color:#070;margin-top:4px">{html.escape(str(rec["observation"]))}</div>'
+                f'<div style="color:#070">{html.escape(str(conversation["prompt"]))}</div>'
             )
+        if conversation.get("prompt_image") is not None:
+            parts.append(_img_tag(conversation["prompt_image"]))
+
+        for turn in conversation.get("turns", []):
+            parts.append('<hr style="border:0;border-top:1px solid #ddd;margin:10px 0 4px">')
+            parts.append(_label(f'turn {turn.get("turn_id", 0)}  ·  assistant', "#06c"))
+            parts.append(f'<div>{html.escape(str(turn.get("response") or ""))}</div>')
+            if turn.get("observation"):
+                parts.append(_label("user", "#888"))
+                parts.append(
+                    f'<div style="color:#070">{html.escape(str(turn["observation"]))}</div>'
+                )
+            if turn.get("observation_image") is not None:
+                parts.append(_img_tag(turn["observation_image"]))
 
     parts.append("</div>")
     return "".join(parts)
@@ -326,13 +317,13 @@ def rows_from_validation(inputs, outputs, scores, images, extras) -> list[dict]:
             # looks like a single turn no matter how long it was.
             "episode_turns": et,
             "n_conversations": nc,
-            "turn_records": tr,
+            "conversations": tr,
         }
         for inp, out, sc, im, ep, g, t, ti, c, su, ds, et, nc, tr in zip(
             inputs, outputs, scores, images or [None] * n,
             col("episode_id"), col("group_idx"), col("traj_idx"), col("turn_idx"),
             col("conversation_id"), col("traj_success"), col("data_source"), col("episode_turns"),
-            col("n_conversations"), col("turn_records"),
+            col("n_conversations"), col("conversations"),
             strict=True,
         )
     ]
