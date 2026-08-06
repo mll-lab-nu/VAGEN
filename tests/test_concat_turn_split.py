@@ -122,3 +122,73 @@ def test_the_training_tensors_are_untouched_by_any_of_this():
     assert merged.batch["response_mask"][0].tolist() == [1, 0, 1, 0, 1], (
         "the mask must still be 1 exactly on generated tokens"
     )
+
+
+def test_frames_in_the_response_region_do_not_trip_the_leftover_check():
+    """The merge deals each span its own frames, one per placeholder run.
+
+    Handed the whole list instead, every span but the last looked like it had frames
+    left over and split_on_images refused -- a mismatch the merge had invented. Because
+    concat and compact keep every observation after the first in the *response* region,
+    that was every multimodal validation pass in both modes. The single existing case
+    missed it by having exactly one frame, and having it in the prompt.
+    """
+    import numpy as np
+    import torch
+    from tensordict import TensorDict
+    from verl import DataProto
+
+    from vagen.utils.concat_val_multi_turn import concat_val_multi_turn, _as_1d_object_array
+
+    IMG, PAD = 700, 0
+
+    class _Tok:
+        pad_token_id = PAD
+        image_token_id = IMG
+
+        def decode(self, ids, **kw):
+            return " ".join(str(int(i)) for i in ids)
+
+    # One frame in the prompt and one in each of the two observations between responses,
+    # which is the layout concat produces.
+    prompt = [900, IMG, 901]
+    resp = [100, 101, 800, IMG, 801, 102, 103]
+    spans = [(0, 2), (5, 7)]
+
+    batch = DataProto(
+        batch=TensorDict({
+            "prompts": torch.tensor([prompt]),
+            "responses": torch.tensor([resp]),
+            "input_ids": torch.tensor([prompt + resp]),
+            "attention_mask": torch.ones(1, len(prompt) + len(resp), dtype=torch.long),
+            "position_ids": torch.arange(len(prompt) + len(resp)).unsqueeze(0),
+            "rm_scores": torch.zeros(1, len(resp)),
+            "loss_mask": torch.tensor([[1, 1, 0, 0, 0, 1, 1]]),
+        }, batch_size=[1]),
+        non_tensor_batch={
+            "group_idx": np.array(["g"], dtype=object),
+            "traj_idx": np.array([0], dtype=object),
+            "turn_idx": np.array([0], dtype=object),
+            "conversation_id": np.array([0], dtype=object),
+            "episode_id": np.array(["e"], dtype=object),
+            "response_spans": _as_1d_object_array([spans]),
+            "image_data": _as_1d_object_array([["frame-prompt", "frame-observation"]]),
+            "reward_extra_info": _as_1d_object_array([{"traj_success": 1.0}]),
+        },
+        meta_info={},
+    )
+    gen = DataProto(
+        batch=TensorDict({}, batch_size=[1]),
+        non_tensor_batch={"group_idx": np.array(["g"], dtype=object),
+                          "traj_idx": np.array([0], dtype=object),
+                          "uid": np.array(["g"], dtype=object)},
+        meta_info={},
+    )
+
+    out = concat_val_multi_turn(batch, gen, _Tok())
+    conv = out.non_tensor_batch["conversations"][0][0]
+    assert [p for p in conv["prompt"] if "image" in p] == [{"image": "frame-prompt"}]
+    observation = conv["turns"][0]["observation"]
+    assert [p for p in observation if "image" in p] == [{"image": "frame-observation"}], (
+        f"the response-region frame did not land in the observation: {observation}"
+    )

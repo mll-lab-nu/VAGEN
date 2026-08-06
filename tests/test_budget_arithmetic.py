@@ -54,7 +54,7 @@ def test_a_summary_as_long_as_the_budget_it_compresses_into_is_refused():
     budget, so at compact_budget=400 it was allowed to be 8000 tokens -- twenty times
     the thing it was being written into. It worked only because the model wrote short
     ones, and nothing would have said so if it stopped."""
-    with pytest.raises(BudgetError, match="buys no turns"):
+    with pytest.raises(BudgetError, match="buys no turns|no compact_budget works"):
         check("compact", _b(compact_budget=400, summary_budget=8000, per_turn=8000, response_len=8000))
 
 
@@ -62,7 +62,9 @@ def test_the_boundary_is_half():
     # per_turn is raised past the summary budget and the window past the peak, so this
     # exercises the halving rule and not one of the others -- which would otherwise fire
     # first and let the test pass for the wrong reason.
-    wide = dict(per_turn=4000, response_len=40000, prompt_len=10000)
+    # The response region has to leave room for the peak, or the band collapses and
+    # reports that instead -- which would pass this test for the wrong reason.
+    wide = dict(per_turn=4000, response_len=40000, prompt_len=10000, env_response=100)
     check("compact", _b(compact_budget=4000, summary_budget=2000, **wide))
     with pytest.raises(BudgetError, match="more than half"):
         check("compact", _b(compact_budget=4000, summary_budget=2001, **wide))
@@ -71,8 +73,9 @@ def test_the_boundary_is_half():
 def test_the_peak_of_a_compacted_conversation_has_to_fit_the_row_it_becomes():
     """A conversation is largest at the moment it is summarised, not before."""
     with pytest.raises(BudgetError, match="largest at the moment it is summarised"):
-        check("compact", _b(prompt_len=1000, response_len=4000, compact_budget=4800,
-                            summary_budget=1000, per_turn=1000, summary_request_len=20))
+        check("compact", _b(prompt_len=1000, response_len=8000, compact_budget=6800,
+                            summary_budget=1000, per_turn=1000, env_response=100,
+                            summary_request_len=20))
 
 
 def test_the_summary_cannot_outrun_a_single_generation():
@@ -96,7 +99,7 @@ def test_the_derived_defaults_satisfy_the_rules_they_are_checked_against():
     for m in (8, 100, 400, 4000, 40000):
         for per_turn in (64, 1024, 8000):
             b = _b(compact_budget=m, per_turn=per_turn,
-                   response_len=max(8 * m, 8000, per_turn), prompt_len=max(1000, m))
+                   response_len=max(4 * m + 4 * per_turn, 8000), prompt_len=max(1000, m))
             k = default_summary_budget(m, per_turn)
             b = replace(b, summary_budget=k)
             b = replace(b, env_response=default_env_response("compact", b))
@@ -129,8 +132,9 @@ def test_the_window_is_the_hard_context_when_that_is_the_smaller_one():
            prompt_len=4000, response_len=8000)
     roomy = compact_budget_bounds(b)[1]
     tight = compact_budget_bounds(replace(b, context=4096))[1]
-    assert tight < roomy
-    with pytest.raises(BudgetError, match="rollout.max_model_len"):
+    assert tight < roomy, "a context below the regions did not tighten the ceiling"
+    check("compact", replace(b, compact_budget=roomy))
+    with pytest.raises(BudgetError, match="largest at the moment it is summarised"):
         check("compact", replace(b, context=4096, compact_budget=roomy))
 
 
@@ -343,4 +347,7 @@ def test_the_two_ceilings_come_from_the_mode():
     assert context_limits("no_concat", b) == (9000, 9000)
     # Compaction opens conversations too, and one that opens at the budget summarises
     # after a single turn -- so its openings are bounded by the budget, not the region.
-    assert context_limits("compact", b) == (1300, 1300)
+    # Its continuations are observations, bounded by env_response_length like anyone
+    # else's; using the budget there left E enforcing nothing in the one mode whose
+    # every relation is written in terms of it.
+    assert context_limits("compact", b) == (1300, 1360)
