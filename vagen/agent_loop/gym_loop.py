@@ -251,10 +251,13 @@ class GymLoop(VagenGymAgentLoopBase):
                         "image_data": images,
                         "last_turn": conversation_id == len(rows) - 1,
                         # Per-token scores, capped alongside the response they index.
+                        # Not named token_level_scores: extra_fields become non-tensor
+                        # columns, and verl already has a *tensor* of that name, so the
+                        # two collide when the batch is converted for the critic.
                         # verl otherwise places one scalar at the final token, which
                         # erases which span earned what -- the whole point of scoring
                         # <observation> and <prediction> where they are written.
-                        "token_level_scores": list(row.scores[:keep]),
+                        "per_token_reward": list(row.scores[:keep]),
                         "episode_id": episode_id,
                         "group_idx": kwargs["group_idx"],
                         "traj_idx": kwargs["traj_idx"],
