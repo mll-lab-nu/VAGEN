@@ -139,8 +139,15 @@ def test_upstream_collects_and_forwards_what_regrouping_needs():
 
     from vagen.trainer.mixin import VagenV0Mixin
 
-    for col in ("image_data", "group_idx", "traj_idx", "turn_idx", "conversation_id"):
+    for col in ("image_data", "group_idx", "traj_idx", "episode_id", "conversations"):
         assert col in VagenV0Mixin.val_log_columns, f"{col} no longer requested"
+    # Not turn_idx or conversation_id: the merge folds an episode's rows into one, so an
+    # episode has many of each and the merge drops them. Requesting them made the
+    # diagnostic report 0/256 forever.
+    for col in ("turn_idx", "conversation_id"):
+        assert col not in VagenV0Mixin.val_log_columns, (
+            f"{col} identifies a row, and after the merge a row is a whole episode"
+        )
 
     src = inspect.getsource(RayPPOTrainer._validate)
     assert "self.val_log_columns" in src, "_validate no longer honours the column list"
