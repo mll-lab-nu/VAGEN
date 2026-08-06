@@ -211,6 +211,30 @@ class GymLoop(VagenGymAgentLoopBase):
             format_reward=float(cfg.get("format_reward", 0.1)),
         )
 
+    def _summary_request_len(self) -> int:
+        """What the summary request costs as the client will actually send it.
+
+        The bare string is not that: the client renders it as a chat turn, which adds the
+        role header and the end marker -- 15 tokens against 23 on Qwen2.5-VL. The bound
+        it appears in is stated exactly, so measuring the wrong thing by 8 tokens makes it
+        exact and wrong. Rendered here the same way, and the wrapper the harness puts
+        around the summary itself is charged too, since that also arrives as context.
+        """
+        turn = [{"role": "user", "content": CompactHarness.SUMMARY_REQUEST}]
+        try:
+            rendered = self.tokenizer.apply_chat_template(
+                turn, add_generation_prompt=True, tokenize=True, return_dict=False,
+                **self.apply_chat_template_kwargs,
+            )
+        except Exception:
+            # A tokenizer with no chat template still needs a number; the bare string
+            # under-counts, which is the safe direction for a ceiling and the unsafe one
+            # for a bound, so say so rather than pretending the measurement happened.
+            logger.warning("no chat template to measure the summary request with; "
+                           "the compact peak bound is approximate")
+            rendered = self.tokenizer.encode(CompactHarness.SUMMARY_REQUEST)
+        return len(rendered) + len(self.tokenizer.encode(CompactHarness.SUMMARY_PREFIX + "\n\n"))
+
     def _overflow_hint(self) -> str:
         """What to change, in terms of the mode that is running.
 
@@ -265,7 +289,7 @@ class GymLoop(VagenGymAgentLoopBase):
             per_turn_configured=per_turn_configured,
             compact_budget=m,
             summary_budget=summary_budget,
-            summary_request_len=len(self.tokenizer.encode(CompactHarness.SUMMARY_REQUEST)),
+            summary_request_len=self._summary_request_len(),
         )
         # Derived from what the mode has left rather than defaulted to a constant, so an
         # env config that does not declare it is still bounded -- by the largest value

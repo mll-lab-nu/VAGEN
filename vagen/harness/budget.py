@@ -142,16 +142,24 @@ def default_env_response(mode: str, b: Budgets) -> int:  # noqa: D401
     exact rather than merely self-consistent -- but an unconfigured run should still be
     bounded by something other than nothing, which is what it was bounded by before.
     """
+    # Every mode: an observation shares the opening call with the system prompt, so it
+    # can never exceed the prompt region. Applied to all three because the relation is,
+    # and leaving it out of concat and compact let the default exceed what check() would
+    # accept -- a default rejected by its own checker fails every run that relied on it.
+    ceiling = b.prompt_len
     if mode == "concat":
         # The response region holds T generations and the T-1 observations between them.
         spare = b.response_len - b.max_turns * b.per_turn
-        return max(0, spare) // max(1, b.max_turns - 1)
-    if mode == "compact" and b.compact_budget:
-        # An observation cannot be larger than the budget it has to be summarised inside,
-        # less the summary that will share it.
+        ceiling = min(ceiling, max(0, spare) // max(1, b.max_turns - 1))
+    elif mode == "compact" and b.compact_budget:
+        # Bounded by the room the peak leaves, which is what compact_budget_bounds
+        # measures from the other side: E appears in that overhead, so solving for it
+        # gives the largest value whose own ceiling still admits this budget.
         k = b.summary_budget or default_summary_budget(b.compact_budget, b.per_turn)
-        return max(0, b.compact_budget - k)
-    return b.prompt_len
+        room = (min(b.window, b.response_len) - b.compact_budget
+                - b.summary_request_len - k - b.per_turn)
+        ceiling = min(ceiling, max(0, room))
+    return ceiling
 
 
 def compact_budget_bounds(b: Budgets) -> tuple[int, int]:
@@ -170,8 +178,13 @@ def compact_budget_bounds(b: Budgets) -> tuple[int, int]:
     """
     k = b.summary_budget or default_summary_budget(b.compact_budget or 4, b.per_turn)
     lowest = 2 * k
-    highest = b.window - b.summary_request_len - k - b.env_response - b.per_turn
-    return lowest, highest
+    overhead = b.summary_request_len + k + b.env_response + b.per_turn
+    # Against the response region and not the window. Almost all of a conversation lands
+    # in the response region -- only the opening call becomes the prompt region -- so a
+    # large max_prompt_length hides an overflow rather than absorbing one. Charging the
+    # opening at zero is the safe direction, since its real size is the system prompt and
+    # that is not known until an episode starts.
+    return lowest, min(b.window, b.response_len) - overhead
 
 
 # ----------------------------------------------------------------------------- checks
@@ -226,16 +239,29 @@ def _check_compact(b: Budgets) -> None:
             f"response_length_per_turn={b.per_turn}: the summary is a generation like any "
             f"other and cannot be longer than one."
         )
-    if 2 * k > m:
+    lowest, highest = compact_budget_bounds(b)
+    if lowest > highest:
+        # Reporting only the ceiling here sends you round a loop: below the floor the
+        # halving rule fires, above the ceiling this one does, and the advice from each
+        # lands in the other's territory.
+        raise BudgetError(
+            f"no compact_budget works with these numbers. The compression rule puts the "
+            f"floor at {lowest} (twice compact_summary_budget={k}) and the room left in "
+            f"the response region puts the ceiling at {highest} "
+            f"(min(window {b.window}, max_response_length {b.response_len}) less the "
+            f"summary request {b.summary_request_len}, the summary {k}, one observation "
+            f"{b.env_response} and one generation {b.per_turn}). Lower "
+            f"compact_summary_budget or env_response_length or response_length_per_turn, "
+            f"or raise max_response_length."
+        )
+    if m < lowest:
         raise BudgetError(
             f"trainer.compact_summary_budget={k} is more than half of "
             f"trainer.compact_budget={m}. A summary that long buys no turns: the next "
             f"conversation opens near the budget, summarises again after one turn, and every "
             f"environment step costs two generations and a summary of a single turn -- a "
-            f"more expensive no_concat."
+            f"more expensive no_concat. compact_budget must be at least {lowest}."
         )
-
-    _, highest = compact_budget_bounds(b)
     if m > highest:
         peak = m + b.env_response + b.per_turn + b.summary_request_len + k
         raise BudgetError(
@@ -243,9 +269,10 @@ def _check_compact(b: Budgets) -> None:
             f"trigger fires on a measured turn cost, so compact_budget={m} can be reached "
             f"and then overshot by one more turn (env_response_length={b.env_response} + "
             f"response_length_per_turn={b.per_turn}) before the summary request "
-            f"({b.summary_request_len}) and the summary ({k}) go on top: {peak} tokens "
-            f"against a window of {b.window} ({b.window_name}). That conversation is one "
-            f"training row, so it has to fit -- compact_budget must be at most {highest}."
+            f"({b.summary_request_len}) and the summary ({k}) go on top: {peak} tokens. "
+            f"Almost all of that lands in the response region, so it is bounded by "
+            f"min(window {b.window}, max_response_length {b.response_len}) and not by the "
+            f"two regions added together -- compact_budget must be at most {highest}."
         )
 
 
@@ -278,10 +305,16 @@ def context_limits(mode: str, b: Budgets) -> tuple[int, int]:
     opening = b.prompt_len
     if mode == "compact" and b.compact_budget:
         opening = min(opening, b.compact_budget)
+    # An observation is bounded by env_response_length wherever a conversation can be
+    # continued. Compaction used the budget here, which bounded nothing worth bounding:
+    # every relation compaction has to satisfy is written in terms of E, and E was the
+    # one quantity with no runtime enforcement in the one mode that depends on it.
+    #
+    # Compaction continues a conversation for two reasons, though, and only one of them
+    # is an observation: the summary request goes out on the same path. It is a fixed
+    # string this module already measures, so admit it rather than reporting a 70-token
+    # observation the environment never returned.
+    continuation = b.env_response if mode in ("concat", "compact") else opening
     if mode == "compact":
-        continuation = b.compact_budget or b.response_len
-    elif mode == "concat":
-        continuation = b.env_response
-    else:
-        continuation = opening
+        continuation = max(continuation, b.summary_request_len)
     return opening, continuation
