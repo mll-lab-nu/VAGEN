@@ -1,21 +1,40 @@
-# VAGEN Architecture — v1 (lightweight)
+# VAGEN Architecture
 
-2026-08-02 · training backend `verl-project/verl@release/v0.8.0` (bee9f6f4)
+Training backend `verl-project/verl@release/v0.8.0` (bee9f6f4).
+
+This began on 2026-08-02 as a design document, and most of it has since been built. Where
+the two disagreed the code was right and the document was not, so the names below are the
+ones in the tree. The rationale sections are kept because they still explain *why*; the
+status table is rewritten because it was claiming that working code did not exist.
+
+## Names, as built
+
+The design used placeholder names that never made it into the code. Reading the older
+sections, substitute:
+
+| document said | the code has | where |
+|---|---|---|
+| `TokenTape` | `Conversation` | `core/tape.py` |
+| `TokenLedger` | `Row` | `core/tape.py` |
+| `BatchView` | `TrajectoryView` | `custom_advantage/trajectory.py` |
+| `core/ports.py` | `core/client.py` | the data types live with the client |
+| `core/harness/` | `core/harness.py` + `harness/` | contract and implementations |
 
 ## Scope
 
-| | v1 | Status |
-|---|---|---|
-| Upgrade to verl 0.8 | ✅ | done, 2493 lines of fork deleted |
-| **Env / harness decoupling** | ❌ | **not started** — no `core/`, no `BaseHarness`, no client layer; the gym loops still own env stepping, context and tokenization together. Design settled 2026-08-03 (§4/§5/§7): harness is text-only, one axis (when to start a new conversation), all token state behind the client |
-| `ConcatHarness` + `NoConcatHarness` | ❌ | **not started** — a handful of lines each once §4 exists; the two gym agent loops merge into them |
-| `CompactHarness` | interface only | falls out of the same axis; nothing extra to build downstream (§9.1) |
-| VLM beyond Qwen | ✅ | Qwen / LLaVA / InternVL all training |
-| Context compaction | interface only | not started |
-| Black-box harness | one downstream rule | not started |
-| Eval unification / async trainers | package split only | not started |
-
-**Estimated effort: ~21–23 engineer-days ≈ 4.5–5 weeks solo**, tests included. See §11.
+| | status |
+|---|---|
+| Upgrade to verl 0.8 | ✅ done, 2493 lines of fork deleted |
+| Env / harness decoupling | ✅ **built.** `core/harness.py`, `core/client.py`, `core/runner.py`, `core/tape.py`. The harness holds no tokenizer, no env and no client; the runner is one loop for training and evaluation |
+| `ConcatHarness` / `NoConcatHarness` | ✅ built, a dozen lines each, registered in `harness/__init__.py` |
+| `CompactHarness` | ✅ built, with the budget arithmetic in `harness/budget.py` |
+| Token accounting / budget checks | ✅ built 2026-08-06. See §12 |
+| Image placeholder ↔ frame alignment | ✅ built 2026-08-06. `utils/image_token_utils.py` |
+| Algorithm layer — token / turn | ✅ token-level and GRPO on `TrajectoryView`; turn-level `traj_turn_gae` in use |
+| VLM beyond Qwen | ✅ Qwen / LLaVA / InternVL all training |
+| Compact loss reweighting | ❌ deferred, algorithm layer |
+| Black-box harness | interface exists (a conversation id is the whole protocol); no adapter written |
+| Eval unification / async trainers | package split only. See §13 for what adopting fully-async would take |
 
 ---
 
@@ -84,7 +103,7 @@ Also free: sticky-session prefix caching (`generate(request_id=…)`), async gen
 
 ---
 
-## 2. Data types · `core/ports.py`
+## 2. Data types · `core/client.py`
 
 ```python
 @dataclass
@@ -175,7 +194,7 @@ class InferenceClient(Protocol):
 
 ---
 
-## 3. `TokenTape` · `core/tape.py`
+## 3. `Conversation` · `core/tape.py`
 
 ```python
 class TokenTape:
@@ -238,7 +257,7 @@ class TokenTape:
 
 ---
 
-## 4. Harness · `core/harness/`
+## 4. Harness · `core/harness.py` and `harness/`
 
 The harness works in text. It never sees a token, a mask, a reward or a logprob, and it
 holds no tokenizer, no client and no env. Each turn it answers one question: **does the
@@ -1105,3 +1124,89 @@ workers/utils/losses.py                         :57 ppo_loss  :147 value_loss (v
 models/transformers/monkey_patch.py:348         ValueHead patch site
 utils/tokenizer.py                              :102 build_multimodal_processor_inputs  :205 registry
 ```
+
+---
+
+## 12. Token accounting · `harness/budget.py`
+
+Six quantities bound a run. Three are enforced by something, three were not until
+2026-08-06:
+
+    C     rollout.max_model_len          hard. The engine refuses past it.
+    n_p   data.max_prompt_length         a row's prompt region
+    n_r   data.max_response_length       a row's response region
+    g     response_length_per_turn       one generation. Hard: it is max_new_tokens.
+    E     env_response_length            one observation, after the processor has
+                                         expanded its images
+    T     max_turns                      environment steps in an episode
+
+and compaction adds two that have to fit inside those:
+
+    m     trainer.compact_budget         the largest a conversation may become
+    k     trainer.compact_summary_budget the largest a summary may be
+
+`S`, the system prompt, comes from the environment and is measured rather than configured.
+Every relation that does not mention it is checked before the rollout; the ones that need
+it are checked on the first call, which is the earliest they can be.
+
+    no_concat   S + E <= n_p,  g <= n_r,  S + E + g <= C
+    concat      T*g + (T-1)*E <= n_r      every turn lands in one response region
+    compact     S + k + E <= min(n_p, m)  a conversation opens on a summary
+                m + E + g + |req| + k <= min(C, n_r)
+                k <= g,  2k <= m          a summary is a generation, and a compression
+
+The response region, not the window, is what bounds a compacted conversation: almost all
+of it lands there, so a large `max_prompt_length` hides an overflow rather than absorbing
+one.
+
+### The trigger
+
+`m` is the largest a conversation may become, so compaction fires when *one more turn
+would not fit*, against a turn cost it **measures** — the last continuation, not the
+configured ceiling. On Sokoban `g` is 512 and a real turn costs about 138, so a trigger
+charging the ceiling fires after the first turn of every conversation and compaction
+silently degenerates into no_concat with a summary attached. The estimate resets with the
+conversation: a new one cannot correct an inherited value, because its first turn is an
+opening call and openings may not inform it.
+
+Measured on Sokoban vision, for scale: `S`=589, `E`=44–58 with a 96×96 frame, so a
+conversation opens at 633 tokens. The `compact_budget=400` used before this existed could
+not hold the system prompt, let alone a turn.
+
+### Runtime companions
+
+Static checks are necessary, not sufficient, because `S` and `E` are measured:
+
+| guard | where | when |
+|---|---|---|
+| `BudgetError` | `harness/budget.py` | before the rollout, from config alone |
+| `ContextTooLarge` | `core/client.py` | on the call, against the mode's ceiling |
+| `CompactionMakesNoProgress` | `harness/compact.py` | on a *repeat* — one short conversation is data, two is the budget |
+| `cap_token_ids` | verl `agent_loop.py` | at the end, refusing to truncate an episode |
+| empty-generation retry | `core/client.py` | before the tape, the harness and `env.step` all see it |
+
+## 13. Adopting fully-async policy
+
+The harness, tape, reward path and budget accounting need **no changes**. verl absorbs
+rollout interruption a layer below the agent loop:
+
+    verl/experimental/fully_async_policy/fully_async_rollouter.py:52
+        """...making rollout interruption invisible to the AgentLoop."""
+
+`FullyAsyncLLMServerClient` resumes from `prompt_ids + token_ids` until the stop reason is
+no longer `aborted`, and it is installed at exactly the argument the agent loop reads as
+`self.server_manager` (`agent_loop.py:633`). So the resume loop sits *below* `VerlClient`.
+
+What would actually change:
+
+1. **The manager base class.** `MultiOutputAgentLoopManager(AgentLoopManager)` would have
+   to compose with `FullyAsyncAgentLoopManager`, which overrides `generate_sequences_single`
+   where ours overrides `generate_sequences`. This is the only structural step.
+2. **The weight version is dropped on the floor.** Under partial rollout one response can
+   span weight updates, and the resume client reports `min_global_steps` / `max_global_steps`
+   in `extra_fields`. `VerlClient.generate` reads that dict already but takes only
+   `prompt_token_ids`. Off-policy correction needs the rest.
+3. **Per-episode failure isolation.** `asyncio.gather` runs with `return_exceptions=False`,
+   so one episode's exception kills the batch. `BudgetError` and `ImagePlaceholderMismatch`
+   are fatal by nature; `ContextTooLarge`, `CompactionMakesNoProgress` and the
+   `cap_token_ids` overflow should drop one episode and continue.
