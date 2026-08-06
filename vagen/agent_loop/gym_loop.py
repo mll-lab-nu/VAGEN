@@ -230,7 +230,9 @@ class GymLoop(VagenGymAgentLoopBase):
                     response_mask=row.response_mask[:keep],
                     multi_modal_data={"image": images} if images else {},
                     response_logprobs=row.logprobs[:keep] or None,
-                    reward_score=float(sum(row.scores)),
+                    # The sum is what verl's own metrics read; the vector below is what
+                    # actually trains. Both, because they answer different questions.
+                    reward_score=float(sum(row.scores[:keep])),
                     num_turns=1,
                     metrics={},
                     extra_fields={
@@ -242,6 +244,11 @@ class GymLoop(VagenGymAgentLoopBase):
                         },
                         "image_data": images,
                         "last_turn": conversation_id == len(rows) - 1,
+                        # Per-token scores, capped alongside the response they index.
+                        # verl otherwise places one scalar at the final token, which
+                        # erases which span earned what -- the whole point of scoring
+                        # <observation> and <prediction> where they are written.
+                        "token_level_scores": list(row.scores[:keep]),
                         "episode_id": episode_id,
                         "group_idx": kwargs["group_idx"],
                         "traj_idx": kwargs["traj_idx"],

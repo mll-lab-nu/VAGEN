@@ -95,3 +95,41 @@ async def test_only_the_missing_section_is_added():
     block = _wrapper(_Env(env_prompt)).instructions(env_prompt)
     assert "<prediction>" in block
     assert "Before acting" not in block, "re-taught a section the env already requests"
+
+
+# ------------------------------------------- offsets must match the text that was searched
+def test_offsets_are_measured_the_way_the_action_text_was_decoded():
+    """The client decodes the response with special tokens skipped, and the spans are
+    found by matching tags in *that* string. Measuring offsets with specials rendered
+    shifts every position after the first one, moving the reward off the description and
+    onto the tag before it."""
+    tok = _pytest.importorskip("transformers").AutoTokenizer.from_pretrained(
+        "$HOME/.cache/huggingface/hub/models--Qwen--Qwen2.5-VL-3B-Instruct/snapshots",
+        trust_remote_code=True,
+    ) if False else None
+
+    class _Tok:
+        """Two ordinary tokens and one special that prints when not skipped."""
+
+        SPECIAL = 99
+
+        def decode(self, ids, skip_special_tokens=False):
+            out = []
+            for i in ids:
+                if i == self.SPECIAL:
+                    if not skip_special_tokens:
+                        out.append("<|special|>")
+                else:
+                    out.append(chr(ord("a") + int(i)))
+            return "".join(out)
+
+    from vagen.rewards.spans import token_offsets, tokens_covering
+
+    ids = [0, _Tok.SPECIAL, 1, 2]           # "a" <|special|> "b" "c"
+    offsets = token_offsets(ids, _Tok())
+    assert offsets == [1, 1, 2, 3], f"offsets counted the special token: {offsets}"
+
+    # span "bc" in the skip-specials text "abc" is chars 1..3
+    assert tokens_covering((1, 3), offsets) == [2, 3], (
+        "the reward landed on the wrong tokens"
+    )
