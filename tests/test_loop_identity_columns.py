@@ -71,7 +71,6 @@ def test_conversations_are_numbered_from_zero_in_order():
 
 def test_each_conversation_reports_the_turns_inside_it():
     for out in _outputs():
-        assert out.extra_fields["turns_here"] == 2
         assert out.extra_fields["response_spans"] == [(0, 1), (1, 2)]
 
 

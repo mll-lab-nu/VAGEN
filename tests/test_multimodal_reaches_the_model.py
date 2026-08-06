@@ -45,9 +45,9 @@ def test_the_consumer_still_reads_images_plural():
     assert "images" in _consumed_keys()
 
 
-@pytest.mark.parametrize("bad", ["image", "img", "pixel_values"])
-def test_a_wrong_key_would_be_caught(bad):
-    consumed = _consumed_keys()
-    if bad in consumed:
-        pytest.skip(f"{bad} is a real key")
-    assert {bad} - consumed, "the guard cannot distinguish a wrong key"
+def test_the_guard_fails_when_the_emitted_key_is_wrong():
+    """The guard is worth nothing unless a wrong key actually fails it. Parametrising
+    over names and asserting they are absent restates the premise instead."""
+    emitted, consumed = {"image"}, {"images", "videos", "audios"}
+    assert not emitted <= consumed, "a wrong key would pass the comparison the guard uses"
+    assert {"images"} <= consumed, "the right key would fail it"

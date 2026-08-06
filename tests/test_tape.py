@@ -240,3 +240,32 @@ def test_an_untouched_prompt_is_accepted():
     c.add_response([7, 8])
     c.adopt_prompt([1, 2, 3, 7, 8])
     assert c.prompt_len == 3
+
+
+def test_the_opening_prompt_may_still_be_re_expanded():
+    """The engine expands an image placeholder in the middle of the opening prompt, so
+    requiring a byte-identical prefix there rejects the only case adoption exists for --
+    and fatally, since nothing catches MaskMisaligned."""
+    c = Conversation(conversation_id="c")
+    c.add_context([1, 2, 100, 3])                 # one placeholder
+    c.adopt_prompt([1, 2, 100, 100, 100, 3])      # engine expanded it to three
+    assert c.token_ids == [1, 2, 100, 100, 100, 3]
+    assert c.prompt_len is None and c.mask == []
+
+
+def test_an_aborted_generation_earns_nothing_rather_than_crediting_the_observation():
+    """vLLM returns no tokens on abort. `end - 1` then points at the token before the
+    turn -- the environment's own text -- or off the start of the list entirely."""
+    c = Conversation(conversation_id="c")
+    c.add_context([1, 2, 3])
+    c.add_response([])
+    c.add_reward(1.0)                              # must not raise
+    assert c.scores == []
+
+    c2 = Conversation(conversation_id="c2")
+    c2.add_context([1, 2, 3])
+    c2.add_response([7, 8])
+    c2.add_context([9])
+    c2.add_response([])
+    c2.add_reward(5.0)
+    assert c2.scores == [0.0, 0.0, 0.0], f"credited an observation token: {c2.scores}"

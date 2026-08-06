@@ -116,8 +116,13 @@ class Conversation:
         """
         delta = len(engine_ids) - len(self.token_ids)
 
-        # Everything before the newest context must survive byte for byte.
-        head_len = len(self.token_ids) - (self._tail_context_len or 0)
+        # Everything before the newest context must survive byte for byte -- but only
+        # once there IS something before it. While the opening prompt is still being
+        # assembled every token is context, and the engine's re-expansion of an image
+        # placeholder lands in the middle of it, so requiring a byte-identical prefix
+        # rejected precisely the case adoption exists for. Fatal, too: nothing catches
+        # MaskMisaligned, so it took the whole batch down.
+        head_len = 0 if self.prompt_len is None else len(self.token_ids) - (self._tail_context_len or 0)
         if engine_ids[:head_len] != self.token_ids[:head_len]:
             differs = next(
                 (i for i in range(min(head_len, len(engine_ids)))
@@ -191,6 +196,11 @@ class Conversation:
         if self._last_response is None:
             raise MaskMisaligned("no model output to credit; the environment acted on nothing")
         start, end = self._last_response
+        if end == start:
+            # An aborted generation returns no tokens. There is nowhere to put the
+            # credit: `end - 1` would land on the observation before it and pay the
+            # environment's own text, or on nothing at all when the turn is the first.
+            return
 
         if isinstance(reward, (int, float)):
             self.scores[end - 1] += float(reward)

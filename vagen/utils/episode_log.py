@@ -129,38 +129,45 @@ def episode_html(turns: list[dict]) -> str:
             f'<div style="color:#c00;font-size:13px"><b>conversation '
             f'{conversation.get("conversation_id", n)}</b></div>'
         )
-        _text(parts, conversation.get("prompt"))
-        if conversation.get("prompt_image") is not None:
-            parts.append(_img_tag(conversation["prompt_image"]))
+        _text(parts, conversation.get("prompt"), conversation.get("prompt_image"))
 
         for turn in conversation.get("turns", []):
             _text(parts, turn.get("response"))
-            _text(parts, turn.get("observation"))
-            if turn.get("observation_image") is not None:
-                parts.append(_img_tag(turn["observation_image"]))
+            _text(parts, turn.get("observation"), turn.get("observation_image"))
 
     parts.append("</div>")
     return "".join(parts)
 
 
-#: Role words a chat template leaves dangling at the end of a rendered turn as the cue
-#: for the model to start writing. Not content -- the model produced nothing there yet.
-_GENERATION_CUE = re.compile(r"(?:\s*\n)?\s*(?:assistant|model)\s*$", re.IGNORECASE)
+#: The template's cue for the decoder to start writing, at the end of a rendered turn.
+#: Real tokens in the sequence, carried at mask 0 -- so they are shown, not hidden. What
+#: they are useful for here is placement: a frame belongs before the cue, since it is
+#: part of what the model was shown, and the cue is where its own writing begins.
+_GENERATION_CUE = re.compile(r"((?:\n)?(?:assistant|model)\n?)\s*$", re.IGNORECASE)
 
 
-def _text(parts: list[str], text) -> None:
-    """One block of the transcript, minus the trailing generation cue.
+def _text(parts: list[str], text, frame=None) -> None:
+    """One block of the transcript, with its frame placed inside it.
 
-    A rendered user turn ends with the template's "assistant" marker, which is an
-    instruction to the decoder rather than something anyone said. Left in, every user
-    block appears to end by speaking as the assistant -- and the frame that closes the
-    turn then looks like the assistant's, when it is what the assistant was shown.
+    Nothing is removed. The block is only split where the decoder cue begins, so the
+    frame lands at the end of what the model was shown rather than after the marker that
+    starts its reply -- which read as though the picture were the assistant's own.
     """
     if not text:
+        if frame is not None:
+            parts.append(_img_tag(frame))
         return
-    trimmed = _GENERATION_CUE.sub("", str(text))
-    if trimmed:
-        parts.append(f'<div>{html.escape(trimmed)}</div>')
+    body = str(text)
+    cue = ""
+    match = _GENERATION_CUE.search(body)
+    if match and frame is not None:
+        body, cue = body[: match.start()], match.group(1)
+    if body:
+        parts.append(f'<div>{html.escape(body)}</div>')
+    if frame is not None:
+        parts.append(_img_tag(frame))
+    if cue:
+        parts.append(f'<div>{html.escape(cue)}</div>')
 
 
 def episode_rows(rows: list[dict]) -> list[dict]:
@@ -200,8 +207,13 @@ def episode_rows(rows: list[dict]) -> list[dict]:
 #: Each takes the episodes of one validation round and returns them in preference order;
 #: `select_episodes` then takes as many as asked for.
 def _by_reward(episodes, *, worst_first):
-    return sorted(episodes, key=lambda e: (e.get("reward") is None, e.get("reward") or 0.0),
-                  reverse=not worst_first)
+    """Ranked by reward, with the reward-less always last.
+
+    ``reverse=True`` would flip the "has no reward" component of the key too, so under
+    "best" the episodes with no score at all sorted first -- the opposite of the ask.
+    """
+    sign = 1.0 if worst_first else -1.0
+    return sorted(episodes, key=lambda e: (e.get("reward") is None, sign * (e.get("reward") or 0.0)))
 
 
 SELECTORS = {
