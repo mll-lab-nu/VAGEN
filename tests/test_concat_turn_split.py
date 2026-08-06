@@ -19,13 +19,18 @@ from vagen.utils.concat_val_multi_turn import concat_val_multi_turn  # noqa: E40
 
 
 class _Tok:
-    """Decodes each id to a word, so the split is legible in assertions."""
+    """Decodes each id to a word, so the split is legible in assertions.
+
+    Declares an image placeholder the way a real processor does, so the merge can find
+    where a picture sits instead of guessing.
+    """
 
     pad_token_id = 0
+    image_token_id = 9
     WORDS = {1: "RESP0", 2: "OBS1", 3: "RESP1", 4: "OBS2", 5: "RESP2"}
 
     def decode(self, ids, **kw):
-        return " ".join(self.WORDS.get(int(i), "?") for i in ids if int(i) != 0)
+        return " ".join(self.WORDS.get(int(i), "?") for i in ids if int(i) not in (0, 9))
 
 
 def _concat_batch():
@@ -38,7 +43,7 @@ def _concat_batch():
     L = resp.shape[1]
     b = TensorDict(
         {
-            "prompts": torch.ones(1, 4, dtype=torch.long),
+            "prompts": torch.tensor([[1, 9, 9, 1]], dtype=torch.long),   # a placeholder run
             "responses": resp,
             "response_mask": torch.tensor([[1, 0, 1, 0, 1]], dtype=torch.long),
             "rm_scores": torch.zeros(1, L),
@@ -53,7 +58,7 @@ def _concat_batch():
 
     nt = {
         "uid": arr("ep"), "group_idx": arr("ep"), "traj_idx": arr(0), "turn_idx": arr(0),
-        "image_data": arr(["f0", "f1", "f2"]),
+        "image_data": arr(["f0"]),
         "reward_extra_info": arr({"traj_success": 0.0}),
         "episode_id": arr("EP"), "conversation_id": arr(0),
         # the three model outputs inside this one conversation
@@ -78,9 +83,14 @@ def test_one_conversation_with_three_turns():
     assert len(convs[0]["turns"]) == 3, f"turns not recovered: {convs[0]['turns']}"
 
 
+def _joined(parts):
+    """The text of a span, ignoring where its pictures sit."""
+    return " ".join(p["text"] for p in parts if "text" in p).strip()
+
+
 def test_each_turn_holds_only_its_own_response():
     turns = _conversations()[0]["turns"]
-    assert [t["response"] for t in turns] == ["RESP0", "RESP1", "RESP2"]
+    assert [_joined(t["response"]) for t in turns] == ["RESP0", "RESP1", "RESP2"]
 
 
 def test_the_observation_between_two_turns_is_recovered():
@@ -88,7 +98,7 @@ def test_the_observation_between_two_turns_is_recovered():
     from the *next row's* prompt -- which is what walking the batch gives you -- yields
     nothing at all here, because concat has no next row."""
     turns = _conversations()[0]["turns"]
-    assert [t["observation"] for t in turns] == ["OBS1", "OBS2", ""], (
+    assert [_joined(t["observation"]) for t in turns] == ["OBS1", "OBS2", ""], (
         "observations between turns were dropped; the transcript reads as a model "
         "talking to itself"
     )
@@ -98,10 +108,11 @@ def test_turn_ids_run_from_zero_within_the_conversation():
     assert [t["turn_id"] for t in _conversations()[0]["turns"]] == [0, 1, 2]
 
 
-def test_frames_are_spread_over_the_turns_not_stacked_at_the_top():
+def test_a_frame_replaces_the_placeholder_run_that_stands_for_it():
+    """The picture's position is in the token sequence, not a guess about which turn it
+    belongs to. Frame f0 stands where the prompt's placeholder is."""
     conv = _conversations()[0]
-    assert conv["prompt_image"] == "f0"
-    assert [t["observation_image"] for t in conv["turns"]] == ["f1", "f2", None]
+    assert [p.get("image") for p in conv["prompt"] if "image" in p] == ["f0"]
 
 
 def test_the_training_tensors_are_untouched_by_any_of_this():

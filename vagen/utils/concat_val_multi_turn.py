@@ -8,6 +8,8 @@ import torch
 from tensordict import TensorDict
 from verl import DataProto
 
+from vagen.utils.image_token_utils import image_token_ids, split_on_images
+
 PAD_TOKEN_ID = 0
 
 
@@ -53,6 +55,7 @@ def concat_val_multi_turn(
     test_output_gen_batch: DataProto,
     test_gen_batch: DataProto,
     tokenizer,
+    processor=None,
 ) -> DataProto:
     """
     Turn -> trajectory concatenation and STRICT reorder by test_gen_batch.uid,
@@ -126,6 +129,9 @@ def concat_val_multi_turn(
         # naturally falls when you walk the batch -- put each new system prompt after
         # the response before it, so the boundary marker landed a whole turn early.
         conversations: List[Dict[str, Any]] = []
+        # Where the pictures actually sit in the sequence, so they can replace their
+        # placeholders instead of being appended near them.
+        placeholders = image_token_ids(processor if processor is not None else tokenizer)
 
         for j, (_, i) in enumerate(turns):
             resp = test_output_gen_batch.batch["responses"][i]
@@ -182,24 +188,30 @@ def concat_val_multi_turn(
             spans = [(int(x), int(y)) for x, y in spans] if spans else [(0, r_len)]
             spans = [(x, y) for x, y in spans if 0 <= x < y <= r_len] or [(0, r_len)]
 
+            # Frames are consumed in sequence order across the whole conversation: the
+            # prompt's placeholders first, then each observation's.
+            remaining = list(frames)
+
+            def take(span_ids):
+                parts = split_on_images(list(span_ids), placeholders, tokenizer, remaining)
+                used = sum(1 for part in parts if "image" in part)
+                del remaining[:used]
+                return parts
+
+            prompt_parts = take(this_prompt[p_start:])
+
             turn_list = []
             for k, (start, end) in enumerate(spans):
                 nxt = spans[k + 1][0] if k + 1 < len(spans) else r_len
                 turn_list.append({
                     "turn_id": k,
-                    "response": tokenizer.decode(resp[start:end], skip_special_tokens=True),
-                    "observation": (
-                        tokenizer.decode(resp[end:nxt], skip_special_tokens=True) if nxt > end else ""
-                    ),
-                    # Frame 0 came with the prompt; frame k+1 with the observation after
-                    # turn k.
-                    "observation_image": frames[k + 1] if k + 1 < len(frames) else None,
+                    "response": take(resp[start:end]),
+                    "observation": take(resp[end:nxt]) if nxt > end else [],
                 })
 
             conversations.append({
                 "conversation_id": j,
-                "prompt": tokenizer.decode(this_prompt[p_start:], skip_special_tokens=True),
-                "prompt_image": frames[0] if frames else None,
+                "prompt": prompt_parts,
                 "turns": turn_list,
             })
 

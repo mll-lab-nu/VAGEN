@@ -102,11 +102,14 @@ def _merged_validation_batch(mode, n_episodes=4):
             ks = [k for k in range(n_turns) if k // per_conv == c] or ([n_turns - 1] if c == n_conversations - 1 else [])
             convs.append({
                 "conversation_id": c,
-                "prompt": f"system + observation (conversation {c})",
-                "prompt_image": PIL.new("RGB", (16, 16), (c, c, c)),
+                # The merge emits alternating text and image parts, the picture sitting
+                # where its placeholder run was.
+                "prompt": [{"text": f"system + observation (conversation {c})"},
+                           {"image": PIL.new("RGB", (16, 16), (c, c, c))}],
                 "turns": [
-                    {"turn_id": t, "response": f"<answer>Up</answer> turn {k}",
-                     "observation": f"obs after {k}", "observation_image": None}
+                    {"turn_id": t,
+                     "response": [{"text": f"<answer>Up</answer> turn {k}"}],
+                     "observation": [{"text": f"obs after {k}"}]}
                     for t, k in enumerate(ks)
                 ],
             })
@@ -177,13 +180,12 @@ def test_the_transcript_interleaves_frames_and_text_in_order():
     from vagen.utils.episode_log import episode_html
 
     h = episode_html([{"conversations": [{
-        "conversation_id": 0, "prompt": "SYSTEM-AND-OBS",
-        "prompt_image": PIL.new("RGB", (8, 8), (1, 1, 1)),
+        "conversation_id": 0,
+        "prompt": [{"text": "SYSTEM-AND-OBS"}, {"image": PIL.new("RGB", (8, 8), (1, 1, 1))}],
         "turns": [
-            {"turn_id": 0, "response": "RESPONSE-ZERO", "observation": "OBS-ZERO",
-             "observation_image": PIL.new("RGB", (8, 8), (2, 2, 2))},
-            {"turn_id": 1, "response": "RESPONSE-ONE", "observation": "",
-             "observation_image": None},
+            {"turn_id": 0, "response": [{"text": "RESPONSE-ZERO"}],
+             "observation": [{"text": "OBS-ZERO"}, {"image": PIL.new("RGB", (8, 8), (2, 2, 2))}]},
+            {"turn_id": 1, "response": [{"text": "RESPONSE-ONE"}], "observation": []},
         ]}]}])
     order = [h.index(x) for x in
              ("SYSTEM-AND-OBS", "base64,", "RESPONSE-ZERO", "OBS-ZERO", "RESPONSE-ONE")]
