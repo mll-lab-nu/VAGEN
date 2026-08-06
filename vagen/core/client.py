@@ -41,11 +41,30 @@ class BackendOutput:
     prompt_token_ids: Optional[list[int]] = None
 
 
+class ContextTooLarge(ValueError):
+    """One call handed the model more context than the mode has room for.
+
+    Context is everything it did not generate: the system prompt, an observation, a
+    summary. Nothing bounded it before -- an environment returns what it returns, and a
+    frame costs hundreds of tokens once the processor expands its placeholder -- so an
+    observation that did not fit was found at the end of the episode by ``cap_token_ids``,
+    if at all, by which point it is a truncated row and not an oversized observation.
+    """
+
+
 class InferenceClient(ABC):
     """Conversation bookkeeping, shared by every backend."""
 
     #: ``None`` for closed APIs that only return text.
     tokenizer: Any = None
+
+    #: The most context one call may add, opening a conversation and continuing one. See
+    #: ``vagen.harness.budget.context_limits``: the two differ because the calls do -- an
+    #: opening call becomes a row's prompt region, a continuation appends to its response
+    #: region. ``None`` disables the check, which is what evaluation against a closed API
+    #: wants, since there is no row to fit.
+    opening_limit: int | None = None
+    continuation_limit: int | None = None
 
     def __init__(self):
         self._conversations: dict[str, Conversation] = {}
@@ -74,7 +93,15 @@ class InferenceClient(ABC):
         # what is new -- deduplicating again here silently dropped every observation
         # after the first, since it sliced a one-message delta against a count of the
         # messages already sent.
-        conversation.add_context(self.encode(messages))
+        #
+        # Measured on this encode rather than a second one: encoding runs the processor,
+        # which is expensive, and it records the message's images against the
+        # conversation -- so measuring separately would both cost twice and ship every
+        # frame twice.
+        opening = conversation.prompt_len is None
+        context = self.encode(messages)
+        self._check_context(context, opening=opening)
+        conversation.add_context(context)
 
         output = await self.generate(conversation.token_ids, **kwargs)
 
@@ -103,6 +130,21 @@ class InferenceClient(ABC):
         return new_id
 
     # ------------------------------------------------------------------ reading
+    def _check_context(self, context: list[int], *, opening: bool) -> None:
+        limit = self.opening_limit if opening else self.continuation_limit
+        if limit is None or len(context) <= limit:
+            return
+        what = ("the call opening a conversation, which is the system prompt and the "
+                "first observation (and under compaction the summary too)"
+                if opening else "an observation")
+        raise ContextTooLarge(
+            f"{what} came to {len(context)} tokens, over the {limit} this mode has room "
+            f"for. Image placeholders are counted expanded, as the model sees them. "
+            f"Set env_response_length to what the environment actually returns, shrink "
+            f"the observation (fewer or smaller frames, shorter text), or raise the "
+            f"budget it has to fit inside -- see vagen/harness/budget.py for which one."
+        )
+
     def reward(self, conversation_id: str, value: float | list[float]) -> None:
         """Credit the turn that just happened in this conversation."""
         self._conversations[conversation_id].add_reward(value)

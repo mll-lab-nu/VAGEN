@@ -1,44 +1,77 @@
-"""Whether the configured numbers can produce an episode at all.
+"""Token accounting: what has to hold for a mode to produce an episode.
 
-Four numbers bound a run:
+Six quantities bound a run. Three are enforced by something, three were not:
 
-    n_prompt   data.max_prompt_length        a row's prompt region
-    n_resp     data.max_response_length      a row's response region
-    per_turn   response_length_per_turn      one generation, if the env config sets one
-    max_turns  the dataset row               env steps in an episode
+    C     rollout.max_model_len          hard. The engine refuses past it.
+    n_p   data.max_prompt_length         a row's prompt region
+    n_r   data.max_response_length       a row's response region
+    g     response_length_per_turn       one generation. Hard: it is max_new_tokens.
+    E     env_response_length            one observation, after the processor has
+                                         expanded its images. Enforced here; nothing
+                                         bounded it before.
+    T     max_turns                      environment steps in an episode
 
-Only the first two are enforced anywhere, and they are enforced at the *end*, when the
-episode is already over and the rollout already paid for -- see ``cap_token_ids``. Whether
-they can be met is a property of the context policy, since the policy is what decides how
-an episode is spread across rows, and it is decidable before the run starts.
+and compaction adds two more that have to fit inside those:
 
-Compaction is where the arithmetic actually bites, because it introduces two more numbers
-that have to fit inside the first four:
+    m     trainer.compact_budget         the largest a conversation may become
+    k     trainer.compact_summary_budget the largest a summary may be
 
-    m   trainer.compact_budget           summarise once the conversation reaches this
-    k   trainer.compact_summary_budget   how long the summary may be
+``S`` is the system prompt, measured rather than configured -- it comes from the
+environment, so it is not known until an episode starts. Every check below that does not
+mention ``S`` is decidable before the rollout and is made there; the ones that need it are
+made on the first call, which is the earliest they can be.
 
-and three relations between them:
+What each mode has to satisfy
+-----------------------------
+A conversation is one training row: its opening call becomes the prompt region and
+everything after becomes the response region.
 
-    per_turn  <= n_resp                  one generation fits the region it is written to
-    m + |req| + k <= n_prompt + n_resp   the conversation is largest just after it is
-                                         summarised, and that is the row it becomes
-    2k <= m                              a summary is a compression. Allowed to be as
-                                         long as the budget it must fit inside, it buys
-                                         no turns: the next conversation opens already
-                                         near m, summarises again after one turn, and
-                                         every environment step costs two generations
-                                         plus a summary of a single turn.
+    no_concat   S + E <= n_p                       one turn per conversation
+                g <= n_r
+                S + E + g <= C
 
-The third is the one that was wrong here and produced no symptom. ``k`` was not a setting
-at all -- the summary generated against ``response_length_per_turn``, so at m=400 and
-per_turn=8000 the summary was permitted to be twenty times the budget it was compressing
-into. It worked because the model happened to write short summaries.
+    concat      S + E <= n_p                       one conversation per episode
+                T*g + (T-1)*E <= n_r               every turn lands in one response region
+                S + E + T*g + (T-1)*E <= C
 
-Nothing here is sufficient. An observation is whatever the environment returns and no
-arithmetic bounds it, so a run that passes these checks can still overflow on data; that
-is what the guard in ``cap_token_ids`` is for. These are the failures that do not need
-data to find.
+    compact     S + k + E <= min(n_p, m)           a conversation opens on a summary
+                m + E + g + |req| + k <= window    and is largest as it is summarised,
+                                                   one turn past the trigger
+                k <= g                             a summary is a generation
+                2k <= m                            and a compression
+
+The last two mention only configured numbers. The first mentions ``S`` and is checked on
+the opening call; that ``m`` also has to be large enough to buy more than one turn depends
+on what a turn actually costs and is checked as it happens.
+
+The trigger
+-----------
+``m`` is the largest a conversation may become, so compaction fires when *one more turn
+would not fit*, not when the budget is already gone. The original trigger, ``used >= m``,
+cannot know what the turn it is about to admit will cost, so a conversation waved through
+at ``m - 1`` still grows by a whole turn before anyone looks again and ``m`` is not
+actually a bound on anything.
+
+What one more turn costs is measured, not assumed: the largest continuation seen so far
+this episode. Charging the configured ceiling ``E + g`` instead looks safer and is
+useless -- on Sokoban ``g`` is 512 and a real turn is about 80, so a trigger charging 512
+fires after the first turn of every conversation and compaction degenerates into no_concat
+with a summary attached. Ceilings bound the worst case; they do not predict the next one.
+
+    trigger      used + observed_turn_cost >= m
+    guaranteed   peak <= m + E + g + |req| + k     (the ceilings do bound the overshoot)
+
+which is what ``compact_budget_bounds`` inverts to get the largest workable ``m``.
+
+Nothing here is sufficient. ``S`` and ``E`` are measured, not promised, and the lower end
+of ``m`` -- is it big enough to buy more than one turn? -- depends on both, so it is not
+decidable here at all. The runtime companions are what close that: the per-call ceilings
+in the client, ``CompactionMakesNoProgress``, and ``cap_token_ids`` at the end.
+
+Measured on Sokoban vision, for scale: S=589, E=44..58 (with a 96x96 frame), so a
+conversation opens at 633 tokens. ``compact_budget=400`` -- which is what this ran with --
+cannot hold the system prompt, let alone a turn. Every conversation summarised after one
+turn and the mode was no_concat at twice the price, silently, for three runs.
 """
 
 from __future__ import annotations
@@ -47,99 +80,208 @@ from dataclasses import dataclass
 
 
 class BudgetError(ValueError):
-    """The configured budgets cannot produce an episode.
+    """The configured numbers cannot produce an episode.
 
-    Raised before the run rather than during it: every one of these is decidable from the
-    config alone, and the alternative is finding out from a crash several hours in, or
-    from a mode that silently degenerates into a more expensive version of another one.
+    Raised before the rollout wherever the failure is decidable from config alone. The
+    alternative is a crash hours in, or no crash at all: a mode that quietly degenerates
+    into a more expensive version of another one still finishes and still writes
+    well-formed rows.
     """
 
 
 @dataclass(frozen=True)
 class Budgets:
-    """The numbers a mode has to work inside. ``summary_*`` are compact-only."""
+    """The numbers a mode has to work inside. ``compact_*`` are compact-only."""
 
-    prompt_len: int
-    response_len: int
-    per_turn: int
-    max_turns: int
-    compact_budget: int | None = None
-    summary_budget: int | None = None
-    summary_request_len: int = 0
-    #: Whether ``per_turn`` is a real per-turn budget or just the whole response region
-    #: standing in for one. Unset, it falls back to ``n_resp``, and multiplying that by
-    #: max_turns says only that a turn could in principle use the whole budget -- true of
-    #: every configuration, so a check on it would refuse them all.
+    prompt_len: int                      # n_p
+    response_len: int                    # n_r
+    per_turn: int                        # g
+    max_turns: int                       # T
+    env_response: int = 0                # E
+    context: int | None = None           # C; None means "whatever the regions allow"
+    compact_budget: int | None = None    # m
+    summary_budget: int | None = None    # k
+    summary_request_len: int = 0         # |req|
+    #: Whether ``per_turn`` is a real per-turn budget or the whole response region
+    #: standing in for one. Unset it falls back to ``n_r``, and ``T*g`` then says only
+    #: that a turn could in principle use everything -- true of every configuration, so
+    #: a check on it would refuse them all.
     per_turn_configured: bool = True
 
     @property
-    def window(self) -> int:
-        """What one conversation may reach in total, prompt region plus response region."""
+    def row(self) -> int:
+        """A conversation's total room: prompt region plus response region."""
         return self.prompt_len + self.response_len
 
+    @property
+    def window(self) -> int:
+        """The tightest hard bound on one conversation."""
+        return min(self.context, self.row) if self.context else self.row
 
+    @property
+    def window_name(self) -> str:
+        return ("rollout.max_model_len" if self.context and self.context < self.row
+                else "max_prompt_length + max_response_length")
+
+
+# ------------------------------------------------------------------------ derivations
 def default_summary_budget(compact_budget: int, per_turn: int) -> int:
-    """A summary budget derived from what it must fit inside, when none is configured.
+    """``k`` when it is not configured: a quarter of what it must fit inside.
 
-    A quarter of the budget leaves three quarters for the system prompt, the observation
-    that opens the new conversation, and the turns the compaction exists to buy. Derived
-    rather than a constant, so lowering ``compact_budget`` does not quietly leave a
-    summary budget behind that is now larger than the thing it compresses into.
+    Derived rather than a constant, so lowering ``m`` cannot leave behind a summary budget
+    that is now larger than the thing it compresses into.
     """
     return max(1, min(per_turn, compact_budget // 4))
 
 
+def default_env_response(mode: str, b: Budgets) -> int:  # noqa: D401
+    """``E`` when it is not configured: the room the mode has left for observations.
+
+    Read off the same relations that check it, so the default is by construction the
+    largest value that passes. A configured ``E`` is better -- it makes the static checks
+    exact rather than merely self-consistent -- but an unconfigured run should still be
+    bounded by something other than nothing, which is what it was bounded by before.
+    """
+    if mode == "concat":
+        # The response region holds T generations and the T-1 observations between them.
+        spare = b.response_len - b.max_turns * b.per_turn
+        return max(0, spare) // max(1, b.max_turns - 1)
+    if mode == "compact" and b.compact_budget:
+        # An observation cannot be larger than the budget it has to be summarised inside,
+        # less the summary that will share it.
+        k = b.summary_budget or default_summary_budget(b.compact_budget, b.per_turn)
+        return max(0, b.compact_budget - k)
+    return b.prompt_len
+
+
+def compact_budget_bounds(b: Budgets) -> tuple[int, int]:
+    """``(lowest, highest)`` workable ``m``, derived from everything else.
+
+    The top is where a conversation stops being summarisable inside the window. The
+    trigger fires on a measured turn cost, so a conversation can be admitted at ``m - 1``
+    and then overshoot by at most one turn before it is closed -- ``E + g``, the ceilings,
+    which is the one thing they are good for. Add the summary request and the summary and
+    that is the peak the window has to hold.
+
+    The bottom is only the compression rule, ``2k <= m``. Whether ``m`` is large enough to
+    buy more than one turn depends on ``S`` and on what a turn actually costs, neither of
+    which is known here; ``CompactionMakesNoProgress`` answers that at runtime, when both
+    have been measured.
+    """
+    k = b.summary_budget or default_summary_budget(b.compact_budget or 4, b.per_turn)
+    lowest = 2 * k
+    highest = b.window - b.summary_request_len - k - b.env_response - b.per_turn
+    return lowest, highest
+
+
+# ----------------------------------------------------------------------------- checks
 def check(mode: str, b: Budgets) -> None:
-    """Raise if ``mode`` cannot run inside ``b``. Returns nothing when it can."""
+    """Raise if ``mode`` cannot run inside ``b``. Silent when it can.
+
+    Everything here is decidable without ``S``, which is why it runs before the rollout.
+    """
     if b.per_turn > b.response_len:
         raise BudgetError(
             f"response_length_per_turn={b.per_turn} exceeds "
-            f"data.max_response_length={b.response_len}, so a single generation does not "
-            f"fit the response region it is written to. Lower the former or raise the latter."
+            f"data.max_response_length={b.response_len}: a single generation does not fit "
+            f"the response region it is written to."
+        )
+    if b.context and b.per_turn > b.context:
+        raise BudgetError(
+            f"response_length_per_turn={b.per_turn} exceeds rollout.max_model_len={b.context}."
         )
 
-    if mode == "concat":
-        # Necessary, not sufficient: this ignores every observation, and in concat the
-        # observations sit in the response region too. If the responses alone do not fit,
-        # no episode of this length can complete whatever the environment returns.
-        floor = b.max_turns * b.per_turn
-        if b.per_turn_configured and floor > b.response_len:
+    if mode == "no_concat":
+        _need(b, b.env_response + b.per_turn, "one turn",
+              f"env_response_length={b.env_response} + response_length_per_turn={b.per_turn}")
+
+    if mode == "concat" and b.per_turn_configured:
+        episode = b.max_turns * b.per_turn + max(0, b.max_turns - 1) * b.env_response
+        if episode > b.response_len:
             raise BudgetError(
                 f"concat keeps the whole episode in one conversation, so its response "
-                f"region has to hold every turn: max_turns={b.max_turns} x "
-                f"response_length_per_turn={b.per_turn} = {floor} tokens against "
-                f"data.max_response_length={b.response_len} -- and that is before a single "
-                f"observation, which concat also stores there. Use trainer.harness=compact, "
-                f"lower max_turns or response_length_per_turn, or raise the budget."
+                f"region holds every turn: max_turns={b.max_turns} x "
+                f"response_length_per_turn={b.per_turn} + {max(0, b.max_turns - 1)} x "
+                f"env_response_length={b.env_response} = {episode} tokens, against "
+                f"data.max_response_length={b.response_len}. Use trainer.harness=compact, "
+                f"lower max_turns / response_length_per_turn / env_response_length, or "
+                f"raise the budget."
             )
+        _need(b, b.env_response + episode, "the whole episode",
+              f"a first observation of {b.env_response} plus {episode} tokens of turns")
 
     if mode == "compact":
-        m, k = b.compact_budget, b.summary_budget
-        if not m or m <= 0:
-            raise BudgetError("trainer.harness=compact needs a positive trainer.compact_budget")
-        if not k or k <= 0:
-            raise BudgetError("trainer.harness=compact needs a positive trainer.compact_summary_budget")
-        if k > b.per_turn:
-            raise BudgetError(
-                f"trainer.compact_summary_budget={k} exceeds "
-                f"response_length_per_turn={b.per_turn}; the summary is a generation like "
-                f"any other and cannot be longer than one."
-            )
-        if 2 * k > m:
-            raise BudgetError(
-                f"trainer.compact_summary_budget={k} is more than half of "
-                f"trainer.compact_budget={m}. A summary that long buys no turns: the next "
-                f"conversation opens near the budget, summarises again after one turn, and "
-                f"every environment step then costs two generations and a summary of a "
-                f"single turn -- a more expensive no_concat. Set the summary budget to "
-                f"about {default_summary_budget(m, b.per_turn)}, or raise compact_budget."
-            )
-        peak = m + b.summary_request_len + k
-        if peak > b.window:
-            raise BudgetError(
-                f"a compacted conversation is largest at the moment it is summarised: "
-                f"compact_budget={m} + the summary request ({b.summary_request_len} tokens) "
-                f"+ compact_summary_budget={k} = {peak} tokens, against a window of "
-                f"max_prompt_length={b.prompt_len} + max_response_length={b.response_len} "
-                f"= {b.window}. That conversation is one training row, so it has to fit."
-            )
+        _check_compact(b)
+
+
+def _check_compact(b: Budgets) -> None:
+    m, k = b.compact_budget, b.summary_budget
+    if not m or m <= 0:
+        raise BudgetError("trainer.harness=compact needs a positive trainer.compact_budget")
+    if not k or k <= 0:
+        raise BudgetError("trainer.harness=compact needs a positive trainer.compact_summary_budget")
+    if k > b.per_turn:
+        raise BudgetError(
+            f"trainer.compact_summary_budget={k} exceeds "
+            f"response_length_per_turn={b.per_turn}: the summary is a generation like any "
+            f"other and cannot be longer than one."
+        )
+    if 2 * k > m:
+        raise BudgetError(
+            f"trainer.compact_summary_budget={k} is more than half of "
+            f"trainer.compact_budget={m}. A summary that long buys no turns: the next "
+            f"conversation opens near the budget, summarises again after one turn, and every "
+            f"environment step costs two generations and a summary of a single turn -- a "
+            f"more expensive no_concat."
+        )
+
+    _, highest = compact_budget_bounds(b)
+    if m > highest:
+        peak = m + b.env_response + b.per_turn + b.summary_request_len + k
+        raise BudgetError(
+            f"a compacted conversation is largest at the moment it is summarised. The "
+            f"trigger fires on a measured turn cost, so compact_budget={m} can be reached "
+            f"and then overshot by one more turn (env_response_length={b.env_response} + "
+            f"response_length_per_turn={b.per_turn}) before the summary request "
+            f"({b.summary_request_len}) and the summary ({k}) go on top: {peak} tokens "
+            f"against a window of {b.window} ({b.window_name}). That conversation is one "
+            f"training row, so it has to fit -- compact_budget must be at most {highest}."
+        )
+
+
+def _need(b: Budgets, tokens: int, what: str, breakdown: str) -> None:
+    """One conversation of ``tokens`` has to fit the hard window."""
+    if tokens > b.window:
+        raise BudgetError(
+            f"{what} needs {tokens} tokens ({breakdown}), against a window of {b.window} "
+            f"({b.window_name})."
+        )
+
+
+def context_limits(mode: str, b: Budgets) -> tuple[int, int]:
+    """``(opening, continuation)``: the most context one call may add, enforced live.
+
+    Context is everything the model is given that it did not generate -- system prompt,
+    observation, summary -- measured after the processor has expanded image placeholders,
+    since a frame costs hundreds of tokens and counting it as one would make the check
+    decorative.
+
+    The two differ because the calls do. A call that opens a conversation becomes that
+    row's prompt region and is bounded by ``n_p``; a call that continues one appends to
+    the response region, which already has to hold every generation in the episode. This
+    is where ``S`` is finally charged: the opening ceiling is the only check that sees the
+    system prompt, because it is the first thing to have measured it.
+
+    Compaction bounds its openings by ``m`` as well, which is stricter and is the point --
+    a conversation that opens at the budget summarises after one turn.
+    """
+    opening = b.prompt_len
+    if mode == "compact" and b.compact_budget:
+        opening = min(opening, b.compact_budget)
+    if mode == "compact":
+        continuation = b.compact_budget or b.response_len
+    elif mode == "concat":
+        continuation = b.env_response
+    else:
+        continuation = opening
+    return opening, continuation

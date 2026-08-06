@@ -55,7 +55,9 @@ class CompactHarness(BaseHarness):
     when training, the provider's reported prompt size when evaluating. The two will not
     agree exactly, so log where it actually triggers.
 
-    ``summary_budget`` bounds the summary itself. Without one it generated against the
+    The trigger fires on "another turn would not fit" rather than "we are already over",
+    against a turn cost it measures as the episode goes. ``summary_budget`` bounds the
+    summary itself. Without one it generated against the
     turn budget, which at ``budget=400`` and a turn budget of 8000 let the summary be
     twenty times the thing it was compressing into -- fine for as long as the model
     happened to write short ones. See ``vagen/harness/budget.py`` for the arithmetic
@@ -68,6 +70,16 @@ class CompactHarness(BaseHarness):
         super().__init__(**cfg)
         self.budget = budget
         self.summary_budget = summary_budget
+        # What one more turn will cost, measured. The trigger fires before the turn it is
+        # deciding about, so without this a conversation waved through at budget-1 still
+        # grows by a whole turn before anyone looks again and the budget bounds nothing.
+        #
+        # Measured and not the configured ceiling: on Sokoban the ceiling is 512 and a
+        # real turn is about 80, so charging the ceiling fires after the first turn of
+        # every conversation and compaction becomes no_concat with a summary attached.
+        # The largest continuation seen this episode, which is 0 until there is one --
+        # the first turn of the first conversation cannot be predicted from nothing.
+        self.turn_cost = 0
         self._used = 0
         self._awaiting_summary = False
         self._summary: str | None = None
@@ -75,6 +87,12 @@ class CompactHarness(BaseHarness):
         self._short_streak = 0
 
     def note_usage(self, used: int) -> None:
+        # A continuation's growth is exactly one turn: the observation that was sent with
+        # it plus the response. An opening call also carries the system prompt, and a
+        # summary call carries the request and the summary, so neither is a turn and
+        # neither may inform the estimate.
+        if self._conversation_id is not None and not self._awaiting_summary:
+            self.turn_cost = max(self.turn_cost, used - self._used)
         self._used = used
 
     def next_call(self) -> Call:
@@ -88,7 +106,7 @@ class CompactHarness(BaseHarness):
             summary, self._summary = self._summary, None
             return Call([self._system, _with_summary(summary, self._msgs[-1])], None)
 
-        if self._conversation_id is not None and self._used >= self.budget:
+        if self._conversation_id is not None and self._used + self.turn_cost >= self.budget:
             self._short_streak = self._short_streak + 1 if self._turns_here <= 1 else 0
             if self._short_streak >= 2:
                 # One turn per conversation is not compaction, it is no_concat at twice

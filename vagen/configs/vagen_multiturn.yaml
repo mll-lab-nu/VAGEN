@@ -89,7 +89,12 @@ trainer:
   # Context policy. Defaults to concat_multi_turn when unset, so existing scripts
   # select the same layout as before.
   harness: null                    # concat | no_concat | compact
-  compact_budget: 4000             # tokens before CompactHarness summarises and restarts
+  # The largest a conversation may become before CompactHarness summarises and restarts.
+  # It has to hold the system prompt, which is re-sent every time a conversation opens,
+  # plus a summary and more than one turn -- on Sokoban the system prompt alone is 589
+  # tokens, so 400 (which this ran with) could not fit an opening call, let alone a turn.
+  # See vagen/harness/budget.py; the checks there refuse the ones that cannot work.
+  compact_budget: 4000
   # How long the summary itself may be. null derives it as compact_budget/4, which is
   # what keeps compaction worth doing: the summary has to fit inside the budget it is
   # compressing into and still leave room for the turns it exists to buy. Left to the
