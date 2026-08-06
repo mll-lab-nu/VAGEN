@@ -15,6 +15,16 @@ import re
 import warnings
 from typing import Optional, Union
 
+class ImagePlaceholderMismatch(ValueError):
+    """Frames and placeholder runs disagree.
+
+    Raised rather than rendered around, because the same two things build
+    ``multi_modal_inputs`` for the forward pass. A count that is wrong here is wrong
+    there, and there it is silent -- the model attends to a picture it was never given,
+    or to none, and the loss stays finite.
+    """
+
+
 # Attributes a processor may expose its image placeholder under, most specific first.
 _TOKEN_ATTRS = ("image_token", "image_placeholder_token", "boi_token")
 
@@ -131,19 +141,17 @@ def split_on_images(token_ids, placeholders: set, tokenizer, frames) -> list[dic
     entirely, which is why the position had to be guessed before -- and guessed wrong,
     since a frame then lands after the marker that starts the model's own reply.
 
-    Frames are consumed in order. A run with no frame left, and a frame with no run to
-    replace, both become visible markers: a mismatch here means the transcript no longer
-    shows what the model was given, which is worse than an ugly line saying so.
+    Frames are consumed in order, and the counts must agree exactly. A mismatch is not a
+    display problem: the same frames and the same placeholders build ``multi_modal_inputs``
+    for the forward pass, so if they disagree here they disagree there -- which is how a
+    model ends up attending to a picture it was not given, or to none at all. It raises.
     """
     if frames and not placeholders:
-        # No adapter for this family. Say so where it will be read, once per span, rather
-        # than appending the pictures somewhere plausible and looking correct.
-        return [
-            {"text": f"[no image placeholder declared for this model; "
-                     f"see IMAGE_TOKEN_ADAPTERS. {len(frames)} frame(s) shown out of place]"},
-            *({"image": f} for f in frames),
-            {"text": tokenizer.decode(list(token_ids), skip_special_tokens=True)},
-        ]
+        raise ImagePlaceholderMismatch(
+            f"{len(frames)} frame(s) to place but no image placeholder is declared for "
+            f"this model. Add an entry to IMAGE_TOKEN_ADAPTERS saying how this family "
+            f"marks an image."
+        )
     parts: list[dict] = []
     pending = list(frames or [])
     buffer: list[int] = []
@@ -161,13 +169,19 @@ def split_on_images(token_ids, placeholders: set, tokenizer, frames) -> list[dic
             flush()
             while i < n and int(token_ids[i]) in placeholders:
                 i += 1
-            parts.append({"image": pending.pop(0)} if pending else {"text": "[image, no frame captured]"})
+            if not pending:
+                raise ImagePlaceholderMismatch(
+                    f"a placeholder run at token {i} has no frame to put in it; "
+                    f"{len(frames or [])} frame(s) were captured for this span"
+                )
+            parts.append({"image": pending.pop(0)})
             continue
         buffer.append(int(token_ids[i]))
         i += 1
     flush()
     if pending:
-        # More frames than placeholder runs: show them, and say they are out of place.
-        parts.append({"text": f"[{len(pending)} frame(s) with no placeholder in this span]"})
-        parts.extend({"image": f} for f in pending)
+        raise ImagePlaceholderMismatch(
+            f"{len(pending)} frame(s) left over with no placeholder run to occupy; "
+            f"the span has {len(frames or []) - len(pending)} run(s)"
+        )
     return parts

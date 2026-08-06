@@ -10,6 +10,7 @@ neither the prompt nor the image. It took a dead 8-step cluster job to find.
 from __future__ import annotations
 
 import pytest
+from omegaconf import OmegaConf
 
 from verl.experimental.agent_loop.agent_loop import cap_token_ids
 
@@ -19,13 +20,21 @@ def test_text_under_budget_is_untouched():
 
 
 def test_text_over_budget_keeps_the_tail_for_prompts():
-    # A prompt drops its oldest context, so the recent turns survive.
+    # verl's default, kept: trimming a dataset prompt to fit is ordinary, and the sample
+    # is still the sample afterwards.
     assert cap_token_ids([1, 2, 3, 4, 5], 2, multimodal=False, keep="tail") == [4, 5]
 
 
 def test_text_over_budget_keeps_the_head_for_responses():
     # A response is cut off at the end; its beginning is what was actually generated.
     assert cap_token_ids([1, 2, 3, 4, 5], 2, multimodal=False, keep="head") == [1, 2, 3, 4, 5][:2]
+
+
+def test_text_over_budget_can_be_made_to_raise():
+    with pytest.raises(ValueError, match="system prompt"):
+        cap_token_ids([1, 2, 3], 2, multimodal=False, keep="tail", on_overflow="raise")
+    with pytest.raises(ValueError, match="closing turns and their rewards"):
+        cap_token_ids([1, 2, 3], 2, multimodal=False, keep="head", on_overflow="raise")
 
 
 def test_multimodal_over_budget_raises_rather_than_slicing():
@@ -44,9 +53,15 @@ def test_the_error_names_the_knob_to_turn():
         cap_token_ids([1, 2, 3], 1, multimodal=True, what="response", budget_name="data.max_response_length")
 
 
-def test_the_loop_cuts_the_parallel_arrays_to_the_same_length():
-    """Production code, not arithmetic performed by the test. Slicing mask and logprobs
-    inside the test and then asserting they match proves only that Python slices."""
+def test_an_episode_over_the_budget_is_refused_rather_than_trained_on():
+    """Text overflow raises in the agent loop, unlike verl's default.
+
+    Truncating here does not produce a shorter version of the episode, it produces a
+    different one: the closing turns go, and the rewards earned in them go with the
+    spans that index them -- the arrays stay mutually consistent and the loss stays
+    finite, so nothing downstream can tell. The message has to name the mode, because
+    the budget is the same knob in all three and the reason it was hit never is.
+    """
     from vagen.agent_loop.gym_loop import GymLoop
 
     class _Row:
@@ -71,19 +86,31 @@ def test_the_loop_cuts_the_parallel_arrays_to_the_same_length():
 
     loop = GymLoop.__new__(GymLoop)
     loop.prompt_length, loop.response_length = 100, 3     # cap below the response
-    out = GymLoop._outputs(loop, _Client(), _Env(), _Result(),
-                           {"group_idx": "g", "traj_idx": 0}, "ep")[0]
-    n = len(out.response_ids)
-    assert n == 3
-    assert len(out.response_mask) == n, "mask outlived the ids it indexes"
-    assert len(out.response_logprobs) == n, "logprobs outlived the ids"
-    assert len(out.extra_fields["per_token_reward"]) == n, "reward vector outlived the ids"
-    # The spans index into response_ids, so they must be cut with it. Left whole, the
-    # second span (3, 5) points past a 3-token response, and the turn it describes is
-    # silently dropped by a range check further downstream.
-    assert all(e <= n for _, e in out.extra_fields["response_spans"]), (
-        f"spans point past the response: {out.extra_fields['response_spans']}"
-    )
+    loop.config = OmegaConf.create({"trainer": {"harness": "concat", "compact_budget": 400}})
+
+    with pytest.raises(ValueError) as e:
+        GymLoop._outputs(loop, _Client(), _Env(), _Result(),
+                         {"group_idx": "g", "traj_idx": 0}, "ep")
+    assert "data.max_response_length" in str(e.value), "the message does not name the knob"
+    assert "harness=concat" in str(e.value), "the message does not name the mode that overflowed"
+    assert "compact" in str(e.value), "concat's overflow does not point at the mode that fixes it"
+
+
+def test_the_overflow_hint_differs_by_mode():
+    """One message for all three modes would send you to raise a number every time."""
+    from vagen.agent_loop.gym_loop import GymLoop
+
+    def hint(trainer):
+        loop = GymLoop.__new__(GymLoop)
+        loop.config = OmegaConf.create({"trainer": trainer})
+        return GymLoop._overflow_hint(loop)
+
+    assert "switch trainer.harness to compact" in hint({"harness": "concat"})
+    assert "compact_budget=400" in hint({"harness": "compact", "compact_budget": 400})
+    assert "single" in hint({"harness": "no_concat"})
+    # Unset harness follows the legacy flag rather than reporting no mode at all.
+    assert "harness=concat" in hint({"harness": None, "concat_multi_turn": True})
+    assert "harness=no_concat" in hint({"harness": None, "concat_multi_turn": False})
 
 
 def test_gym_loop_defers_to_the_guard_rather_than_slicing():

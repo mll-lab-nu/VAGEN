@@ -60,13 +60,13 @@ def test_the_vector_is_published_not_only_its_sum():
     assert out.reward_score == 3.0, "the scalar is still needed for verl's own metrics"
 
 
-def test_the_vector_is_capped_with_the_response_it_indexes():
-    """A score at position 9 of a response truncated to 4 indexes nothing."""
+def test_the_scalar_is_the_sum_of_the_vector_that_trains():
+    """verl's metrics read the scalar and the loss reads the vector, so a run whose
+    reported reward and actual reward disagree looks healthy from the outside."""
     from vagen.agent_loop.gym_loop import GymLoop
 
     loop = GymLoop.__new__(GymLoop)
-    loop.prompt_length = 100
-    loop.response_length = 2          # cap below the response length
+    loop.prompt_length, loop.response_length = 100, 100     # both fit
     out = GymLoop._outputs(loop, _Client(), _Env(), _Result(),
                            {"group_idx": "g", "traj_idx": 0}, "ep")[0]
     assert len(out.extra_fields["per_token_reward"]) == len(out.response_ids)
