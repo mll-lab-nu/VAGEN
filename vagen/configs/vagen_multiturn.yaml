@@ -4,8 +4,12 @@
 # ============================================================================
 
 hydra:
+  # Relative, so it resolves against the working directory and only works when that is
+  # the repo root -- from anywhere else hydra reports "Could not load 'ppo_trainer'" with
+  # a search path reading `file://file:../../verl/...`. Every caller overrides it with an
+  # absolute one; this is the fallback, not the mechanism.
   searchpath:
-    - file:../../verl/verl/trainer/config  # Hydra search path pointing to verl's default config directory
+    - file:../../verl/verl/trainer/config
 
 defaults:
   - ppo_trainer    # Base PPO trainer config (actor/critic/rollout/algorithm defaults)
