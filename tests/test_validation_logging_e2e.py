@@ -113,8 +113,8 @@ def test_each_context_policy_logs_its_true_shape(monkeypatch, mode, want_turns, 
     monkeypatch.setitem(__import__("sys").modules, "wandb", _fake_wandb(sink))
     t = _Trainer(n=4)
     t._maybe_log_val_generations(*_merged_validation_batch(mode)[:3],
-                                 images=_merged_validation_batch(mode)[3],
-                                 extras=_merged_validation_batch(mode)[4])
+                                 extras={**_merged_validation_batch(mode)[4],
+                                          'image_data': _merged_validation_batch(mode)[3]})
     assert sink, "nothing reached wandb"
     payload, step = sink[-1]
     assert "val/episodes" in payload, f"wrong key: {list(payload)}"
@@ -130,7 +130,9 @@ def test_each_context_policy_logs_its_true_shape(monkeypatch, mode, want_turns, 
         assert row[table.columns.index(f"ep{i}_reward")] is not None, f"{mode}: reward missing"
         assert row[table.columns.index(f"ep{i}_success")] is not None, f"{mode}: verdict missing"
     html = row[table.columns.index("ep0_html")]
-    assert html.count(">assistant<") == want_turns, f"{mode}: expected {want_turns} turns"
+    for k in range(want_turns):
+        assert f"turn {k}" in html or f"Up</answer> turn {k}" in html, (
+            f"{mode}: turn {k} missing from the transcript")
     assert html.count("<b>conversation") == want_convs, f"{mode}: expected {want_convs} conversations"
 
 
@@ -139,7 +141,7 @@ def test_the_sample_is_balanced_and_carries_frames(monkeypatch):
     monkeypatch.setitem(__import__("sys").modules, "wandb", _fake_wandb(sink))
     t = _Trainer(n=4)
     i, o, s, im, ex = _merged_validation_batch("concat", n_episodes=8)
-    t._maybe_log_val_generations(i, o, s, images=im, extras=ex)
+    t._maybe_log_val_generations(i, o, s, extras={**ex, 'image_data': im})
     table = sink[-1][0]["val/episodes"]
     n_ep = (len(table.columns) - 1) // len(_PER_EPISODE)
     row = table.data[0]

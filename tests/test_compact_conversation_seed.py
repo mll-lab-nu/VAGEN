@@ -79,5 +79,20 @@ def test_it_is_one_user_turn_not_two():
 def test_multimodal_content_keeps_its_parts_in_order():
     msg = _with_summary("SUM", {"role": "user",
                                 "content": [{"type": "image"}, {"type": "text", "text": "OBS"}]})
-    assert msg["content"][0] == {"type": "text", "text": "SUM"}
+    assert msg["content"][0] == {"type": "text", "text": "SUM\n\n"}
     assert msg["content"][1:] == [{"type": "image"}, {"type": "text", "text": "OBS"}]
+
+
+def test_the_summary_does_not_run_into_the_observation():
+    """A chat template joins the parts of a content list with nothing between them, so a
+    separator added only for string content leaves
+    '...align it with the target.After your answer, the extracted valid action is...'
+    -- no boundary at all between the story so far and where the agent now is."""
+    for content in ("PLAIN-OBS", [{"type": "image"}, {"type": "text", "text": "PART-OBS"}]):
+        msg = _with_summary("THE SUMMARY", {"role": "user", "content": content})
+        rendered = (
+            msg["content"] if isinstance(msg["content"], str)
+            else "".join(p.get("text", "") for p in msg["content"])
+        )
+        assert "THE SUMMARY\n\n" in rendered, f"no blank line for {type(content).__name__}"
+        assert "SUMMARYAfter" not in rendered and "SUMMARYPART" not in rendered

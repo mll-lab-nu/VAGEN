@@ -18,11 +18,17 @@ def _with_summary(summary: str, observation: Msg) -> Msg:
     The observation, not an initial observation: the environment resets once per episode,
     so every conversation after the first opens on whatever the last ``step`` returned.
     """
+    # The blank line is part of the summary text, not something the caller adds. A parts
+    # list is concatenated by the chat template with nothing between the parts, so
+    # separating them only in the string branch produced
+    # "...align it with the target.After your answer, the extracted valid action is..."
+    # -- the summary running straight into the observation with no boundary at all.
+    body = f"{summary}\n\n"
     content = observation.get("content")
     if isinstance(content, str):
-        merged = f"{summary}\n\n{content}"
+        merged = f"{body}{content}"
     elif isinstance(content, list):
-        merged = [{"type": "text", "text": summary}, *content]
+        merged = [{"type": "text", "text": body}, *content]
     else:
         merged = summary
     return {**observation, "role": "user", "content": merged}

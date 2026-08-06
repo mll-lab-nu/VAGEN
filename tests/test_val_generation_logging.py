@@ -43,8 +43,8 @@ class _Base:
     def __init__(self):
         self.base_calls = []
 
-    def _maybe_log_val_generations(self, inputs, outputs, scores, images=None, extras=None):
-        self.base_calls.append((inputs, outputs, scores, images))
+    def _maybe_log_val_generations(self, inputs, outputs, scores, extras=None):
+        self.base_calls.append((inputs, outputs, scores, (extras or {}).get('image_data')))
 
 
 class _Trainer(VagenV0Mixin, _Base):
@@ -84,7 +84,7 @@ def _episode_batch(n_episodes=3, turns_per=2):
 def test_calls_are_regrouped_into_episodes():
     t = _Trainer(log_val_generations=10)
     i, o, s, im, ex = _episode_batch(n_episodes=3, turns_per=2)
-    t._maybe_log_val_generations(i, o, s, images=im, extras=ex)
+    t._maybe_log_val_generations(i, o, s, extras={**ex, 'image_data': im})
 
     assert len(t._vagen_val_logger.episode_calls) == 1
     _, episodes, step = t._vagen_val_logger.episode_calls[0]
@@ -96,7 +96,7 @@ def test_calls_are_regrouped_into_episodes():
 def test_both_turns_of_an_episode_are_in_its_cell():
     t = _Trainer(log_val_generations=10)
     i, o, s, im, ex = _episode_batch(n_episodes=1, turns_per=3)
-    t._maybe_log_val_generations(i, o, s, images=im, extras=ex)
+    t._maybe_log_val_generations(i, o, s, extras={**ex, 'image_data': im})
     (_, episodes, _) = t._vagen_val_logger.episode_calls[0]
     html = episodes[0]["html"]
     for turn in range(3):
@@ -106,7 +106,7 @@ def test_both_turns_of_an_episode_are_in_its_cell():
 def test_it_honours_the_requested_count():
     t = _Trainer(log_val_generations=2)
     i, o, s, im, ex = _episode_batch(n_episodes=5, turns_per=2)
-    t._maybe_log_val_generations(i, o, s, images=im, extras=ex)
+    t._maybe_log_val_generations(i, o, s, extras={**ex, 'image_data': im})
     (_, episodes, _) = t._vagen_val_logger.episode_calls[0]
     assert len(episodes) == 2
 
@@ -115,7 +115,7 @@ def test_zero_means_off():
     """A table of full transcripts every step is expensive; the switch has to gate."""
     t = _Trainer(log_val_generations=0)
     i, o, s, im, ex = _episode_batch()
-    t._maybe_log_val_generations(i, o, s, images=im, extras=ex)
+    t._maybe_log_val_generations(i, o, s, extras={**ex, 'image_data': im})
     assert t._vagen_val_logger.episode_calls == []
     assert t._vagen_val_logger.calls == []
     assert t.base_calls == []
@@ -124,7 +124,7 @@ def test_zero_means_off():
 def test_without_episode_ids_it_falls_back_to_verls_table():
     """A text-only loop publishes no ids, and must not lose its table."""
     t = _Trainer()
-    t._maybe_log_val_generations(["a"], ["b"], [1.0], images=[None], extras={})
+    t._maybe_log_val_generations(["a"], ["b"], [1.0], extras={"image_data": [None]})
     assert t._vagen_val_logger.episode_calls == []
     assert len(t.base_calls) == 1
 
@@ -137,20 +137,22 @@ def test_upstream_collects_and_forwards_what_regrouping_needs():
     """
     import inspect
 
-    from verl.trainer.ppo.ray_trainer import EXTRA_LOG_COLUMNS, RayPPOTrainer
+    from verl.trainer.ppo.ray_trainer import RayPPOTrainer
 
-    for col in ("group_idx", "traj_idx", "turn_idx", "conversation_id"):
-        assert col in EXTRA_LOG_COLUMNS, f"{col} no longer collected"
+    from vagen.trainer.mixin import VagenV0Mixin
+
+    for col in ("image_data", "group_idx", "traj_idx", "turn_idx", "conversation_id"):
+        assert col in VagenV0Mixin.val_log_columns, f"{col} no longer requested"
 
     src = inspect.getsource(RayPPOTrainer._validate)
-    assert 'non_tensor_batch.get("image_data")' in src, "_validate no longer collects frames"
-    assert "extras=" in src, "_validate no longer forwards the episode columns"
+    assert "self.val_log_columns" in src, "_validate no longer honours the column list"
+    assert "extras=" in src, "_validate no longer forwards the columns"
     assert "sample_extras" in src and "reward_extra_infos_dict}" in src, (
-        "_validate no longer forwards both the episode columns and the env's own metrics"
+        "_validate no longer forwards both the requested columns and the env's metrics"
     )
 
     sig = inspect.signature(RayPPOTrainer._maybe_log_val_generations)
-    assert "images" in sig.parameters and "extras" in sig.parameters
+    assert "extras" in sig.parameters
 
 
 def test_the_agent_loop_publishes_the_columns_the_logger_regroups_on():
@@ -170,7 +172,7 @@ def test_the_environments_verdict_reaches_the_table():
     t = _Trainer(log_val_generations=10)
     i, o, s_, im, ex = _episode_batch(n_episodes=2, turns_per=2)
     ex["traj_success"] = [0.0, 1.0, 0.0, 1.0]
-    t._maybe_log_val_generations(i, o, s_, images=im, extras=ex)
+    t._maybe_log_val_generations(i, o, s_, extras={**ex, 'image_data': im})
     (_, episodes, _) = t._vagen_val_logger.episode_calls[0]
     assert {e["success"] for e in episodes} == {0.0, 1.0}, "verdict lost between upstream and the table"
 
@@ -182,7 +184,7 @@ def test_a_column_of_nones_does_not_shadow_a_good_one():
     t = _Trainer(log_val_generations=4)
     i, o, s, im, ex = _episode_batch(n_episodes=2, turns_per=2)
     ex["episode_id"] = [None] * len(o)      # absent, as after a merge that dropped it
-    t._maybe_log_val_generations(i, o, s, images=im, extras=ex)
+    t._maybe_log_val_generations(i, o, s, extras={**ex, 'image_data': im})
     assert t._vagen_val_logger.episode_calls, "fell back despite group_idx being present"
     assert t.base_calls == []
 
@@ -192,7 +194,7 @@ def test_episode_id_is_preferred_when_present():
     i, o, s, im, ex = _episode_batch(n_episodes=2, turns_per=2)
     ex["episode_id"] = [f"ep{j % 2}" for j in range(len(o))]
     ex["group_idx"] = [None] * len(o)
-    t._maybe_log_val_generations(i, o, s, images=im, extras=ex)
+    t._maybe_log_val_generations(i, o, s, extras={**ex, 'image_data': im})
     assert t._vagen_val_logger.episode_calls, "episode_id alone was not enough"
 
 
@@ -201,6 +203,21 @@ def test_with_neither_it_still_falls_back():
     i, o, s, im, ex = _episode_batch(n_episodes=2, turns_per=2)
     ex["episode_id"] = [None] * len(o)
     ex["group_idx"] = [None] * len(o)
-    t._maybe_log_val_generations(i, o, s, images=im, extras=ex)
+    t._maybe_log_val_generations(i, o, s, extras={**ex, 'image_data': im})
     assert t._vagen_val_logger.episode_calls == []
     assert len(t.base_calls) == 1
+
+
+def test_the_diagnostic_reports_on_columns_that_exist():
+    """It exists to catch a dropped column. Naming one that was renamed makes it report
+    a permanent false alarm, which is worse than not reporting."""
+    from vagen.trainer.mixin import VagenV0Mixin
+    from vagen.utils.episode_log import describe_columns
+
+    line = describe_columns({}, 4)
+    for key in line.replace("=", " ").split():
+        if "/" in key:
+            continue
+        assert key in VagenV0Mixin.val_log_columns, (
+            f"the diagnostic reports on {key!r}, which is not a column we request"
+        )
