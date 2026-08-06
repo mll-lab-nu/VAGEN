@@ -82,6 +82,30 @@ class TrajectoryView:
         key = np.stack([group, traj, turn], axis=1)
         uniq_key, first_idx, inverse = np.unique(key, axis=0, return_index=True, return_inverse=True)
 
+        # Rows sharing (group, traj, turn) are deduplicated: np.unique keeps the first
+        # and the rest inherit its advantages and returns. That is right for the copies
+        # `pad_dataproto_to_divisor` appends, which are identical to what they duplicate.
+        # It is wrong for rows that merely collide -- a loop that stopped emitting
+        # turn_idx collapses every row onto turn 0 -- because then a row is handed an
+        # advantage computed for a different response, on a mask that marks different
+        # positions. The two are distinguishable: real copies agree on the mask.
+        if len(uniq_key) != len(key):
+            m = response_mask.to(torch.bool)
+            for i, first in enumerate(first_idx):
+                same = np.flatnonzero(inverse == i)
+                if len(same) > 1 and not bool(
+                    m.index_select(0, torch.as_tensor(same.astype(np.int64),
+                                                      dtype=torch.long, device=device))
+                    .eq(m[int(first)]).all()
+                ):
+                    raise ValueError(
+                        f"{len(same)} rows share the key {tuple(uniq_key[i].tolist())} "
+                        f"(group_idx, traj_idx, turn_idx) but have different response "
+                        f"masks, so they are distinct turns rather than padding copies. "
+                        f"Deduplicating would give them one row's advantages. Check that "
+                        f"the agent loop emits a distinct turn_idx per row."
+                    )
+
         rows = torch.as_tensor(first_idx.astype(np.int64), dtype=torch.long, device=device)
         mask = response_mask.to(torch.bool).index_select(0, rows)
 
