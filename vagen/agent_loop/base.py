@@ -21,7 +21,6 @@ from verl.experimental.agent_loop.agent_loop import AgentLoopBase
 _ENV_CLASS_CACHE: dict[str, type] = {}
 
 # (id(processing_class), chat-template kwargs) -> (processing_class, prefix token ids)
-_SYSTEM_PREFIX_CACHE: dict[tuple[int, str], tuple[Any, list[int]]] = {}
 
 
 class VagenGymAgentLoopBase(AgentLoopBase):
@@ -44,30 +43,3 @@ class VagenGymAgentLoopBase(AgentLoopBase):
             _ENV_CLASS_CACHE[env_name] = getattr(importlib.import_module(module_path), class_name)
         return _ENV_CLASS_CACHE[env_name]
 
-    def system_prompt_prefix_ids(self) -> list[int]:
-        """Token ids a system message contributes before its own content.
-
-        Used to strip the system turn back off a rendered prompt. Distinct from the
-        base class's ``system_prompt``, which is the prefix a template inserts on its
-        own; this one is the wrapper around an explicit system-role message.
-        """
-        processing_class = self.processor if self.processor is not None else self.tokenizer
-        key = (id(processing_class), repr(sorted(self.apply_chat_template_kwargs.items())))
-        if key not in _SYSTEM_PREFIX_CACHE:
-            _SYSTEM_PREFIX_CACHE[key] = (processing_class, self._render_system_prompt_prefix())
-        return _SYSTEM_PREFIX_CACHE[key][1]
-
-    def _render_system_prompt_prefix(self) -> list[int]:
-        placeholder = [{"role": "system", "content": "placeholder"}]
-        if self.processor is not None:
-            text = self.processor.apply_chat_template(
-                placeholder, add_generation_prompt=False, tokenize=False, **self.apply_chat_template_kwargs
-            )
-            return self.processor(text=[text], return_tensors="pt")["input_ids"].squeeze(0).tolist()
-        return self.tokenizer.apply_chat_template(
-            placeholder,
-            add_generation_prompt=False,
-            tokenize=True,
-            return_dict=False,
-            **self.apply_chat_template_kwargs,
-        )

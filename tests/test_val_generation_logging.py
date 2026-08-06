@@ -26,7 +26,6 @@ class _Recorder:
     """Stands in for EpisodeTableLogger: renders in-process, records what it would log."""
 
     def __init__(self):
-        self.calls = []
         self.episode_calls = []
 
     def submit(self, rows, n, step, strategy="balanced", success_ratio=0.5):
@@ -117,7 +116,6 @@ def test_zero_means_off():
     i, o, s, im, ex = _episode_batch()
     t._maybe_log_val_generations(i, o, s, extras={**ex, 'image_data': im})
     assert t._vagen_val_logger.episode_calls == []
-    assert t._vagen_val_logger.calls == []
     assert t.base_calls == []
 
 

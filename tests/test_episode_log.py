@@ -339,21 +339,24 @@ def test_an_absent_observation_prints_no_empty_user_block():
     assert h.count("<div>") == 2, "an empty block was rendered"
 
 
-def test_the_dangling_generation_cue_is_not_shown():
-    """A rendered user turn ends with the template's "assistant" marker -- an instruction
-    to the decoder, not something anyone said. Left in, every user block appears to end
-    by speaking as the assistant, and the frame that closes the turn then reads as the
-    assistant's rather than as what the assistant was shown."""
+def test_the_generation_cue_is_kept_and_the_frame_goes_before_it():
+    """The cue is real tokens in the training sequence, carried at mask 0, and this view
+    exists to show what was trained on -- so it is not removed. It is only used to place
+    the frame: the picture is part of what the model was shown, so it belongs before the
+    marker where the model's own writing starts.
+
+    Deleting it instead was the wrong fix: making the picture look right by hiding part
+    of the sequence."""
     h = episode_html([{"conversations": [{
         "conversation_id": 0,
         "prompt": "system\nrules\nuser\n[obs]\n\nassistant",
-        "prompt_image": None,
+        "prompt_image": _frame(),
         "turns": [{"turn_id": 0, "response": "<answer>Up</answer>",
                    "observation": "user\nnext obs\n\nassistant",
-                   "observation_image": None}],
+                   "observation_image": _frame((5, 5, 5))}],
     }]}])
     assert "[obs]" in h and "next obs" in h
-    assert "\nassistant" not in h and ">assistant<" not in h
+    assert h.count("assistant") == 2, "the decoder cue was removed from the transcript"
 
 
 def test_the_frame_closes_the_user_turn_and_precedes_the_response():
@@ -370,10 +373,18 @@ def test_the_frame_closes_the_user_turn_and_precedes_the_response():
     assert h.index("OBSERVATION") < h.rindex("base64,") < h.index("RESPONSE-ONE")
 
 
-def test_a_response_that_happens_to_end_in_the_word_assistant_is_kept():
-    """The trim is for the cue at the end of a rendered turn, not for the word."""
+def test_a_block_with_no_frame_is_left_whole():
+    """The split exists only to place a frame. With none, nothing is rearranged."""
     h = episode_html([{"conversations": [{
         "conversation_id": 0, "prompt": "p", "prompt_image": None,
         "turns": [{"turn_id": 0, "response": "I am the assistant here, and I act",
                    "observation": "", "observation_image": None}]}]}])
     assert "I am the assistant here, and I act" in h
+
+
+def test_best_does_not_rank_the_unscored_first():
+    """`reverse=True` flips every component of the sort key, including "has no reward"."""
+    eps = [dict(_ep("a", 1.0), reward=1.0), dict(_ep("b", 1.0), reward=5.0),
+           dict(_ep("c", 0.0), reward=None)]
+    assert [e["episode"] for e in select_episodes(eps, 2, "best")] == ["b", "a"]
+    assert [e["episode"] for e in select_episodes(eps, 2, "worst")] == ["a", "b"]

@@ -44,17 +44,46 @@ def test_the_error_names_the_knob_to_turn():
         cap_token_ids([1, 2, 3], 1, multimodal=True, what="response", budget_name="data.max_response_length")
 
 
-def test_response_arrays_stay_aligned_when_a_text_response_is_capped():
-    """The mask and logprobs must be cut to the same length as the ids.
+def test_the_loop_cuts_the_parallel_arrays_to_the_same_length():
+    """Production code, not arithmetic performed by the test. Slicing mask and logprobs
+    inside the test and then asserting they match proves only that Python slices."""
+    from vagen.agent_loop.gym_loop import GymLoop
 
-    Slicing the ids by the budget but the mask by a stale length is the same class of
-    bug one layer down: both are well-formed, and the loss stays finite while the mask
-    no longer describes the tokens it is applied to.
-    """
-    ids, mask, logprobs = [1, 2, 3, 4, 5], [1, 1, 0, 1, 1], [0.1, 0.2, 0.3, 0.4, 0.5]
-    kept = cap_token_ids(ids, 3, multimodal=False, keep="head", what="response")
-    n = len(kept)
-    assert (kept, mask[:n], logprobs[:n]) == ([1, 2, 3], [1, 1, 0], [0.1, 0.2, 0.3])
+    class _Row:
+        conversation_id = "c"
+        prompt_ids = [1, 2]
+        response_ids = [10, 11, 12, 13, 14]
+        response_mask = [1, 1, 0, 1, 1]
+        logprobs = [0.1, 0.2, 0.3, 0.4, 0.5]
+        scores = [0.0, 1.0, 0.0, 2.0, 0.0]
+        response_spans = [(0, 2), (3, 5)]
+
+    class _Client:
+        def rows(self): return [_Row()]
+        def images(self, cid): return []
+
+    class _Env:
+        success = False
+        state_scores = {}
+
+    class _Result:
+        turns = 2
+
+    loop = GymLoop.__new__(GymLoop)
+    loop.prompt_length, loop.response_length = 100, 3     # cap below the response
+    out = GymLoop._outputs(loop, _Client(), _Env(), _Result(),
+                           {"group_idx": "g", "traj_idx": 0}, "ep")[0]
+    n = len(out.response_ids)
+    assert n == 3
+    assert len(out.response_mask) == n, "mask outlived the ids it indexes"
+    assert len(out.response_logprobs) == n, "logprobs outlived the ids"
+    assert len(out.extra_fields["per_token_reward"]) == n, "reward vector outlived the ids"
+    # The spans index into response_ids, so they must be cut with it. Left whole, the
+    # second span (3, 5) points past a 3-token response, and the turn it describes is
+    # silently dropped by a range check further downstream.
+    assert all(e <= n for _, e in out.extra_fields["response_spans"]), (
+        f"spans point past the response: {out.extra_fields['response_spans']}"
+    )
 
 
 def test_gym_loop_defers_to_the_guard_rather_than_slicing():

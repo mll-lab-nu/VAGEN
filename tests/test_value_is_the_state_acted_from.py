@@ -82,16 +82,44 @@ def test_both_extraction_paths_keep_the_shift():
     )
 
 
-def test_the_turn_estimator_anchors_at_the_first_token_of_the_turn():
-    """The other half of the contract: the shift only gives V(s_t) if we read the turn's
-    FIRST position. Anchoring at the last would give the state after the turn was
-    written -- a bug this repo has had before."""
-    import inspect
+def test_the_turn_estimator_reads_the_value_at_the_turn_start():
+    """Behavioural, because the source-scanning version could not tell the two apart:
+    a version anchoring at the LAST token of a turn also contains "start" and "gather".
 
-    from vagen.custom_advantage import trajectory_algos
+    Two turns in one row with distinct values. The turn's value must be the one at the
+    position it begins, not the one where it ends.
+    """
+    import numpy as np
 
-    src = inspect.getsource(trajectory_algos.compute_traj_turn_gae)
-    assert "start" in src, "the turn estimator no longer refers to a turn start"
-    # A turn's value is gathered at its start; anchoring at the end would read the state
-    # after the turn was written, which this repo has shipped before.
-    assert "gather" in src and "start" in src
+    from vagen.custom_advantage.trajectory_algos import compute_traj_turn_gae
+
+    width = 6
+    # turn 0 covers 0..1, turn 1 covers 3..5 (a gap marks the boundary)
+    mask = torch.tensor([[1, 1, 0, 1, 1, 1]], dtype=torch.float32)
+    values = torch.tensor([[10.0, 99.0, 0.0, 20.0, 99.0, 99.0]])
+    scores = torch.zeros(1, width)
+    scores[0, 1] = 1.0      # turn 0 earns 1
+    scores[0, 5] = 1.0      # turn 1 earns 1
+
+    batch = {"token_level_scores": scores, "responses": torch.zeros(1, width, dtype=torch.long),
+             "response_mask": mask, "values": values}
+    nt = {"group_idx": np.array(["g"], dtype=object),
+          "traj_idx": np.array([0], dtype=object),
+          "turn_idx": np.array([0], dtype=object)}
+
+    adv, ret = compute_traj_turn_gae(batch=batch, non_tensor_batch=nt,
+                                     config=type("C", (), {"gamma": 1.0, "lam": 1.0})())
+
+    # Real returns sit only at anchors; everywhere else carries the sentinel that says
+    # "no supervision here".
+    from vagen.custom_advantage.trajectory_algos import IGNORE_RETURN
+
+    anchors = (ret[0] != IGNORE_RETURN).nonzero().flatten().tolist()
+    assert anchors == [0, 3], (
+        f"returns are anchored at {anchors}, not at the turn starts [0, 3]"
+    )
+    # The 99.0 values sit at the turns' last positions. If those were read, they would
+    # dominate the returns -- which is how an end-of-turn anchor shows up.
+    assert ret[0][anchors].abs().max().item() < 50.0, (
+        f"an end-of-turn value leaked in: {ret[0].tolist()}"
+    )

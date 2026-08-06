@@ -36,6 +36,16 @@ logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
 STATE_REWARD_SPECS = {"Sokoban": sokoban_spec.SPEC}
 
 
+def _spans_within(spans, keep: int) -> list[tuple[int, int]]:
+    """The response spans that survive a truncation to ``keep`` tokens, clipped to it."""
+    out = []
+    for start, end in spans or ():
+        if start >= keep:
+            break
+        out.append((int(start), min(int(end), keep)))
+    return out
+
+
 def _accepts_response(step) -> bool:
     """Whether an env's ``step`` wants the response tokens and the tokenizer."""
     try:
@@ -270,8 +280,11 @@ class GymLoop(VagenGymAgentLoopBase):
                         #: (start, end) per turn within this conversation, so turn ids
                         #: restart at 0 in each one rather than running on across the
                         #: episode.
-                        "response_spans": list(row.response_spans),
-                        "turns_here": len(row.response_spans),
+                        # Clipped with the response they index. Emitting them whole after
+                        # a truncation leaves spans pointing past the end, and the only
+                        # thing that noticed was a range check downstream that silently
+                        # dropped the turns they described.
+                        "response_spans": _spans_within(row.response_spans, keep),
                         # How many turns the episode actually ran. num_turns above is 1
                         # per row by construction, and in concat mode an episode is one
                         # row -- so without this the only turn count anything can see

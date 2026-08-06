@@ -89,12 +89,22 @@ def test_the_placeholder_used_to_strip_is_the_one_prepended():
     """Two copies of this turn is two chances for the strip to be the wrong length."""
     import inspect
 
+    import pathlib
+
+    # Scoped to the package, not one module: the duplicate this guards against lived in
+    # a *different* file, so scanning only verl_client could never have seen it.
+    root = pathlib.Path(verl_client_module().__file__).parent
+    hits = sum(
+        p.read_text().count('"content": "placeholder"')
+        for p in root.glob("*.py")
+    )
+    assert hits == 1, f"the placeholder turn is written out {hits} times across the package"
+
+
+def verl_client_module():
     from vagen.agent_loop import verl_client
 
-    src = inspect.getsource(verl_client)
-    assert src.count('{"role": "system", "content": "placeholder"}') == 1, (
-        "the placeholder turn is written out more than once"
-    )
+    return verl_client
 
 
 def test_the_prefix_is_rendered_the_same_way_it_is_prepended(tok):

@@ -43,7 +43,21 @@ def _fake_wandb(sink):
     })
 
 
-class _Trainer(VagenV0Mixin):
+class _Fallback:
+    """Stands in for verl's implementation, below the mixin in the MRO.
+
+    Records that it was reached rather than raising from a method nothing calls: the
+    previous version put the guard on the subclass, where it shadowed the mixin instead
+    of catching a delegation to it.
+    """
+
+    fell_back = False
+
+    def _maybe_log_val_generations(self, *a, **k):
+        type(self).fell_back = True
+
+
+class _Trainer(VagenV0Mixin, _Fallback):
     """Only what the logging path touches."""
 
     def __init__(self, n=4):
@@ -54,12 +68,7 @@ class _Trainer(VagenV0Mixin):
         self.global_steps = 5
         self._vagen_val_logger = EpisodeTableLogger(use_ray=False)
 
-    def _maybe_log_val_generations_base(self, *a, **k):
-        raise AssertionError("fell back to verl's flat table")
 
-    # what super() would resolve to
-    def __getattr__(self, name):
-        raise AttributeError(name)
 
 
 def _merged_validation_batch(mode, n_episodes=4):
@@ -115,6 +124,7 @@ def test_each_context_policy_logs_its_true_shape(monkeypatch, mode, want_turns, 
     t._maybe_log_val_generations(*_merged_validation_batch(mode)[:3],
                                  extras={**_merged_validation_batch(mode)[4],
                                           'image_data': _merged_validation_batch(mode)[3]})
+    assert not _Fallback.fell_back, "delegated to verl's flat table instead of logging episodes"
     assert sink, "nothing reached wandb"
     payload, step = sink[-1]
     assert "val/episodes" in payload, f"wrong key: {list(payload)}"
