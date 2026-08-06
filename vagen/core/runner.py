@@ -36,7 +36,10 @@ async def run_episode(env, harness, client, *, seed=None, max_turns: int = 10, *
         action = None
         while action is None:
             call = harness.next_call()
-            response = await client.send(call.messages, call.conversation_id, **send_kwargs)
+            kw = dict(send_kwargs)
+            if call.sampling_params:
+                kw["sampling_params"] = {**(kw.get("sampling_params") or {}), **call.sampling_params}
+            response = await client.send(call.messages, call.conversation_id, **kw)
             # A budget-driven harness needs to know how large the conversation has
             # grown. It receives a number, not tokens -- the count is the client's.
             if hasattr(harness, "note_usage"):

@@ -33,6 +33,11 @@ class Call:
 
     messages: list[Msg]
     conversation_id: Optional[str] = None
+    #: Overrides for this call only, merged over the episode's. A harness needs this
+    #: when one of its calls is not like the others: compaction's summary has to be
+    #: bounded by its own budget rather than by the turn budget, or it can be longer
+    #: than the conversation it is replacing.
+    sampling_params: Optional[dict] = None
 
 
 class BaseHarness(ABC):
