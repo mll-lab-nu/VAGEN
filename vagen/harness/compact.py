@@ -65,11 +65,17 @@ class CompactHarness(BaseHarness):
     """
 
     SUMMARY_REQUEST = "Summarise the conversation so far. Keep every fact needed to continue."
+    #: What the summary is wrapped in when it seeds the next conversation. Named because
+    #: the accounting has to charge it: a relation written as ``S + k + E`` is short by
+    #: whatever this costs, every time a conversation opens.
+    SUMMARY_PREFIX = "Summary so far: "
 
     def __init__(self, budget: int, summary_budget: int | None = None, **cfg):
         super().__init__(**cfg)
         self.budget = budget
         self.summary_budget = summary_budget
+        self._reset_episode_state()
+
         # What one more turn will cost, measured. The trigger fires before the turn it is
         # deciding about, so without this a conversation waved through at budget-1 still
         # grows by a whole turn before anyone looks again and the budget bounds nothing.
@@ -77,14 +83,36 @@ class CompactHarness(BaseHarness):
         # Measured and not the configured ceiling: on Sokoban the ceiling is 512 and a
         # real turn is about 80, so charging the ceiling fires after the first turn of
         # every conversation and compaction becomes no_concat with a summary attached.
-        # The largest continuation seen this episode, which is 0 until there is one --
-        # the first turn of the first conversation cannot be predicted from nothing.
-        self.turn_cost = 0
+        #
+        # The last continuation, not the largest. A maximum stops predicting and starts
+        # remembering: one response at the ceiling -- legal, it is exactly what
+        # response_length_per_turn permits -- would set the estimate for the rest of the
+        # episode, cut every later conversation off after a single turn, and kill the run
+        # claiming a budget of 1300 could not hold a turn costing 825. Being wrong low
+        # costs one turn of overshoot, which the ceilings bound anyway; being wrong high
+        # has no bound at all. Zero until there is a continuation to measure -- the first
+        # turn of the first conversation cannot be predicted from nothing.
+
+    def _reset_episode_state(self) -> None:
         self._used = 0
         self._awaiting_summary = False
         self._summary: str | None = None
         self._turns_here = 0
         self._short_streak = 0
+        self.turn_cost = 0        # see the note above __init__'s reset
+
+    def begin(self, system, init_obs) -> None:
+        """Start an episode, including the parts of the state only this class has.
+
+        The base class resets the conversation; everything counted here is per-episode
+        too. Left behind, a stale ``turn_cost`` compacts the next episode early and a
+        stale ``_turns_here`` makes its first conversation look one turn longer than it
+        is -- which reads as progress and switches off the no-progress guard exactly
+        where it is needed. Not reachable while the loop builds a harness per episode,
+        but the base class says not to depend on that.
+        """
+        self._reset_episode_state()
+        super().begin(system, init_obs)
 
     def note_usage(self, used: int) -> None:
         # A continuation's growth is exactly one turn: the observation that was sent with
@@ -92,7 +120,7 @@ class CompactHarness(BaseHarness):
         # summary call carries the request and the summary, so neither is a turn and
         # neither may inform the estimate.
         if self._conversation_id is not None and not self._awaiting_summary:
-            self.turn_cost = max(self.turn_cost, used - self._used)
+            self.turn_cost = used - self._used
         self._used = used
 
     def next_call(self) -> Call:
@@ -135,10 +163,17 @@ class CompactHarness(BaseHarness):
 
         if self._awaiting_summary:
             self._awaiting_summary = False
-            self._summary = f"Summary so far: {response.text}"
+            self._summary = f"{self.SUMMARY_PREFIX}{response.text}"
             self._conversation_id = None      # the next call opens a fresh conversation
             self._used = 0
             self._turns_here = 0
+            # The estimate is about this conversation, and there is no longer one. Carried
+            # across, a single expensive turn keeps predicting for conversations it was
+            # never part of: it cannot be corrected, because the first turn of a new
+            # conversation is an opening call and openings may not inform the estimate.
+            # One 512-token response was enough to cut the next two conversations short
+            # and kill the run.
+            self.turn_cost = 0
             return None                        # consumed: the environment does not act
         self._turns_here += 1
         return super().accept(response)

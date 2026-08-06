@@ -133,6 +133,25 @@ def image_token_ids(source) -> set:
     return ids
 
 
+def count_placeholder_runs(token_ids, placeholders: set) -> int:
+    """How many frames this span has room for: one per *run* of placeholder ids.
+
+    A caller slicing a conversation into spans needs this to hand each span its own
+    frames. Given the whole list instead, every span but the last looks like it has
+    frames left over, and ``split_on_images`` refuses -- correctly, by its own rule, for
+    a mismatch the caller invented.
+    """
+    runs, inside = 0, False
+    for tid in token_ids:
+        if int(tid) in placeholders:
+            if not inside:
+                runs += 1
+            inside = True
+        else:
+            inside = False
+    return runs
+
+
 def split_on_images(token_ids, placeholders: set, tokenizer, frames) -> list[dict]:
     """A token span as alternating text and image parts, in sequence order.
 

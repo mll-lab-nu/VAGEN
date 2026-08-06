@@ -8,7 +8,9 @@ import torch
 from tensordict import TensorDict
 from verl import DataProto
 
-from vagen.utils.image_token_utils import image_token_ids, split_on_images
+from vagen.utils.image_token_utils import (
+    count_placeholder_runs, image_token_ids, split_on_images,
+)
 
 PAD_TOKEN_ID = 0
 
@@ -193,10 +195,17 @@ def concat_val_multi_turn(
             remaining = list(frames)
 
             def take(span_ids):
-                parts = split_on_images(list(span_ids), placeholders, tokenizer, remaining)
-                used = sum(1 for part in parts if "image" in part)
-                del remaining[:used]
-                return parts
+                # Hand this span only the frames it has room for. Passing the whole
+                # remaining list made every span look like it had frames left over, and
+                # the leftover check -- which exists to catch a real placeholder/feature
+                # mismatch -- fired on the first span of any conversation whose pictures
+                # were not all in its prompt. That is every multimodal concat and compact
+                # episode, since their later frames sit in the response region.
+                span_ids = list(span_ids)
+                runs = count_placeholder_runs(span_ids, placeholders)
+                mine, del_ = remaining[:runs], remaining[runs:]
+                remaining[:] = del_
+                return split_on_images(span_ids, placeholders, tokenizer, mine)
 
             prompt_parts = take(this_prompt[p_start:])
 
