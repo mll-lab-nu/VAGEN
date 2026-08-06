@@ -58,7 +58,9 @@ def compute_gae_no_concat_advantage_return(
     # verl 0.8 hands estimators the raw containers plus the algorithm config instead
     # of the whole DataProto; gamma/lam live on that config.
     gamma, lam = config.gamma, config.lam
-    token_level_scores = batch["token_level_scores"]
+    from vagen.custom_advantage.trajectory_algos import rewards_for_advantage
+
+    token_level_scores = rewards_for_advantage(batch)
     values = batch.get("values", torch.zeros_like(token_level_scores))
     response_mask = batch["response_mask"]
     group_idx = non_tensor_batch["group_idx"]
@@ -181,7 +183,7 @@ def compute_gae_no_concat_advantage_return(
         # ------------------------------------------------------------------
         # 4) Optional whitening (unique samples only)
         # ------------------------------------------------------------------
-        advantages_u = verl_F.masked_whiten(advantages_u, mask_f)
+        advantages_u = verl_F.masked_whiten(advantages_u, mask_f) * mask_f
 
         # ------------------------------------------------------------------
         # 5) Broadcast back to full batch (including padded duplicates)
@@ -219,7 +221,9 @@ def compute_gae_no_concat_advantage_return_firsttok(
     # verl 0.8 hands estimators the raw containers plus the algorithm config instead
     # of the whole DataProto; gamma/lam live on that config.
     gamma, lam = config.gamma, config.lam
-    token_level_scores = batch["token_level_scores"]
+    from vagen.custom_advantage.trajectory_algos import rewards_for_advantage
+
+    token_level_scores = rewards_for_advantage(batch)
     values = batch.get("values", torch.zeros_like(token_level_scores))
     response_mask = batch["response_mask"]
     group_idx = non_tensor_batch["group_idx"]
@@ -332,7 +336,7 @@ def compute_gae_no_concat_advantage_return_firsttok(
         # ------------------------------------------------------------------
         # 4) Optional whitening (unique samples only)
         # ------------------------------------------------------------------
-        advantages_u = verl_F.masked_whiten(advantages_u, mask_f)
+        advantages_u = verl_F.masked_whiten(advantages_u, mask_f) * mask_f
 
         # ------------------------------------------------------------------
         # 5) Broadcast back to full batch (including padded duplicates)

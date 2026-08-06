@@ -16,6 +16,18 @@ GRPO needs no critic. Only turn-level GAE leaves positions unsupervised, which i
 
 from __future__ import annotations
 
+def rewards_for_advantage(batch) -> "torch.Tensor":
+    """The per-token reward the advantage should be built from.
+
+    ``token_level_rewards`` when it exists, ``token_level_scores`` otherwise. verl writes
+    the KL-penalised reward into the former and leaves the latter untouched, so reading
+    only the scores makes ``algorithm.use_kl_in_reward=True`` a silent no-op -- the
+    penalty is computed, stored, and never read.
+    """
+    rewards = batch.get("token_level_rewards")
+    return batch["token_level_scores"] if rewards is None else rewards
+
+
 import numpy as np
 import torch
 import verl.utils.torch_functional as verl_F
@@ -55,7 +67,7 @@ def _sequence_index(view: TrajectoryView, width: int) -> tuple[torch.Tensor, tor
 def compute_traj_token_gae(*, batch, non_tensor_batch, config=None, **kwargs):
     """Token-level GAE over a trajectory, across whatever rows it occupies."""
     gamma, lam = float(config.gamma), float(config.lam)
-    scores = batch["token_level_scores"]
+    scores = rewards_for_advantage(batch)
     values = batch.get("values", torch.zeros_like(scores))
     response_mask = batch["response_mask"]
 
@@ -104,7 +116,7 @@ def compute_traj_grpo(*, batch, non_tensor_batch, config=None, **kwargs):
     Needs no critic, so ``returns`` mirrors ``advantages`` -- verl's own GRPO does the
     same, and nothing reads ``returns`` when the critic is disabled.
     """
-    scores = batch["token_level_scores"]
+    scores = rewards_for_advantage(batch)
     response_mask = batch["response_mask"]
     norm_by_std = True if config is None else config.get("norm_adv_by_std_in_grpo", True)
 
@@ -187,7 +199,7 @@ def compute_traj_turn_gae(*, batch, non_tensor_batch, config=None, ignore_value:
     rather than assumed to be rows, so it works under either layout.
     """
     gamma, lam = float(config.gamma), float(config.lam)
-    scores = batch["token_level_scores"]
+    scores = rewards_for_advantage(batch)
     values = batch.get("values", torch.zeros_like(scores))
     response_mask = batch["response_mask"]
 
