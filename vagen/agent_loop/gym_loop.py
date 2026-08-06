@@ -196,6 +196,30 @@ class GymLoop(VagenGymAgentLoopBase):
             format_reward=float(cfg.get("format_reward", 0.1)),
         )
 
+    def _overflow_hint(self) -> str:
+        """What to change, in terms of the mode that is running.
+
+        The budget is the same knob in every mode but the reason it was hit is not, and a
+        message that only names ``max_response_length`` sends you to raise a number when
+        the answer is usually to change how the context is being kept.
+        """
+        mode = self.config.trainer.get("harness", None) or (
+            "concat" if self.config.trainer.get("concat_multi_turn", True) else "no_concat"
+        )
+        fix = {
+            "concat": "concat keeps every turn in one conversation, so the episode grows "
+                      "without bound; switch trainer.harness to compact, lower the turn "
+                      "limit, or raise the budget.",
+            "compact": f"compact should have summarised before this; "
+                       f"trainer.compact_budget={self.config.trainer.get('compact_budget')} "
+                       f"is too close to the budget to leave room for the turn that "
+                       f"crosses it, or a single turn exceeds it on its own.",
+            "no_concat": "no_concat sends one turn per conversation, so a single "
+                         "observation and response are over the budget on their own; "
+                         "shrink the observation or raise the budget.",
+        }.get(mode, "")
+        return f" Running trainer.harness={mode}: {fix}" if fix else ""
+
     def _build_harness(self):
         mode = self.config.trainer.get("harness", None)
         if mode is None:
@@ -223,14 +247,29 @@ class GymLoop(VagenGymAgentLoopBase):
             # and the model then dies in the attention on a shape that names neither.
             # verl refuses to slice a multimodal sequence; we defer to the same rule
             # rather than keeping a second, quieter policy here.
+            #
+            # Text overflows raise here too, which is not verl's default. A dataset
+            # prompt that does not fit is trimmed and the sample is still the sample;
+            # an episode that does not fit is a different episode after trimming. The
+            # window running out is precisely the condition the context policies exist
+            # to answer, so hitting it means the policy and the budget disagree -- a
+            # thing to fix, not to train through.
             mm = bool(images)
+            # Only built when it will be read: the hint asks config what mode is running,
+            # and paying for that on every row of every episode to describe a failure
+            # that almost never happens is the wrong way round.
+            over = (len(row.prompt_ids) > self.prompt_length
+                    or len(row.response_ids) > self.response_length)
+            hint = self._overflow_hint() if over else ""
             prompt_ids = cap_token_ids(
                 row.prompt_ids, self.prompt_length, multimodal=mm, keep="tail",
                 what="prompt", budget_name="data.max_prompt_length",
+                on_overflow="raise", hint=hint,
             )
             response_ids = cap_token_ids(
                 row.response_ids, self.response_length, multimodal=mm, keep="head",
                 what="response", budget_name="data.max_response_length",
+                on_overflow="raise", hint=hint,
             )
             keep = len(response_ids)
             outputs.append(
