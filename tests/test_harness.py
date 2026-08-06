@@ -106,16 +106,21 @@ def test_compaction_asks_for_a_summary_then_starts_over():
 
 def test_the_environment_never_acts_on_a_summary():
     """★ A forwarded summary would make the env step on text that is not an action, so
-    the episode would advance by a turn that never happened. Here the budget is exceeded
-    every turn, so each turn costs two calls: a summary the harness keeps, and the action
-    it forwards."""
-    h = CompactHarness(budget=1)
+    the episode would advance by a turn that never happened. The turn that trips the
+    budget costs two calls: a summary the harness keeps, and the action it forwards.
+
+    Usage grows and resets the way a real conversation's does, rather than sitting over
+    the budget forever -- pinned over it, this exercises a configuration that cannot buy
+    a single turn, which the harness now refuses outright.
+    """
+    h = CompactHarness(budget=100)
     h.begin(SYS, {"role": "user", "content": "obs0"})
     ids = iter(f"c{i}" for i in range(1, 99))
-    calls, actions = [], []
-    for t in range(3):
+    calls, actions, used = [], [], 0
+    for t in range(6):
         while True:
-            h.note_usage(99)                       # always over budget
+            used = 0 if h._conversation_id is None else used + 40
+            h.note_usage(used)
             call = h.next_call()
             calls.append(call)
             live = call.conversation_id or next(ids)
@@ -125,8 +130,8 @@ def test_the_environment_never_acts_on_a_summary():
                 break
         h.add_observation({"role": "user", "content": f"obs{t + 1}"})
 
-    assert len(actions) == 3, "every turn must still produce exactly one env action"
-    assert len(calls) > 3, "no summary call was issued, so nothing was consumed"
+    assert len(actions) == 6, "every turn must still produce exactly one env action"
+    assert len(calls) > 6, "no summary call was issued, so nothing was consumed"
 
 
 def test_the_budget_resets_after_compacting():

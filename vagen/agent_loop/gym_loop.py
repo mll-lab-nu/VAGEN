@@ -27,6 +27,8 @@ from vagen.rewards.judge import shared_judge
 from vagen.rewards.state_reward import TAGS, StateRewardWrapper
 from vagen.agent_loop.verl_client import VerlClient
 from vagen.harness import HARNESSES, build_harness
+from vagen.harness.budget import Budgets, check as check_budgets, default_summary_budget
+from vagen.harness.compact import CompactHarness
 from vagen.core.runner import run_episode
 
 logger = logging.getLogger(__file__)
@@ -139,8 +141,9 @@ class GymLoop(VagenGymAgentLoopBase):
             kwargs,
         )
 
-        harness = self._build_harness()
         per_turn = min(int(kwargs.get("response_length_per_turn") or self.response_length), self.response_length)
+        harness = self._build_harness(per_turn, max_turns,
+                                      per_turn_configured=bool(kwargs.get("response_length_per_turn")))
         client = VerlClient(
             self.server_manager,
             self.tokenizer,
@@ -203,9 +206,7 @@ class GymLoop(VagenGymAgentLoopBase):
         message that only names ``max_response_length`` sends you to raise a number when
         the answer is usually to change how the context is being kept.
         """
-        mode = self.config.trainer.get("harness", None) or (
-            "concat" if self.config.trainer.get("concat_multi_turn", True) else "no_concat"
-        )
+        mode = self._harness_mode()
         fix = {
             "concat": "concat keeps every turn in one conversation, so the episode grows "
                       "without bound; switch trainer.harness to compact, lower the turn "
@@ -220,14 +221,42 @@ class GymLoop(VagenGymAgentLoopBase):
         }.get(mode, "")
         return f" Running trainer.harness={mode}: {fix}" if fix else ""
 
-    def _build_harness(self):
-        mode = self.config.trainer.get("harness", None)
-        if mode is None:
-            # Fall back to the flag the existing scripts set, so the same run
-            # configuration selects the same layout as before.
-            mode = "concat" if self.config.trainer.get("concat_multi_turn", True) else "no_concat"
+    def _harness_mode(self) -> str:
+        return self.config.trainer.get("harness", None) or (
+            "concat" if self.config.trainer.get("concat_multi_turn", True) else "no_concat"
+        )
+
+    def _build_harness(self, per_turn: int, max_turns: int, per_turn_configured: bool = True):
+        """The policy, plus a check that the numbers it was given can produce an episode.
+
+        Checked here rather than at startup because two of them -- ``max_turns`` and the
+        per-turn budget -- come from the dataset row, so they are not known until an
+        episode is about to run. Still before the rollout: every failure it reports is
+        decidable from the numbers alone, and the alternative is a crash after the
+        generation has been paid for, or a mode that quietly degenerates into a more
+        expensive version of another one and reports nothing at all.
+        """
+        mode = self._harness_mode()
+        summary_budget = None
         if mode == "compact":
-            return build_harness(mode, budget=int(self.config.trainer.compact_budget))
+            m = int(self.config.trainer.compact_budget)
+            configured = self.config.trainer.get("compact_summary_budget", None)
+            summary_budget = int(configured) if configured else default_summary_budget(m, per_turn)
+
+        check_budgets(mode, Budgets(
+            prompt_len=self.prompt_length,
+            response_len=self.response_length,
+            per_turn=per_turn,
+            max_turns=max_turns,
+            per_turn_configured=per_turn_configured,
+            compact_budget=int(self.config.trainer.compact_budget) if mode == "compact" else None,
+            summary_budget=summary_budget,
+            summary_request_len=len(self.tokenizer.encode(CompactHarness.SUMMARY_REQUEST)),
+        ))
+
+        if mode == "compact":
+            return build_harness(mode, budget=int(self.config.trainer.compact_budget),
+                                 summary_budget=summary_budget)
         return build_harness(mode)
 
     def _outputs(self, client, env, result, kwargs, episode_id: str) -> list[AgentLoopOutput]:
