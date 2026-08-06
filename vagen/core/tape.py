@@ -106,9 +106,30 @@ class Conversation:
         delta falls on a trailing run of zeros, and the mask can be corrected without
         locating anything inside the token stream.
 
-        The assumption is asserted afterwards rather than trusted.
+        The assumption is checked against the tokens, not against a length. Comparing
+        ``len(token_ids) - len(mask)`` to ``prompt_len`` afterwards proves nothing in the
+        branch that needs proving: the correction grows the mask by exactly the delta
+        that grew the tokens, so the difference is unchanged whatever moved. A delta
+        split between the opening region and the tail passes it, and then ``prompt_len``
+        points short of the real boundary -- placeholder tokens end up at the head of
+        ``response_ids`` with mask 1, trained on as if the model had written them.
         """
         delta = len(engine_ids) - len(self.token_ids)
+
+        # Everything before the newest context must survive byte for byte.
+        head_len = len(self.token_ids) - (self._tail_context_len or 0)
+        if engine_ids[:head_len] != self.token_ids[:head_len]:
+            differs = next(
+                (i for i in range(min(head_len, len(engine_ids)))
+                 if engine_ids[i] != self.token_ids[i]),
+                min(head_len, len(engine_ids)),
+            )
+            raise MaskMisaligned(
+                f"the engine re-expanded something before the newest context: token "
+                f"{differs} of the first {head_len} changed. Only the trailing context "
+                f"may differ, or the opening/response boundary moves without prompt_len "
+                f"following it."
+            )
 
         if delta and self._tail_context_len:
             adjusted = self._tail_context_len + delta

@@ -122,7 +122,7 @@ def test_a_delta_too_large_to_absorb_raises():
     c = _conv()
     c.add_response([7, 8])
     c.add_context([9])
-    with pytest.raises(MaskMisaligned, match="not confined"):
+    with pytest.raises(MaskMisaligned, match="before the newest context|not confined"):
         c.adopt_prompt([1, 2])
 
 
@@ -134,7 +134,7 @@ def test_a_shifted_opening_context_raises():
 
     # The tail is a response, so no context span can absorb the delta. Rather than
     # silently shifting where the prompt ends, the invariant has to catch it.
-    with pytest.raises(MaskMisaligned, match="other than the newest context"):
+    with pytest.raises(MaskMisaligned, match="before the newest context|other than the newest"):
         c.adopt_prompt([1, 2, 3, 4, 7, 8])
 
 
@@ -208,3 +208,35 @@ def test_scores_survive_an_adoption():
 
     assert len(c.scores) == len(c.mask)
     assert c.scores[:2] == [0.0, 1.0], "credit must stay on the token that earned it"
+
+
+def test_a_delta_split_between_the_opening_and_the_tail_is_caught():
+    """The length check cannot see this: the mask grows by exactly the delta that grew
+    the tokens, so the difference it compares is unchanged wherever the change was. The
+    consequence is prompt_len pointing short of the real boundary, which puts prompt
+    tokens at the head of response_ids with mask 1 -- trained on as if generated."""
+    c = Conversation(conversation_id="c")
+    c.add_context([1, 2, 3])
+    c.add_response([7, 8])
+    c.add_context([9])
+    with pytest.raises(MaskMisaligned, match="before the newest context"):
+        # opening grew by 2 (90, 91) and the observation by 1
+        c.adopt_prompt([1, 2, 3, 90, 91, 7, 8, 9, 9])
+
+
+def test_a_change_confined_to_the_newest_context_is_still_accepted():
+    c = Conversation(conversation_id="c")
+    c.add_context([1, 2, 3])
+    c.add_response([7, 8])
+    c.add_context([9])
+    c.adopt_prompt([1, 2, 3, 7, 8, 9, 9, 9])          # only the tail re-expanded
+    assert c.token_ids == [1, 2, 3, 7, 8, 9, 9, 9]
+    assert len(c.mask) == len(c.token_ids) - c.prompt_len
+
+
+def test_an_untouched_prompt_is_accepted():
+    c = Conversation(conversation_id="c")
+    c.add_context([1, 2, 3])
+    c.add_response([7, 8])
+    c.adopt_prompt([1, 2, 3, 7, 8])
+    assert c.prompt_len == 3

@@ -259,7 +259,12 @@ def concat_val_multi_turn(
             "conversations": conversations,
             # Turns the episode ran. Prefer what the loop counted; fall back to the rows
             # merged here, which is the same number under no_concat.
-            "episode_turns": sum(len(c["turns"]) for c in conversations) or len(turns),
+            # The runner's count, which excludes summaries. Counting response spans
+            # instead adds one per compaction: a summary is a model output like any
+            # other, but the environment never acted on it.
+            "episode_turns": _first(
+                "episode_turns", sum(len(c["turns"]) for c in conversations) or len(turns)
+            ),
             # How many conversations the episode spanned: 1 for concat, one per turn for
             # no_concat, and however many compactions happened plus one for compact.
             "n_conversations": len(conversations),
