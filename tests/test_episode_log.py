@@ -298,7 +298,8 @@ def test_each_turn_shows_as_an_assistant_block():
         _conv(0, "S0", [("a", ""), ("b", "")]),
         _conv(1, "S1", [("c", "")]),
     ]}])
-    assert h.count(">assistant<") == 3, "one assistant block per turn"
+    for body in ("a", "b", "c"):
+        assert f">{body}</div>" in h, f"turn body {body} missing"
 
 
 def test_the_summary_exchange_is_just_the_last_turn_of_its_conversation():
@@ -323,13 +324,56 @@ def test_the_transcript_adds_only_roles_and_conversation_rules():
         _conv(0, "SYS", [("a", "obs")]),
         _conv(1, "SYS2", [("b", "")]),
     ]}])
+    # Only the conversation heading is ours. The decoded text carries the template's
+    # own role markers; adding a second set put two of each on the screen, and ours were
+    # a guess at the block's contents while the template's are what the model read.
     assert "turn 0" not in h and "turn 1" not in h
     assert h.count("conversation 0") == 1 and h.count("conversation 1") == 1
-    for role in (">system + user<", ">assistant<", ">user<"):
-        assert role in h, f"missing {role}"
+    for ours in ("system + user", ">assistant<", ">user<"):
+        assert ours not in h, f"still labelling {ours!r}"
 
 
 def test_an_absent_observation_prints_no_empty_user_block():
     h = episode_html([{"conversations": [_conv(0, "SYS", [("only-response", "")])]}])
-    assert h.count(">user<") == 0, "an empty user turn was rendered"
     assert "only-response" in h
+    assert h.count("<div>") == 2, "an empty block was rendered"
+
+
+def test_the_dangling_generation_cue_is_not_shown():
+    """A rendered user turn ends with the template's "assistant" marker -- an instruction
+    to the decoder, not something anyone said. Left in, every user block appears to end
+    by speaking as the assistant, and the frame that closes the turn then reads as the
+    assistant's rather than as what the assistant was shown."""
+    h = episode_html([{"conversations": [{
+        "conversation_id": 0,
+        "prompt": "system\nrules\nuser\n[obs]\n\nassistant",
+        "prompt_image": None,
+        "turns": [{"turn_id": 0, "response": "<answer>Up</answer>",
+                   "observation": "user\nnext obs\n\nassistant",
+                   "observation_image": None}],
+    }]}])
+    assert "[obs]" in h and "next obs" in h
+    assert "\nassistant" not in h and ">assistant<" not in h
+
+
+def test_the_frame_closes_the_user_turn_and_precedes_the_response():
+    """The frame is what the assistant was looking at, so it belongs at the end of the
+    turn that showed it -- immediately above the response that reasons about it."""
+    h = episode_html([{"conversations": [{
+        "conversation_id": 0, "prompt": "PROMPT", "prompt_image": _frame(),
+        "turns": [{"turn_id": 0, "response": "RESPONSE-ZERO",
+                   "observation": "OBSERVATION", "observation_image": _frame((9, 9, 9))},
+                  {"turn_id": 1, "response": "RESPONSE-ONE",
+                   "observation": "", "observation_image": None}],
+    }]}])
+    assert h.index("PROMPT") < h.index("base64,") < h.index("RESPONSE-ZERO")
+    assert h.index("OBSERVATION") < h.rindex("base64,") < h.index("RESPONSE-ONE")
+
+
+def test_a_response_that_happens_to_end_in_the_word_assistant_is_kept():
+    """The trim is for the cue at the end of a rendered turn, not for the word."""
+    h = episode_html([{"conversations": [{
+        "conversation_id": 0, "prompt": "p", "prompt_image": None,
+        "turns": [{"turn_id": 0, "response": "I am the assistant here, and I act",
+                   "observation": "", "observation_image": None}]}]}])
+    assert "I am the assistant here, and I act" in h

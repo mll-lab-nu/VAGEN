@@ -28,6 +28,7 @@ from __future__ import annotations
 import base64
 import html
 import io
+import re
 from collections import defaultdict
 from typing import Any
 
@@ -91,25 +92,18 @@ def group_turns(rows: list[dict]) -> dict[tuple, list[dict]]:
 
 
 def episode_html(turns: list[dict]) -> str:
-    """The episode as it was actually spoken, with as little added as possible.
+    """The episode as it was spoken, with one thing added: where a conversation starts.
 
-        conversation 0
-        system + user   ...the prompt, padding stripped...
-        [frame]
-        assistant       ...what the model wrote...
-        user            ...what came back...
-        [frame]
-        assistant       ...
-        conversation 1
-        ...
+    Nothing else is labelled. The decoded text already carries the template's own
+    ``system`` / ``user`` / ``assistant`` markers, so adding our own put two of each on
+    the screen -- and ours were a guess at what the block contained, while the
+    template's are what the model actually read. Turn boundaries are visible in the text
+    for the same reason.
 
-    Roles, not turn numbers. This is meant to read like the transcript that was trained
-    on, so the only things added are the role each block came from and a rule where a
-    conversation restarts -- both cheap, and the conversation rule is the one boundary
-    you cannot infer from the text.
+    A conversation boundary is the exception: it is the one thing the text cannot show,
+    because from inside the transcript a compaction looks like a model that forgot.
 
-    Padding never appears: the merge decodes each span from the real tokens, so what is
-    shown is what the model saw.
+    Padding never appears: the merge decodes each span from the real tokens.
     """
     parts = [f'<div style="{_STYLE}">']
     first = turns[0]
@@ -135,13 +129,13 @@ def episode_html(turns: list[dict]) -> str:
             f'<div style="color:#c00;font-size:13px"><b>conversation '
             f'{conversation.get("conversation_id", n)}</b></div>'
         )
-        _block(parts, "system + user", conversation.get("prompt"), "#070")
+        _text(parts, conversation.get("prompt"))
         if conversation.get("prompt_image") is not None:
             parts.append(_img_tag(conversation["prompt_image"]))
 
         for turn in conversation.get("turns", []):
-            _block(parts, "assistant", turn.get("response"), "#111")
-            _block(parts, "user", turn.get("observation"), "#070")
+            _text(parts, turn.get("response"))
+            _text(parts, turn.get("observation"))
             if turn.get("observation_image") is not None:
                 parts.append(_img_tag(turn["observation_image"]))
 
@@ -149,18 +143,24 @@ def episode_html(turns: list[dict]) -> str:
     return "".join(parts)
 
 
-def _block(parts: list[str], role: str, text, colour: str) -> None:
-    """A role heading and its text, or nothing when there is no text."""
+#: Role words a chat template leaves dangling at the end of a rendered turn as the cue
+#: for the model to start writing. Not content -- the model produced nothing there yet.
+_GENERATION_CUE = re.compile(r"(?:\s*\n)?\s*(?:assistant|model)\s*$", re.IGNORECASE)
+
+
+def _text(parts: list[str], text) -> None:
+    """One block of the transcript, minus the trailing generation cue.
+
+    A rendered user turn ends with the template's "assistant" marker, which is an
+    instruction to the decoder rather than something anyone said. Left in, every user
+    block appears to end by speaking as the assistant -- and the frame that closes the
+    turn then looks like the assistant's, when it is what the assistant was shown.
+    """
     if not text:
         return
-    parts.append(
-        f'<div style="color:#888;margin-top:10px;font-size:11px">{role}</div>'
-        f'<div style="color:{colour}">{html.escape(str(text))}</div>'
-    )
-
-
-def _label(text: str, color: str) -> str:
-    return f'<div style="color:{color};margin-top:8px"><b>{html.escape(text)}</b></div>'
+    trimmed = _GENERATION_CUE.sub("", str(text))
+    if trimmed:
+        parts.append(f'<div>{html.escape(trimmed)}</div>')
 
 
 def episode_rows(rows: list[dict]) -> list[dict]:
@@ -280,7 +280,7 @@ def describe_columns(extras: dict, n_rows: int) -> str:
     one-turn ones -- or as one, once only n are shown."""
     bits = []
     for key in ("episode_id", "group_idx", "turn_idx", "conversation_id", "episode_turns",
-                "n_conversations", "turn_records"):
+                "n_conversations", "conversations"):
         vals = extras.get(key) or []
         present = sum(1 for v in vals if v is not None)
         bits.append(f"{key}={present}/{n_rows}")

@@ -36,7 +36,6 @@ from vagen.custom_metric.metric import METRIC_REGISTRY
 from vagen.trainer.logic import collect_registry_metrics, value_mask_from_returns
 from vagen.utils.image_token_utils import replace_image_tokens_for_logging
 from vagen.utils.episode_log import describe_columns, rows_from_validation
-from vagen.utils.image_validation_logger import ValidationGenerationsLogger
 from vagen.utils.wandb_episodes import EpisodeTableLogger
 
 
@@ -204,6 +203,23 @@ class VagenV0Mixin(VagenLogicMixin):
             outputs = replace_image_tokens_for_logging(outputs, processor)
         return super()._dump_generations(inputs, outputs, *args, **kwargs)
 
+    #: What the episode log needs from a validation batch. Named here rather than in
+    #: verl: these are our columns, produced by our agent loop and our validation merge,
+    #: and adding one should not touch the dependency. Eight separate upstream commits
+    #: went into this list before it moved.
+    val_log_columns = (
+        "image_data",        # the frames the model was shown
+        "episode_id",        # identity: episode > conversation > turn
+        "group_idx",
+        "traj_idx",
+        "turn_idx",
+        "conversation_id",
+        "data_source",
+        "episode_turns",     # counts the merge computes while it still can
+        "n_conversations",
+        "conversations",     # the transcript, laid out as it was spoken
+    )
+
     def _fit_dump_data(self, batch):
         super()._fit_dump_data(batch)
         self._vagen_dump_images(batch)
@@ -222,7 +238,7 @@ class VagenV0Mixin(VagenLogicMixin):
             logger_.flush()
         return out
 
-    def _maybe_log_val_generations(self, inputs, outputs, scores, images=None, extras=None):
+    def _maybe_log_val_generations(self, inputs, outputs, scores, extras=None):
         """Hand validation episodes to the logger. The assembling lives in utils.
 
         verl's table is one row per model call, which is the wrong unit for looking at an
@@ -238,6 +254,7 @@ class VagenV0Mixin(VagenLogicMixin):
         if not n:
             return
         extras = extras or {}
+        images = extras.get("image_data")
         # Each checked on its own. `a or b` picks a list of Nones over a good list,
         # because a non-empty list is truthy whatever is in it -- which sent this down
         # the fallback path and logged verl's flat table instead of the episode one.
@@ -246,7 +263,7 @@ class VagenV0Mixin(VagenLogicMixin):
         has_group = any(v is not None for v in (extras.get("group_idx") or []))
         if not (has_id or has_group):
             # Nothing published episode ids, so there is nothing to regroup.
-            return super()._maybe_log_val_generations(inputs, outputs, scores, images=images)
+            return super()._maybe_log_val_generations(inputs, outputs, scores, extras=extras)
 
         if self.config.trainer.get("replace_image_tokens_for_logging", True):
             processor = getattr(self, "processor", None)
