@@ -190,8 +190,14 @@ async def test_compaction_fires_and_splits_the_episode_into_rows():
     conversation each time, which is what makes the rows."""
     from vagen.harness import CompactHarness
 
-    env, client = Env(terminate_at=3), Client()
-    await run_episode(env, CompactHarness(budget=1), client, max_turns=5)
+    # A budget of one token trips on every turn, which is the shape the harness now
+    # rejects: compaction that buys no turns is no_concat at twice the price. This fake
+    # opens at 9 tokens, spends 5 a turn, and reopens at 30 after a summary, so 40 is
+    # the smallest budget that leaves the *reseeded* conversation room for more than one
+    # turn. Below it the harness refuses, correctly: at 30 the summary alone is three
+    # quarters of the budget it has to fit inside.
+    env, client = Env(terminate_at=12), Client()
+    await run_episode(env, CompactHarness(budget=40), client, max_turns=12)
 
     assert len(client.rows()) > 1, "compaction never started a second conversation"
     assert all(any(r.response_mask) for r in client.rows()), "a row with no model output survived"

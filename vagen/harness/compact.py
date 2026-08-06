@@ -7,6 +7,20 @@ from typing import Optional
 from vagen.core.harness import BaseHarness, Call, Msg
 
 
+class CompactionMakesNoProgress(RuntimeError):
+    """Conversation after conversation hit the budget after a single turn.
+
+    Not a slow run: the episode still finishes, every row is well-formed, and the only
+    trace is a rollout that cost twice what it should and a summary per environment step.
+    Nothing downstream distinguishes it from compaction working.
+
+    Raised on a repeat, not on the first one. A single conversation cut short by an
+    unusually large observation is data, and killing a run over it would be wrong; two in
+    a row cannot be, because the second opened on a summary written under this budget --
+    if that still leaves no room, nothing later will.
+    """
+
+
 def _with_summary(summary: str, observation: Msg) -> Msg:
     """The summary and the observation as one user message.
 
@@ -40,16 +54,25 @@ class CompactHarness(BaseHarness):
     ``budget`` is counted in whatever unit ``note_usage`` is fed — tokens from the client
     when training, the provider's reported prompt size when evaluating. The two will not
     agree exactly, so log where it actually triggers.
+
+    ``summary_budget`` bounds the summary itself. Without one it generated against the
+    turn budget, which at ``budget=400`` and a turn budget of 8000 let the summary be
+    twenty times the thing it was compressing into -- fine for as long as the model
+    happened to write short ones. See ``vagen/harness/budget.py`` for the arithmetic
+    these two have to satisfy together.
     """
 
     SUMMARY_REQUEST = "Summarise the conversation so far. Keep every fact needed to continue."
 
-    def __init__(self, budget: int, **cfg):
+    def __init__(self, budget: int, summary_budget: int | None = None, **cfg):
         super().__init__(**cfg)
         self.budget = budget
+        self.summary_budget = summary_budget
         self._used = 0
         self._awaiting_summary = False
         self._summary: str | None = None
+        self._turns_here = 0
+        self._short_streak = 0
 
     def note_usage(self, used: int) -> None:
         self._used = used
@@ -58,13 +81,31 @@ class CompactHarness(BaseHarness):
         if self._awaiting_summary:
             # Ask inside the current conversation, so the model can see what it is
             # summarising.
-            return Call([{"role": "user", "content": self.SUMMARY_REQUEST}], self._conversation_id)
+            return Call([{"role": "user", "content": self.SUMMARY_REQUEST}], self._conversation_id,
+                        sampling_params={"max_new_tokens": self.summary_budget} if self.summary_budget else None)
 
         if self._summary is not None:
             summary, self._summary = self._summary, None
             return Call([self._system, _with_summary(summary, self._msgs[-1])], None)
 
         if self._conversation_id is not None and self._used >= self.budget:
+            self._short_streak = self._short_streak + 1 if self._turns_here <= 1 else 0
+            if self._short_streak >= 2:
+                # One turn per conversation is not compaction, it is no_concat at twice
+                # the price: two generations per environment step, and each summary
+                # summarising a single turn. Arithmetic catches the configurations that
+                # guarantee this (see harness/budget.py); reaching it anyway means the
+                # data does -- an observation, or a turn, close to the whole budget.
+                raise CompactionMakesNoProgress(
+                    f"{self._short_streak} conversations in a row reached the budget after a "
+                    f"single turn -- this one at {self._used} tokens against "
+                    f"compact_budget={self.budget} -- so compacting buys no turns and every "
+                    f"environment step is costing two generations. The second of them opened "
+                    f"on a summary written under this budget, so it is the budget and not the "
+                    f"data: raise trainer.compact_budget above what one turn costs "
+                    f"({self._used} tokens here), lower trainer.compact_summary_budget, or "
+                    f"shrink the observation."
+                )
             self._awaiting_summary = True
             return self.next_call()
 
@@ -79,5 +120,7 @@ class CompactHarness(BaseHarness):
             self._summary = f"Summary so far: {response.text}"
             self._conversation_id = None      # the next call opens a fresh conversation
             self._used = 0
+            self._turns_here = 0
             return None                        # consumed: the environment does not act
+        self._turns_here += 1
         return super().accept(response)
