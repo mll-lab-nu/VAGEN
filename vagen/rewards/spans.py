@@ -18,12 +18,19 @@ import re
 def token_offsets(token_ids: list[int], tokenizer) -> list[int]:
     """Character offset at which each token ends, decoding prefixes of what was emitted.
 
+    ★ Decoded the same way the text being searched was decoded -- ``skip_special_tokens``
+    on. The spans come from matching tags in the action text, which the client produced
+    with special tokens skipped; measuring offsets with them rendered shifts every
+    position after the first special token by that token's printed length. One
+    ``<|box_start|>`` before the description was enough to move a reward off
+    ``box left of player`` and onto ``<observation>box left``.
+
     Monotone by construction. O(n) decodes; at a few hundred response tokens that is
     negligible next to the rollout itself.
     """
     offsets, text = [], ""
     for k in range(1, len(token_ids) + 1):
-        text = tokenizer.decode(token_ids[:k], skip_special_tokens=False)
+        text = tokenizer.decode(token_ids[:k], skip_special_tokens=True)
         offsets.append(len(text))
     return offsets
 
