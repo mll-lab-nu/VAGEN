@@ -138,11 +138,17 @@ class VerlClient(InferenceClient):
             mm_processor_kwargs=self.mm_processor_kwargs or None,
         )
         extra = getattr(output, "extra_fields", None) or {}
+        # min/max only differ under partial rollout, where a resumed generation can span a
+        # weight update. Read here because this is the only place they exist: the fields
+        # are set by verl's resuming client and nothing downstream sees `output`.
+        lo, hi = extra.get("min_global_steps"), extra.get("max_global_steps")
         return BackendOutput(
             text=self.tokenizer.decode(output.token_ids, skip_special_tokens=True),
             token_ids=list(output.token_ids),
             logprobs=list(output.log_probs) if output.log_probs else None,
             prompt_token_ids=extra.get("prompt_token_ids"),
+            stop_reason=getattr(output, "stop_reason", None),
+            weights_version=(int(lo), int(hi)) if lo is not None and hi is not None else None,
         )
 
     # ------------------------------------------------------------------ plumbing

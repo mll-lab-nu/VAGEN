@@ -272,9 +272,16 @@ def select_episodes(
 def describe_columns(extras: dict, n_rows: int) -> str:
     """What actually arrived. The grouping depends on these and fails silently without
     them: every row becomes its own episode, so a five-turn episode reads as five
-    one-turn ones -- or as one, once only n are shown."""
+    one-turn ones -- or as one, once only n are shown.
+
+    Only columns the merge actually produces. ``turn_idx`` and ``conversation_id``
+    identify a row, and the merge folds an episode's rows into one, so it drops them --
+    reporting them anyway printed "turn_idx=0/256" every validation, which reads as the
+    exact failure this line exists to catch. What carries the per-turn structure is
+    ``conversations``, and that is reported.
+    """
     bits = []
-    for key in ("episode_id", "group_idx", "turn_idx", "conversation_id", "episode_turns",
+    for key in ("episode_id", "group_idx", "episode_turns",
                 "n_conversations", "conversations"):
         vals = extras.get(key) or []
         present = sum(1 for v in vals if v is not None)
