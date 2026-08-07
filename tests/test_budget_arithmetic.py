@@ -79,7 +79,7 @@ def test_a_conversation_with_no_room_to_work_in_is_refused():
     """The one static thing compaction still cannot recover from: the summary, its
     request and one generation do not fit the region, so every conversation would close
     before its first turn."""
-    with pytest.raises(BudgetError, match="no room to work in"):
+    with pytest.raises(BudgetError, match="no room to buy a turn"):
         check("compact", _b(prompt_len=1000, response_len=1000, compact_budget=6800,
                             summary_budget=600, per_turn=600, env_response=100,
                             summary_request_len=20))
@@ -114,7 +114,10 @@ def test_the_derived_defaults_satisfy_the_rules_they_are_checked_against():
                    response_len=max(4 * m + 4 * per_turn, 8000), prompt_len=max(1000, m))
             k = default_summary_budget(m, per_turn)
             b = replace(b, summary_budget=k)
-            b = replace(b, env_response=default_env_response("compact", b))
+            # Derived, so it must say so: the exact "can a conversation buy a turn"
+            # check is meaningless against a number chosen to be generous.
+            b = replace(b, env_response=default_env_response("compact", b),
+                        env_response_configured=False)
             assert k >= 1
             check("compact", b)
 
@@ -123,11 +126,17 @@ def test_the_room_check_turns_over_exactly_where_it_says():
     """A bound the error tells you to use, that then fails, costs a second submission."""
     from dataclasses import replace
 
+    # E declared, so the exact form applies: summary + request + generation + one
+    # observation + the floor below which the next generation is not worth making.
     b = _b(compact_budget=None, summary_budget=500, per_turn=1000, env_response=300,
-           prompt_len=4000, summary_request_len=13)
-    needed = 500 + 13 + 1000
+           prompt_len=4000, summary_request_len=13, env_response_configured=True)
+    for n_r in range(1800, 4000):
+        floor = min(1000, max(1, n_r // 4))
+        if 500 + 13 + 1000 + 300 + floor <= n_r:
+            needed = n_r
+            break
     check("compact", replace(b, response_len=needed))
-    with pytest.raises(BudgetError, match="no room to work in"):
+    with pytest.raises(BudgetError, match="no room to buy a turn"):
         check("compact", replace(b, response_len=needed - 1))
 
 

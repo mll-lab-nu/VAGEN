@@ -81,6 +81,11 @@ class Budgets:
     #: that a turn could in principle use everything -- true of every configuration, so
     #: a check on it would refuse them all.
     per_turn_configured: bool = True
+    #: Whether ``env_response`` was declared by the env config or derived from the region.
+    #: Derived it is deliberately generous -- it only has to catch one pathological
+    #: observation -- so a check that solves for whether a turn fits is meaningless
+    #: against it and would refuse every unconfigured run.
+    env_response_configured: bool = True
 
     @property
     def row(self) -> int:
@@ -130,8 +135,13 @@ def default_env_response(mode: str, b: Budgets) -> int:  # noqa: D401
     if mode == "no_concat":
         # Every call opens a conversation, so the observation lands in the prompt region.
         return max(1, b.prompt_len)
-    # Room for one observation and the generation that answers it.
-    return max(1, b.response_len - b.per_turn)
+    # Room for one observation and the generation that answers it -- but never less than
+    # a quarter of the region. `per_turn` is clamped up to `response_len` when a config
+    # asks for more than the region holds, and `response_len - per_turn` is then 0: a
+    # ceiling of one token, which refuses every observation on the second turn of every
+    # episode. Measured: all four spatial_gym scripts, whose per-turn budget (2048)
+    # exceeds their region (2000).
+    return max(b.response_len // 4, b.response_len - b.per_turn, 1)
 
 
 def compact_budget_bounds(b: Budgets) -> tuple[int, int]:
@@ -227,16 +237,33 @@ def _check_compact(b: Budgets) -> None:
             f"larger than anything that can be written into it."
         )
 
-    # A floor has to exist: room for the summary, its request, and one generation worth
-    # making. Below this no configuration works, whatever compact_budget says.
+    # A conversation has to be able to buy a turn: room for the summary and its request,
+    # one generation, and -- when the environment's size is actually declared -- one
+    # observation and the floor below which the next generation is not worth making.
+    #
+    # Without the observation and the floor this admitted configurations that then died
+    # at runtime after two environment steps, discarding rows that were already good:
+    # n_r=1000, g=700, k=20, |req|=70 passes `k + |req| + g <= n_r` at 790 and fails the
+    # real condition at 800. That gap is the mechanism behind CompactionMakesNoProgress
+    # firing on configurations this function accepted.
+    #
+    # The exact form needs a declared `env_response_length`. Derived, that number is
+    # deliberately generous -- it exists to catch one pathological observation, not to
+    # describe a typical one -- and checking against it would refuse every unconfigured
+    # run.
+    floor = min(b.per_turn, max(1, b.response_len // 4))
     needed = k + b.summary_request_len + b.per_turn
+    detail = (f"compact_summary_budget={k} + the summary request ({b.summary_request_len}) "
+              f"+ response_length_per_turn={b.per_turn}")
+    if b.env_response_configured:
+        needed += b.env_response + floor
+        detail += f" + env_response_length={b.env_response} + a floor of {floor}"
     if needed > b.response_len:
         raise BudgetError(
-            f"a conversation has no room to work in: compact_summary_budget={k} + the "
-            f"summary request ({b.summary_request_len}) + response_length_per_turn="
-            f"{b.per_turn} = {needed}, against data.max_response_length={b.response_len}. "
-            f"Every conversation would close before its first turn. Lower "
-            f"compact_summary_budget or response_length_per_turn, or raise "
+            f"a conversation has no room to buy a turn: {detail} = {needed}, against "
+            f"data.max_response_length={b.response_len}. Every conversation would close "
+            f"at or before its first turn. Lower compact_summary_budget, "
+            f"response_length_per_turn or env_response_length, or raise "
             f"max_response_length."
         )
 

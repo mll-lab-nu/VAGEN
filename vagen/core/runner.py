@@ -16,6 +16,10 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+#: How many model calls one environment step may take. Compaction spends a second one on
+#: the summary; nothing legitimately needs more than a handful.
+MAX_CALLS_PER_TURN = 8
+
 
 @dataclass
 class EpisodeResult:
@@ -38,7 +42,13 @@ async def run_episode(env, harness, client, *, seed=None, max_turns: int = 10, *
         result = EpisodeResult(info=dict(info or {}))
         for _ in range(max_turns):
             action = None
-            while action is None:
+            # A turn may legitimately take more than one call -- compaction spends one on
+            # the summary -- but only a bounded number. `accept` returning None is the
+            # only way out of this loop, and a backend that returns something the harness
+            # keeps every time spins here: measured at 100,001 generations, and 100,001
+            # conversations under no_concat, for a client whose `text` came back None.
+            # Closed APIs return that for a refusal, and nothing in the type enforces str.
+            for _attempt in range(MAX_CALLS_PER_TURN):
                 # What the harness is about to decide about, measured rather than
                 # estimated: how much of the response region this conversation has spent,
                 # and how big the observation waiting to go into it is. Both come from the
@@ -97,6 +107,14 @@ async def run_episode(env, harness, client, *, seed=None, max_turns: int = 10, *
                 # environment must not act on it -- that would advance the episode by a
                 # turn that never happened.
                 action = harness.accept(response)
+                if action is not None:
+                    break
+            else:
+                raise RuntimeError(
+                    f"turn {result.turns} took {MAX_CALLS_PER_TURN} model calls without "
+                    f"producing an action. The harness is keeping every response for "
+                    f"itself, which one of them was supposed to stop doing."
+                )
 
             obs, reward, terminated, truncated, step_info = await env.step(
                 action, response_token_ids=response.token_ids, tokenizer=client.tokenizer

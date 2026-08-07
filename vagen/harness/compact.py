@@ -71,14 +71,21 @@ class CompactHarness(BaseHarness):
     SUMMARY_PREFIX = "Summary so far: "
 
     def __init__(self, budget: int | None = None, summary_budget: int | None = None,
-                 summary_request_len: int = 0, **cfg):
+                 summary_request_len: int | None = None, **cfg):
         super().__init__(**cfg)
         #: What closing a conversation costs. Both halves, because the summary *request*
         #: is a user message into the same conversation, so it lands in the same response
         #: region -- reserving only the summary overflows by the request every single
         #: time, deterministically, and `on_overflow` turns that into a dead batch.
         self.summary_budget = summary_budget
-        self.summary_request_len = summary_request_len
+        if summary_request_len is None and summary_budget is not None:
+            # Defaulting this to zero under-reserves by exactly the request, on every
+            # compaction, deterministically -- and silently, because the caller that
+            # forgot to measure it is the one that cannot tell. Only gym_loop knows the
+            # real number; anyone constructing this directly gets a bound rather than a
+            # blind spot.
+            summary_request_len = len(self.SUMMARY_REQUEST.split()) * 3
+        self.summary_request_len = summary_request_len or 0
         #: Optional second trigger, kept because the first one alone is not a lever.
         #: "Compact when the next turn does not fit" fills the whole response region, so
         #: on a model whose region is wide the mode never compacts at all and becomes
@@ -154,7 +161,12 @@ class CompactHarness(BaseHarness):
 
         if self._summary is not None:
             summary, self._summary = self._summary, None
-            return Call([self._system, _with_summary(summary, self._msgs[-1])], None)
+            # Bounded like every other call. It was the one exception, safe only because
+            # VerlClient falls back to response_length_per_turn -- which the closed-API
+            # client this module advertises does not have.
+            limit = self.max_new_tokens()
+            return Call([self._system, _with_summary(summary, self._msgs[-1])], None,
+                        sampling_params={"max_new_tokens": limit} if limit is not None else None)
 
         if self._conversation_id is not None and self._should_compact():
             self._short_streak = self._short_streak + 1 if self._turns_here <= 1 else 0
