@@ -105,22 +105,8 @@ def test_one_long_but_legal_generation_does_not_kill_a_healthy_run():
             gen=lambda i: 512 if i == 1 else 80)
 
 
-def test_the_response_region_alone_fits_when_the_checks_pass():
-    """``peak <= n_p + n_r`` does not imply the row fits: almost all of a conversation
-    lands in the response region, and a large n_p hides that rather than absorbing it.
-
-    Both halves matter. The first config is refused now and produced 5376-token rows
-    against a 2048 region before; the second passes, and the rows it produces have to be
-    inside the region the check promised.
-    """
-    from vagen.harness.budget import BudgetError
-
-    hidden = Budgets(prompt_len=32768, response_len=2048, per_turn=1024, max_turns=5,
-                     env_response=64, compact_budget=20000, summary_budget=256,
-                     summary_request_len=REQ)
-    with pytest.raises(BudgetError, match="lands in the response region"):
-        check("compact", hidden)
-
+def test_the_response_region_holds_what_the_checks_let_through():
+    """The region is the bound now, so a config that passes must produce rows inside it."""
     b = Budgets(prompt_len=32768, response_len=8192, per_turn=1024, max_turns=5,
                 env_response=64, compact_budget=4000, summary_budget=256,
                 summary_request_len=REQ)
@@ -128,6 +114,7 @@ def test_the_response_region_alone_fits_when_the_checks_pass():
     c = episode("compact", b, system=600, obs=lambda i: 64, gen=lambda i: 1024)
     worst = max(len(r.response_ids) for r in c.rows())
     assert worst <= b.response_len, f"response region {worst} > max_response_length {b.response_len}"
+
 
 
 def test_env_response_length_is_enforced_in_the_mode_whose_arithmetic_needs_it():
@@ -176,17 +163,18 @@ def test_the_defaults_are_the_largest_values_that_pass():
     check("concat", replace(c, env_response=default_env_response("concat", c)))
 
 
-def test_an_impossible_band_says_so_once_rather_than_sending_you_round_it():
-    """Reporting only the ceiling when the floor is above it gives advice that fails the
-    next check, and the next: 800 is "more than half", 1000 is "at most 445", 445 is
-    "more than half" again."""
+def test_a_region_that_cannot_hold_one_turn_says_so_once():
+    """The band search is gone with compact_budget's demotion. What is left is the one
+    thing no runtime can recover from: no room for a summary, its request and a
+    generation, so every conversation closes before its first turn."""
     from vagen.harness.budget import BudgetError
 
     b = Budgets(prompt_len=512, response_len=1024, per_turn=512, max_turns=3,
                 env_response=64, compact_budget=800, summary_budget=500,
                 summary_request_len=REQ)
-    with pytest.raises(BudgetError, match="no compact_budget"):
+    with pytest.raises(BudgetError, match="no room to work in"):
         check("compact", b)
+
 
 
 def test_an_environment_is_closed_even_when_the_episode_raises():

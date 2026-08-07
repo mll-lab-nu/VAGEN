@@ -3,7 +3,7 @@ envs:
     n_envs: 256
     data_source: sokoban
     seed: [10001,10256,1]
-    max_turns: 5
+    max_turns: 20
     response_length_per_turn: 512
     config:
       render_mode: vision

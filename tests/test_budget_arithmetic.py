@@ -55,45 +55,51 @@ def test_the_same_episode_is_fine_under_no_concat():
 
 
 # --------------------------------------------------------------------- compact
-def test_a_summary_as_long_as_the_budget_it_compresses_into_is_refused():
-    """The live default before this existed: the summary generated against the turn
-    budget, so at compact_budget=400 it was allowed to be 8000 tokens -- twenty times
-    the thing it was being written into. It worked only because the model wrote short
-    ones, and nothing would have said so if it stopped."""
-    with pytest.raises(BudgetError, match="buys no turns|no compact_budget works"):
-        check("compact", _b(compact_budget=400, summary_budget=8000, per_turn=8000, response_len=8000))
+def test_a_summary_as_long_as_the_region_it_lives_in_is_refused():
+    """A summary is a generation, and the client clamps it to response_length_per_turn --
+    so a reservation larger than that is reserving room for something that cannot be
+    written into it."""
+    with pytest.raises(BudgetError, match="larger than anything that can be written"):
+        check("compact", _b(compact_budget=400, summary_budget=8000, per_turn=512,
+                            response_len=8000))
 
 
-def test_the_boundary_is_half():
-    # per_turn is raised past the summary budget and the window past the peak, so this
-    # exercises the halving rule and not one of the others -- which would otherwise fire
-    # first and let the test pass for the wrong reason.
-    # The response region has to leave room for the peak, or the band collapses and
-    # reports that instead -- which would pass this test for the wrong reason.
+
+def test_an_unhelpful_optional_budget_warns_rather_than_refuses():
+    """`2k <= m` used to be fatal. It is advisory now: the region trigger is what has to
+    hold, and this only says the *optional* second trigger is set somewhere unhelpful."""
     wide = dict(per_turn=4000, response_len=40000, prompt_len=10000, env_response=100)
     check("compact", _b(compact_budget=4000, summary_budget=2000, **wide))
-    with pytest.raises(BudgetError, match="more than half"):
+    with pytest.warns(UserWarning, match="more than half"):
         check("compact", _b(compact_budget=4000, summary_budget=2001, **wide))
 
 
-def test_the_peak_of_a_compacted_conversation_has_to_fit_the_row_it_becomes():
-    """A conversation is largest at the moment it is summarised, not before."""
-    with pytest.raises(BudgetError, match="largest at the moment it is summarised"):
-        check("compact", _b(prompt_len=1000, response_len=8000, compact_budget=6800,
-                            summary_budget=1000, per_turn=1000, env_response=100,
+
+def test_a_conversation_with_no_room_to_work_in_is_refused():
+    """The one static thing compaction still cannot recover from: the summary, its
+    request and one generation do not fit the region, so every conversation would close
+    before its first turn."""
+    with pytest.raises(BudgetError, match="no room to work in"):
+        check("compact", _b(prompt_len=1000, response_len=1000, compact_budget=6800,
+                            summary_budget=600, per_turn=600, env_response=100,
                             summary_request_len=20))
 
 
+
 def test_the_summary_cannot_outrun_a_single_generation():
-    with pytest.raises(BudgetError, match="cannot be longer than one"):
-        check("compact", _b(per_turn=500, compact_budget=4000, summary_budget=1500))
+    with pytest.raises(BudgetError, match="larger than anything that can be written"):
+        check("compact", _b(per_turn=500, compact_budget=4000, summary_budget=1500,
+                            response_len=8000))
 
 
-def test_compact_without_its_budgets_says_which_one_is_missing():
-    with pytest.raises(BudgetError, match="compact_budget"):
-        check("compact", _b(compact_budget=None, summary_budget=100))
+
+def test_compact_without_a_summary_budget_says_so():
+    """compact_budget is optional now -- the response region is the real bound -- but the
+    summary budget is not: it is what gets reserved."""
     with pytest.raises(BudgetError, match="compact_summary_budget"):
         check("compact", _b(compact_budget=4000, summary_budget=None))
+    check("compact", _b(compact_budget=None, summary_budget=100))
+
 
 
 def test_the_derived_defaults_satisfy_the_rules_they_are_checked_against():
@@ -113,18 +119,17 @@ def test_the_derived_defaults_satisfy_the_rules_they_are_checked_against():
             check("compact", b)
 
 
-def test_the_top_of_the_band_is_exactly_where_the_check_turns_over():
+def test_the_room_check_turns_over_exactly_where_it_says():
     """A bound the error tells you to use, that then fails, costs a second submission."""
     from dataclasses import replace
 
-    from vagen.harness.budget import compact_budget_bounds
+    b = _b(compact_budget=None, summary_budget=500, per_turn=1000, env_response=300,
+           prompt_len=4000, summary_request_len=13)
+    needed = 500 + 13 + 1000
+    check("compact", replace(b, response_len=needed))
+    with pytest.raises(BudgetError, match="no room to work in"):
+        check("compact", replace(b, response_len=needed - 1))
 
-    b = _b(compact_budget=1, summary_budget=500, per_turn=1000, env_response=300,
-           prompt_len=4000, response_len=8000, summary_request_len=13)
-    _, highest = compact_budget_bounds(b)
-    check("compact", replace(b, compact_budget=highest))
-    with pytest.raises(BudgetError, match="largest at the moment it is summarised"):
-        check("compact", replace(b, compact_budget=highest + 1))
 
 
 def test_the_window_is_the_hard_context_when_that_is_the_smaller_one():
@@ -132,16 +137,13 @@ def test_the_window_is_the_hard_context_when_that_is_the_smaller_one():
     refuses past it, and no amount of room in the training tensors changes that."""
     from dataclasses import replace
 
-    from vagen.harness.budget import compact_budget_bounds
-
-    b = _b(compact_budget=1, summary_budget=500, per_turn=1000, env_response=300,
+    b = _b(compact_budget=None, summary_budget=500, per_turn=1000, env_response=300,
            prompt_len=4000, response_len=8000)
-    roomy = compact_budget_bounds(b)[1]
-    tight = compact_budget_bounds(replace(b, context=4096))[1]
-    assert tight < roomy, "a context below the regions did not tighten the ceiling"
-    check("compact", replace(b, compact_budget=roomy))
-    with pytest.raises(BudgetError, match="largest at the moment it is summarised"):
-        check("compact", replace(b, context=4096, compact_budget=roomy))
+    assert b.window == b.row
+    assert replace(b, context=4096).window == 4096
+    with pytest.warns(UserWarning, match="rollout.max_model_len"):
+        check("concat", replace(b, context=4096, max_turns=10, per_turn=1000))
+
 
 
 # --------------------------------------------------------------- the live dynamics
