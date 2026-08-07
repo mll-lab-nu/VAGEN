@@ -353,9 +353,9 @@ def test_the_two_ceilings_come_from_the_mode():
            env_response=1360, compact_budget=1300, summary_budget=325)
     assert context_limits("concat", b) == (9000, 1360)
     assert context_limits("no_concat", b) == (9000, 9000)
-    # Compaction opens conversations too, and one that opens at the budget summarises
-    # after a single turn -- so its openings are bounded by the budget, not the region.
-    # Its continuations are observations, bounded by env_response_length like anyone
-    # else's; using the budget there left E enforcing nothing in the one mode whose
-    # every relation is written in terms of it.
-    assert context_limits("compact", b) == (1300, 1360)
+    # Compaction's openings are bounded by the prompt region like everyone else's. They
+    # used to be bounded by compact_budget, from when that number was what a conversation
+    # had to fit inside; it is an optional trigger now, and treating a trigger as a
+    # ceiling killed the episode on its first call -- the opening is the system prompt
+    # plus the first observation, with no summary in it yet to compact away.
+    assert context_limits("compact", b) == (9000, 1360)
