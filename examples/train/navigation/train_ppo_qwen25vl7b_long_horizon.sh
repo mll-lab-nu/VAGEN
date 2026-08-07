@@ -35,6 +35,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     data.val_files="$SCRIPTDIR/val_navigation_long_horizon.yaml" \
     actor_rollout_ref.model.path="$MODEL" \
     critic.model.path="$MODEL" \
+    critic.enable=True \
     algorithm.adv_estimator=gae \
     trainer.harness=concat \
     data.train_batch_size=128 \
@@ -58,5 +59,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     trainer.experiment_name="$EXPERIMENT_NAME" \
     trainer.default_local_dir="$EXPERIMENT_DIR/verl_checkpoints" \
     trainer.rollout_data_dir="$EXPERIMENT_DIR/rollout_data" \
+    trainer.validation_data_dir="$EXPERIMENT_DIR/validation" \
+    actor_rollout_ref.actor.checkpoint.save_contents="['model','hf_model','optimizer','extra']" \
     "$@" \
     2>&1 | tee "$EXPERIMENT_DIR/run.log"

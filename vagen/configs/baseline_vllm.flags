@@ -30,7 +30,11 @@ actor_rollout_ref.rollout.multi_turn.enable=True
 actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=1
 actor_rollout_ref.ref.fsdp_config.param_offload=True
 
-critic.enable=True
+# critic.enable is NOT here on purpose: `need_critic` short-circuits on it, so setting it
+# in the shared flags builds and trains a critic for the GRPO scripts too -- a whole extra
+# model, and every critic/* metric measured against GRPO's whitened advantages. It is
+# exactly the "anything an experiment varies" this file says it excludes. The PPO scripts
+# set it themselves.
 critic.optim.lr=1e-5
 critic.model.use_remove_padding=True
 critic.model.enable_gradient_checkpointing=True

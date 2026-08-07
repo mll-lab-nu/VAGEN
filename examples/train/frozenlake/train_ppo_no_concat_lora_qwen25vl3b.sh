@@ -35,6 +35,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     data.val_files="$SCRIPTDIR/val_frozenlake_vision.yaml" \
     actor_rollout_ref.model.path="$MODEL" \
     critic.model.path="$MODEL" \
+    critic.enable=True \
     algorithm.adv_estimator=no_concat_gae \
     trainer.harness=no_concat \
     data.train_batch_size=128 \
@@ -50,6 +51,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     actor_rollout_ref.model.lora_rank=32 \
     actor_rollout_ref.model.lora_alpha=32 \
     actor_rollout_ref.model.target_modules="all-linear" \
+    actor_rollout_ref.rollout.layered_summon=True \
     actor_rollout_ref.rollout.load_format="safetensors" \
     trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \
@@ -61,5 +63,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     trainer.experiment_name="$EXPERIMENT_NAME" \
     trainer.default_local_dir="$EXPERIMENT_DIR/verl_checkpoints" \
     trainer.rollout_data_dir="$EXPERIMENT_DIR/rollout_data" \
+    trainer.validation_data_dir="$EXPERIMENT_DIR/validation" \
+    actor_rollout_ref.actor.checkpoint.save_contents="['model','hf_model','optimizer','extra']" \
     "$@" \
     2>&1 | tee "$EXPERIMENT_DIR/run.log"
