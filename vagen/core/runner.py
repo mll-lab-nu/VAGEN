@@ -39,6 +39,28 @@ async def run_episode(env, harness, client, *, seed=None, max_turns: int = 10, *
         for _ in range(max_turns):
             action = None
             while action is None:
+                # What the harness is about to decide about, measured rather than
+                # estimated: how much of the response region this conversation has spent,
+                # and how big the observation waiting to go into it is. Both come from the
+                # client because it is the only layer that knows a token. Measuring is
+                # side-effect free -- that is what `render` is separable from `encode`
+                # for; asking used to ship every picture twice.
+                if hasattr(harness, "note_room") and harness.pending_observation() is not None:
+                    cid = getattr(harness, "_conversation_id", None)
+                    spent = client.response_len(cid) if cid else 0
+                    obs = 0 if cid is None else client.measure([harness.pending_observation()])
+                    harness.note_room(spent, obs)
+                    if harness.exhausted():
+                        # No room for another turn, and this policy cannot make room --
+                        # compaction can, and says so by never being exhausted. The
+                        # episode stops here rather than generating into a space too
+                        # small to hold an action. Truncated, not terminated: the
+                        # environment had more to give.
+                        logger.info("no room left for another turn at turn %d; "
+                                    "ending the episode", result.turns)
+                        result.truncated = True
+                        return result
+
                 call = harness.next_call()
                 kw = dict(send_kwargs)
                 if call.sampling_params:

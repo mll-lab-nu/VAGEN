@@ -348,7 +348,14 @@ class GymLoop(VagenGymAgentLoopBase):
         check_budgets(mode, b)
 
         if mode == "compact":
-            return build_harness(mode, budget=m, summary_budget=summary_budget), b
+            # The response region is the real ceiling; compact_budget is an optional
+            # second trigger for keeping conversations shorter than it.
+            return build_harness(
+                mode, budget=m, summary_budget=summary_budget,
+                response_len=self.response_length,
+                summary_request_len=b.summary_request_len,
+                floor=per_turn,
+            ), b
         return build_harness(mode), b
 
     def _outputs(self, client, env, result, kwargs, episode_id: str) -> list[AgentLoopOutput]:

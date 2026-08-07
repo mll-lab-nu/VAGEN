@@ -10,4 +10,6 @@ class NoConcatHarness(BaseHarness):
     observation, never the history."""
 
     def next_call(self) -> Call:
-        return Call([self._system, self._msgs[-1]], None)
+        limit = self.max_new_tokens()
+        return Call([self._system, self._msgs[-1]], None,
+                    sampling_params={"max_new_tokens": limit} if limit is not None else None)

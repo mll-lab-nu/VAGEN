@@ -70,10 +70,21 @@ class CompactHarness(BaseHarness):
     #: whatever this costs, every time a conversation opens.
     SUMMARY_PREFIX = "Summary so far: "
 
-    def __init__(self, budget: int, summary_budget: int | None = None, **cfg):
+    def __init__(self, budget: int | None = None, summary_budget: int | None = None,
+                 summary_request_len: int = 0, **cfg):
         super().__init__(**cfg)
-        self.budget = budget
+        #: What closing a conversation costs. Both halves, because the summary *request*
+        #: is a user message into the same conversation, so it lands in the same response
+        #: region -- reserving only the summary overflows by the request every single
+        #: time, deterministically, and `on_overflow` turns that into a dead batch.
         self.summary_budget = summary_budget
+        self.summary_request_len = summary_request_len
+        #: Optional second trigger, kept because the first one alone is not a lever.
+        #: "Compact when the next turn does not fit" fills the whole response region, so
+        #: on a model whose region is wide the mode never compacts at all and becomes
+        #: concat -- and the only way to change that would be to narrow the region, which
+        #: is also the training row width. This keeps the two separable.
+        self.budget = budget
         self._reset_episode_state()
 
         # What one more turn will cost, measured. The trigger fires before the turn it is
@@ -100,6 +111,8 @@ class CompactHarness(BaseHarness):
         self._turns_here = 0
         self._short_streak = 0
         self.turn_cost = 0        # see the note above __init__'s reset
+        self._room_resp = None
+        self._room_obs = 0
 
     def begin(self, system, init_obs) -> None:
         """Start an episode, including the parts of the state only this class has.
@@ -113,6 +126,15 @@ class CompactHarness(BaseHarness):
         """
         self._reset_episode_state()
         super().begin(system, init_obs)
+
+    def _reserve(self) -> int:
+        """Room for what closes this conversation: the summary *and* its request.
+
+        Both halves. The request is a user message into the same conversation, so it
+        lands in the same response region -- reserving only the summary overflows by the
+        request every single time, deterministically.
+        """
+        return (self.summary_budget or 0) + self.summary_request_len
 
     def note_usage(self, used: int) -> None:
         # A continuation's growth is exactly one turn: the observation that was sent with
@@ -134,7 +156,7 @@ class CompactHarness(BaseHarness):
             summary, self._summary = self._summary, None
             return Call([self._system, _with_summary(summary, self._msgs[-1])], None)
 
-        if self._conversation_id is not None and self._used + self.turn_cost >= self.budget:
+        if self._conversation_id is not None and self._should_compact():
             self._short_streak = self._short_streak + 1 if self._turns_here <= 1 else 0
             if self._short_streak >= 2:
                 # One turn per conversation is not compaction, it is no_concat at twice
@@ -143,21 +165,44 @@ class CompactHarness(BaseHarness):
                 # guarantee this (see harness/budget.py); reaching it anyway means the
                 # data does -- an observation, or a turn, close to the whole budget.
                 raise CompactionMakesNoProgress(
-                    f"{self._short_streak} conversations in a row reached the budget after a "
-                    f"single turn -- this one at {self._used} tokens against "
-                    f"compact_budget={self.budget} -- so compacting buys no turns and every "
-                    f"environment step is costing two generations. The second of them opened "
-                    f"on a summary written under this budget, so it is the budget and not the "
-                    f"data: raise trainer.compact_budget above what one turn costs "
-                    f"({self._used} tokens here), lower trainer.compact_summary_budget, or "
-                    f"shrink the observation."
+                    f"{self._short_streak} conversations in a row closed after a single "
+                    f"turn. This one had {self._room_resp} tokens of response region and a "
+                    f"{self._room_obs}-token observation pending, against "
+                    f"max_response_length={self.response_len} less a reserve of "
+                    f"{(self.summary_budget or 0) + self.summary_request_len} for the "
+                    f"summary and its request"
+                    + (f", and compact_budget={self.budget}" if self.budget else "")
+                    + f". Compacting buys no turns that way and every environment step "
+                    f"costs two generations. Raise max_response_length, lower "
+                    f"compact_summary_budget or response_length_per_turn, or shrink the "
+                    f"observation."
                 )
             self._awaiting_summary = True
             return self.next_call()
 
+        limit = self.max_new_tokens()
+        params = {"max_new_tokens": limit} if limit is not None else None
         if self._conversation_id is None:
-            return Call([self._system, *self._msgs], None)
-        return Call([self._msgs[-1]], self._conversation_id)
+            return Call([self._system, *self._msgs], None, sampling_params=params)
+        return Call([self._msgs[-1]], self._conversation_id, sampling_params=params)
+
+    def exhausted(self) -> bool:
+        """Never: making room is what this harness does."""
+        return False
+
+    def _should_compact(self) -> bool:
+        """Either the next turn does not fit, or the optional budget says close early.
+
+        Two triggers, or-ed. The first is the correct one -- it is measured against the
+        region the conversation actually has to fit in, using the real size of the
+        observation about to be sent rather than an estimate of the last turn. The second
+        exists because the first is not a lever: it only fires when the region is nearly
+        full, so a wide region means no compaction at all.
+        """
+        left = self._left()
+        if left is not None and left < self.floor:
+            return True
+        return bool(self.budget) and self._used + self.turn_cost >= self.budget
 
     def accept(self, response) -> Optional[str]:  # noqa: D102 - see base
 
