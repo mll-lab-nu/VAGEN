@@ -126,15 +126,24 @@ def test_the_invariant_holds_under_random_sizes(seed):
 
 
 # ------------------------------------------------------------------------ termination
-def test_no_generation_is_ever_squeezed_below_the_floor():
+def test_a_conversation_is_closed_rather_than_squeezed_below_the_floor():
     """A five-token generation is not an action, it is half an `<answer>` that the
-    environment then parses."""
+    environment then parses.
+
+    Asserting `max_new_tokens() >= floor` would prove nothing -- it is literally
+    `max(floor, left)`. What has to hold is that the harness *stops asking* once the room
+    is under the floor, so the clamp is never the thing keeping the promise.
+    """
     h = CompactHarness(budget=None, summary_budget=100, response_len=1000,
                        summary_request_len=REQ, floor=200)
     h.begin(SYS, OBS)
-    for resp in (0, 300, 600, 660, 661, 900):
+    room = 1000 - 100 - REQ
+    for resp, should_compact in ((0, False), (room - 200 - 58, False),
+                                 (room - 199 - 58, True), (900, True)):
         h.note_room(resp, 58)
-        assert h.max_new_tokens() >= 200
+        assert h._should_compact() is should_compact, (
+            f"resp={resp}: left={h._left()} against floor={h.floor}"
+        )
 
 
 def test_the_opening_call_charges_no_observation():
@@ -182,6 +191,14 @@ def test_the_optional_budget_restores_it_without_touching_the_region():
 
 def test_the_two_triggers_cannot_contradict_each_other():
     """Whichever fires first wins, and the region one is always the backstop -- so a
-    compact_budget set absurdly high cannot push a conversation past its row."""
-    peak, _, _ = simulate(turns=200, budget=10**9, **SOKOBAN)
-    assert peak <= SOKOBAN["n_r"]
+    compact_budget set absurdly high cannot push a conversation past its row.
+
+    The budget is set past anything reachable *and* the region is narrowed, so the region
+    trigger is demonstrably the one doing the work. Left at Sokoban's width this drove the
+    same path as the plain invariant test five above.
+    """
+    narrow = {**SOKOBAN, "n_r": 1600}
+    peak, per_conv, sums = simulate(turns=200, budget=10**9, **narrow)
+    assert sums > 0, "the region trigger never fired, so the backstop is untested"
+    assert peak <= narrow["n_r"], f"peak {peak} escaped the region"
+    assert max(per_conv) > 1, "conversations held one turn, so this is no_concat"

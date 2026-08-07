@@ -367,3 +367,61 @@ def test_no_concat_measures_the_conversation_it_is_about_to_open():
     assert h.continues_conversation() is False
     h.note_room(0, 0)
     assert not h.exhausted()
+
+
+def test_the_observation_is_actually_measured():
+    """"Measured, not estimated" is half the design, and nothing tested it.
+
+    A client whose `measure` returns 0 passed the entire suite: every decision then runs
+    on a pending observation of size zero, which is the estimate-shaped failure the
+    measurement replaced.
+    """
+    seen = []
+
+    class _Counting(_Client):
+        def measure(self, messages):
+            n = super().measure(messages)
+            seen.append(n)
+            return n
+
+    b = Budgets(prompt_len=500, response_len=4000, per_turn=100, max_turns=4,
+                env_response=200)
+    opening, continuation = context_limits("concat", b)
+    c = _Counting(lambda i: 50, b.per_turn)
+    c.opening_limit, c.continuation_limit = opening, continuation
+    asyncio.run(run_episode(_Env(20, lambda i: 37), build_harness(
+        "concat", response_len=b.response_len, floor=b.per_turn), c, max_turns=4))
+
+    assert seen, "the observation was never measured"
+    assert any(n > 0 for n in seen), (
+        f"every measurement came back zero, so the harness decided on nothing: {seen}"
+    )
+
+
+def test_the_room_the_harness_sees_tracks_the_conversation_it_will_use():
+    """The other half: response_len has to be read, and read for the right conversation."""
+    rooms = []
+
+    class _Recording(CompactHarness := __import__(
+            "vagen.harness.compact", fromlist=["CompactHarness"]).CompactHarness):
+        def note_room(self, response_len, obs_len):
+            rooms.append((response_len, obs_len))
+            super().note_room(response_len, obs_len)
+
+    b = Budgets(prompt_len=500, response_len=3000, per_turn=100, max_turns=6,
+                env_response=200, compact_budget=None, summary_budget=100,
+                summary_request_len=REQ)
+    opening, continuation = context_limits("compact", b)
+    c = _Client(lambda i: 100, b.per_turn)
+    c.opening_limit, c.continuation_limit = opening, continuation
+    asyncio.run(run_episode(_Env(20, lambda i: 37), _Recording(
+        summary_budget=100, summary_request_len=REQ,
+        response_len=b.response_len, floor=b.per_turn), c, max_turns=6))
+
+    assert rooms[0] == (0, 0), f"the opening call was charged something: {rooms[0]}"
+    assert any(r > 0 for r, _ in rooms[1:]), (
+        f"the spent region was never read as non-zero: {rooms}"
+    )
+    assert any(o > 0 for _, o in rooms[1:]), (
+        f"the observation was never charged: {rooms}"
+    )
