@@ -190,6 +190,10 @@ class CompactHarness(BaseHarness):
         """Never: making room is what this harness does."""
         return False
 
+    def continues_conversation(self) -> bool:
+        """False while a summary is pending: the next call opens on it."""
+        return self._summary is None and super().continues_conversation()
+
     def _should_compact(self) -> bool:
         """Either the next turn does not fit, or the optional budget says close early.
 

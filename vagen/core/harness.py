@@ -90,6 +90,16 @@ class BaseHarness(ABC):
         """
         self._room_resp, self._room_obs = response_len, obs_len
 
+    def continues_conversation(self) -> bool:
+        """Whether the next call appends to the conversation already open.
+
+        The room a call has is the room of the conversation it will land in, and that is
+        not always the one just used: no_concat opens a new one every turn, so measuring
+        the old one reports a region that is about to be discarded. Compaction overrides
+        this when it is about to reseed.
+        """
+        return self._conversation_id is not None
+
     def _reserve(self) -> int:
         """What must stay free for whatever closes the conversation. Nothing, by default."""
         return 0

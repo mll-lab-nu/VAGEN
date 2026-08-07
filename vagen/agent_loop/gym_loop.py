@@ -347,16 +347,19 @@ class GymLoop(VagenGymAgentLoopBase):
         b = replace(b, env_response=int(env_response) if env_response else default_env_response(mode, b))
         check_budgets(mode, b)
 
+        # Every mode gets the region and the floor. Passing them to compaction alone
+        # left `_left()` as None for the other two, so nothing bounded their generation
+        # by the room left and nothing stopped them when it ran out -- concat then filled
+        # past its region and the batch-boundary cut took model turns with it, losing the
+        # reward on them. Measured: 62 of 182 admitted concat configs lost reward.
+        room = dict(response_len=self.response_length, floor=per_turn)
         if mode == "compact":
-            # The response region is the real ceiling; compact_budget is an optional
-            # second trigger for keeping conversations shorter than it.
+            # compact_budget is an optional second trigger on top of the region.
             return build_harness(
                 mode, budget=m, summary_budget=summary_budget,
-                response_len=self.response_length,
-                summary_request_len=b.summary_request_len,
-                floor=per_turn,
+                summary_request_len=b.summary_request_len, **room,
             ), b
-        return build_harness(mode), b
+        return build_harness(mode, **room), b
 
     def _outputs(self, client, env, result, kwargs, episode_id: str) -> list[AgentLoopOutput]:
         rows = client.rows()
