@@ -36,6 +36,12 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     actor_rollout_ref.model.path="$MODEL" \
     critic.model.path="$MODEL" \
     algorithm.adv_estimator=grpo \
+    actor_rollout_ref.actor.optim.lr=3e-5 \
+    actor_rollout_ref.actor.use_kl_loss=True \
+    actor_rollout_ref.actor.kl_loss_coef=0.001 \
+    algorithm.kl_ctrl.kl_coef=0.001 \
+    actor_rollout_ref.rollout.max_model_len=5000 \
+    trainer.log_val_generations=16 \
     trainer.harness=concat \
     data.train_batch_size=16 \
     data.max_response_length=4000 \
@@ -62,5 +68,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     trainer.experiment_name="$EXPERIMENT_NAME" \
     trainer.default_local_dir="$EXPERIMENT_DIR/verl_checkpoints" \
     trainer.rollout_data_dir="$EXPERIMENT_DIR/rollout_data" \
+    trainer.validation_data_dir="$EXPERIMENT_DIR/validation" \
+    actor_rollout_ref.actor.checkpoint.save_contents="['model','hf_model','optimizer','extra']" \
     "$@" \
     2>&1 | tee "$EXPERIMENT_DIR/run.log"
