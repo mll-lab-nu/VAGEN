@@ -32,14 +32,20 @@ def test_a_workable_configuration_passes_in_every_mode(mode):
 
 
 # ---------------------------------------------------------------------- concat
-def test_concat_refuses_an_episode_whose_turns_cannot_all_fit():
-    """concat's response region holds the whole episode, so this is arithmetic, not luck."""
-    with pytest.raises(BudgetError, match=r"10 x response_length_per_turn=1000 \+ 9 x env_response_length=200"):
+def test_concat_warns_about_an_episode_whose_turns_cannot_all_fit():
+    """A warning, not a refusal, and the change is deliberate.
+
+    The arithmetic is a worst case -- every turn generating its full allowance -- and it
+    is survivable two ways now: the generation is bounded by the room actually left, and
+    what overflows anyway is truncated rather than refused. Refusing would rule out any
+    long episode on the strength of a case a real rollout does not reach.
+    """
+    with pytest.warns(UserWarning, match=r"10 x response_length_per_turn=1000 \+ 9 x env_response_length=200"):
         check("concat", _b(max_turns=10, per_turn=1000, response_len=8000, env_response=200))
 
 
 def test_concat_points_at_the_mode_that_solves_it_rather_than_only_the_number():
-    with pytest.raises(BudgetError, match="trainer.harness=compact"):
+    with pytest.warns(UserWarning, match="trainer.harness=compact"):
         check("concat", _b(max_turns=10))
 
 

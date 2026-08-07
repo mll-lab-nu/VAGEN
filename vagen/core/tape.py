@@ -171,6 +171,16 @@ class Conversation:
             )
 
     # ------------------------------------------------------------------ reading
+    @property
+    def response_len(self) -> int:
+        """Tokens in the trainable region: everything after the opening call.
+
+        Not ``len(token_ids)``. A budget written against ``max_response_length`` has to
+        be measured against the region that budget names -- counting the prompt region
+        too over-reserves by the system prompt, which on Sokoban is most of it.
+        """
+        return 0 if self.prompt_len is None else len(self.token_ids) - self.prompt_len
+
     def is_trainable(self) -> bool:
         """False for a conversation the model never spoke in — a new conversation
         immediately followed by a terminal step. Such rows carry no gradient and are

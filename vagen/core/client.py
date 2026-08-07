@@ -223,5 +223,23 @@ class InferenceClient(ABC):
         """
         return len(self._conversations[conversation_id].token_ids)
 
+    def response_len(self, conversation_id: str) -> int:
+        """How much of ``max_response_length`` this conversation has spent."""
+        return self._conversations[conversation_id].response_len
+
+    def measure(self, messages: list) -> int:
+        """Tokens these messages would add, without adding them.
+
+        Backends that cannot render without side effects may override; the default routes
+        through ``render``, which exists for exactly this.
+        """
+        rendered = self.render(messages)
+        return len(rendered[0] if isinstance(rendered, tuple) else rendered)
+
+    def render(self, messages: list):
+        """Tokens for these messages, recording nothing. Defaults to ``encode`` for
+        backends where encoding has no side effects to begin with."""
+        return self.encode(messages)
+
     def conversations(self) -> list[Conversation]:
         return list(self._conversations.values())

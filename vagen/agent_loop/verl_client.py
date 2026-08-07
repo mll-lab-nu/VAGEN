@@ -47,17 +47,27 @@ class VerlClient(InferenceClient):
 
     # ------------------------------------------------------------------ encoding
     def encode(self, messages: list[dict]) -> list[int]:
-        """Render messages to tokens, recording their images against the conversation.
+        """Render and record. See ``render`` for why the two are separable."""
+        ids, images = self.render(messages)
+        if self._active is not None and images:
+            self._images.setdefault(self._active, []).extend(images)
+        return ids
+
+    def render(self, messages: list[dict]) -> tuple[list[int], list]:
+        """Tokens and frames for these messages, recording nothing.
+
+        Split out from ``encode`` so a caller can ask "how big is this observation?"
+        before deciding what to do with it. Asking used to mean encoding, and encoding
+        recorded the frames against the conversation -- so measuring once shipped every
+        picture twice, which is the alignment failure this codebase keeps finding.
 
         Rendered with a placeholder turn in front and then stripped, so a mid-conversation
         span is tokenized the way it will sit in the full sequence rather than as if it
         began the prompt -- chat templates prepend a system block otherwise.
         """
         if not messages:
-            return []
+            return [], []
         new_images = [image for message in messages for image in images_of(message)]
-        if self._active is not None:
-            self._images.setdefault(self._active, []).extend(new_images)
 
         opening = self._conversations[self._active].prompt_len is None if self._active else True
         flat = [{"role": m["role"], "content": _parts(m)} for m in messages]
@@ -94,7 +104,7 @@ class VerlClient(InferenceClient):
                 **self.apply_chat_template_kwargs,
             )
         if opening:
-            return ids
+            return ids, new_images
         prefix = self._template_prefix()
         if ids[: len(prefix)] != prefix:
             # The strip is only safe if the rendered span really starts with it.
@@ -102,7 +112,7 @@ class VerlClient(InferenceClient):
                 "chat template did not begin the continuation with the placeholder turn; "
                 "stripping a fixed length here would corrupt the span"
             )
-        return ids[len(prefix) :]
+        return ids[len(prefix) :], new_images
 
     def _template_prefix(self) -> list[int]:
         """Tokens a chat template emits before the first message's content.
