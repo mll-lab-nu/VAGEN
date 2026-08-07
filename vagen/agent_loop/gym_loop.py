@@ -46,14 +46,32 @@ logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
 STATE_REWARD_SPECS = {"Sokoban": sokoban_spec.SPEC}
 
 
-def _spans_within(spans, keep: int) -> list[tuple[int, int]]:
-    """The response spans that survive a truncation to ``keep`` tokens, clipped to it."""
-    out = []
+def _spans_within(spans, keep: int) -> tuple[list[tuple[int, int]], int]:
+    """The spans that survive a truncation to ``keep``, and where the survivors end.
+
+    A span that straddles the cut is dropped entirely rather than clipped, and the caller
+    unmasks what is left of it. Clipping looked like the gentler option and is the worse
+    one: the surviving fragment keeps mask 1, so it is trained on as if it were an action,
+    while the reward -- which ``add_reward`` writes at ``scores[end - 1]`` -- is past the
+    cut and dropped. The model is optimised on half a move, at reward zero.
+
+    It is always the *last* turn, and the last turn is where the terminal reward lands.
+    The response region ends on a model span (the next observation is only appended if it
+    fits), so every overflow straddles one. Measured on a solve-at-turn-5 episode with a
+    four-token overflow: 10.4 earned, 0.4 trained, the whole success reward gone. Under a
+    group-relative estimator the rollouts that *solved* then get the group's most negative
+    advantage, because the baseline moved with them.
+    """
+    out, safe_end = [], 0
     for start, end in spans or ():
+        start, end = int(start), int(end)
         if start >= keep:
             break
-        out.append((int(start), min(int(end), keep)))
-    return out
+        if end > keep:
+            break            # straddles the cut: the whole turn goes
+        out.append((start, end))
+        safe_end = end
+    return out, safe_end
 
 
 def _accepts_response(step) -> bool:
@@ -437,11 +455,17 @@ class GymLoop(VagenGymAgentLoopBase):
                 row.response_ids, response_frames, hint)
             images = prompt_frames + response_frames
             keep = len(response_ids)
+            spans, safe_end = _spans_within(row.response_spans, keep)
+            # Whatever is left of a dropped turn is context, not an action. Left at
+            # mask 1 it trains as a decision the model never finished making.
+            mask = list(row.response_mask[:keep])
+            for i in range(safe_end, len(mask)):
+                mask[i] = 0
             outputs.append(
                 AgentLoopOutput(
                     prompt_ids=prompt_ids,
                     response_ids=response_ids,
-                    response_mask=row.response_mask[:keep],
+                    response_mask=mask,
                     # "images", plural. Upstream renamed this key; the singular form is
                     # silently ignored, so the processor is handed no pictures, the
                     # forward pass gets image-pad tokens with no vision features and
@@ -449,7 +473,14 @@ class GymLoop(VagenGymAgentLoopBase):
                     # complaining. The rollout still sees the frames -- only the model
                     # being optimised is blind.
                     multi_modal_data={"images": images} if images else {},
-                    response_logprobs=row.logprobs[:keep] or None,
+                    # None when the engine did not return logprobs. The tape fills
+                    # unsupplied positions with 0.0, and `[0.0, 0.0, ...] or None` is the
+                    # list -- so verl received a real rollout_log_probs tensor of zeros.
+                    # Every rollout-vs-training probability metric then reads that as the
+                    # rollout's actual belief, and `apply_bypass_mode` guards only on the
+                    # key being present, so a zero vector sets old_log_probs to zero.
+                    response_logprobs=(row.logprobs[:keep]
+                                       if any(row.logprobs[:keep]) else None),
                     # The sum is what verl's own metrics read; the vector below is what
                     # actually trains. Both, because they answer different questions.
                     reward_score=float(sum(row.scores[:keep])),
@@ -488,7 +519,7 @@ class GymLoop(VagenGymAgentLoopBase):
                         # a truncation leaves spans pointing past the end, and the only
                         # thing that noticed was a range check downstream that silently
                         # dropped the turns they described.
-                        "response_spans": _spans_within(row.response_spans, keep),
+                        "response_spans": spans,
                         # How many turns the episode actually ran. num_turns above is 1
                         # per row by construction, and in concat mode an episode is one
                         # row -- so without this the only turn count anything can see

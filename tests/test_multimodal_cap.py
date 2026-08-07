@@ -150,3 +150,98 @@ def test_gym_loop_defers_to_the_guard_rather_than_slicing():
     assert "cap_token_ids" in src, "_outputs no longer routes through the guard"
     for raw in ("[-self.prompt_length :]", "[: self.response_length]", "[-self.prompt_length:]"):
         assert raw not in src, f"_outputs still slices raw: {raw}"
+
+
+def test_a_turn_straddling_the_cut_is_dropped_whole_not_clipped():
+    """Clipping looks gentler and is worse.
+
+    The surviving fragment keeps mask 1 -- trained on as if it were an action -- while
+    the reward, which add_reward writes at scores[end-1], is past the cut and dropped.
+    The model is optimised on half a move at reward zero. And it is always the *last*
+    turn, because the response region ends on a model span: measured on a solve-at-5
+    episode with a four-token overflow, 10.4 earned and 0.4 trained.
+    """
+    from omegaconf import OmegaConf
+
+    from vagen.agent_loop.gym_loop import GymLoop
+
+    class _Row:
+        ordinal = 0
+        conversation_id = "c"
+        prompt_ids = [1]
+        #        turn 0        obs          turn 1 (straddles a cut at 14)
+        response_ids = [10, 11, 12, 13] + [20, 21, 22, 23] + [30, 31, 32, 33]
+        response_mask = [1, 1, 1, 1] + [0, 0, 0, 0] + [1, 1, 1, 1]
+        logprobs = [0.0] * 12
+        scores = [0, 0, 0, 1.0] + [0] * 4 + [0, 0, 0, 9.0]     # the big one is last
+        response_spans = [(0, 4), (8, 12)]
+
+    class _Client:
+        def rows(self): return [_Row()]
+        def images(self, cid): return []
+
+    class _Env:
+        success = True
+        state_scores = {}
+
+    class _Result:
+        turns = 2
+
+    loop = GymLoop.__new__(GymLoop)
+    loop.prompt_length, loop.response_length = 100, 10        # cuts inside span (8,12)
+    loop.processor = loop.tokenizer = None
+    loop._ph_cache = (set(), set())
+    loop.config = OmegaConf.create({"trainer": {"harness": "concat", "compact_budget": 400}})
+
+    out = GymLoop._outputs(loop, _Client(), _Env(), _Result(),
+                           {"group_idx": "g", "traj_idx": 0}, "ep")[0]
+    spans = out.extra_fields["response_spans"]
+    assert spans == [(0, 4)], f"the straddling turn survived as a fragment: {spans}"
+    assert all(e <= len(out.response_ids) for _, e in spans)
+    # nothing past the last surviving span may still look like a decision
+    assert not any(out.response_mask[4:]), (
+        f"a half-turn is still masked as an action: {out.response_mask}"
+    )
+    assert out.reward_score == pytest.approx(sum(out.extra_fields["per_token_reward"]))
+
+
+def test_absent_logprobs_are_published_as_absent():
+    """The tape fills unsupplied positions with 0.0, and `[0.0, ...] or None` is the list
+    -- so verl got a real rollout_log_probs tensor of zeros and read it as the rollout's
+    actual belief."""
+    from omegaconf import OmegaConf
+
+    from vagen.agent_loop.gym_loop import GymLoop
+
+    class _Row:
+        ordinal = 0
+        conversation_id = "c"
+        prompt_ids = [1]
+        response_ids = [10, 11]
+        response_mask = [1, 1]
+        logprobs = [0.0, 0.0]              # what the tape writes when none came back
+        scores = [0.0, 1.0]
+        response_spans = [(0, 2)]
+
+    class _Client:
+        def rows(self): return [_Row()]
+        def images(self, cid): return []
+
+    class _Env:
+        success = True
+        state_scores = {}
+
+    class _Result:
+        turns = 1
+
+    loop = GymLoop.__new__(GymLoop)
+    loop.prompt_length, loop.response_length = 100, 100
+    loop.processor = loop.tokenizer = None
+    loop._ph_cache = (set(), set())
+    loop.config = OmegaConf.create({"trainer": {"harness": "concat", "compact_budget": 400}})
+
+    out = GymLoop._outputs(loop, _Client(), _Env(), _Result(),
+                           {"group_idx": "g", "traj_idx": 0}, "ep")[0]
+    assert out.response_logprobs is None, (
+        f"a fabricated all-zero logprob vector was published: {out.response_logprobs}"
+    )
