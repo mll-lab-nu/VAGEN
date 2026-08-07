@@ -279,12 +279,16 @@ def context_limits(mode: str, b: Budgets) -> tuple[int, int]:
     is where ``S`` is finally charged: the opening ceiling is the only check that sees the
     system prompt, because it is the first thing to have measured it.
 
-    Compaction bounds its openings by ``m`` as well, which is stricter and is the point --
-    a conversation that opens at the budget summarises after one turn.
+    Compaction no longer bounds its openings by ``m``. It used to, back when ``m`` was
+    what a conversation had to fit inside; ``m`` is an optional *trigger* now -- close
+    earlier than the region would -- and treating a trigger as a ceiling made the lever
+    unusable in exactly the range it is for. ``compact_budget=400`` is accepted by every
+    static check and then dies on the first call of the episode, because the opening is
+    the system prompt plus the first observation (647 tokens on Sokoban) and there is no
+    summary in it yet to be compacted away. Whether a conversation opens too full to buy
+    a turn is a runtime question, and ``CompactionMakesNoProgress`` is where it is asked.
     """
     opening = b.prompt_len
-    if mode == "compact" and b.compact_budget:
-        opening = min(opening, b.compact_budget)
     # An observation is bounded by env_response_length wherever a conversation can be
     # continued. Compaction used the budget here, which bounded nothing worth bounding:
     # every relation compaction has to satisfy is written in terms of E, and E was the

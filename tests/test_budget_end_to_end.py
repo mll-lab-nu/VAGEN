@@ -425,3 +425,56 @@ def test_the_room_the_harness_sees_tracks_the_conversation_it_will_use():
     assert any(o > 0 for _, o in rooms[1:]), (
         f"the observation was never charged: {rooms}"
     )
+
+
+# ------------------------------------------------------ two regressions, pinned
+def test_an_unset_per_turn_budget_does_not_collapse_concat_to_one_turn():
+    """`response_length_per_turn` is optional, and unset it falls back to the whole
+    response length. Using that as the floor makes exhausted() true after a single token,
+    so every episode stopped at turn one -- marked truncated, well-formed row, nothing
+    reporting it. Erring small is the safe direction: too small only allows a squeezed
+    generation, too large deletes the episode.
+    """
+    from omegaconf import OmegaConf
+
+    from vagen.agent_loop.gym_loop import GymLoop
+
+    def floor_for(per_turn, configured):
+        loop = GymLoop.__new__(GymLoop)
+        loop.prompt_length, loop.response_length = 2048, 8000
+        loop.tokenizer = type("T", (), {"encode": lambda self, t: [0] * 13,
+                                        "apply_chat_template": lambda self, *a, **k: [0] * 34})()
+        loop.apply_chat_template_kwargs = {}
+        loop.config = OmegaConf.create({
+            "trainer": {"harness": "concat", "compact_budget": 1300,
+                        "compact_summary_budget": None},
+            "actor_rollout_ref": {"rollout": {"max_model_len": None}}})
+        h, _ = GymLoop._build_harness(loop, per_turn=per_turn, max_turns=20,
+                                      per_turn_configured=configured)
+        return h.floor
+
+    assert floor_for(512, True) == 512, "a configured per-turn budget should be the floor"
+    unset = floor_for(8000, False)          # the fallback: per_turn == response_length
+    assert unset < 8000, "the floor is the whole region, so one token exhausts it"
+    assert unset <= 8000 // 4, f"the floor is {unset} of an 8000 region"
+
+    h = build_harness("concat", response_len=8000, floor=unset)
+    h.begin({"role": "system", "content": "s"}, {"role": "user", "content": "o"})
+    h.note_room(100, 50)                    # one turn in
+    assert not h.exhausted(), "the episode would stop after its first turn"
+
+
+def test_the_compact_budget_lever_works_in_the_range_it_is_for():
+    """compact_budget is a trigger, not a ceiling. Treating it as one bounded the opening
+    call by it, so a small budget -- the whole point of the lever -- died on the episode's
+    first call: the opening is the system prompt plus the first observation, and there is
+    no summary in it yet to compact away."""
+    from vagen.harness.budget import context_limits
+
+    b = Budgets(prompt_len=2048, response_len=6144, per_turn=512, max_turns=20,
+                env_response=1000, compact_budget=400, summary_budget=100,
+                summary_request_len=REQ)
+    check("compact", b)
+    opening, _ = context_limits("compact", b)
+    assert opening == 2048, f"the opening is bounded by the trigger, not the region: {opening}"
+    assert opening > 589 + 58, "a Sokoban opening call would be refused before it ran"
