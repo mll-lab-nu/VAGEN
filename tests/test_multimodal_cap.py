@@ -53,20 +53,22 @@ def test_the_error_names_the_knob_to_turn():
         cap_token_ids([1, 2, 3], 1, multimodal=True, what="response", budget_name="data.max_response_length")
 
 
-def test_an_episode_over_the_budget_is_refused_rather_than_trained_on():
-    """Text overflow raises in the agent loop, unlike verl's default.
+def test_an_over_budget_response_is_truncated_and_an_over_budget_prompt_is_not():
+    """The two regions are not symmetric, and the asymmetry is the point.
 
-    Truncating here does not produce a shorter version of the episode, it produces a
-    different one: the closing turns go, and the rewards earned in them go with the
-    spans that index them -- the arrays stay mutually consistent and the loss stays
-    finite, so nothing downstream can tell. The message has to name the mode, because
-    the budget is the same knob in all three and the reason it was hit never is.
+    The response region holds observations, whose size the environment decides. Refusing
+    there makes a long-tail rollout impossible to debug, and what gets cut is context:
+    the model's own tokens are bounded by max_new_tokens, so only observations can
+    overflow, and observations carry mask 0 and no reward.
+
+    The prompt region is the *opening call* -- system prompt plus the first observation.
+    Nothing in it is old, so a left cut takes the instructions. It still raises.
     """
+    from omegaconf import OmegaConf
+
     from vagen.agent_loop.gym_loop import GymLoop
 
     class _Row:
-        # Numbered where the conversation was opened, not by position among the rows
-        # that survive -- see Conversation.ordinal.
         ordinal = 0
         conversation_id = "c"
         prompt_ids = [1, 2]
@@ -87,16 +89,34 @@ def test_an_episode_over_the_budget_is_refused_rather_than_trained_on():
     class _Result:
         turns = 2
 
-    loop = GymLoop.__new__(GymLoop)
-    loop.prompt_length, loop.response_length = 100, 3     # cap below the response
-    loop.config = OmegaConf.create({"trainer": {"harness": "concat", "compact_budget": 400}})
+    def _loop(prompt_len, response_len):
+        loop = GymLoop.__new__(GymLoop)
+        loop.prompt_length, loop.response_length = prompt_len, response_len
+        loop.processor, loop.tokenizer, loop._ph_cache = None, None, None
+        loop.config = OmegaConf.create({"trainer": {"harness": "concat", "compact_budget": 400}})
+        return loop
 
-    with pytest.raises(ValueError) as e:
-        GymLoop._outputs(loop, _Client(), _Env(), _Result(),
+    out = GymLoop._outputs(_loop(100, 3), _Client(), _Env(), _Result(),
+                           {"group_idx": "g", "traj_idx": 0}, "ep")[0]
+    n = len(out.response_ids)
+    assert n == 3, f"the response was not cut to the budget: {n}"
+    assert len(out.response_mask) == n, "mask outlived the ids it indexes"
+    assert len(out.response_logprobs) == n, "logprobs outlived the ids"
+    assert len(out.extra_fields["per_token_reward"]) == n, "reward vector outlived the ids"
+    assert all(e <= n for _, e in out.extra_fields["response_spans"]), (
+        f"spans point past the response: {out.extra_fields['response_spans']}"
+    )
+
+    class _BigPrompt(_Row):
+        prompt_ids = list(range(50))
+
+    class _BigClient(_Client):
+        def rows(self): return [_BigPrompt()]
+
+    with pytest.raises(ValueError, match="data.max_prompt_length"):
+        GymLoop._outputs(_loop(3, 100), _BigClient(), _Env(), _Result(),
                          {"group_idx": "g", "traj_idx": 0}, "ep")
-    assert "data.max_response_length" in str(e.value), "the message does not name the knob"
-    assert "harness=concat" in str(e.value), "the message does not name the mode that overflowed"
-    assert "compact" in str(e.value), "concat's overflow does not point at the mode that fixes it"
+
 
 
 def test_the_overflow_hint_differs_by_mode():

@@ -133,6 +133,117 @@ def image_token_ids(source) -> set:
     return ids
 
 
+class NoValidTruncation(ValueError):
+    """The budget cannot hold anything worth training on.
+
+    A truncation always exists -- drop every picture -- but a 400-token budget on a
+    sequence whose first image alone is 300 leaves four tokens, which is a well-formed
+    batch row and a worthless one. Better to drop the row and count it.
+    """
+
+
+def vision_sentinel_ids(source) -> set:
+    """The ids that bracket a picture, if the model declares them.
+
+    Not decoration. ``get_rope_index`` counts images by reading the token *after* every
+    ``vision_start`` -- ``vision_tokens = input_ids[vision_start_indices + 1]``, in
+    transformers and in verl's own copy -- so a run that has lost its opening sentinel is
+    not counted as an image at all. It is laid out as text, the grid entry meant for it is
+    consumed by a later run, and every position after it shifts. Nothing raises: the
+    placeholder and feature counts still agree, so ``masked_scatter`` runs happily.
+
+    That makes ``vision_start .. vision_end`` the atomic unit for cutting, not the run.
+
+    Declared on the config for Qwen2.5-VL, which verl attaches to the processor. Read the
+    same way as the placeholders themselves: no spelling table.
+    """
+    ids = set()
+    for holder in (source, getattr(source, "config", None), getattr(source, "processor", None),
+                   getattr(getattr(source, "processor", None), "config", None)):
+        if holder is None:
+            continue
+        for attr in ("vision_start_token_id", "vision_end_token_id"):
+            value = getattr(holder, attr, None)
+            if isinstance(value, int):
+                ids.add(value)
+    return ids
+
+
+def placeholder_blocks(token_ids, placeholders: set, sentinels: set = frozenset()) -> list:
+    """``(start, end)`` of each picture, sentinels included.
+
+    ``count_placeholder_runs`` answers "how many"; cutting needs "where", and it needs the
+    boundary to be the *block* rather than the run -- see ``vision_sentinel_ids``.
+    """
+    ids = [int(t) for t in token_ids]
+    blocks, i, n = [], 0, len(ids)
+    while i < n:
+        if ids[i] in placeholders:
+            start, end = i, i
+            while end < n and ids[end] in placeholders:
+                end += 1
+            # Swallow the sentinels that bracket this run, when the model has them.
+            if sentinels and start > 0 and ids[start - 1] in sentinels:
+                start -= 1
+            if sentinels and end < n and ids[end] in sentinels:
+                end += 1
+            blocks.append((start, end))
+            i = end
+        else:
+            i += 1
+    return blocks
+
+
+def truncate_keeping_images_whole(token_ids, budget: int, *, keep: str, placeholders: set,
+                                  frames=None, sentinels: set = frozenset(), min_kept: int = 1):
+    """Cut to ``budget``, never through a picture. Returns ``(token_ids, frames)``.
+
+    A cut that lands inside a picture takes the whole picture, and the frame that goes
+    with it -- placeholder blocks and ``multi_modal_inputs`` are strictly 1:1, and
+    ``multi_modal_inputs`` is built from the frames list *alone* (the token sequence is
+    decoded with ``skip_special_tokens=True`` first, which erases every placeholder). So
+    a frames list that disagrees with the blocks is not caught by anything downstream; it
+    is handed to the model as a picture it was never shown.
+
+    ``keep="head"`` cuts the end, ``keep="tail"`` drops the beginning.
+    """
+    ids = list(token_ids)
+    frames = list(frames or [])
+    if len(ids) <= budget:
+        return ids, frames
+
+    blocks = placeholder_blocks(ids, placeholders, sentinels)
+    if blocks and len(blocks) != len(frames):
+        raise ImagePlaceholderMismatch(
+            f"{len(blocks)} placeholder block(s) but {len(frames)} frame(s) before "
+            f"truncating; the two have to agree or the cut cannot keep them in step"
+        )
+
+    if keep == "head":
+        cut = budget
+        for start, end in blocks:
+            if start < cut < end:
+                cut = start          # the cut fell inside this picture, so it goes too
+                break
+        kept_ids = ids[:cut]
+        kept_frames = [f for (s, e), f in zip(blocks, frames) if e <= cut]
+    else:
+        cut = len(ids) - budget
+        for start, end in blocks:
+            if start < cut < end:
+                cut = end
+                break
+        kept_ids = ids[cut:]
+        kept_frames = [f for (s, e), f in zip(blocks, frames) if s >= cut]
+
+    if len(kept_ids) < min_kept:
+        raise NoValidTruncation(
+            f"cutting to {budget} leaves {len(kept_ids)} token(s), under the {min_kept} "
+            f"worth keeping. A picture that does not fit takes the whole sequence with it."
+        )
+    return kept_ids, kept_frames
+
+
 def count_placeholder_runs(token_ids, placeholders: set) -> int:
     """How many frames this span has room for: one per *run* of placeholder ids.
 
