@@ -76,6 +76,7 @@ turn and the mode was no_concat at twice the price, silently, for three runs.
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 
 
@@ -211,14 +212,22 @@ def check(mode: str, b: Budgets) -> None:
     if mode == "concat" and b.per_turn_configured:
         episode = b.max_turns * b.per_turn + max(0, b.max_turns - 1) * b.env_response
         if episode > b.response_len:
-            raise BudgetError(
+            # A warning, not an error. This is the worst case -- every turn generating
+            # its full allowance -- and it is now survivable two ways: the generation is
+            # bounded by the room actually left, and what overflows anyway is truncated
+            # rather than refused. Refusing here would rule out any long episode on the
+            # strength of a worst case that a real rollout does not reach, which is the
+            # bluntness that makes a long-tail run impossible to debug.
+            warnings.warn(
                 f"concat keeps the whole episode in one conversation, so its response "
                 f"region holds every turn: max_turns={b.max_turns} x "
                 f"response_length_per_turn={b.per_turn} + {max(0, b.max_turns - 1)} x "
                 f"env_response_length={b.env_response} = {episode} tokens, against "
-                f"data.max_response_length={b.response_len}. Use trainer.harness=compact, "
-                f"lower max_turns / response_length_per_turn / env_response_length, or "
-                f"raise the budget."
+                f"data.max_response_length={b.response_len}. Turns will be generated "
+                f"against the room left rather than the full allowance, and anything over "
+                f"is truncated -- but if episodes really do run that long, use "
+                f"trainer.harness=compact or lower max_turns.",
+                stacklevel=2,
             )
         _need(b, b.env_response + episode, "the whole episode",
               f"a first observation of {b.env_response} plus {episode} tokens of turns")
@@ -279,9 +288,12 @@ def _check_compact(b: Budgets) -> None:
 def _need(b: Budgets, tokens: int, what: str, breakdown: str) -> None:
     """One conversation of ``tokens`` has to fit the hard window."""
     if tokens > b.window:
-        raise BudgetError(
+        warnings.warn(
             f"{what} needs {tokens} tokens ({breakdown}), against a window of {b.window} "
-            f"({b.window_name})."
+            f"({b.window_name}). This is the worst case; generation is bounded by the "
+            f"room left and the overflow is truncated, but the numbers do not leave "
+            f"headroom for it.",
+            stacklevel=2,
         )
 
 
