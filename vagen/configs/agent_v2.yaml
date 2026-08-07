@@ -1,2 +1,9 @@
+# What `agent_name` selects. The dataset emits "gym_agent" (gym_agent_dataset.py), and
+# only this file registers that name -- the @register decorator on GymLoop registers
+# "gym_agent_v2", which nothing dispatches to. So this file is the dispatch, not a
+# duplicate of the decorator.
+#
+# agent.yaml and agent_no_concat.yaml were byte-identical copies of this and referenced
+# by nothing; deleted. Which harness runs is `trainer.harness`, not a separate loop.
 - name: gym_agent
   _target_: vagen.agent_loop.gym_loop.GymLoop

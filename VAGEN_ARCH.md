@@ -75,7 +75,7 @@ vagen/
 │   chat_api.py  adapters/            (local_engine.py / managed_server.py: later)
 ├── eval/       depends on core + clients — **no verl / torch / ray**
 └── train/      depends on core + clients + verl
-    verl_client.py  verl_agent_loop.py  trainer_mixin.py  dataset.py  advantage/
+    verl_client.py  gym_loop.py  multi_output.py   (see AGENT.md section 6)
 ```
 
 ```
@@ -140,7 +140,7 @@ class TokenLedger:
     """One training sample.
 
     ★ Python built-ins + PIL only — no torch.Tensor, or the eval side is forced to
-      install torch. Tensor conversion happens in train/verl_agent_loop.py.
+      install torch. Tensor conversion happens in agent_loop/gym_loop.py.
     """
     prompt_ids: list[int]
     response_ids: list[int]
@@ -467,7 +467,7 @@ trigger point.
 `NoConcatHarness` produces T samples per rollout, so verl's one-output-per-agent-loop assumption must be lifted. v0.8.0 already factored the postprocess out, so this is four lines:
 
 ```python
-# train/verl_agent_loop.py
+# agent_loop/gym_loop.py
 class MultiOutputAgentLoopWorker(AgentLoopWorker):
     async def _run_agent_loop(self, sampling_params, trajectory, *, agent_name, trace=True, **kw):
         outputs = await agent_loop.run(sampling_params, **kw)          # may return a list
@@ -484,7 +484,7 @@ class MultiOutputAgentLoopManager(AgentLoopManager):
     agent_loop_workers_class = ray.remote(MultiOutputAgentLoopWorker)
 ```
 ```bash
-actor_rollout_ref.rollout.agent.agent_loop_manager_class=vagen.train.verl_agent_loop.MultiOutputAgentLoopManager
+actor_rollout_ref.rollout.agent.agent_loop_manager_class=vagen.agent_loop.multi_output.MultiOutputAgentLoopManager
 ```
 Official hooks: `workers/config/rollout.py:97`, `ray_trainer.py:930`, `agent_loop.py:1074`.
 **Side effect: the 825-line `agent_loop_no_concat.py` fork is deleted outright.** Compaction later needs nothing more here.
@@ -662,7 +662,7 @@ When we build it: **port slime's `TrajectoryManager`** (508 lines, Apache-2.0 �
    - **T2 contract** — the six invariants below plus the chat-template self-check, against 3 real tokenizers (Qwen2.5-VL, Qwen3, InternVL). CPU only.
    - **T3 integration** — one short end-to-end run per phase, compared against a stored baseline curve.
 3. **Store a baseline before touching anything in a phase.** Every phase's exit criterion is "matches baseline".
-4. **CI enforces dependency direction** — clean-env import of `vagen.eval`.
+4. **CI enforces dependency direction** — clean-env import of `vagen.evaluate`.
 5. **Fail loudly.** Every silent-degradation path found so far must raise, not warn: verl's `hf_processor` swallowing an unsupported processor into `None`; chat-template prefix instability; image/token count mismatch.
 6. **New harness ≈ 50 lines, new algorithm ≈ 20 lines.** If either needs much more, the abstraction leaked — fix the abstraction, don't work around it.
 7. 🔴 **Nothing downstream of `TokenLedger` assumes the Runner drove the episode** (§9.2).

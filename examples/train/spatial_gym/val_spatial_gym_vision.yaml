@@ -2,9 +2,16 @@ envs:
   - name: SpatialGym
     n_envs: 50
     data_source: spatial_gym
-    seed: [0, 49, 1]  
+    # Disjoint from train's [0,49]. They were identical, so validation was
+    # reporting training performance.
+    seed: [1000, 1049, 1]
     max_turns: 11
-    response_length_per_turn: 2048
+    # Below data.max_response_length (2000). Above it, the loop clamps per_turn up
+    # to the region, and the derived observation ceiling collapses with it.
+    response_length_per_turn: 1024
+    # What one observation may be. Declared rather than derived: the derivation is
+    # deliberately generous and the static checks are only exact against a real number.
+    env_response_length: 600
     config:
       exp_type: active
       render_mode: vision

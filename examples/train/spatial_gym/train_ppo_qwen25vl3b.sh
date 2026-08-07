@@ -26,6 +26,8 @@ VERL=${VERL:-$(cd "$V/../verl" 2>/dev/null && pwd)}
 export PYTHONPATH=${VERL:+$VERL:}$V${PYTHONPATH:+:$PYTHONPATH}
 mapfile -t BASE < <(grep -vE '^\s*(#|$)' "$V/vagen/configs/baseline_vllm.flags" | sed "s|\$V|$V|g")
 
+# train_batch_size is 32, not 128: the dataset is n_envs=50 and the loader drops
+# the last partial batch, so 128 yields zero batches and the trainer asserts.
 PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     --config-path="$V/vagen/configs" --config-name=vagen_multiturn \
     hydra.searchpath="[file://$VERL/verl/trainer/config]" \
@@ -38,7 +40,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     critic.enable=True \
     algorithm.adv_estimator=gae \
     trainer.harness=concat \
-    data.train_batch_size=128 \
+    data.train_batch_size=32 \
     data.max_prompt_length=4000 \
     data.max_response_length=2000 \
     actor_rollout_ref.actor.ppo_mini_batch_size=32 \
