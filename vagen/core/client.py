@@ -56,7 +56,21 @@ class BackendOutput:
     weights_version: Optional[tuple[int, int]] = None
 
 
-class ContextTooLarge(ValueError):
+class EpisodeUnusable(Exception):
+    """This episode cannot be finished; other episodes are unaffected.
+
+    The distinction that matters is *what the failure is evidence of*. A configuration
+    error is evidence about every episode, so it should stop the run. An observation that
+    came back too large, or a conversation that could not buy a turn, is evidence about
+    this rollout -- and taking the batch down for it means one unlucky environment sample
+    costs an entire training step.
+
+    Which is what happened: these escaped ``run_episode``, nothing caught them, and
+    verl's ``asyncio.gather`` has no ``return_exceptions``.
+    """
+
+
+class ContextTooLarge(EpisodeUnusable, ValueError):
     """One call handed the model more context than the mode has room for.
 
     Context is everything it did not generate: the system prompt, an observation, a

@@ -190,7 +190,7 @@ You can follow the Sokoban examples as templates:
 
 Write your training script based on:
 
-* [`examples/train/sokoban/train_ppo_qwen25vl3b.sh`](examples/train/sokoban/train/train_ppo_qwen25vl3b.sh)
+* [`examples/train/sokoban/train_ppo_qwen25vl3b.sh`](examples/train/sokoban/train_ppo_qwen25vl3b.sh)
 
 
 ## More Customization
@@ -208,7 +208,7 @@ refer to `vagen/configs/vagen_multiturn.yaml`
 ```yaml
 # Enable no concat mode: input is system prompt + current step observation
 trainer:
-  concat_multi_turn: False
+  harness: no_concat        # concat | no_concat | compact
 # Currently only supported with algorithm.adv_estimator=no_concat_gae
 
 ```

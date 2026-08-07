@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Optional
 
+from vagen.core.client import EpisodeUnusable
 from vagen.core.harness import BaseHarness, Call, Msg
 
 
-class CompactionMakesNoProgress(RuntimeError):
+class CompactionMakesNoProgress(EpisodeUnusable, RuntimeError):
     """Conversation after conversation hit the budget after a single turn.
 
     Not a slow run: the episode still finishes, every row is well-formed, and the only

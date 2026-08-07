@@ -480,3 +480,27 @@ def test_the_compact_budget_lever_works_in_the_range_it_is_for():
     opening, _ = context_limits("compact", b)
     assert opening == 2048, f"the opening is bounded by the trigger, not the region: {opening}"
     assert opening > 589 + 58, "a Sokoban opening call would be refused before it ran"
+
+
+def test_an_unusable_episode_costs_one_episode_not_the_batch():
+    """verl's asyncio.gather has no return_exceptions, so anything escaping run_episode
+    takes the whole rollout step with it. A too-large observation is evidence about this
+    rollout; a bad configuration is evidence about every one, and still stops the run."""
+    from omegaconf import OmegaConf
+
+    from vagen.agent_loop.gym_loop import GymLoop
+    from vagen.core.client import ContextTooLarge, EpisodeUnusable
+    from vagen.harness.budget import BudgetError
+    from vagen.utils.image_token_utils import ImagePlaceholderMismatch
+
+    assert issubclass(ContextTooLarge, EpisodeUnusable)
+    from vagen.harness.compact import CompactionMakesNoProgress
+    assert issubclass(CompactionMakesNoProgress, EpisodeUnusable)
+    # These say something about the configuration, not about one rollout.
+    assert not issubclass(BudgetError, EpisodeUnusable)
+    assert not issubclass(ImagePlaceholderMismatch, EpisodeUnusable)
+
+    import inspect
+    src = inspect.getsource(GymLoop.run)
+    assert "except EpisodeUnusable" in src, "run() no longer isolates an unusable episode"
+    assert "return []" in src, "a dropped episode must yield no rows rather than raise"

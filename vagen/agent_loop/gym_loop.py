@@ -37,6 +37,7 @@ from vagen.utils.image_token_utils import (
     image_token_ids, placeholder_blocks, truncate_keeping_images_whole,
     vision_sentinel_ids,
 )
+from vagen.core.client import EpisodeUnusable
 from vagen.core.runner import run_episode
 
 logger = logging.getLogger(__file__)
@@ -135,6 +136,11 @@ class GymEnvAdapter:
         return {"role": role, "content": convert_obs_to_content(obs, **self.kwargs), "images": images}
 
 
+# Registered under both names: the dataset emits "gym_agent"
+# (gym_agent_dataset.py) and that is what actually dispatches, via
+# configs/agent_v2.yaml. "gym_agent_v2" is the decorator's own name and
+# nothing selects it -- kept so a config that does still resolves.
+@register("gym_agent")
 @register("gym_agent_v2")
 class GymLoop(VagenGymAgentLoopBase):
     """Runner + harness + client. The mode comes from config, not from the class."""
@@ -189,7 +195,21 @@ class GymLoop(VagenGymAgentLoopBase):
         # up as a truncated row and not as an oversized observation.
         client.opening_limit, client.continuation_limit = opening_limit, continuation_limit
 
-        result = await run_episode(env, harness, client, seed=kwargs["seed"], max_turns=max_turns)
+        try:
+            result = await run_episode(env, harness, client, seed=kwargs["seed"],
+                                       max_turns=max_turns)
+        except EpisodeUnusable as exc:
+            # This rollout cannot be finished, and that is evidence about this rollout
+            # rather than about the run. Letting it out takes the whole batch with it:
+            # verl's asyncio.gather has no return_exceptions, so one unlucky environment
+            # sample costs an entire training step.
+            #
+            # A configuration error is different -- it is evidence about every episode --
+            # and BudgetError, ImagePlaceholderMismatch and the prompt overflow are
+            # deliberately not EpisodeUnusable, so they still stop the run.
+            logger.warning("[vagen] dropping episode %s: %s: %s",
+                           episode_id, type(exc).__name__, exc)
+            return []
         return self._outputs(client, env, result, kwargs, episode_id)
 
     def _maybe_state_reward(self, env, env_name: str, max_turns: int = 1):

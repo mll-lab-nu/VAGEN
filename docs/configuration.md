@@ -6,8 +6,6 @@ The main config file is [`vagen/configs/vagen_multiturn.yaml`](https://github.co
 
 ```yaml
 trainer:
-  skip_special_tokens_val: False
-  skip_special_tokens_train: False
   replace_image_tokens_for_logging: True
   log_image:
     enable: True
@@ -17,8 +15,6 @@ trainer:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `skip_special_tokens_val` | bool | `False` | Skip special tokens when logging validation outputs |
-| `skip_special_tokens_train` | bool | `False` | Skip special tokens when logging training outputs |
 | `replace_image_tokens_for_logging` | bool | `True` | Replace `<image>` tokens with placeholder for cleaner logs |
 | `log_image.enable` | bool | `True` | Enable image logging to local folder |
 | `log_image.max_pending` | int | `2` | Maximum pending image uploads |
