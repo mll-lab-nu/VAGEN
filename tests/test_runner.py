@@ -217,3 +217,73 @@ def test_the_environment_contract_is_written_down():
     # The two distinctions an implementer gets wrong silently.
     assert "terminated" in doc and "truncated" in doc
     assert "re-encoding" in doc or "re-encoded" in doc
+
+
+def test_a_turn_cannot_take_unboundedly_many_model_calls():
+    """A backend whose response the harness always keeps spins the inner loop forever.
+
+    Measured before this: 100,001 generations for one environment step, and under
+    no_concat 100,001 conversations opened, for a client whose `text` came back None --
+    which is what a closed API returns for a refusal. `Response.text` is typed `str` and
+    nothing enforced it.
+    """
+    import asyncio
+
+    import pytest
+
+    from vagen.core.harness import BaseHarness, Call
+    from vagen.core.runner import MAX_CALLS_PER_TURN, run_episode
+
+    calls = []
+
+    class _Keeps(BaseHarness):
+        """Never yields an action -- the shape a misbehaving harness has."""
+
+        def next_call(self):
+            calls.append(1)
+            return Call([{"role": "user", "content": "x"}], None)
+
+        def accept(self, response):
+            return None
+
+    class _Client:
+        tokenizer = None
+
+        async def send(self, messages, conversation_id=None, **kw):
+            class _R:
+                text, conversation_id, token_ids = "act", "c1", [1]
+            return _R()
+
+        def usage(self, cid): return 1
+        def reward(self, cid, v): pass
+        def response_len(self, cid): return 0
+        def measure(self, m): return 1
+
+    class _Env:
+        async def reset(self, seed): return {"obs_str": "o"}, {}
+        async def system_prompt(self): return {"role": "system", "content": "s"}
+        async def step(self, a, **kw): return {"obs_str": "o"}, 0.0, True, False, {}
+        async def close(self): self.closed = True
+
+    with pytest.raises(RuntimeError, match="without producing an action"):
+        asyncio.run(run_episode(_Env(), _Keeps(), _Client(), max_turns=2))
+    assert len(calls) <= MAX_CALLS_PER_TURN, f"{len(calls)} calls before giving up"
+
+
+def test_a_non_string_response_is_treated_as_an_empty_generation():
+    """`accept` forwards `response.text`; None is not None-the-sentinel, it is a value the
+    loop would take for an action."""
+    import asyncio
+
+    from vagen.core.client import BackendOutput, InferenceClient
+
+    class _C(InferenceClient):
+        tokenizer = None
+
+        def encode(self, messages): return [0]
+        async def generate(self, prompt_ids, **kw):
+            return BackendOutput(text=None, token_ids=[1])
+
+    c = _C()
+    r = asyncio.run(c.send([{"role": "user", "content": "x"}]))
+    assert r.text == "", f"a None response reached the harness as {r.text!r}"

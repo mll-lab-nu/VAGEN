@@ -75,6 +75,11 @@ class BaseHarness(ABC):
         """
         self._system, self._msgs = system, [init_obs]
         self._conversation_id = None
+        # The room too. A reused harness otherwise reports the *previous* episode's
+        # spend, which can read as exhausted before this episode has generated anything.
+        # CompactHarness already did this for its own state; the base class was the one
+        # depending on the loop building a harness per episode.
+        self._room_resp, self._room_obs = None, 0
 
     def add_observation(self, obs: Msg) -> None:
         self._msgs.append(obs)

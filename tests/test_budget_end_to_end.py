@@ -162,10 +162,12 @@ def test_the_defaults_are_the_largest_values_that_pass():
     b = Budgets(prompt_len=1024, response_len=8192, per_turn=1024, max_turns=5,
                 compact_budget=4096, summary_budget=default_summary_budget(4096, 1024),
                 summary_request_len=REQ)
-    check("compact", replace(b, env_response=default_env_response("compact", b)))
+    check("compact", replace(b, env_response=default_env_response("compact", b),
+                             env_response_configured=False))
 
     c = Budgets(prompt_len=512, response_len=2048, per_turn=256, max_turns=2)
-    check("concat", replace(c, env_response=default_env_response("concat", c)))
+    check("concat", replace(c, env_response=default_env_response("concat", c),
+                            env_response_configured=False))
 
 
 def test_a_region_that_cannot_hold_one_turn_says_so_once():
@@ -177,7 +179,7 @@ def test_a_region_that_cannot_hold_one_turn_says_so_once():
     b = Budgets(prompt_len=512, response_len=1024, per_turn=512, max_turns=3,
                 env_response=64, compact_budget=800, summary_budget=500,
                 summary_request_len=REQ)
-    with pytest.raises(BudgetError, match="no room to work in"):
+    with pytest.raises(BudgetError, match="no room to buy a turn"):
         check("compact", b)
 
 
