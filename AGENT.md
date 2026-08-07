@@ -1,0 +1,180 @@
+# VAGEN — orientation for an agent picking this up
+
+Read this first; it is meant to take five minutes. `VAGEN_ARCH.md` has the design
+rationale, and it is long. Anything here that disagrees with it, believe this.
+
+Training backend: `verl@release/v0.8.0`, a **sibling checkout** at `../verl` — verl is
+**not pip-installed**, so it has to be on `PYTHONPATH`.
+
+```bash
+export PATH=$HOME/miniconda3/envs/verl/bin:$PATH
+PYTHONPATH=$(pwd)/../verl:$(pwd) python -m pytest -q     # 524 passed, 6 skipped, 1 xfailed
+```
+
+---
+
+## 1. What this is
+
+A multi-turn agentic RL layer over verl. An episode is an agent talking to an
+environment; the question this codebase is organised around is **how that conversation is
+laid out for training**, because that choice is what varies between experiments.
+
+Three layouts, one axis — *when does a new conversation start?*
+
+| mode | shape | one episode becomes |
+|---|---|---|
+| `concat` | one conversation, many turns | 1 training row |
+| `no_concat` | many conversations, one turn each | N rows |
+| `compact` | several conversations, several turns each | a few rows |
+
+Set with `trainer.harness=concat|no_concat|compact`.
+
+## 2. The layering, and the one rule that keeps it honest
+
+```
+run_episode          core/runner.py     one loop, for training and evaluation
+  └ harness          core/harness.py    when to start a new conversation. No tokenizer,
+                     harness/*.py       no env, no client -- text and messages only
+  └ client           core/client.py     the ONLY layer that knows a token
+                     agent_loop/verl_client.py
+  └ env              core/env.py        observations in, actions out
+```
+
+**A conversation id is the whole protocol.** Passing one continues that conversation;
+passing `None` starts a new one. That is why the same harness drives a verl rollout and a
+closed chat API, and why the three modes are three points on one axis rather than three
+mechanisms.
+
+`Conversation` (`core/tape.py`) holds one conversation's tokens and which of them the
+model produced. **One conversation is one training row.**
+
+## 3. Invariants you can break silently
+
+These have all been broken at least once, and none of them raised when they were.
+
+1. **`multi_modal_data={"images": ...}` — plural.** Upstream renamed the key; the singular
+   is silently ignored, the model gets image-pad tokens with no features, and Qwen skips
+   the `masked_scatter` rather than complaining. The rollout still sees the pictures; only
+   the model being optimised is blind.
+2. **Placeholder blocks ↔ frames, strictly 1:1, and the block is
+   `vision_start .. vision_end`, not the run.** `get_rope_index` counts images by reading
+   the token *after* every `vision_start`, so a run that lost its sentinel is laid out as
+   text and every later position shifts — while the counts still agree.
+   `multi_modal_inputs` is built from the frames list **alone**, so nothing downstream
+   cross-checks it.
+3. **The critic's value at position `p` is conditioned on tokens ≤ `p`**, so `V(s_t)` for
+   response token `i` is the output at `i-1`. verl left-shifts in `padding.py`. Exactly
+   once — not zero times, not twice.
+4. **`response_mask` / `logprobs` / `scores` / `per_token_reward` / `response_spans` all
+   index `response_ids`.** Cut one, cut all of them.
+5. **An observation in the response region is mask 0 and carries no reward.** Rewards land
+   at `scores[end-1]` of a *model* span. This is what makes truncation safe.
+6. **A conversation's ordinal is decided when it is opened**, never by position in
+   `rows()` — a conversation the model never spoke in is dropped there, and numbering the
+   survivors renumbers everything after the gap with no hole to notice.
+
+## 4. Token budgets
+
+Full treatment in `../logs/三个mode-token限制与结束逻辑.md`. The short version:
+
+Every turn, in every mode, asks the same question:
+
+```python
+left = max_response_length - response_region_spent - measured_pending_observation - reserve
+max_new_tokens = max(floor, left)
+exhausted      = left < floor        # compact overrides: it can make room
+```
+
+The observation is **measured, not estimated** — which is why `render` is separable from
+`encode` (measuring used to record the frames a second time). `reserve` is 0 except under
+compaction, where it is `summary_budget + summary_request_len`; the request is a user
+message into the *same* conversation, so leaving it out overflows deterministically.
+
+Four defences, outermost first: static checks (`harness/budget.py`) → per-call ceilings
+(`client._check_context`) → the per-turn room check → image-aware truncation at the batch
+boundary. Only two static checks are fatal; the rest warn, because refusing on a worst
+case rules out long episodes that a real rollout handles fine.
+
+**The prompt region raises, the response region truncates.** Deliberate: the prompt is the
+opening call and has nothing old to drop, so cutting it takes the system prompt.
+
+## 5. Running things
+
+```bash
+# the shared flags -- these select VAGEN's agent loop. Without them verl runs its own
+# and the job looks healthy while none of this repo's rollout code executes.
+vagen/configs/baseline_vllm.flags
+
+bash examples/train/sokoban/train_ppo_qwen25vl3b.sh          # reads those flags
+MODEL=/path/to/local/snapshot bash examples/train/...        # avoids a flaky hub lookup
+bash examples/train/... --cfg job --resolve                  # dry-run the config, no GPU
+```
+
+A judge endpoint is needed only when `trainer.state_reward.*.enable=True`:
+`bash scripts/launch_judge.sh` (~23 GB/card, shares every GPU).
+
+**Reaping matters.** Orphaned vLLM workers holding 60–90 GB/card have bitten this project
+repeatedly. Kill everything on the GPUs *except* the judge's process tree.
+
+## 6. Where things are
+
+```
+vagen/core/          the contracts: harness, client, runner, tape, env
+vagen/harness/       concat / no_concat / compact, and budget.py
+vagen/agent_loop/    gym_loop.py (the verl AgentLoop), verl_client.py, multi_output.py
+vagen/utils/         image_token_utils.py, concat_val_multi_turn.py, episode_log.py
+vagen/trainer/       VagenPPOTrainer + the mixins over verl's SeparateRayPPOTrainer
+vagen/custom_advantage/   the algorithm layer (TrajectoryView, traj_token_gae, ...)
+logs/                design notes and findings -- see below
+```
+
+`../logs/` (outside git) is where the reasoning lives:
+
+| file | what |
+|---|---|
+| `三个mode-token限制与结束逻辑.md` | the budgets and every termination path |
+| `四个token上限-与compact观察.md` | the design discussion the budgets came from |
+| `CHANGELOG-overnight.md` | what changed and why, including the mistakes |
+| `template-seam.md` | a known defect, pinned as xfail, and why it is not a one-liner |
+| `dropped-row-renumbering.md` | conversation numbering + what adopting fully-async needs |
+
+## 7. Where it stands
+
+**Working and verified end to end** — three modes on Sokoban, 6 steps each, validation at
+0/2/4/6, episode transcripts to wandb, zero guards fired:
+
+```
+concat     1 conversation per episode
+no_concat  one per turn
+compact    4-5 per 20-turn episode        (max_turns=20, compact_budget=1300)
+```
+
+Also working: image-aware truncation, budget-aware generation in all three modes, the
+identity chain (group > episode > conversation > turn), per-token rewards reaching the
+loss, `value_mask` reaching the critic, all 20 training scripts config-verified with
+sokoban and frozenlake actually run.
+
+### Open, ranked
+
+| | severity | where |
+|---|---|---|
+| The summary is a turn in the GAE recursion | by design | compaction's summary is a policy action -- generated, trained (mask 1), and its zero immediate reward is correct credit assignment. So it is a step, and the turn before it bootstraps through it. Listed because it surprises people, not because it is wrong |
+| `_check_context` runs before `adopt_prompt` | med | the per-call ceiling measures a length the batch never sees when the engine's image tiling differs from ours. The lengths are compared and logged now; the ceiling is still not re-checked after adoption |
+| Policy sampling a vision token | med | nothing bans special tokens from a generation; `get_rope_index` then dies with a bare `IndexError` naming nothing |
+| `env.reset()` outside the try | med | `runner.py` -- a reset failure never closes the env; remote env clients leak a session per row |
+| Videos are not carried through | med | `image_token_ids` counts video pads as pictures but `_message` lifts only `<image>`, so a video env breaks the 1:1 contract by construction |
+| Adjacent placeholders on a sentinel-less family | low | two pictures render as one run on llava-interleave, so blocks say 1 for 2 frames. Latent: no shipped env emits adjacent placeholders |
+| Every continuation is one separator short | low | `../logs/template-seam.md`; pinned xfail, symmetric between rollout and training |
+| Compact loss reweighting | -- | deferred by the project owner; algorithm layer |
+| 10 of 14 verl patches could move to the VAGEN layer | -- | audited, hooks identified; cleanliness only |
+
+## 8. How to work here
+
+- **Write the test so it can fail.** Several checks in this repo's history reported "ok"
+  for code that had crashed on import, or asserted an identity (`max(f, x) >= f`). Before
+  trusting a new check, mutate the thing it guards and watch it go red.
+- **Do not trust a green run over a measurement.** The three-mode runs passed for weeks
+  while compact was silently behaving as no_concat.
+- **Long output goes to `../logs/`,** not the terminal.
+- **Never edit `vagen/` or `verl/` while a training run is in flight** — a later mode in
+  the same sweep will pick up the change and the comparison stops being one.
