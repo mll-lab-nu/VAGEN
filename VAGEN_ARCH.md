@@ -2,6 +2,11 @@
 
 Training backend `verl-project/verl@release/v0.8.0` (bee9f6f4).
 
+> **Start with `AGENT.md`.** It is the five-minute orientation: the layering, the
+> invariants that break silently, how to run things, and where the project stands. This
+> document is the design rationale behind those decisions, and it is long. Where the two
+> disagree, `AGENT.md` is the current one.
+
 This began on 2026-08-02 as a design document, and most of it has since been built. Where
 the two disagreed the code was right and the document was not, so the names below are the
 ones in the tree. The rationale sections are kept because they still explain *why*; the
