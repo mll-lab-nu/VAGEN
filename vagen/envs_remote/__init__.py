@@ -11,7 +11,7 @@ Architecture:
 Usage:
 
     # Client side
-    from vagen.envs.remote import GymImageEnvClient
+    from vagen.envs_remote import GymImageEnvClient
 
     client = GymImageEnvClient(env_config={
         "base_urls": ["http://localhost:8000", "http://localhost:8001"],
@@ -21,7 +21,7 @@ Usage:
     })
 
     # Server side
-    from vagen.envs.remote import GymService, BaseGymHandler
+    from vagen.envs_remote import GymService, BaseGymHandler
 
     class MyEnvHandler(BaseGymHandler):
         async def create_env(self, env_config):

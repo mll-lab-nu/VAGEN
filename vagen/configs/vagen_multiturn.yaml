@@ -49,7 +49,6 @@ actor_rollout_ref:
 # ============================================================================
 trainer:
   val_before_train: True                    
-  skip_pad_tokens: True                      # Strip pad tokens when decoding for logging 
   replace_image_tokens_for_logging: True    # By default, we want to convert a sequence of image tokens with readable placeholders in logs
   max_actor_ckpt_to_keep: 1                # Max number of actor checkpoints to keep (saves disk space)
   max_critic_ckpt_to_keep: 1               # Max number of critic checkpoints to keep

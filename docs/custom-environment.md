@@ -36,9 +36,9 @@ Prepare training and validation configs:
 
 You can follow the Sokoban examples as templates:
 
-* [`examples/sokoban/train_sokoban_vision.yaml`](https://github.com/mll-lab-nu/VAGEN/blob/main/examples/sokoban/train_sokoban_vision.yaml)
-* [`examples/sokoban/val_sokoban_vision.yaml`](https://github.com/mll-lab-nu/VAGEN/blob/main/examples/sokoban/val_sokoban_vision.yaml)
+* [`examples/train/sokoban/train_sokoban_vision.yaml`](https://github.com/mll-lab-nu/VAGEN/blob/main/examples/train/sokoban/train_sokoban_vision.yaml)
+* [`examples/train/sokoban/val_sokoban_vision.yaml`](https://github.com/mll-lab-nu/VAGEN/blob/main/examples/train/sokoban/val_sokoban_vision.yaml)
 
 ## Step 4: Create a Training Script
 
-Write your training script based on [`examples/sokoban/train_ppo_qwen25vl3b.sh`](https://github.com/mll-lab-nu/VAGEN/blob/main/examples/sokoban/train_ppo_qwen25vl3b.sh)
+Write your training script based on [`examples/train/sokoban/train_ppo_qwen25vl3b.sh`](https://github.com/mll-lab-nu/VAGEN/blob/main/examples/train/sokoban/train_ppo_qwen25vl3b.sh)

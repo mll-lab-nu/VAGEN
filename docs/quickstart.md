@@ -26,7 +26,7 @@ pip install -e .
 # Install VERL
 cd verl
 USE_MEGATRON=0 bash scripts/install_vllm_sglang_mcore.sh
-pip install --no-deps -e .
+# verl is used from the sibling checkout, on PYTHONPATH -- not installed
 
 # Additional dependencies
 pip install "trl==0.26.2"
@@ -50,7 +50,7 @@ sys + obs_0 + response_0 + obs_1 + response_1 + ...
 ```bash
 cd VAGEN
 wandb login
-bash examples/sokoban/train_ppo_qwen25vl3b.sh
+bash examples/train/sokoban/train_ppo_qwen25vl3b.sh
 ```
 
 #### 2. Non-Concatenated Training
@@ -69,5 +69,5 @@ This paradigm uses custom GAE for cross-turn credit assignment.
 ```bash
 cd VAGEN
 wandb login
-bash examples/sokoban/train_ppo_no_concat_qwen25vl3b.sh
+bash examples/train/sokoban/train_ppo_no_concat_qwen25vl3b.sh
 ```

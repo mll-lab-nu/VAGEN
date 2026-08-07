@@ -134,6 +134,8 @@ def image_token_ids(source) -> set:
 
 
 class NoValidTruncation(ValueError):
+    # Not EpisodeUnusable: reaching it means a single row could not be made trainable,
+    # which is about the row, and _outputs is where that is decided.
     """The budget cannot hold anything worth training on.
 
     A truncation always exists -- drop every picture -- but a 400-token budget on a
