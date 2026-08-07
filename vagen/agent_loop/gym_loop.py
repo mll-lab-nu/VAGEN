@@ -352,7 +352,17 @@ class GymLoop(VagenGymAgentLoopBase):
         # by the room left and nothing stopped them when it ran out -- concat then filled
         # past its region and the batch-boundary cut took model turns with it, losing the
         # reward on them. Measured: 62 of 182 admitted concat configs lost reward.
-        room = dict(response_len=self.response_length, floor=per_turn)
+        # The floor is the smallest generation worth making, and it must never be a large
+        # fraction of the region. `per_turn` falls back to the whole response length when
+        # the env config declares no per-turn budget -- a supported case -- and using that
+        # as the floor makes `exhausted()` true after a single token: every concat episode
+        # then stops at turn one, marked truncated, with a perfectly well-formed row and
+        # nothing reporting it.
+        #
+        # Erring small is the safe direction. Too small only allows a squeezed generation,
+        # which the truncation handles; too large silently deletes the episode.
+        room = dict(response_len=self.response_length,
+                    floor=min(per_turn, max(1, self.response_length // 4)))
         if mode == "compact":
             # compact_budget is an optional second trigger on top of the region.
             return build_harness(
