@@ -33,6 +33,10 @@ from vagen.harness.budget import (
     default_summary_budget,
 )
 from vagen.harness.compact import CompactHarness
+from vagen.utils.image_token_utils import (
+    image_token_ids, placeholder_blocks, truncate_keeping_images_whole,
+    vision_sentinel_ids,
+)
 from vagen.core.runner import run_episode
 
 logger = logging.getLogger(__file__)
@@ -235,6 +239,52 @@ class GymLoop(VagenGymAgentLoopBase):
             rendered = self.tokenizer.encode(CompactHarness.SUMMARY_REQUEST)
         return len(rendered) + len(self.tokenizer.encode(CompactHarness.SUMMARY_PREFIX + "\n\n"))
 
+    def _placeholders(self):
+        """The ids a picture sits behind, and the sentinels that bracket it.
+
+        Cached: reading them is cheap but this runs per row, and the answer is a property
+        of the model.
+        """
+        if getattr(self, "_ph_cache", None) is None:
+            source = self.processor if self.processor is not None else self.tokenizer
+            self._ph_cache = (image_token_ids(source), vision_sentinel_ids(source))
+        return self._ph_cache
+
+    def _split_frames(self, prompt_ids, images):
+        """Which frames belong to the prompt region and which to the response region.
+
+        ``client.images()`` hands back every frame in the conversation, but the two
+        regions are cut separately, so each needs its own list. The boundary is a
+        context/response seam -- ``prompt_len`` is set at the first response -- so it can
+        never fall inside a picture.
+        """
+        images = list(images or [])
+        if not images:
+            return [], []
+        placeholders, sentinels = self._placeholders()
+        n = len(placeholder_blocks(prompt_ids, placeholders, sentinels))
+        return images[:n], images[n:]
+
+    def _truncate_response(self, response_ids, frames, hint):
+        """Cut the response region to fit, never through a picture."""
+        if len(response_ids) <= self.response_length:
+            return list(response_ids), list(frames)
+        placeholders, sentinels = self._placeholders()
+        if frames and not sentinels and placeholders:
+            # Without the sentinels a cut can orphan a run from its vision_start, which
+            # rope then lays out as text -- silently, since every count still agrees.
+            # Refuse rather than degrade into that.
+            raise ValueError(
+                f"the response is {len(response_ids)} tokens against "
+                f"data.max_response_length={self.response_length} and carries images, but "
+                f"this model declares no vision sentinels, so it cannot be cut safely.{hint}"
+            )
+        logger.warning("response of %d tokens exceeds data.max_response_length=%d; "
+                       "truncating.%s", len(response_ids), self.response_length, hint)
+        return truncate_keeping_images_whole(
+            response_ids, self.response_length, keep="head",
+            placeholders=placeholders, frames=frames, sentinels=sentinels, min_kept=1)
+
     def _overflow_hint(self) -> str:
         """What to change, in terms of the mode that is running.
 
@@ -333,16 +383,27 @@ class GymLoop(VagenGymAgentLoopBase):
             over = (len(row.prompt_ids) > self.prompt_length
                     or len(row.response_ids) > self.response_length)
             hint = self._overflow_hint() if over else ""
+
+            # The prompt still refuses to be cut, and that is not asymmetry for its own
+            # sake: this region is the *opening call* -- system prompt plus the first
+            # observation, plus a summary under compaction. There is nothing old in it to
+            # drop, so a left cut takes the instructions. The client's opening ceiling
+            # already bounds it, so reaching here means something upstream is wrong.
             prompt_ids = cap_token_ids(
                 row.prompt_ids, self.prompt_length, multimodal=mm, keep="tail",
                 what="prompt", budget_name="data.max_prompt_length",
                 on_overflow="raise", hint=hint,
             )
-            response_ids = cap_token_ids(
-                row.response_ids, self.response_length, multimodal=mm, keep="head",
-                what="response", budget_name="data.max_response_length",
-                on_overflow="raise", hint=hint,
-            )
+            # The response is truncated rather than refused. Budget-aware generation is
+            # what should keep it inside the region; this is the backstop for when the
+            # environment returns more than anyone planned for, and refusing there makes
+            # a long-tail rollout impossible to debug. What gets cut is context: the
+            # model's own tokens are bounded by max_new_tokens, so only observations can
+            # overflow, and observations are mask 0 and carry no reward.
+            prompt_frames, response_frames = self._split_frames(row.prompt_ids, images)
+            response_ids, response_frames = self._truncate_response(
+                row.response_ids, response_frames, hint)
+            images = prompt_frames + response_frames
             keep = len(response_ids)
             outputs.append(
                 AgentLoopOutput(
