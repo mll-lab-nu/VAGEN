@@ -141,6 +141,8 @@ def test_every_cut_survives_the_real_position_id_path(keep):
     placeholders = {i for i in image_token_ids(processor)}
     sentinels = vision_sentinel_ids(processor)
     assert sentinels, "the sentinels must be declared, or the cut cannot be safe"
+    vstart = getattr(processor.config, "vision_start_token_id", None)
+    assert vstart is not None, "no vision_start declared, so rope's count cannot be checked"
 
     frames = [Image.new("RGB", (56, 56), (i * 40, 0, 0)) for i in range(3)]
     text = processor.apply_chat_template(
@@ -173,6 +175,20 @@ def test_every_cut_survives_the_real_position_id_path(keep):
             pytest.fail(f"{keep} budget={budget}: position ids rejected the cut: "
                         f"{type(exc).__name__}: {exc}")
 
+        # And the silent half. Rope counts an image by reading the token after each
+        # vision_start, so a run that lost its sentinel is counted as text and raises
+        # nothing at all -- asserting "no exception" would pass straight over the failure
+        # this whole file exists for. Measured on the naive rule: 0 of 40 tail budgets
+        # raise, 3 of 40 are silently wrong.
+        # Only vision_START opens an image; vision_end closes one, and counting from it
+        # reads whatever text follows. rope itself indexes `vision_start_indices + 1`.
+        counted = sum(1 for i, tok in enumerate(kept)
+                      if tok == vstart and i + 1 < len(kept) and kept[i + 1] in placeholders)
+        assert counted == len(kept_frames), (
+            f"{keep} budget={budget}: rope counts {counted} image(s) but {len(kept_frames)} "
+            f"frame(s) were kept -- an orphaned run is being laid out as text"
+        )
+
 
 def test_the_naive_rule_really_is_insufficient():
     """A canary. Without it, every test above could be passing for the wrong reason.
@@ -195,3 +211,57 @@ def test_the_naive_rule_really_is_insufficient():
         "the naive rule produced no orphaned run, so the sentinel handling above is "
         "not being tested by anything"
     )
+
+
+# ------------------------------------------------- that the loop actually uses all this
+def test_the_batch_boundary_cuts_with_the_image_aware_helper():
+    """The helper being correct is worth nothing if `_outputs` slices around it.
+
+    Replacing the call in `_truncate_response` with a plain `ids[:budget]` that keeps
+    every frame broke no test before this one: the truncation tests all exercise the
+    helper directly.
+    """
+    from omegaconf import OmegaConf
+
+    from vagen.agent_loop.gym_loop import GymLoop
+
+    ids = [1, 2] + [VS, PAD, PAD, PAD, VE] + [3] * 10 + [VS, PAD, PAD, PAD, VE] + [4]
+    frames = ["first", "second"]
+
+    class _Row:
+        ordinal = 0
+        conversation_id = "c"
+        prompt_ids = [1]
+        response_ids = ids
+        response_mask = [1] * len(ids)
+        logprobs = [0.0] * len(ids)
+        scores = [0.0] * len(ids)
+        response_spans = [(0, len(ids))]
+
+    class _Client:
+        def rows(self): return [_Row()]
+        def images(self, cid): return list(frames)
+
+    class _Env:
+        success = False
+        state_scores = {}
+
+    class _Result:
+        turns = 1
+
+    loop = GymLoop.__new__(GymLoop)
+    loop.prompt_length, loop.response_length = 100, 16      # cuts inside the second image
+    loop.processor = loop.tokenizer = None
+    loop._ph_cache = (PH, SENT)
+    loop.config = OmegaConf.create({"trainer": {"harness": "concat", "compact_budget": 400}})
+
+    out = GymLoop._outputs(loop, _Client(), _Env(), _Result(),
+                           {"group_idx": "g", "traj_idx": 0}, "ep")[0]
+    kept = out.response_ids
+    kept_frames = out.multi_modal_data.get("images", [])
+    blocks = placeholder_blocks(kept, PH, SENT)
+    assert len(blocks) == len(kept_frames), (
+        f"{len(blocks)} block(s) survived but {len(kept_frames)} frame(s) were published"
+    )
+    assert not kept or kept[-1] != VS, "a dangling vision_start reached the batch"
+    assert kept_frames == ["first"], f"the wrong frame survived: {kept_frames}"
