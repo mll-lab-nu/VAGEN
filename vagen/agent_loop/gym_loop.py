@@ -270,6 +270,17 @@ class GymLoop(VagenGymAgentLoopBase):
         if len(response_ids) <= self.response_length:
             return list(response_ids), list(frames)
         placeholders, sentinels = self._placeholders()
+        if frames and not placeholders:
+            # No declared placeholder ids means no blocks are found, so every frame is
+            # dropped and the row goes out with image-pad tokens and no pictures -- the
+            # model attends to something it was never given, and nothing raises. The
+            # guard below required `placeholders` to be non-empty, which is precisely
+            # the case it needed to catch.
+            raise ValueError(
+                f"the response carries {len(frames)} image(s) but this model declares no "
+                f"image placeholder ids, so the sequence cannot be cut without losing "
+                f"them. Register the family in IMAGE_TOKEN_ADAPTERS.{hint}"
+            )
         if frames and not sentinels and placeholders:
             # Without the sentinels a cut can orphan a run from its vision_start, which
             # rope then lays out as text -- silently, since every count still agrees.
@@ -344,7 +355,8 @@ class GymLoop(VagenGymAgentLoopBase):
         # Derived from what the mode has left rather than defaulted to a constant, so an
         # env config that does not declare it is still bounded -- by the largest value
         # that would have passed the checks below.
-        b = replace(b, env_response=int(env_response) if env_response else default_env_response(mode, b))
+        b = replace(b, env_response=int(env_response) if env_response else default_env_response(mode, b),
+                    env_response_configured=bool(env_response))
         check_budgets(mode, b)
 
         # Every mode gets the region and the floor. Passing them to compaction alone

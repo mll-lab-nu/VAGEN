@@ -124,11 +124,28 @@ class InferenceClient(ABC):
         # from. This is also what repairs any seam left by rendering messages
         # incrementally, since the correction lands on the span just added.
         if output.prompt_token_ids is not None:
+            # Adopting is the point -- the engine expands multimodal placeholders its own
+            # way and we want the sequence we train on to be the one it ran. But adopting
+            # silently absorbs a *systematic* disagreement too: `adopt_prompt` only guards
+            # the head, so a per-image tiling difference lands entirely in the tail and is
+            # swallowed, while multi_modal_inputs is still rebuilt locally from the frames.
+            # The first thing to notice would be masked_scatter in the actor.
+            expected = len(conversation.token_ids)
+            got = len(output.prompt_token_ids)
+            if got != expected:
+                logger.warning(
+                    "the engine ran a prompt of %d tokens where this client rendered %d "
+                    "(%+d). Adopting the engine's, which is right for training, but a "
+                    "standing difference means the two are tiling images differently and "
+                    "multi_modal_inputs is built from ours.", got, expected, got - expected)
             conversation.adopt_prompt(output.prompt_token_ids)
         conversation.add_response(output.token_ids, output.logprobs)
 
+        # A backend that returns None -- what a closed API gives for a refusal or a
+        # filtered completion -- must not reach the harness as an action. `accept`
+        # forwards it, `while action is None` never exits, and the loop spins.
         return Response(
-            text=output.text,
+            text=output.text if isinstance(output.text, str) else "",
             conversation_id=conversation_id,
             token_ids=output.token_ids,
             logprobs=output.logprobs,

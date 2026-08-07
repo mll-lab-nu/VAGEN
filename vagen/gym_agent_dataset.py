@@ -31,6 +31,12 @@ class EnvSpec:
     seed_list: Optional[List[int]] = None
     max_turns: int = 1
     response_length_per_turn: Optional[int] = None
+    # The largest a single observation from this environment may be, in tokens, after the
+    # processor has expanded any images. Left unset it is derived from the response
+    # region -- see vagen/harness/budget.py:default_env_response -- but the derivation
+    # cannot know what this environment actually returns, and the runtime error for an
+    # oversized observation says to set this. It has to be settable for that to be advice.
+    env_response_length: Optional[int] = None
 
 @dataclass
 class EnvSpecs:
@@ -202,6 +208,7 @@ class AgenticDataset(Dataset):
                         "config": spec.config,
                         "max_turns": spec.max_turns,
                         "response_length_per_turn": spec.response_length_per_turn,
+                        "env_response_length": spec.env_response_length,
                         "data_source": data_source,
                         "agent_name":"gym_agent",
                         # verl's agent loop stores raw_prompt on every output and reads
