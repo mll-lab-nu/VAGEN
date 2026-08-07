@@ -9,6 +9,10 @@ class NoConcatHarness(BaseHarness):
     """A conversation per turn: the model sees the system prompt and the latest
     observation, never the history."""
 
+    def continues_conversation(self) -> bool:
+        """Never. Every turn opens a new conversation, so the room is always a whole one."""
+        return False
+
     def next_call(self) -> Call:
         limit = self.max_new_tokens()
         return Call([self._system, self._msgs[-1]], None,

@@ -46,9 +46,13 @@ async def run_episode(env, harness, client, *, seed=None, max_turns: int = 10, *
                 # side-effect free -- that is what `render` is separable from `encode`
                 # for; asking used to ship every picture twice.
                 if hasattr(harness, "note_room") and harness.pending_observation() is not None:
+                    # The room belongs to the conversation the *next* call will land in,
+                    # which is not always the one just used -- no_concat opens a new one
+                    # every turn, and compaction opens one on a pending summary.
+                    cont = harness.continues_conversation()
                     cid = getattr(harness, "_conversation_id", None)
-                    spent = client.response_len(cid) if cid else 0
-                    obs = 0 if cid is None else client.measure([harness.pending_observation()])
+                    spent = client.response_len(cid) if (cont and cid) else 0
+                    obs = client.measure([harness.pending_observation()]) if cont else 0
                     harness.note_room(spent, obs)
                     if harness.exhausted():
                         # No room for another turn, and this policy cannot make room --

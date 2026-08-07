@@ -74,8 +74,13 @@ class _Env:
 def episode(mode, b, *, system, obs, gen):
     """Run one episode under ``mode``, wired exactly as ``gym_loop`` wires it."""
     opening, continuation = context_limits(mode, b)
-    kw = (dict(budget=b.compact_budget, summary_budget=b.summary_budget)
-          if mode == "compact" else {})
+    # Mirrors gym_loop._build_harness. Leaving response_len out here is the same mistake
+    # the production wiring made: the harness then accounts for nothing and the test
+    # cannot see it.
+    kw = dict(response_len=b.response_len, floor=b.per_turn)
+    if mode == "compact":
+        kw.update(budget=b.compact_budget, summary_budget=b.summary_budget,
+                  summary_request_len=b.summary_request_len)
     c = _Client(gen, b.per_turn)
     c.opening_limit, c.continuation_limit = opening, continuation
     asyncio.run(run_episode(_Env(system, obs), build_harness(mode, **kw), c,
@@ -296,3 +301,69 @@ def test_a_persistently_empty_generation_ends_the_episode_rather_than_faking_an_
 
     assert env.actions == [], f"the environment was stepped on an empty action: {env.actions}"
     assert res.truncated, "an episode cut short by a dead engine must not look terminal"
+
+
+# ------------------------------------------------- the region reaches every harness
+@pytest.mark.parametrize("mode", ["concat", "no_concat", "compact"])
+def test_every_harness_is_given_the_room_it_has_to_work_in(mode):
+    """Passing the region to compaction alone left the other two unbounded.
+
+    `_left()` came back None, so nothing capped their generation and nothing stopped them
+    when the region ran out. concat then filled past it and the batch-boundary cut took
+    model turns with it -- with the reward on them. Measured before this: 62 of 182
+    admitted concat configs lost reward.
+    """
+    from omegaconf import OmegaConf
+
+    from vagen.agent_loop.gym_loop import GymLoop
+
+    loop = GymLoop.__new__(GymLoop)
+    loop.prompt_length, loop.response_length = 2048, 6144
+    loop.tokenizer = type("T", (), {"encode": lambda self, t: [0] * 13,
+                                    "apply_chat_template": lambda self, *a, **k: [0] * 34})()
+    loop.apply_chat_template_kwargs = {}
+    loop.config = OmegaConf.create({
+        "trainer": {"harness": mode, "compact_budget": 1300, "compact_summary_budget": None},
+        "actor_rollout_ref": {"rollout": {"max_model_len": None}},
+    })
+
+    harness, _ = GymLoop._build_harness(loop, per_turn=512, max_turns=20)
+    assert harness.response_len == 6144, f"{mode} was not told the region"
+    assert harness.floor == 512, f"{mode} was not told the floor"
+
+    harness.begin({"role": "system", "content": "s"}, {"role": "user", "content": "o"})
+    harness.note_room(6144 - 100, 50)
+    assert harness._left() is not None, f"{mode} is not accounting at all"
+
+
+def test_concat_stops_instead_of_overrunning_its_region():
+    """The failure S1 describes, end to end: the reward the environment paid has to
+    reach the row, and it cannot if the region overflows and the cut lands in a turn."""
+    class _Paying(_Env):
+        async def step(self, action, **kw):
+            self.i += 1
+            return {"obs_str": "o" * self.obs(self.i)}, 1.0, False, False, {}
+
+    b = Budgets(prompt_len=500, response_len=400, per_turn=100, max_turns=8,
+                env_response=50)
+    c = episode("concat", b, system=20, obs=lambda i: 10, gen=lambda i: 100)
+    rows = c.rows()
+    assert rows, "the episode produced no trainable row"
+    for r in rows:
+        assert len(r.response_ids) <= b.response_len, (
+            f"the response region reached {len(r.response_ids)} against {b.response_len}"
+        )
+
+
+def test_no_concat_measures_the_conversation_it_is_about_to_open():
+    """Each turn opens a new one, so the room is a whole region every time. Measuring the
+    conversation just left reports a region about to be discarded, and the episode stops
+    after one turn."""
+    from vagen.harness import build_harness
+
+    h = build_harness("no_concat", response_len=200, floor=10)
+    h.begin({"role": "system", "content": "s"}, {"role": "user", "content": "o"})
+    h._conversation_id = "c1"           # a conversation has been used and left
+    assert h.continues_conversation() is False
+    h.note_room(0, 0)
+    assert not h.exhausted()
