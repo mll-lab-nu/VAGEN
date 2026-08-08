@@ -57,11 +57,19 @@ def test_the_template_really_does_inject_a_system_block(tok):
     assert "You are a helpful assistant." in rendered
 
 
-def test_a_continuation_span_starts_at_the_user_turn(tok):
+def test_a_continuation_span_carries_the_separator_the_model_does_not_generate(tok):
+    """It leads with the newline, and that is the fix rather than a leak.
+
+    Qwen closes a message with `<|im_end|>\n`. The model stops at `<|im_end|>`, so the
+    newline is template output that belongs to the *preceding* assistant turn -- and
+    stripping the placeholder whole took it away, leaving every turn boundary one token
+    short of what the template would have produced.
+    """
     c = _client(tok)
     ids = c.encode([{"role": "user", "content": "OBSERVATION-ONE"}])
     text = tok.decode(ids)
-    assert text.startswith("<|im_start|>user"), f"span starts with: {text[:60]!r}"
+    sep = tok.decode(c._message_separator())
+    assert text.startswith(sep + "<|im_start|>user"), f"span starts with: {text[:60]!r}"
     assert "helpful assistant" not in text, (
         "the injected system block leaked into the continuation span"
     )
@@ -113,7 +121,8 @@ def test_the_prefix_is_rendered_the_same_way_it_is_prepended(tok):
     that never happened -- and the guard turns that into a loud failure, not a quiet one."""
     c = _client(tok)
     ids = c.encode([{"role": "user", "content": "OBS"}])   # must not raise
-    assert tok.decode(ids).startswith("<|im_start|>user")
+    sep = tok.decode(c._message_separator())
+    assert tok.decode(ids).startswith(sep + "<|im_start|>user")
 
 
 def test_the_guard_refuses_to_strip_a_span_that_does_not_start_with_the_prefix(tok, monkeypatch):

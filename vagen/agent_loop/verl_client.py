@@ -8,9 +8,12 @@ all of them on every call.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from vagen.core.client import BackendOutput, InferenceClient
+
+logger = logging.getLogger(__name__)
 
 
 def _parts(message: dict) -> list[dict]:
@@ -105,7 +108,7 @@ class VerlClient(InferenceClient):
             )
         if opening:
             return ids, new_images
-        prefix = self._template_prefix()
+        prefix = self._template_prefix()[: -len(self._message_separator()) or None]
         if ids[: len(prefix)] != prefix:
             # The strip is only safe if the rendered span really starts with it.
             raise ValueError(
@@ -113,6 +116,67 @@ class VerlClient(InferenceClient):
                 "stripping a fixed length here would corrupt the span"
             )
         return ids[len(prefix) :], new_images
+
+    def _message_separator(self) -> list[int]:
+        """What the template puts after a message that the model never generates.
+
+        Qwen closes every message with ``<|im_end|>\n``. The model stops at
+        ``<|im_end|>``, so the newline is template output -- and stripping the placeholder
+        turn whole took it away, leaving every continuation one token short of what the
+        template would have produced. Rollout and training saw the same seam, so nothing
+        downstream could tell; it is off-distribution input, not a mismatch.
+
+        Derived, then **verified**. The derivation reads the tokenizer's declared
+        terminator and takes what follows it, which is the same class of thing as reading
+        ``image_token_id`` -- but a family whose chat template closes a message with
+        something other than its ``eos_token`` would derive the wrong answer silently. So
+        the result is checked against a real two-turn render, and on any mismatch this
+        returns nothing and the old behaviour stands. Being one token short is survivable;
+        splicing the wrong tokens into every turn boundary is not.
+        """
+        if getattr(self, "_sep_cache", None) is not None:
+            return self._sep_cache
+        self._sep_cache = []
+        try:
+            eos = getattr(self.tokenizer, "eos_token_id", None)
+            one = self._render_plain([_PLACEHOLDER_TURN])
+            if eos is not None and eos in one:
+                sep = one[len(one) - 1 - one[::-1].index(eos):][1:]
+                if sep and self._separator_reproduces_the_template(sep):
+                    self._sep_cache = sep
+        except Exception as exc:  # noqa: BLE001 - a failed derivation must not stop a run
+            logger.warning("could not derive the message separator (%s); continuations "
+                           "will be one token short of the canonical render", exc)
+        return self._sep_cache
+
+    def _render_plain(self, messages) -> list[int]:
+        """Tokenize messages through the chat template, no images, no generation prompt."""
+        return list(self.tokenizer.apply_chat_template(
+            [{"role": m["role"], "content": _text_only(m)} for m in messages],
+            add_generation_prompt=False, tokenize=True, return_dict=False,
+            **self.apply_chat_template_kwargs))
+
+    def _separator_reproduces_the_template(self, sep: list[int]) -> bool:
+        """Does building a two-turn exchange incrementally, with this separator, equal
+        what the template produces in one go? If not, the derivation is wrong."""
+        user = {"role": "user", "content": "U"}
+        assistant = {"role": "assistant", "content": "A"}
+        canonical = list(self.tokenizer.apply_chat_template(
+            [user, assistant, user], add_generation_prompt=True, tokenize=True,
+            return_dict=False, **self.apply_chat_template_kwargs))
+        opening = list(self.tokenizer.apply_chat_template(
+            [user], add_generation_prompt=True, tokenize=True, return_dict=False,
+            **self.apply_chat_template_kwargs))
+        # what the model would emit for that assistant turn: its content, then the close
+        whole = self._render_plain([user, assistant])
+        generated = whole[len(self._render_plain([user])):]
+        generated = generated[len(opening) - len(self._render_plain([user])):] \
+            if len(opening) > len(self._render_plain([user])) else generated
+        if len(generated) <= len(sep):
+            return False
+        generated = generated[:-len(sep)]          # the model stops before the separator
+        rest = canonical[len(opening) + len(generated):]
+        return opening + generated + rest == canonical and rest[: len(sep)] == sep
 
     def _template_prefix(self) -> list[int]:
         """Tokens a chat template emits before the first message's content.
