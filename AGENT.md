@@ -159,14 +159,10 @@ sokoban and frozenlake actually run.
 | | severity | where |
 |---|---|---|
 | The summary is a turn in the GAE recursion | by design | compaction's summary is a policy action -- generated, trained (mask 1), and its zero immediate reward is correct credit assignment. So it is a step, and the turn before it bootstraps through it. Listed because it surprises people, not because it is wrong |
-| `_check_context` runs before `adopt_prompt` | med | the per-call ceiling measures a length the batch never sees when the engine's image tiling differs from ours. The lengths are compared and logged now; the ceiling is still not re-checked after adoption |
-| Policy sampling a vision token | med | nothing bans special tokens from a generation; `get_rope_index` then dies with a bare `IndexError` naming nothing |
-| `env.reset()` outside the try | med | `runner.py` -- a reset failure never closes the env; remote env clients leak a session per row |
-| Videos are not carried through | med | `image_token_ids` counts video pads as pictures but `_message` lifts only `<image>`, so a video env breaks the 1:1 contract by construction |
-| Adjacent placeholders on a sentinel-less family | low | two pictures render as one run on llava-interleave, so blocks say 1 for 2 frames. Latent: no shipped env emits adjacent placeholders |
-| Every continuation is one separator short | low | `../logs/template-seam.md`; pinned xfail, symmetric between rollout and training |
-| Compact loss reweighting | -- | deferred by the project owner; algorithm layer |
-| 10 of 14 verl patches could move to the VAGEN layer | -- | audited, hooks identified; cleanliness only |
+| Compact loss reweighting | deferred | by the project owner; algorithm layer |
+| 10 of 14 verl patches could move to the VAGEN layer | cleanliness | audited, hooks identified. The critic mask is explicitly blessed to stay |
+| An empty first generation shrinks the batch | low | the episode contributes no rows and `multi_output._postprocess` only raises when *every* rollout is empty. Under GRPO that quietly shrinks a group |
+| `_summary_request_len` over-counts | low | it renders the request as an *opening* turn, so Qwen injects a system block: 39 tokens where the client sends 23. Over-reserving is the safe direction |
 
 ## 8. How to work here
 
