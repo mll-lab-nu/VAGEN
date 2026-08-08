@@ -9,7 +9,8 @@ from tensordict import TensorDict
 from verl import DataProto
 
 from vagen.utils.image_token_utils import (
-    count_placeholder_runs, image_token_ids, split_on_images,
+    ImagePlaceholderMismatch, count_placeholder_runs, image_token_ids,
+    split_on_images, vision_sentinel_ids,
 )
 
 PAD_TOKEN_ID = 0
@@ -133,7 +134,9 @@ def concat_val_multi_turn(
         conversations: List[Dict[str, Any]] = []
         # Where the pictures actually sit in the sequence, so they can replace their
         # placeholders instead of being appended near them.
-        placeholders = image_token_ids(processor if processor is not None else tokenizer)
+        source = processor if processor is not None else tokenizer
+        placeholders = image_token_ids(source)
+        sentinels = vision_sentinel_ids(source)
 
         for j, (_, i) in enumerate(turns):
             resp = test_output_gen_batch.batch["responses"][i]
@@ -193,6 +196,23 @@ def concat_val_multi_turn(
             # Frames are consumed in sequence order across the whole conversation: the
             # prompt's placeholders first, then each observation's.
             remaining = list(frames)
+            # Every frame has to be accounted for by a run somewhere in this conversation.
+            # Fewer runs than frames means two pictures rendered as one indistinguishable
+            # placeholder block -- which happens on a family that declares no vision
+            # sentinels -- and the frames then slide: a span takes the wrong picture and
+            # the last is dropped, with nothing raised. This is detectable; adjacency
+            # itself is not.
+            total_runs = (count_placeholder_runs(this_prompt[p_start:], placeholders)
+                          + count_placeholder_runs(resp[:r_len], placeholders))
+            if remaining and total_runs < len(remaining):
+                raise ImagePlaceholderMismatch(
+                    f"{total_runs} placeholder run(s) for {len(remaining)} frame(s) in one "
+                    f"conversation"
+                    + ("" if sentinels else
+                       " -- this model declares no vision sentinels, so adjacent pictures "
+                       "render as a single run and cannot be told apart. Register the "
+                       "family in IMAGE_TOKEN_ADAPTERS.")
+                )
 
             def take(span_ids):
                 # Hand this span only the frames it has room for. Passing the whole

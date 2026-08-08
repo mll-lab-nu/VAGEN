@@ -147,6 +147,12 @@ class InferenceClient(ABC):
             expected = len(conversation.token_ids)
             got = len(output.prompt_token_ids)
             if got != expected:
+                # Re-check the ceiling against what the engine actually ran. Measuring
+                # before adoption meant the ceiling passed on our render and the batch
+                # boundary then saw a longer sequence -- exactly the end-of-episode
+                # surprise the per-call ceilings were introduced to replace.
+                if opening:
+                    self._check_context(list(output.prompt_token_ids), opening=True)
                 logger.warning(
                     "the engine ran a prompt of %d tokens where this client rendered %d "
                     "(%+d). Adopting the engine's, which is right for training, but a "
