@@ -192,3 +192,63 @@ def test_frames_in_the_response_region_do_not_trip_the_leftover_check():
     assert [p for p in observation if "image" in p] == [{"image": "frame-observation"}], (
         f"the response-region frame did not land in the observation: {observation}"
     )
+
+
+def test_two_pictures_rendering_as_one_run_are_refused_not_slid():
+    """Without vision sentinels, adjacent pictures are one indistinguishable block.
+
+    The frames then slide: this span takes the wrong picture and the last is dropped,
+    with nothing raised. Adjacency itself is undetectable, but "fewer runs than frames"
+    is, and it is the same condition.
+    """
+    import numpy as np
+    import pytest
+    import torch
+    from tensordict import TensorDict
+    from verl import DataProto
+
+    from vagen.utils.concat_val_multi_turn import concat_val_multi_turn, _as_1d_object_array
+    from vagen.utils.image_token_utils import ImagePlaceholderMismatch
+
+    IMG, PAD = 700, 0
+
+    class _NoSentinels:
+        pad_token_id = PAD
+        image_token_id = IMG          # declared; sentinels are not
+
+        def decode(self, ids, **kw):
+            return " ".join(str(int(i)) for i in ids)
+
+    prompt = [900, IMG, IMG, 901]     # two pictures, one indistinguishable run
+    resp = [100, 101]
+    batch = DataProto(
+        batch=TensorDict({
+            "prompts": torch.tensor([prompt]),
+            "responses": torch.tensor([resp]),
+            "input_ids": torch.tensor([prompt + resp]),
+            "attention_mask": torch.ones(1, len(prompt) + len(resp), dtype=torch.long),
+            "position_ids": torch.arange(len(prompt) + len(resp)).unsqueeze(0),
+            "rm_scores": torch.zeros(1, len(resp)),
+            "loss_mask": torch.tensor([[1, 1]]),
+        }, batch_size=[1]),
+        non_tensor_batch={
+            "group_idx": np.array(["g"], dtype=object),
+            "traj_idx": np.array([0], dtype=object),
+            "turn_idx": np.array([0], dtype=object),
+            "conversation_id": np.array([0], dtype=object),
+            "episode_id": np.array(["e"], dtype=object),
+            "response_spans": _as_1d_object_array([[(0, 2)]]),
+            "image_data": _as_1d_object_array([["first", "second"]]),
+            "reward_extra_info": _as_1d_object_array([{"traj_success": 1.0}]),
+        },
+        meta_info={},
+    )
+    gen = DataProto(
+        batch=TensorDict({}, batch_size=[1]),
+        non_tensor_batch={"group_idx": np.array(["g"], dtype=object),
+                          "traj_idx": np.array([0], dtype=object),
+                          "uid": np.array(["g"], dtype=object)},
+        meta_info={},
+    )
+    with pytest.raises(ImagePlaceholderMismatch, match="no vision sentinels"):
+        concat_val_multi_turn(batch, gen, _NoSentinels())
