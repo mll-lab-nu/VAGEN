@@ -225,8 +225,12 @@ def test_the_batch_boundary_cuts_with_the_image_aware_helper():
 
     from vagen.agent_loop.gym_loop import GymLoop
 
+    #  model turn | observation with a picture | model turn | observation with a picture
     ids = [1, 2] + [VS, PAD, PAD, PAD, VE] + [3] * 10 + [VS, PAD, PAD, PAD, VE] + [4]
     frames = ["first", "second"]
+    # Spans cover the model's tokens only -- the pictures arrive in observations, which
+    # sit between them. A span covering a placeholder would mean the policy emitted one.
+    spans = [(0, 2), (7, 17)]
 
     class _Row:
         ordinal = 0
@@ -236,7 +240,7 @@ def test_the_batch_boundary_cuts_with_the_image_aware_helper():
         response_mask = [1] * len(ids)
         logprobs = [0.0] * len(ids)
         scores = [0.0] * len(ids)
-        response_spans = [(0, len(ids))]
+        response_spans = spans
 
     class _Client:
         def rows(self): return [_Row()]
@@ -265,3 +269,51 @@ def test_the_batch_boundary_cuts_with_the_image_aware_helper():
     )
     assert not kept or kept[-1] != VS, "a dangling vision_start reached the batch"
     assert kept_frames == ["first"], f"the wrong frame survived: {kept_frames}"
+
+
+def test_a_vision_token_the_policy_invented_is_refused():
+    """Nothing bans the vision vocabulary from a generation -- they are ordinary ids.
+
+    Sampled, there is no frame behind them, the placeholder count exceeds the frame count
+    and the row dies inside get_rope_index with a bare `IndexError: index 2 is out of
+    bounds`, several layers from anything naming a cause.
+    """
+    from omegaconf import OmegaConf
+
+    from vagen.agent_loop.gym_loop import GymLoop, SampledVisionToken
+    from vagen.core.client import EpisodeUnusable
+
+    assert issubclass(SampledVisionToken, EpisodeUnusable), (
+        "the policy's output is not a configuration error; it should cost one rollout"
+    )
+
+    class _Row:
+        ordinal = 0
+        conversation_id = "c"
+        prompt_ids = [1, 2]
+        response_ids = [5, VS, PAD, 6]          # the model emitted a picture opener
+        response_mask = [1, 1, 1, 1]
+        logprobs = [0.0] * 4
+        scores = [0.0] * 4
+        response_spans = [(0, 4)]
+
+    class _Client:
+        def rows(self): return [_Row()]
+        def images(self, cid): return []
+
+    class _Env:
+        success = False
+        state_scores = {}
+
+    class _Result:
+        turns = 1
+
+    loop = GymLoop.__new__(GymLoop)
+    loop.prompt_length, loop.response_length = 100, 100
+    loop.processor = loop.tokenizer = None
+    loop._ph_cache = (PH, SENT)
+    loop.config = OmegaConf.create({"trainer": {"harness": "concat", "compact_budget": 400}})
+
+    with pytest.raises(SampledVisionToken, match="generated vision token"):
+        GymLoop._outputs(loop, _Client(), _Env(), _Result(),
+                         {"group_idx": "g", "traj_idx": 0}, "ep")

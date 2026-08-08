@@ -35,8 +35,11 @@ class EpisodeResult:
 
 
 async def run_episode(env, harness, client, *, seed=None, max_turns: int = 10, **send_kwargs) -> EpisodeResult:
-    obs, info = await env.reset(seed)
+    # Inside the try: a reset that raises left the environment open, and a remote env
+    # client holds a server-side session and an HTTP client that only close() releases --
+    # one leaked per row of the batch.
     try:
+        obs, info = await env.reset(seed)
         harness.begin(await env.system_prompt(), obs_to_message(obs))
 
         result = EpisodeResult(info=dict(info or {}))

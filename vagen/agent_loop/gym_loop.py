@@ -47,6 +47,11 @@ logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
 STATE_REWARD_SPECS = {"Sokoban": sokoban_spec.SPEC}
 
 
+class SampledVisionToken(EpisodeUnusable, ValueError):
+    """The policy emitted an image placeholder of its own accord. See
+    ``GymLoop._refuse_sampled_vision_tokens``."""
+
+
 def _spans_within(spans, keep: int) -> tuple[list[tuple[int, int]], int]:
     """The spans that survive a truncation to ``keep``, and where the survivors end.
 
@@ -132,7 +137,20 @@ class GymEnvAdapter:
         await self.env.close()
 
     def _message(self, obs: dict, role: str = "user") -> dict:
-        images = _normalize_images(obs.get("multi_modal_input", {}).get("<image>", []) or [])
+        mm = obs.get("multi_modal_input", {}) or {}
+        # Only images are carried. A video would count as a picture -- image_token_ids
+        # returns the video pad id too -- while nothing lifts it into multi_modal_data,
+        # so the placeholder runs and the frames stop being 1:1 and the row dies deep in
+        # get_rope_index with `'NoneType' object is not subscriptable`, naming nothing.
+        # Refuse where the environment can be pointed at instead.
+        unsupported = [k for k in mm if k not in ("<image>",) and mm.get(k)]
+        if unsupported:
+            raise NotImplementedError(
+                f"environment {self.name!r} returned {unsupported} in multi_modal_input; "
+                f"only '<image>' is carried into training. Supporting another modality "
+                f"means lifting it here and adding it to multi_modal_data in _outputs."
+            )
+        images = _normalize_images(mm.get("<image>", []) or [])
         return {"role": role, "content": convert_obs_to_content(obs, **self.kwargs), "images": images}
 
 
@@ -284,9 +302,39 @@ class GymLoop(VagenGymAgentLoopBase):
         of the model.
         """
         if getattr(self, "_ph_cache", None) is None:
-            source = self.processor if self.processor is not None else self.tokenizer
-            self._ph_cache = (image_token_ids(source), vision_sentinel_ids(source))
+            source = getattr(self, "processor", None) or getattr(self, "tokenizer", None)
+            self._ph_cache = ((image_token_ids(source), vision_sentinel_ids(source))
+                              if source is not None else (set(), set()))
         return self._ph_cache
+
+    def _refuse_sampled_vision_tokens(self, row) -> None:
+        """A picture the policy invented is not a picture.
+
+        Nothing bans the vision vocabulary from a generation -- they are ordinary ids --
+        so a model can sample ``<|vision_start|><|image_pad|>`` and there is no frame
+        behind it. The placeholder count then exceeds the frame count and the row dies in
+        ``get_rope_index`` with a bare ``IndexError: index 2 is out of bounds``, several
+        layers from anything that names a cause.
+
+        Refused as an unusable episode rather than a fatal one: it is the policy's output,
+        not the configuration, and a model that does this occasionally should cost one
+        rollout rather than the run. It is worth watching, though -- a model that has
+        learned to emit image tokens is learning something the reward did not ask for.
+        """
+        placeholders, sentinels = self._placeholders()
+        watched = placeholders | sentinels
+        if not watched:
+            return
+        for start, end in row.response_spans or ():
+            hit = {t for t in row.response_ids[int(start):int(end)] if int(t) in watched}
+            if hit:
+                raise SampledVisionToken(
+                    f"the policy generated vision token(s) {sorted(hit)} inside its own "
+                    f"response at [{start}, {end}). There is no frame behind them, so the "
+                    f"placeholder runs and multi_modal_inputs stop being 1:1 and the row "
+                    f"fails inside get_rope_index. Ban these ids at sampling "
+                    f"(rollout.sampling_params) if the model keeps doing it."
+                )
 
     def _split_frames(self, prompt_ids, images):
         """Which frames belong to the prompt region and which to the response region.
@@ -470,6 +518,7 @@ class GymLoop(VagenGymAgentLoopBase):
             # a long-tail rollout impossible to debug. What gets cut is context: the
             # model's own tokens are bounded by max_new_tokens, so only observations can
             # overflow, and observations are mask 0 and carry no reward.
+            self._refuse_sampled_vision_tokens(row)
             prompt_frames, response_frames = self._split_frames(row.prompt_ids, images)
             response_ids, response_frames = self._truncate_response(
                 row.response_ids, response_frames, hint)

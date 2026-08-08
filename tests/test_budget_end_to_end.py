@@ -504,3 +504,30 @@ def test_an_unusable_episode_costs_one_episode_not_the_batch():
     src = inspect.getsource(GymLoop.run)
     assert "except EpisodeUnusable" in src, "run() no longer isolates an unusable episode"
     assert "return []" in src, "a dropped episode must yield no rows rather than raise"
+
+
+def test_the_opening_ceiling_is_checked_against_what_the_engine_actually_ran():
+    """Measuring before adoption let a longer sequence through.
+
+    The engine expands multimodal placeholders its own way, and `adopt_prompt` takes its
+    version -- so a ceiling checked on our render passes while the batch boundary sees
+    something bigger. That is the end-of-episode surprise the per-call ceilings exist to
+    replace.
+    """
+    from vagen.core.client import BackendOutput, ContextTooLarge, InferenceClient
+
+    class _Expanding(InferenceClient):
+        """Renders 10 tokens; the engine says it ran 40."""
+
+        tokenizer = None
+
+        def encode(self, messages): return [0] * 10
+
+        async def generate(self, prompt_ids, **kw):
+            return BackendOutput(text="a", token_ids=[1],
+                                 prompt_token_ids=[0] * 40)
+
+    c = _Expanding()
+    c.opening_limit, c.continuation_limit = 20, 20
+    with pytest.raises(ContextTooLarge, match="came to 40"):
+        asyncio.run(c.send([{"role": "user", "content": "x"}]))
