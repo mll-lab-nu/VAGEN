@@ -16,8 +16,10 @@ import glob
 
 import pytest
 
+from model_path import local_snapshot
+
 MODEL = glob.glob(
-    "$HOME/.cache/huggingface/hub/models--Qwen--Qwen2.5-VL-3B-Instruct/snapshots/*/"
+    (local_snapshot() or "") + "/"
 )
 pytestmark = pytest.mark.skipif(not MODEL, reason="Qwen2.5-VL snapshot not present")
 

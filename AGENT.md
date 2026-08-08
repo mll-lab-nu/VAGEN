@@ -7,8 +7,7 @@ Training backend: `verl@release/v0.8.0`, a **sibling checkout** at `../verl` —
 **not pip-installed**, so it has to be on `PYTHONPATH`.
 
 ```bash
-export PATH=$HOME/miniconda3/envs/verl/bin:$PATH
-PYTHONPATH=$(pwd)/../verl:$(pwd) python -m pytest -q     # 524 passed, 6 skipped, 1 xfailed
+PYTHONPATH=$(pwd)/../verl:$(pwd) python -m pytest -q     # 534 passed, 6 skipped
 ```
 
 ---
