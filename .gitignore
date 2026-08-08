@@ -40,3 +40,22 @@ rollouts/
 # the working tree -- and a `git add -A` then commits them. It has happened once.
 artifacts/
 wandb/
+
+# Run outputs and model weights. None of these belong in a repo, and a `git add -A`
+# after an experiment is how they get here.
+*.jsonl
+*.pt
+*.ckpt
+*.safetensors
+*.tar
+checkpoints/
+ray_results/
+runs/
+tensorboard/
+nohup.out
+
+# Local environment and credentials
+.venv/
+.env
+.netrc
+_mast/
