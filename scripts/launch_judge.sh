@@ -11,7 +11,8 @@
 #
 # vllm, matching the MAST entrypoint. Two engines for one job is two sets of failures.
 set -eo pipefail
-ENV=${ENV:-$HOME/miniconda3/envs/verl}
+# The conda env the judge runs in. Defaults to the one this shell is already using.
+ENV=${ENV:-$(python3 -c 'import sys, os; print(os.path.dirname(os.path.dirname(sys.executable)))' 2>/dev/null || echo "$CONDA_PREFIX")}
 MODEL=${MODEL:-Qwen/Qwen3-4B-Instruct-2507}
 PORT=${PORT:-8123}
 TP=${TP:-8}

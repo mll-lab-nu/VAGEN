@@ -27,8 +27,9 @@ from vagen.utils.image_token_utils import (
     vision_sentinel_ids,
 )
 
-MODEL = ("$HOME/.cache/huggingface/hub/models--Qwen--Qwen2.5-VL-3B-Instruct"
-         "/snapshots/66285546d2b821cf421d4f5eb2576359d3770cd3")
+from model_path import local_snapshot
+
+MODEL = local_snapshot()
 
 PAD, VS, VE = 9, 8, 7          # placeholder, vision_start, vision_end
 PH, SENT = {PAD}, {VS, VE}

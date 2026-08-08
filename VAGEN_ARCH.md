@@ -733,7 +733,7 @@ Baseline frozen at `PHASE0_CPU_BASELINE.txt` — **diff against it at the end of
 later phase**; that is the concrete form of "matches baseline" in the exit criteria.
 
 **Known pre-existing failures (all environmental, none ours):**
-- 35 failures/errors: every one traces to `$HOME/models/` not existing, so HF
+- 35 failures/errors: every one traces to the local model cache not existing, so HF
   treats local paths as repo ids and raises `HFValidationError`.
 - 1 collection error, `tests/models/test_fused_kernels_ulysses_sp_on_cpu.py`:
   `No module named 'transformers.models.qwen3_5'`. 🔴 **The env is on transformers
@@ -967,7 +967,7 @@ legacy files.
 Bringing up an actual sokoban run surfaced several things that block Phase 1:
 
 **Stale installs.** Both editable installs in the conda `verl` env point at
-`$HOME/projects/vagen/VAGEN`, **which no longer exists**. `import verl` therefore
+an older checkout path, **which no longer exists**. `import verl` therefore
 only resolves when cwd happens to contain a `verl/` directory. Worse, `VAGEN/verl` is an
 uninitialised submodule (empty dir) that Python treats as a namespace package and which
 **shadows the real verl** whenever you run from the VAGEN root — and VAGEN's hydra

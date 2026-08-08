@@ -12,6 +12,8 @@ import re
 
 import pytest
 
+from model_path import local_snapshot
+
 from vagen.agent_loop.gym_loop import STATE_REWARD_SPECS
 
 
@@ -104,7 +106,7 @@ def test_offsets_are_measured_the_way_the_action_text_was_decoded():
     shifts every position after the first one, moving the reward off the description and
     onto the tag before it."""
     tok = _pytest.importorskip("transformers").AutoTokenizer.from_pretrained(
-        "$HOME/.cache/huggingface/hub/models--Qwen--Qwen2.5-VL-3B-Instruct/snapshots",
+        local_snapshot() or "",
         trust_remote_code=True,
     ) if False else None
 
