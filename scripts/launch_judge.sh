@@ -9,7 +9,7 @@
 # Instruct-only on purpose: a thinking model would spend its budget reasoning about a
 # format conversion, on the critical path of every turn of every rollout.
 #
-# vllm, matching the MAST entrypoint. Two engines for one job is two sets of failures.
+# vllm, matching the cluster entrypoint. Two engines for one job is two sets of failures.
 set -eo pipefail
 # The conda env the judge runs in. Defaults to the one this shell is already using.
 ENV=${ENV:-$(python3 -c 'import sys, os; print(os.path.dirname(os.path.dirname(sys.executable)))' 2>/dev/null || echo "$CONDA_PREFIX")}

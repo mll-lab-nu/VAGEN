@@ -1,5 +1,5 @@
-# The flags that make a VAGEN run work, shared by the local driver and the MAST
-# entrypoint so the two cannot drift. Maintaining two copies cost two dead MAST jobs:
+# The flags that make a VAGEN run work, shared by the local driver and the cluster
+# entrypoint so the two cannot drift. Maintaining two copies cost two dead cluster jobs:
 # each omission surfaces only on the cluster, one flag per submission.
 #
 # What belongs here: settings that make the run go at all, or that select VAGEN's own

@@ -962,7 +962,7 @@ Not yet validated on GPUs: the v0.8.0 training path end-to-end. The baselines ab
 ran on the pre-0.8 stack. A short sokoban smoke test is the gate for deleting the two
 legacy files.
 
-### Environment findings (2026-08-02, a development host with 8× B200)
+### Environment findings (2026-08-02, an 8-GPU host)
 
 Bringing up an actual sokoban run surfaced several things that block Phase 1:
 
@@ -975,7 +975,7 @@ searchpath (`file:../../verl/verl/trainer/config`) points into that same empty d
 initialise the submodule or run from a neutral cwd with `PYTHONPATH` + a
 `hydra.searchpath` override; `baseline_runs/run.sh` does the latter.
 
-**Missing dependencies** (installed during this session, all via ` pip`):
+**Missing dependencies** (installed during this session, all via `pip`):
 
 | Package | Why | Note |
 |---|---|---|
