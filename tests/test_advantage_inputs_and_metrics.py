@@ -9,57 +9,95 @@ critic is broken.
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
 torch = pytest.importorskip("torch")
 
-from vagen.custom_advantage.trajectory_algos import rewards_for_advantage  # noqa: E402
+from vagen.custom_advantage import AdvantageInputs  # noqa: E402
+
+
+def _inputs(**columns):
+    return AdvantageInputs(columns, {}, None, "probe")
 
 
 def test_the_penalised_reward_is_preferred_when_present():
     """verl writes the KL penalty into token_level_rewards and leaves the scores alone."""
-    batch = {
-        "token_level_scores": torch.tensor([[1.0, 2.0]]),
-        "token_level_rewards": torch.tensor([[0.5, 1.5]]),
-    }
-    assert torch.equal(rewards_for_advantage(batch), batch["token_level_rewards"]), (
+    inputs = _inputs(
+        token_level_scores=torch.tensor([[1.0, 2.0]]),
+        token_level_rewards=torch.tensor([[0.5, 1.5]]),
+    )
+    assert torch.equal(inputs.rewards, torch.tensor([[0.5, 1.5]])), (
         "use_kl_in_reward is a silent no-op: the penalty is stored and never read"
     )
 
 
 def test_the_scores_are_used_when_there_is_no_penalty():
-    batch = {"token_level_scores": torch.tensor([[1.0, 2.0]])}
-    assert torch.equal(rewards_for_advantage(batch), batch["token_level_scores"])
+    inputs = _inputs(token_level_scores=torch.tensor([[1.0, 2.0]]))
+    assert torch.equal(inputs.rewards, torch.tensor([[1.0, 2.0]]))
 
 
-def test_every_estimator_goes_through_the_helper():
-    """One of them reading the raw key is the whole bug back again."""
+def test_no_estimator_reads_the_raw_scores_directly():
+    """★ One of them reaching past `inputs.rewards` is the whole bug back again.
+
+    The previous version of this test split the module on a helper that no longer exists
+    and then searched the *whole file* when the split failed -- so it was asserting
+    against a string that had moved, not against the estimators.
+    """
+    import ast
     import inspect
 
-    from vagen.custom_advantage import no_concat_gae, trajectory_algos
+    from vagen.custom_advantage import trajectory_algos
 
-    for module in (trajectory_algos, no_concat_gae):
-        src = inspect.getsource(module)
-        body = src.split("def rewards_for_advantage", 1)
-        body = body[1].split("\n\n\n", 1)[1] if len(body) > 1 else src
-        assert 'batch["token_level_scores"]' not in body, (
-            f"{module.__name__} still reads the un-penalised scores directly"
-        )
+    tree = ast.parse(inspect.getsource(trajectory_algos))
+    offenders = [
+        node.name
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+        and any("advantage_estimator" in ast.unparse(d) for d in node.decorator_list)
+        and ("token_level_scores" in ast.unparse(node) or "inputs.scores" in ast.unparse(node))
+    ]
+    assert not offenders, (
+        f"{offenders} read the un-penalised scores; use inputs.rewards or "
+        "algorithm.use_kl_in_reward silently does nothing"
+    )
 
 
 def test_critic_metrics_ignore_the_unsupervised_sentinel():
-    """The sentinel marks positions with no return. Averaging it in gave
-    critic/returns/mean = -87 where the supervised mean was 0.75."""
-    import inspect
+    """★ Behavioural, not a source grep. The previous version asserted that the string
+    "value_mask" appeared in the function -- which an explanatory *comment* satisfies, so
+    deleting the narrowing itself left the test green while critic/returns/mean went back
+    to reporting about -87."""
+    from verl import DataProto
+    from verl.trainer.ppo.metric_utils import compute_data_metrics
 
-    from verl.trainer.ppo import metric_utils
+    from vagen.trainer.logic import IGNORE_RETURN
 
-    src = inspect.getsource(metric_utils.compute_data_metrics)
-    assert "value_mask" in src, "the metrics no longer know about the sentinel"
-    assert "masked_select(returns, returns_mask)" in src
-    assert "masked_select(values, returns_mask)" in src, (
-        "values and returns must be masked the same way or explained variance "
-        "compares different position sets"
+    n, width = 2, 4
+    returns = torch.full((n, width), IGNORE_RETURN)
+    returns[:, 0] = 0.75                       # one supervised anchor per row
+    values = torch.zeros(n, width)
+    values[:, 0] = 0.5
+    value_mask = torch.zeros(n, width, dtype=torch.long)
+    value_mask[:, 0] = 1
+
+    batch = DataProto.from_single_dict({
+        "returns": returns,
+        "values": values,
+        "value_mask": value_mask,
+        "advantages": torch.zeros(n, width),
+        "token_level_scores": torch.zeros(n, width),
+        "token_level_rewards": torch.zeros(n, width),
+        "response_mask": torch.ones(n, width, dtype=torch.long),
+        "attention_mask": torch.ones(n, width * 2, dtype=torch.long),
+        "prompts": torch.zeros(n, width, dtype=torch.long),
+        "responses": torch.zeros(n, width, dtype=torch.long),
+    })
+    metrics = compute_data_metrics(batch, use_critic=True)
+
+    assert metrics["critic/returns/mean"] == pytest.approx(0.75), (
+        f"critic/returns/mean is {metrics['critic/returns/mean']}, so the -100 sentinel "
+        "is being averaged in"
     )
 
 

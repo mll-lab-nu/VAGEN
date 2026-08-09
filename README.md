@@ -208,7 +208,12 @@ refer to `vagen/configs/vagen_multiturn.yaml`
 # Enable no concat mode: input is system prompt + current step observation
 trainer:
   harness: no_concat        # concat | no_concat | compact
-# Currently only supported with algorithm.adv_estimator=no_concat_gae
+
+# no_concat and compact put one episode in several rows, so the advantage estimator has
+# to be one that stitches them back together. verl's own `gae`/`grpo` score a row at a
+# time and would drop every turn's credit at the row boundary; the trainer refuses that
+# pairing at startup rather than training on it.
+algorithm:
 
 ```
 

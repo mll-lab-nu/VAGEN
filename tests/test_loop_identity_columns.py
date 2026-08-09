@@ -16,6 +16,15 @@ import pytest
 
 from vagen.agent_loop.gym_loop import GymLoop
 
+class _NoCompaction:
+    """A harness that never summarised. `_outputs` asks it which conversations ended at a
+    compaction seam rather than because the environment stepped; only CompactHarness ever
+    answers non-empty."""
+
+    summarised_conversations: set = set()
+
+
+
 
 class _Row:
     response_spans = [(0, 1), (1, 2)]   # two turns inside this conversation
@@ -55,7 +64,7 @@ def _outputs():
     loop.prompt_length = 100
     loop.response_length = 100
     kwargs = {"group_idx": "g-1", "traj_idx": 0}
-    return GymLoop._outputs(loop, _Client(), _Env(), _Result(), kwargs, "ep-abc")
+    return GymLoop._outputs(loop, _Client(), _Env(), _Result(), kwargs, "ep-abc", _NoCompaction())
 
 
 def test_every_row_carries_the_whole_identity_chain():
@@ -65,6 +74,39 @@ def test_every_row_carries_the_whole_identity_chain():
             assert key in f, f"the loop stopped publishing {key}"
         assert f["episode_id"] == "ep-abc"
         assert f["group_idx"] == "g-1"
+
+
+def test_every_per_row_column_the_loop_publishes_survives_the_trip_to_the_trainer():
+    """★ Publishing a per-row column is only half of it.
+
+    verl drops ``input_non_tensor_batch`` wholesale under streaming reward, so anything
+    the loop emits has to be named in ``INDEX_COLUMNS`` or ``ROW_COLUMNS`` to be put back.
+    A column that is emitted but not listed simply is not there by the time an estimator
+    reads it -- and every reader of these columns treats absence as a legitimate default
+    ("no seams", "one conversation"), so nothing raises and the estimator quietly runs
+    the version of itself that the column existed to correct.
+
+    Listing them one by one is what let ``ends_with_summary`` be added to the loop and
+    forgotten here, so this asks the loop what it publishes rather than being told.
+    """
+    from vagen.agent_loop.multi_output import MultiOutputAgentLoopWorker as _M
+
+    carried = set(_M.INDEX_COLUMNS) | set(_M.ROW_COLUMNS)
+    # Not per-row identity: these are either per-rollout (restored from the input batch),
+    # consumed inside the loop, or turned into tensors before the trip.
+    not_identity = {"traj_idx", "reward_extra_info", "image_data", "per_token_reward",
+                    "last_turn", "response_mask", "logprobs", "metrics"}
+
+    published = set()
+    for out in _outputs():
+        published |= set(out.extra_fields)
+
+    missing = published - carried - not_identity
+    assert not missing, (
+        f"the loop publishes {sorted(missing)} but nothing restores them after verl "
+        f"drops the non-tensor batch -- add them to ROW_COLUMNS, or to this test's "
+        f"`not_identity` if they genuinely do not need to survive"
+    )
 
 
 def test_conversations_are_numbered_from_zero_in_order():
@@ -119,6 +161,11 @@ def test_a_dropped_conversation_does_not_renumber_the_ones_after_it():
     loop = GymLoop.__new__(GymLoop)
     loop.prompt_length = loop.response_length = 100
     outs = GymLoop._outputs(loop, _Dropping(), _Env(), _Result(),
-                            {"group_idx": "g-1", "traj_idx": 0}, "ep-abc")
+                            {"group_idx": "g-1", "traj_idx": 0}, "ep-abc", _NoCompaction())
     ids = [o.extra_fields["conversation_id"] for o in outs]
     assert ids == [0, 2, 3], f"the gap was closed up and everything after it renumbered: {ids}"
+    # ★ And last_turn has to survive the same gap. Comparing the ordinal against
+    # `len(rows) - 1` marks ordinal 2 -- the middle row -- and leaves the real last one
+    # unflagged. The whole suite passed with that bug in place.
+    flags = [o.extra_fields["last_turn"] for o in outs]
+    assert flags == [False, False, True], f"last_turn followed the gap: {flags}"

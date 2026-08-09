@@ -1,17 +1,30 @@
-"""Registration for advantage estimators that emit *sentinel* returns.
+"""What the trainer needs to know about an estimator, declared where it registers.
 
-Turn-level estimators such as ``no_concat_gae`` write a real return at one anchor token
-per turn and leave every other position at ``IGNORE_RETURN`` (-100.0). The critic must
-therefore be told which positions carry supervision, via ``value_mask``; without it, it
-is trained to regress towards the sentinel almost everywhere.
+Two properties, both of which used to be -- or would otherwise be -- a hard-coded list
+of names somewhere else in the tree. A list like that drifts from the names actually
+registered, and both failure modes here are silent.
 
-Deciding that from a hard-coded list of estimator names is what this module exists to
-avoid: the list and the registered names drift apart silently, and the symptom -- a
-critic fitting a constant -- shows up as a *falling* value loss and a healthy-looking
-explained variance, so nothing obvious fails.
+**Sentinel returns.** Turn-level estimators such as ``turn_level_gae`` write a real
+return at one anchor token per turn and leave every other position at ``IGNORE_RETURN``
+(-100.0). The critic must be told which positions carry supervision, via ``value_mask``;
+without it, it is trained to regress towards the sentinel almost everywhere. The symptom
+is a *falling* value loss and a healthy-looking explained variance, so nothing fails.
 
-Instead an estimator declares that it emits sentinels at the point where it registers
-itself, so the two cannot disagree. ``tests/test_advantage_registry.py`` additionally
+**Spanning rows.** An episode is one row only under ``concat``; ``no_concat`` gives each
+turn its own row and ``compact`` starts a new one at every compaction. An estimator that
+scores one row at a time -- which is every estimator verl ships -- then opens each row
+with ``nextvalues=0``, asserting that nothing after the row boundary is worth anything.
+Training proceeds, the loss curves look ordinary, and the agent is simply never credited
+across a turn boundary. ``spans_rows`` is what lets the trainer refuse that pairing at
+startup instead.
+
+**Needing a critic.** An estimator that reads ``values`` produces something entirely
+different when there is no critic -- not an error, a different algorithm. verl only
+builds one automatically for the literal estimator name ``"gae"``, so every estimator
+here has to say so and the trainer has to check.
+
+An estimator declares all three at the point where it registers itself, so the declaration
+and the registration cannot disagree. ``tests/test_advantage_registry.py`` additionally
 asserts that every estimator whose implementation mentions ``IGNORE_RETURN`` has
 actually declared it.
 """
@@ -25,9 +38,37 @@ from verl.trainer.ppo.core_algos import register_adv_est
 # Estimator names whose `returns` contain IGNORE_RETURN at unsupervised positions.
 SENTINEL_RETURN_ESTIMATORS: set[str] = set()
 
+# Estimator names that stitch an episode's rows back together before scoring it.
+TRAJECTORY_ESTIMATORS: set[str] = set()
 
-def register_sentinel_adv_est(name: str) -> Callable:
-    """Register an advantage estimator that writes sentinel returns.
+# Estimator names that read the critic's values and are meaningless without them.
+CRITIC_ESTIMATORS: set[str] = set()
+
+# Estimator names that combine a per-token recursion with a per-turn one, and so are only
+# defined at gamma == 1. See `requires_undiscounted`.
+UNDISCOUNTED_ESTIMATORS: set[str] = set()
+
+
+def register_trajectory_adv_est(
+    name: str, *, needs_critic: bool = False, undiscounted: bool = False
+) -> Callable:
+    """Register an estimator that scores a whole episode, however its rows are laid out."""
+
+    def decorator(fn):
+        TRAJECTORY_ESTIMATORS.add(name)
+        if needs_critic:
+            CRITIC_ESTIMATORS.add(name)
+        if undiscounted:
+            UNDISCOUNTED_ESTIMATORS.add(name)
+        return register_adv_est(name)(fn)
+
+    return decorator
+
+
+def register_sentinel_adv_est(
+    name: str, *, needs_critic: bool = False, undiscounted: bool = False
+) -> Callable:
+    """Register a trajectory estimator that additionally writes sentinel returns.
 
     Same contract as verl's ``register_adv_est``, and additionally records the name so
     the trainer can decide to compute ``value_mask`` without hard-coding anything.
@@ -35,14 +76,63 @@ def register_sentinel_adv_est(name: str) -> Callable:
 
     def decorator(fn):
         SENTINEL_RETURN_ESTIMATORS.add(name)
-        return register_adv_est(name)(fn)
+        return register_trajectory_adv_est(
+            name, needs_critic=needs_critic, undiscounted=undiscounted
+        )(fn)
 
     return decorator
 
 
-def needs_value_mask(adv_estimator) -> bool:
-    """Whether this estimator's returns require a ``value_mask``.
+def _name_of(adv_estimator) -> str:
+    """Accepts a str or verl's ``AdvantageEstimator`` enum (whose members are str-valued)."""
+    return str(getattr(adv_estimator, "value", adv_estimator))
 
-    Accepts a str or verl's ``AdvantageEstimator`` enum (whose members are str-valued).
+
+def needs_value_mask(adv_estimator) -> bool:
+    """Whether this estimator's returns require a ``value_mask``."""
+    return _name_of(adv_estimator) in SENTINEL_RETURN_ESTIMATORS
+
+
+def needs_critic(adv_estimator) -> bool:
+    """Whether this estimator is meaningless without a critic.
+
+    ★ verl decides whether to build one from ``critic.enable``, and when that is unset it
+    falls back to ``adv_estimator == "gae"`` -- the *literal string*. Every estimator here
+    fails that test, so an unset ``critic.enable`` disables the critic, ``values`` becomes
+    zeros, and GAE quietly degenerates into a whitened discounted reward sum. The run
+    comes up, uses half the memory, trains faster, and the only evidence is a warning that
+    reads "Disabled critic as algorithm.adv_estimator != gae".
     """
-    return str(getattr(adv_estimator, "value", adv_estimator)) in SENTINEL_RETURN_ESTIMATORS
+    return _name_of(adv_estimator) in CRITIC_ESTIMATORS
+
+
+def requires_undiscounted(adv_estimator) -> bool:
+    """Whether this estimator is only defined at ``algorithm.gamma == 1``.
+
+    ★ An estimator that runs one recursion per token and another per turn discounts the
+    same span of trajectory twice over, by two different clocks. Crossing one turn costs
+    the turn-level chain a single ``gamma``; it costs the token-level chain
+    ``gamma ** (tokens in that turn)``. The two agree only at ``gamma == 1``.
+
+    The divergence is not a rounding error and it is not bounded by the turn count -- it
+    is set by how much the model wrote. At ``gamma = 0.99`` a 200-token turn bootstraps
+    ``0.99 ** 200 = 0.134`` where the turn level uses ``0.99``, an over-weighting of 7.5x;
+    a 500-token turn gives ``0.0066``, over-weighted 152x. The *effective* horizon
+    therefore becomes a function of the policy's verbosity, which the policy is free to
+    change during training. Measured relative gradient error against an exact policy
+    gradient: 0.11% at gamma 0.999, 1.06% at 0.99, 4.9% at 0.95.
+
+    Nothing about this fails loudly, which is why it is a startup assertion rather than a
+    documented caveat: ``gamma`` has a perfectly ordinary default and every curve keeps
+    its shape.
+    """
+    return _name_of(adv_estimator) in UNDISCOUNTED_ESTIMATORS
+
+
+def spans_rows(adv_estimator) -> bool:
+    """Whether this estimator carries its recursion across an episode's rows.
+
+    False for everything verl ships: those score one row and stop, which is correct only
+    when a row is a whole episode.
+    """
+    return _name_of(adv_estimator) in TRAJECTORY_ESTIMATORS

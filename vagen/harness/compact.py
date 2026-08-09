@@ -226,6 +226,11 @@ class CompactHarness(BaseHarness):
         if self._awaiting_summary:
             self._awaiting_summary = False
             self._summary = f"{self.SUMMARY_PREFIX}{response.text}"
+            # Recorded before the id is dropped: this conversation ended because the
+            # context filled up, not because the environment stepped. See
+            # `BaseHarness.summarised_conversations` for who reads it and why.
+            if self._conversation_id is not None:
+                self.summarised_conversations.add(self._conversation_id)
             self._conversation_id = None      # the next call opens a fresh conversation
             self._used = 0
             self._turns_here = 0
