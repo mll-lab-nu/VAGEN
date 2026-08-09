@@ -91,7 +91,14 @@ def test_the_turn_estimator_reads_the_value_at_the_turn_start():
     """
     import numpy as np
 
-    from vagen.custom_advantage.trajectory_algos import compute_traj_turn_gae
+    import vagen.custom_advantage  # noqa: F401  importing is what registers them
+    from verl.trainer.ppo.core_algos import get_adv_estimator_fn
+
+    # Through the registry, so this exercises the same dispatch verl uses rather than
+    # the undecorated function -- which takes an AdvantageInputs, not verl's kwargs.
+    # The import above is load-bearing: without it this file passes only when an
+    # alphabetically earlier one happens to have imported the package first.
+    compute_turn_level_gae = get_adv_estimator_fn("turn_level_gae")
 
     width = 6
     # turn 0 covers 0..1, turn 1 covers 3..5 (a gap marks the boundary)
@@ -107,7 +114,7 @@ def test_the_turn_estimator_reads_the_value_at_the_turn_start():
           "traj_idx": np.array([0], dtype=object),
           "turn_idx": np.array([0], dtype=object)}
 
-    adv, ret = compute_traj_turn_gae(batch=batch, non_tensor_batch=nt,
+    adv, ret = compute_turn_level_gae(batch=batch, non_tensor_batch=nt,
                                      config=type("C", (), {"gamma": 1.0, "lam": 1.0})())
 
     # Real returns sit only at anchors; everywhere else carries the sentinel that says

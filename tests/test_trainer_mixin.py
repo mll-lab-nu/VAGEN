@@ -59,11 +59,15 @@ class _Trainer(VagenV0Mixin, _FakeBase):
         self._vagen_image_futures = []
 
 
-def _cfg(adv="gae", filter_enable=False, balance=True, local_dir="/nonexistent"):
+def _cfg(adv="gae", filter_enable=False, balance=True, local_dir="/nonexistent", harness="concat"):  # noqa: D103
     return OmegaConf.create(
         {
             "algorithm": {"adv_estimator": adv},
-            "trainer": {"balance_batch": balance, "default_local_dir": local_dir},
+            "trainer": {
+                "balance_batch": balance,
+                "default_local_dir": local_dir,
+                "harness": harness,
+            },
             "filter": {"enable": filter_enable, "name": "noop", "filter_kwargs": {}},
         }
     )
@@ -85,12 +89,133 @@ def _batch(n=4, width=3):
     )
 
 
+# --------------------------------------------- estimator vs. context policy
+
+
+@pytest.mark.parametrize("adv", ["gae", "grpo", "reinforce_plus_plus"])
+@pytest.mark.parametrize("harness", ["no_concat", "compact"])
+def test_row_local_estimator_is_refused_under_a_splitting_harness(adv, harness):
+    """★ The pairing that fails silently. verl's estimators score one row and open each
+    with nextvalues=0; under these policies a row is one turn, so turn t is never
+    credited with anything that happened after it. Nothing downstream notices."""
+    t = _Trainer(_cfg(adv=adv, harness=harness))
+    with pytest.raises(ValueError, match="scores one row at a time"):
+        t._vagen_check_estimator_spans_the_layout()
+
+
+@pytest.mark.parametrize("adv", ["token_level_gae", "removed_estimator_gae", "turn_level_gae", "trajectory_grpo"])
+@pytest.mark.parametrize("harness", ["concat", "no_concat", "compact"])
+def test_trajectory_estimators_are_allowed_everywhere(adv, harness):
+    """The other half of the claim: these stitch the rows back together, so every policy
+    is fine. If one of them were rejected the guard would be over-broad, which is the
+    failure mode a permissive test never catches."""
+    import vagen.custom_advantage  # noqa: F401  registers the estimators
+
+    _Trainer(_cfg(adv=adv, harness=harness))._vagen_check_estimator_spans_the_layout()
+
+
+@pytest.mark.parametrize("adv", ["gae", "grpo"])
+def test_row_local_estimator_is_fine_under_concat(adv):
+    """Concat puts a whole episode in one row, so row-local *is* trajectory-level there.
+    Rejecting it would break every existing script."""
+    _Trainer(_cfg(adv=adv, harness="concat"))._vagen_check_estimator_spans_the_layout()
+
+
+def test_the_check_runs_at_startup():
+    """★ A guard nothing calls is not a guard. Pins the call into `_vagen_init` so
+    deleting it there is caught here rather than by a wasted training run."""
+    import inspect
+
+    from vagen.trainer.mixin import VagenLogicMixin
+
+    src = inspect.getsource(VagenLogicMixin._vagen_init)
+    assert "_vagen_check_estimator_spans_the_layout()" in src
+
+
+def test_the_guard_reads_the_registry_rather_than_a_local_list():
+    """The set of safe estimators must come from the registry the estimators populate.
+    A list kept in the trainer would drift the moment one is added."""
+    import inspect
+
+    from vagen.trainer.mixin import VagenLogicMixin
+
+    src = inspect.getsource(VagenLogicMixin._vagen_check_estimator_spans_the_layout)
+    assert "spans_rows" in src
+    for name in ("token_level_gae", "removed_estimator_gae", "trajectory_grpo"):
+        assert name not in src, f"{name} is hard-coded in the trainer; read the registry"
+
+
+# ------------------------------------------------------------- critic guard
+
+
+@pytest.mark.parametrize("adv", ["token_level_gae", "removed_estimator_gae", "turn_level_gae"])
+def test_a_value_based_estimator_without_a_critic_is_refused(adv):
+    """★ verl builds a critic from `critic.enable`, and when that is unset it falls back
+    to `adv_estimator == "gae"` -- the literal string. Every estimator here fails that
+    test, so `values` reads as zeros and GAE becomes a whitened discounted reward sum.
+    The run starts, uses half the memory, trains faster, and says so only in a warning
+    that reads "Disabled critic as algorithm.adv_estimator != gae"."""
+    import vagen.custom_advantage  # noqa: F401  registers them
+
+    t = _Trainer(_cfg(adv=adv))
+    t.use_critic = False
+    with pytest.raises(ValueError, match="no critic will be built"):
+        t._vagen_check_estimator_has_its_critic()
+
+
+@pytest.mark.parametrize("adv", ["token_level_gae", "removed_estimator_gae", "turn_level_gae"])
+def test_the_same_estimators_pass_with_a_critic(adv):
+    import vagen.custom_advantage  # noqa: F401
+
+    t = _Trainer(_cfg(adv=adv))
+    t.use_critic = True
+    t._vagen_check_estimator_has_its_critic()
+
+
+@pytest.mark.parametrize("adv", ["trajectory_grpo", "grpo"])
+def test_critic_free_estimators_are_not_required_to_have_one(adv):
+    """Over-broad would be just as bad: GRPO needs no critic and must not be forced to
+    pay for one."""
+    import vagen.custom_advantage  # noqa: F401
+
+    t = _Trainer(_cfg(adv=adv))
+    t.use_critic = False
+    t._vagen_check_estimator_has_its_critic()
+
+
+def test_the_critic_check_runs_at_startup():
+    """A guard nothing calls is not a guard."""
+    import inspect
+
+    from vagen.trainer.mixin import VagenLogicMixin
+
+    assert "_vagen_check_estimator_has_its_critic()" in inspect.getsource(VagenLogicMixin._vagen_init)
+
+
+def test_the_real_trainer_calls_vagen_init():
+    """★ Both guards live in `_vagen_init`, and the two tests above only pin that they are
+    *inside* it. Deleting the one line that calls it left the entire suite green -- the
+    guards existed and never ran. This pins the seam itself."""
+    import inspect
+
+    from vagen.trainer.ppo_trainer import VagenPPOTrainer
+
+    src = inspect.getsource(VagenPPOTrainer.__init__)
+    assert "self._vagen_init()" in src, (
+        "nothing calls _vagen_init, so every startup guard in it is dead"
+    )
+    # And after super(), which is what makes self.config and self.use_critic exist.
+    assert src.index("super().__init__") < src.index("self._vagen_init()")
+
+
 # ------------------------------------------------------------- value_mask
 
 
 def test_value_mask_written_for_sentinel_estimator():
-    """★ The regression that mattered: `no_concat_gae` must get a value_mask."""
-    t = _Trainer(_cfg(adv="no_concat_gae"))
+    """★ The regression that mattered: an estimator that anchors one return per turn
+    must get a value_mask, or the critic regresses towards the -100 sentinel almost
+    everywhere while its loss falls and nothing looks wrong."""
+    t = _Trainer(_cfg(adv="turn_level_gae"))
     out = t._fit_compute_advantage(_batch())
 
     assert "value_mask" in out.batch
@@ -104,7 +229,7 @@ def test_value_mask_not_written_for_plain_gae():
 
 def test_super_advantage_runs_first():
     """Our work reads `returns`, so verl must have computed them already."""
-    t = _Trainer(_cfg(adv="no_concat_gae"))
+    t = _Trainer(_cfg(adv="turn_level_gae"))
     t._fit_compute_advantage(_batch())
     assert t.calls[0] == "super_advantage"
 

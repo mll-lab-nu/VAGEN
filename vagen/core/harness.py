@@ -63,6 +63,19 @@ class BaseHarness(ABC):
         self.floor = max(1, floor)
         self._room_resp: int | None = None
         self._room_obs = 0
+        #: Conversations this harness closed by asking the model to summarise, rather
+        #: than because the environment stepped. Empty for every harness but
+        #: ``CompactHarness``; declared here so the estimators can read it off any
+        #: harness without asking which one they have.
+        #:
+        #: ★ Why an advantage estimator cares. A summary is a model emission and an
+        #: action, so it ends a "turn" in the token stream -- but no environment step
+        #: happened, and the next conversation's first action sees the same world state
+        #: the summary did. An estimator that discounts turn-to-turn therefore charges a
+        #: compaction seam the same as a real transition, and since compaction frequency
+        #: is set by how verbosely the policy writes, the effective horizon becomes a
+        #: function of the policy's own output length -- which it changes as it trains.
+        self.summarised_conversations: set[str] = set()
 
     # ------------------------------------------------------------------ input
     def begin(self, system: Msg, init_obs: Msg) -> None:
@@ -80,6 +93,10 @@ class BaseHarness(ABC):
         # CompactHarness already did this for its own state; the base class was the one
         # depending on the loop building a harness per episode.
         self._room_resp, self._room_obs = None, 0
+        # Per-episode, like everything else reset here. Carried over, a reused harness
+        # would mark the *previous* episode's conversation ids as seams, and conversation
+        # ids are per-episode ordinals -- so the marks land on unrelated conversations.
+        self.summarised_conversations = set()
 
     def add_observation(self, obs: Msg) -> None:
         self._msgs.append(obs)

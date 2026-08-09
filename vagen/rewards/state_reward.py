@@ -168,8 +168,25 @@ class StateRewardWrapper:
             span, value = scored["spans"].get(name), scored.get(name)
             if span is None or not value:
                 continue
-            for i, share in enumerate(spread(value, tokens_covering(span, offsets), len(offsets))):
-                vector[i] += share
+            covered = tokens_covering(span, offsets)
+            if not covered:
+                continue
+            # ★ On the span's LAST token, not spread across it. A span's score is a
+            # property of the whole span -- you cannot tell whether a state estimation is
+            # right from half of it -- so the reward is determined at the step that
+            # completes the span, and that is where it belongs. The recursion then hands
+            # it back to every token that caused it.
+            #
+            # Spreading gave the opposite gradient: with `value/K` at each of K tokens,
+            # G_j (the return from j) collects only the shares at or after j, so the
+            # span's FIRST token received the whole value and its LAST received value/K.
+            # That is backwards -- the last token is the one that finished the thing being
+            # scored.
+            #
+            # Same rule as `outcome` below, which already sits on the turn's last token:
+            # every score lands on the last token of whatever it scores. The total is
+            # unchanged, so the length-hacking channel `spread` was guarding stays shut.
+            vector[covered[-1]] += value
 
         # Outcome and format belong to the turn as a whole, so they sit on its last
         # token -- the position a return is bootstrapped from.

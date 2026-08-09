@@ -228,7 +228,7 @@ class GymLoop(VagenGymAgentLoopBase):
             logger.warning("[vagen] dropping episode %s: %s: %s",
                            episode_id, type(exc).__name__, exc)
             return []
-        return self._outputs(client, env, result, kwargs, episode_id)
+        return self._outputs(client, env, result, kwargs, episode_id, harness)
 
     def _maybe_state_reward(self, env, env_name: str, max_turns: int = 1):
         """Wrap the environment so the reasoning is scored, if configured.
@@ -469,7 +469,8 @@ class GymLoop(VagenGymAgentLoopBase):
             ), b
         return build_harness(mode, **room), b
 
-    def _outputs(self, client, env, result, kwargs, episode_id: str) -> list[AgentLoopOutput]:
+    def _outputs(self, client, env, result, kwargs, episode_id: str,
+                 harness) -> list[AgentLoopOutput]:
         rows = client.rows()
         outputs = []
         # One row is one conversation. Ordered from 0 in the order they were opened --
@@ -528,8 +529,19 @@ class GymLoop(VagenGymAgentLoopBase):
             # Whatever is left of a dropped turn is context, not an action. Left at
             # mask 1 it trains as a decision the model never finished making.
             mask = list(row.response_mask[:keep])
+            scores = list(row.scores[:keep])
             for i in range(safe_end, len(mask)):
                 mask[i] = 0
+                # ★ The scores go with the mask, not just the mask. A *scalar* env reward
+                # sits at the turn's last token and is clipped away with the span, so that
+                # half looked fixed. A *vector* reward (state_reward) is spread over tokens
+                # near the turn's start, so it survives the `[:keep]` slice while the mask
+                # above it is zeroed: the estimators gather only mask-1 positions and drop
+                # it, but `token_level_scores` still carries it -- into critic/score/mean,
+                # into the custom metrics, and into the STARPO-S filter's per-sample reward,
+                # which decides which groups survive. Reported reward then exceeds trained
+                # reward with nothing reporting the gap.
+                scores[i] = 0.0
             outputs.append(
                 AgentLoopOutput(
                     prompt_ids=prompt_ids,
@@ -552,7 +564,7 @@ class GymLoop(VagenGymAgentLoopBase):
                                        if any(row.logprobs[:keep]) else None),
                     # The sum is what verl's own metrics read; the vector below is what
                     # actually trains. Both, because they answer different questions.
-                    reward_score=float(sum(row.scores[:keep])),
+                    reward_score=float(sum(scores)),
                     num_turns=1,
                     metrics={},
                     extra_fields={
@@ -563,7 +575,13 @@ class GymLoop(VagenGymAgentLoopBase):
                             **{f"{k}_reward": v for k, v in env.state_scores.items()},
                         },
                         "image_data": images,
-                        "last_turn": conversation_id == len(rows) - 1,
+                        "last_turn": row is rows[-1],
+                        # `row is rows[-1]`, not `conversation_id == len(rows) - 1`:
+                        # conversation_id is the ordinal assigned when the conversation
+                        # was opened, and a conversation the model never spoke in is
+                        # dropped without returning its number. Comparing an ordinal to
+                        # a count then flags the wrong row -- ordinals [0,2,3] with
+                        # len(rows)==3 marks the middle one and misses the last.
                         # Per-token scores, capped alongside the response they index.
                         # Not named token_level_scores: extra_fields become non-tensor
                         # columns, and verl already has a *tensor* of that name, so the
@@ -571,7 +589,14 @@ class GymLoop(VagenGymAgentLoopBase):
                         # verl otherwise places one scalar at the final token, which
                         # erases which span earned what -- the whole point of scoring
                         # <observation> and <prediction> where they are written.
-                        "per_token_reward": list(row.scores[:keep]),
+                        "per_token_reward": scores,
+                        # True when this conversation ended because the context filled
+                        # up and the model was asked to summarise -- not because the
+                        # environment stepped. The next conversation's first action sees
+                        # the same world state this row's summary saw, so an estimator
+                        # that discounts turn-to-turn must not charge this seam as a
+                        # transition. See `BaseHarness.summarised_conversations`.
+                        "ends_with_summary": row.conversation_id in harness.summarised_conversations,
                         "episode_id": episode_id,
                         "group_idx": kwargs["group_idx"],
                         "traj_idx": kwargs["traj_idx"],
