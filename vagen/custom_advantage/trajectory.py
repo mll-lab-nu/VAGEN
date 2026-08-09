@@ -11,22 +11,39 @@ the rows of each trajectory, in turn order, and which token positions in them ar
 output. This module supplies exactly that, so an estimator can be written once and run
 under either layout -- a concat trajectory is simply one whose row list has length one.
 
+* compact -- one row per conversation, a new one at every compaction
+
+★ **What identifies a trajectory.** ``episode_id``, when the agent loop emits it: it is
+minted once per ``run_episode`` and is the only column that *means* "one episode".
+``(group_idx, traj_idx)`` is the fallback, and it is a weaker thing -- that pair
+identifies a *rollout*, and a rollout is one episode only because the loop happens to
+make it so. The two agree today only because verl's ``repeat_interleave`` and VAGEN's
+positional ``traj_idx`` tile line up, which nothing asserts; and on the validation path
+they already disagree, because padding a batch to a multiple of the worker count
+duplicates prompts that then run as genuinely separate episodes under the same pair.
+Merging two episodes into one trajectory is silent: the backward recursion simply runs
+through both, and the earlier one is credited with the later one's rewards.
+
 Two details the layout forces and every estimator would otherwise repeat:
 
 * Padding duplicates. ``pad_dataproto_to_divisor`` repeats real rows to reach a multiple
-  of the DP world size, so a ``(group_idx, traj_idx, turn_idx)`` triple can appear more
-  than once. Scoring a duplicate twice would double-count it in the backward recursion,
-  so the view deduplicates and offers ``broadcast`` to expand results back.
-* ``group_idx`` is a uuid string, so it has to be factorized before it can be sorted or
-  compared numerically.
+  of the DP world size, so an identity can appear more than once. Scoring a duplicate
+  twice would double-count it in the backward recursion, so the view deduplicates and
+  offers ``broadcast`` to expand results back.
+* ``group_idx`` and ``episode_id`` are uuid strings, so they have to be factorized before
+  they can be sorted or compared numerically.
 """
 
 from __future__ import annotations
+
+import logging
 
 from dataclasses import dataclass
 
 import numpy as np
 import torch
+
+logger = logging.getLogger(__name__)
 
 
 def to_int64_codes(x, factorize_if_non_numeric: bool = False) -> np.ndarray:
@@ -69,20 +86,43 @@ class TrajectoryView:
     @classmethod
     def build(cls, response_mask: torch.Tensor, non_tensor_batch) -> TrajectoryView:
         device = response_mask.device
-        group = to_int64_codes(non_tensor_batch["group_idx"], factorize_if_non_numeric=True)
-        traj = to_int64_codes(non_tensor_batch["traj_idx"])
+        # Identity first: `episode_id` when the loop published one, because that column
+        # is minted per episode and nothing else here is. The pair below identifies a
+        # rollout, which coincides with an episode only by construction of the loop --
+        # see this module's docstring. Two int64 columns either way, so the rest of the
+        # method does not care which it got.
+        if "episode_id" in non_tensor_batch:
+            episode = to_int64_codes(non_tensor_batch["episode_id"], factorize_if_non_numeric=True)
+            group = np.zeros(len(episode), dtype=np.int64)
+        else:
+            group = to_int64_codes(non_tensor_batch["group_idx"], factorize_if_non_numeric=True)
+            episode = to_int64_codes(non_tensor_batch["traj_idx"])
+            # ★ The fallback merges rather than fails. `(group_idx, traj_idx)` identifies a
+            # *rollout*, and a rollout is one episode only because the training loop makes
+            # it so -- validation runs several episodes per rollout (n_envs 30 and 60 on
+            # val_navigation, 50 on val_spatial_gym), so every one of them collapses into
+            # a single "trajectory" and the recursion carries credit from one episode into
+            # a completely unrelated one. Nothing raises: the shapes are right and the
+            # numbers are finite. Warned rather than raised because the training path
+            # always publishes `episode_id` and only `concat_val_multi_turn` does not.
+            logger.warning(
+                "no `episode_id` column; grouping trajectories by (group_idx, traj_idx) "
+                "instead. That is one rollout, not one episode -- if a rollout here holds "
+                "more than one episode they are being scored as a single trajectory, with "
+                "credit flowing between them."
+            )
         # Concat keeps a whole trajectory in one row, so there is no turn axis and the
         # agent loop emits none. Defaulting to zero is what makes an estimator run
         # unchanged under either layout instead of needing a concat-specific branch.
         if "turn_idx" in non_tensor_batch:
             turn = to_int64_codes(non_tensor_batch["turn_idx"])
         else:
-            turn = np.zeros(len(traj), dtype=np.int64)
+            turn = np.zeros(len(episode), dtype=np.int64)
 
-        key = np.stack([group, traj, turn], axis=1)
+        key = np.stack([group, episode, turn], axis=1)
         uniq_key, first_idx, inverse = np.unique(key, axis=0, return_index=True, return_inverse=True)
 
-        # Rows sharing (group, traj, turn) are deduplicated: np.unique keeps the first
+        # Rows sharing (episode, turn) are deduplicated: np.unique keeps the first
         # and the rest inherit its advantages and returns. That is right for the copies
         # `pad_dataproto_to_divisor` appends, which are identical to what they duplicate.
         # It is wrong for rows that merely collide -- a loop that stopped emitting
@@ -100,7 +140,7 @@ class TrajectoryView:
                 ):
                     raise ValueError(
                         f"{len(same)} rows share the key {tuple(uniq_key[i].tolist())} "
-                        f"(group_idx, traj_idx, turn_idx) but have different response "
+                        f"(episode, turn) but have different response "
                         f"masks, so they are distinct turns rather than padding copies. "
                         f"Deduplicating would give them one row's advantages. Check that "
                         f"the agent loop emits a distinct turn_idx per row."

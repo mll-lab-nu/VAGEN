@@ -15,8 +15,8 @@ from verl.trainer.ppo.core_algos import get_adv_estimator_fn
 
 from vagen.custom_advantage.trajectory import TrajectoryView
 
-TOKEN_GAE = get_adv_estimator_fn("traj_token_gae")
-TRAJ_GRPO = get_adv_estimator_fn("traj_grpo")
+TOKEN_GAE = get_adv_estimator_fn("token_level_gae")
+TRAJ_GRPO = get_adv_estimator_fn("trajectory_grpo")
 
 
 class _Cfg(dict):
@@ -277,12 +277,31 @@ def test_token_gae_runs_without_a_turn_column():
 
 # ------------------------------------------------------------------- bi-level GAE
 
-BILEVEL = get_adv_estimator_fn("traj_bilevel_gae")
+BILEVEL = get_adv_estimator_fn("bi_level_gae")
 
 
 class _BiCfg(_Cfg):
     def __init__(self, gamma=1.0, lam=1.0, lam_low=1.0):
         self.gamma, self.lam, self.lam_low = gamma, lam, lam_low
+
+
+def test_bilevel_refuses_to_run_without_lam_low():
+    """★ Both limits of lam_low are estimators that exist under their own names, so a
+    missing value would not fail -- it would run turn-level GAE under the bi-level name
+    and the only evidence would be numbers matching the wrong baseline.
+
+    verl's AlgoConfig has no lam_low field, so forgetting hydra's `+` prefix is the
+    normal way to arrive here."""
+    cfg = _Cfg()
+    cfg.gamma, cfg.lam = 1.0, 0.7
+    assert cfg.get("lam_low", None) is None, "the fixture must not supply it"
+
+    with pytest.raises(ValueError, match="lam_low"):
+        BILEVEL(
+            batch=_batch([[0.0, 1.0]], [[1, 1]]),
+            non_tensor_batch=_nt(["g"], [0], [0]),
+            config=cfg,
+        )
 
 
 def test_bilevel_reduces_to_token_level_when_the_lambdas_agree():
@@ -360,7 +379,7 @@ def test_bilevel_supervises_every_token_so_needs_no_value_mask():
         config=cfg,
     )
 
-    assert needs_value_mask("traj_bilevel_gae") is False
+    assert needs_value_mask("bi_level_gae") is False
     assert float(ret.min()) > -1.0, "a sentinel return leaked into the output"
 
 
@@ -382,28 +401,57 @@ def test_turn_boundaries_are_found_under_both_layouts():
 
 # ----------------------------------------------------------------- turn-level GAE
 
-TURN_GAE = get_adv_estimator_fn("traj_turn_gae")
-OLD_TURN_GAE = get_adv_estimator_fn("no_concat_gae")
+TURN_GAE = get_adv_estimator_fn("turn_level_gae")
 
 
-def test_turn_gae_matches_the_implementation_it_replaces():
-    """★ The safety net for the replacement. The old estimator only handles the split
-    layout, so that is where they are compared -- and they must agree token for token,
-    not merely look similar."""
+def _turn_gae_by_hand(scores, values, gamma, lam):
+    """Turn-level GAE for one trajectory laid out one turn per row, written straight
+    from the definition: reward is the turn's total, value is the critic at the state the
+    turn acts from, recursion runs backward over turns.
+
+    An independent oracle rather than a copy of the code under test. The estimator this
+    replaced was compared against here until it was deleted; keeping a copy of a deleted
+    implementation would only have asserted that a refactor preserved itself.
+    """
+    advantages, nextvalue, lastgaelam = [], 0.0, 0.0
+    for r, v in zip(reversed(scores), reversed(values)):
+        delta = sum(r) + gamma * nextvalue - v[0]
+        lastgaelam = delta + gamma * lam * lastgaelam
+        advantages.append(lastgaelam)
+        nextvalue = v[0]
+    return advantages[::-1]
+
+
+def test_turn_gae_matches_the_definition():
+    """★ The safety net for the replacement: it must agree with turn-level GAE computed
+    by hand, token for token, not merely look similar."""
     cfg = _Cfg()
     cfg.gamma, cfg.lam = 1.0, 0.9
 
     mask = [[1, 1], [1, 1], [1, 1]]
-    args = dict(
-        batch=_batch([[0.0, 0.0], [0.0, 0.5], [0.0, 1.0]], mask, [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]]),
+    scores = [[0.0, 0.0], [0.0, 0.5], [0.0, 1.0]]
+    values = [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]]
+    adv, _ = TURN_GAE(
+        batch=_batch(scores, mask, values),
         non_tensor_batch=_nt(["g", "g", "g"], [0, 0, 0], [0, 1, 2]),
+        config=cfg,
     )
-    new_adv, new_ret = TURN_GAE(config=cfg, **args)
-    old_adv, old_ret = OLD_TURN_GAE(config=cfg, **args)
 
-    assert _tokens(new_adv, mask) == pytest.approx(_tokens(old_adv, mask), rel=1e-5)
-    flat = lambda tensor: [v for row in tensor.tolist() for v in row]
-    assert flat(new_ret) == pytest.approx(flat(old_ret), rel=1e-5)
+    # The estimator whitens its output, so the reference has to be whitened the same
+    # way to be comparable. Calling verl's own masked_whiten rather than reproducing it
+    # keeps this test about the GAE recursion -- reimplementing it here got the unbiased
+    # variance wrong and turned a correct estimator red.
+    import verl.utils.torch_functional as verl_F
+
+    by_hand = _turn_gae_by_hand(scores, values, cfg.gamma, cfg.lam)
+    mask_t = torch.tensor(mask, dtype=torch.float32)
+    expected = torch.tensor(by_hand, dtype=torch.float32).unsqueeze(1).expand(3, 2).contiguous()
+    expected = verl_F.masked_whiten(expected, mask_t) * mask_t
+
+    assert _tokens(adv, mask) == pytest.approx(_tokens(expected, mask), rel=1e-4, abs=1e-5)
+    # Every token of a turn carries that turn's advantage.
+    for i in range(3):
+        assert float(adv[i, 1]) == pytest.approx(float(adv[i, 0]))
 
 
 def test_turn_gae_writes_a_return_only_at_each_turns_first_token():
@@ -475,4 +523,4 @@ def test_turn_values_are_not_lost_to_a_scatter_collision():
 def test_turn_gae_still_needs_a_value_mask():
     from vagen.custom_advantage import needs_value_mask
 
-    assert needs_value_mask("traj_turn_gae") is True
+    assert needs_value_mask("turn_level_gae") is True

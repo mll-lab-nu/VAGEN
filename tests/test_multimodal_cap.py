@@ -14,6 +14,15 @@ from omegaconf import OmegaConf
 
 from verl.experimental.agent_loop.agent_loop import cap_token_ids
 
+class _NoCompaction:
+    """A harness that never summarised. `_outputs` asks it which conversations ended at a
+    compaction seam rather than because the environment stepped; only CompactHarness ever
+    answers non-empty."""
+
+    summarised_conversations: set = set()
+
+
+
 
 def test_text_under_budget_is_untouched():
     assert cap_token_ids([1, 2, 3], 10, multimodal=False) == [1, 2, 3]
@@ -97,7 +106,7 @@ def test_an_over_budget_response_is_truncated_and_an_over_budget_prompt_is_not()
         return loop
 
     out = GymLoop._outputs(_loop(100, 3), _Client(), _Env(), _Result(),
-                           {"group_idx": "g", "traj_idx": 0}, "ep")[0]
+                           {"group_idx": "g", "traj_idx": 0}, "ep", _NoCompaction())[0]
     n = len(out.response_ids)
     assert n == 3, f"the response was not cut to the budget: {n}"
     assert len(out.response_mask) == n, "mask outlived the ids it indexes"
@@ -115,7 +124,7 @@ def test_an_over_budget_response_is_truncated_and_an_over_budget_prompt_is_not()
 
     with pytest.raises(ValueError, match="data.max_prompt_length"):
         GymLoop._outputs(_loop(3, 100), _BigClient(), _Env(), _Result(),
-                         {"group_idx": "g", "traj_idx": 0}, "ep")
+                         {"group_idx": "g", "traj_idx": 0}, "ep", _NoCompaction())
 
 
 
@@ -194,7 +203,7 @@ def test_a_turn_straddling_the_cut_is_dropped_whole_not_clipped():
     loop.config = OmegaConf.create({"trainer": {"harness": "concat", "compact_budget": 400}})
 
     out = GymLoop._outputs(loop, _Client(), _Env(), _Result(),
-                           {"group_idx": "g", "traj_idx": 0}, "ep")[0]
+                           {"group_idx": "g", "traj_idx": 0}, "ep", _NoCompaction())[0]
     spans = out.extra_fields["response_spans"]
     assert spans == [(0, 4)], f"the straddling turn survived as a fragment: {spans}"
     assert all(e <= len(out.response_ids) for _, e in spans)
@@ -241,7 +250,7 @@ def test_absent_logprobs_are_published_as_absent():
     loop.config = OmegaConf.create({"trainer": {"harness": "concat", "compact_budget": 400}})
 
     out = GymLoop._outputs(loop, _Client(), _Env(), _Result(),
-                           {"group_idx": "g", "traj_idx": 0}, "ep")[0]
+                           {"group_idx": "g", "traj_idx": 0}, "ep", _NoCompaction())[0]
     assert out.response_logprobs is None, (
         f"a fabricated all-zero logprob vector was published: {out.response_logprobs}"
     )

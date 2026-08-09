@@ -40,6 +40,21 @@ from verl.experimental.agent_loop.agent_loop import (
 )
 from verl.protocol import DataProto
 
+#: Which input rollout each output row came from, as an index into the batch the trainer
+#: dispatched. Stamped on the batch *before* it is chunked across workers, so it rides
+#: through ``input_non_tensor_batch`` and gets expanded per row by the same
+#: ``np.repeat(val, counts)`` that expands every other per-rollout column.
+#:
+#: ★ This column is what stops the trainer from silently discarding rows. ``_fit_generate``
+#: assumes one output row per input row; when a harness splits an episode across rows it
+#: has to expand its own per-rollout columns to match, and it cannot work out the mapping
+#: on its own -- by the time it sees the batch the workers' outputs have been
+#: concatenated and the chunk boundaries are gone. Deriving it here rather than
+#: reconstructing it there also handles a rollout that produced *no* rows: its index
+#: simply never appears, so the trainer drops it instead of misaligning everything after
+#: it. See ``SeparateRayPPOTrainer._align_generated_rows`` for the consuming end.
+ROLLOUT_SOURCE = "__vagen_rollout_index__"
+
 
 class MultiOutputAgentLoopWorker(AgentLoopWorker):
     """An ``AgentLoopWorker`` whose agent loops may return a list of outputs.
@@ -131,13 +146,21 @@ class MultiOutputAgentLoopWorker(AgentLoopWorker):
     # episode log sort every turn equal, so a transcript reads as a coherent episode
     # that never happened.
     ROW_COLUMNS = ("episode_id", "turn_idx", "conversation_id", "episode_turns",
-                   "response_spans")
+                   "response_spans", "ends_with_summary")
 
     def _vagen_restore_indices(self, output: DataProto, expanded: dict[str, Any] | None) -> DataProto:
-        """Put the trajectory index columns back if verl dropped them."""
+        """Put the trajectory index columns back if verl dropped them.
+
+        ★ verl drops `input_non_tensor_batch` *wholesale* when streaming reward is on
+        (`agent_loop.py`: `if self.reward_loop_worker_handles is None and ...`), and VAGEN
+        scores inside the environment, so `use_rm` is False, the handles exist, and that
+        branch is the normal one. Every per-rollout column arrives here already deleted --
+        including ROLLOUT_SOURCE, without which the trainer cannot align the rows it just
+        produced and refuses the whole step.
+        """
         if not expanded:
             return output
-        for key in self.INDEX_COLUMNS:
+        for key in (*self.INDEX_COLUMNS, ROLLOUT_SOURCE):
             if key not in output.non_tensor_batch and key in expanded:
                 output.non_tensor_batch[key] = expanded[key]
         return output
@@ -209,6 +232,11 @@ class MultiOutputAgentLoopManager(AgentLoopManager):
         prompts.non_tensor_batch["group_idx"] = uid
         n = self.rollout_config.val_kwargs.n if prompts.meta_info.get("validate") else self.rollout_config.n
         prompts.non_tensor_batch["traj_idx"] = traj_idx_for_interleaved_repeat(len(uid), n)
+        # Stamped here because here is the last point where a row's position *is* its
+        # identity: the base's next act is `prompts.chunk(...)`, after which a worker
+        # knows only its own slice. Riding out through `input_non_tensor_batch` costs
+        # nothing -- the worker already repeats every such column by its row counts.
+        prompts.non_tensor_batch[ROLLOUT_SOURCE] = np.arange(len(uid), dtype=np.int64)
 
     def _vagen_merge_for_validation(self, output: DataProto, prompts: DataProto) -> DataProto:
         """Fold each trajectory's per-turn rows back into a single row.

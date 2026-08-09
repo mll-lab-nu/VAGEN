@@ -97,6 +97,63 @@ case rules out long episodes that a real rollout handles fine.
 **The prompt region raises, the response region truncates.** Deliberate: the prompt is the
 opening call and has nothing old to drop, so cutting it takes the system prompt.
 
+## 4b. Advantage estimators
+
+The context policy decides **how an episode is laid out in rows**; the estimator decides
+**how it is scored**. They are independent, and every estimator here works under all
+three policies — which is the property `TrajectoryView` exists to provide.
+
+| `algorithm.adv_estimator` | one MDP step is | notes |
+|---|---|---|
+| **`token_level_gae`** | one model-emitted token | **the baseline.** State = everything seen before the token; action = the token. Anything the model did not emit (observations, template scaffolding) is state, never action, and the recursion steps over it. |
+| `bi_level_gae` | same, plus a second `lam` at turn boundaries | `lam_low == lam` reproduces token-level exactly; `lam_low == 1` reproduces turn-level at each turn's first token. Both limits are pinned by tests. Needs `+algorithm.lam_low=…` — hydra's `+`, because verl's `AlgoConfig` has no such field. Not defaulted: its limits are the other two estimators, so a missing value would run one of them under this name. |
+| `turn_level_gae` | one turn | writes a return only at each turn's first token; needs `value_mask`. |
+| `trajectory_grpo` | — | one advantage per episode, normalised within its prompt group. No critic. |
+
+★ **Why not verl's `gae` / `grpo`.** They score one row and open each with
+`nextvalues=0`. Under `concat` a row *is* an episode, so that is correct and they are
+fine. Under `no_concat` and `compact` a row is one conversation, so they assert that
+nothing after the row boundary is worth anything — the agent is never credited across a
+turn boundary. Nothing fails; the curves look ordinary. The trainer therefore **refuses
+that pairing at startup** (`_vagen_check_estimator_spans_the_layout`), reading the set of
+safe names from the registry the estimators populate themselves.
+
+`no_concat_gae` was deleted 2026-08-08: it conflated a layout with an algorithm. What it
+did is `turn_level_gae`, which finds turns from the token stream instead of assuming a
+row is a turn.
+
+### Adding one
+
+```python
+from vagen.custom_advantage import AdvantageInputs, AdvantageOutputs, advantage_estimator
+
+@advantage_estimator("my_algo")
+def my_algo(inputs: AdvantageInputs):
+    beta = inputs.required_param("beta", "It weights X.")   # +algorithm.beta=0.3
+    adv = inputs.zeros()
+    for rows in inputs.view.trajectories:      # one episode, its rows in turn order
+        ...
+    return AdvantageOutputs(advantages=adv, returns=adv + inputs.values)
+```
+
+`inputs` carries the per-token tensors (`rewards` — KL-penalised; `scores` — raw;
+`values`, `old_log_probs`, `ref_log_probs`, `rollout_log_probs`, `kl()`), the identity
+columns (`group_idx`, `traj_idx`, `episode_id`, `conversation_id`, `uid`), and `view`.
+`AdvantageOutputs` additionally carries `value_mask` and `policy_mask`. Full contract in
+`vagen/custom_advantage/inputs.py`.
+
+Registering is all that is needed to get `tests/test_estimator_contract.py` run against
+it: layout equivalence, no advantage on observation tokens, padding duplicates not
+double-counted, verl's kwargs tolerated, sentinel returns declared. Every one of those
+properties fails silently in training. An estimator with a required hyperparameter needs
+an entry in that file's `PARAMS` — forgetting fails with instructions.
+
+★ **verl's own contract is two tensors.** `compute_advantage` does
+`advantages, returns = fn(...)` and writes exactly those; the actor reads `advantages`,
+the critic reads `returns`, and both mask with `response_mask`. There is no actor/critic
+split and no mask in the return value, so `value_mask` and `policy_mask` travel as keys
+written into the batch — each backed by a patch in `verl/workers/utils/losses.py`.
+
 ## 5. Running things
 
 ```bash
@@ -123,7 +180,7 @@ vagen/harness/       concat / no_concat / compact, and budget.py
 vagen/agent_loop/    gym_loop.py (the verl AgentLoop), verl_client.py, multi_output.py
 vagen/utils/         image_token_utils.py, concat_val_multi_turn.py, episode_log.py
 vagen/trainer/       VagenPPOTrainer + the mixins over verl's SeparateRayPPOTrainer
-vagen/custom_advantage/   the algorithm layer (TrajectoryView, traj_token_gae, ...)
+vagen/custom_advantage/   the algorithm layer (TrajectoryView + the estimators)
 logs/                design notes and findings -- see below
 ```
 
@@ -159,7 +216,7 @@ sokoban and frozenlake actually run.
 |---|---|---|
 | The summary is a turn in the GAE recursion | by design | compaction's summary is a policy action -- generated, trained (mask 1), and its zero immediate reward is correct credit assignment. So it is a step, and the turn before it bootstraps through it. Listed because it surprises people, not because it is wrong |
 | Compact loss reweighting | deferred | by the project owner; algorithm layer |
-| 10 of 14 verl patches could move to the VAGEN layer | cleanliness | audited, hooks identified. The critic mask is explicitly blessed to stay |
+| 10 of 15 verl patches could move to the VAGEN layer | cleanliness | audited, hooks identified. The critic mask is explicitly blessed to stay, and the actor mask added 2026-08-08 alongside it for the same reason: a loss-side mask has no hook |
 | An empty first generation shrinks the batch | low | the episode contributes no rows and `multi_output._postprocess` only raises when *every* rollout is empty. Under GRPO that quietly shrinks a group |
 | `_summary_request_len` over-counts | low | it renders the request as an *opening* turn, so Qwen injects a system block: 39 tokens where the client sends 23. Over-reserving is the safe direction |
 

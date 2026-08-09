@@ -35,8 +35,8 @@ sections, substitute:
 | `CompactHarness` | ✅ built, with the budget arithmetic in `harness/budget.py` |
 | Token accounting / budget checks | ✅ built 2026-08-06. See §12 |
 | Image placeholder ↔ frame alignment | ✅ built 2026-08-06. `utils/image_token_utils.py` |
-| Algorithm layer — token / turn | ✅ token-level and GRPO on `TrajectoryView`; turn-level `traj_turn_gae` in use |
-| Algorithm layer — bi-level | ❌ not written |
+| Algorithm layer | ✅ `token_level_gae` (baseline), `bi_level_gae`, `turn_level_gae`, `trajectory_grpo`, all on `TrajectoryView`. `no_concat_gae` deleted 2026-08-08 |
+| Row-local estimator under a splitting harness | ✅ refused at startup (`_vagen_check_estimator_spans_the_layout`) |
 | VLM beyond Qwen | ✅ Qwen / LLaVA / InternVL all training |
 | Compact loss reweighting | ❌ deferred, algorithm layer |
 | Black-box harness | interface exists (a conversation id is the whole protocol); no adapter written |
@@ -851,11 +851,11 @@ trajectory being one whose list has length one.
 |---|---|---|---|---|---|
 | `gae` (verl) | concat | 5/5 | 0.275 → 0.231 | 6.95 → 1.43 | 4.87 |
 | `no_concat_gae` (turn-level) | no-concat | 5/5 | 0.097 → 0.159 | 1.03 → 0.105 | 2.46 |
-| `traj_token_gae` | no-concat | 5/5 | 0.094 → 0.138 | 7.86 → 0.82 | 4.61 |
-| `traj_token_gae` | concat | 5/5 | 0.163 → 0.300 | 3.14 → 0.59 | 3.93 |
-| `traj_grpo` | no-concat | 5/5 | 0.074 → 0.141 | n/a (no critic) | **1.732** |
+| `token_level_gae` | no-concat | 5/5 | 0.094 → 0.138 | 7.86 → 0.82 | 4.61 |
+| `token_level_gae` | concat | 5/5 | 0.163 → 0.300 | 3.14 → 0.59 | 3.93 |
+| `trajectory_grpo` | no-concat | 5/5 | 0.074 → 0.141 | n/a (no critic) | **1.732** |
 
-`traj_grpo`'s 1.732 is an exact check rather than a plausible number: four trajectories
+`trajectory_grpo`'s 1.732 is an exact check rather than a plausible number: four trajectories
 per group with one success gives mean 0.25 and population std 0.433, so the winner's
 normalised advantage is (1 − 0.25)/0.433 = √3.
 

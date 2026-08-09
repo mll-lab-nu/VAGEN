@@ -1,5 +1,5 @@
 #!/bin/bash
-# sokoban - no_concat_gae - ppo_no_concat_qwen25vl3b
+# sokoban - token_level_gae - ppo_no_concat_qwen25vl3b
 #
 # Per-experiment settings only. Everything that makes a VAGEN run work at all lives in
 # vagen/configs/baseline_vllm.flags and is read below -- in particular the two flags that
@@ -36,7 +36,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     actor_rollout_ref.model.path="$MODEL" \
     critic.model.path="$MODEL" \
     critic.enable=True \
-    algorithm.adv_estimator=no_concat_gae \
+    algorithm.adv_estimator=token_level_gae \
     trainer.harness=no_concat \
     data.train_batch_size=128 \
     data.max_response_length=800 \

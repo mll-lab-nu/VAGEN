@@ -92,6 +92,17 @@ def concat_val_multi_turn(
     group_arr = nt["group_idx"]
     traj_arr = nt["traj_idx"]
     turn_arr = nt.get("turn_idx", [0] * n)
+    # ★ KNOWN BUG, deliberately not fixed here. This groups by (group_idx, traj_idx),
+    # which identifies a *rollout*, not an episode -- and on this path the two provably
+    # differ: `_validate` pads the generation batch to a multiple of the worker count by
+    # duplicating rows from the front, those duplicates run as genuinely separate
+    # episodes, and `_vagen_assign_indices` re-tiles traj_idx positionally so a copy
+    # lands on the same pair as its original. The strict count check below then fires,
+    # every validation, on val_navigation (n_envs=30 and 60) and val_spatial_gym (50).
+    # `episode_id` is the column that would fix it, and `TrajectoryView` already prefers
+    # it -- but switching here changes what a "trajectory" means to this whole file and
+    # breaks the fixtures in tests/test_val_merge_carries_identity.py, so it needs its
+    # own pass rather than a one-line swap. Tracked in AGENT.md.
 
     # ------------------------------------------------------------------
     # 1) Group turns by (group_idx, traj_idx)

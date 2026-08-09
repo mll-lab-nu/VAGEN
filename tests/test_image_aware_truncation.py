@@ -29,6 +29,15 @@ from vagen.utils.image_token_utils import (
 
 from model_path import local_snapshot
 
+class _NoCompaction:
+    """A harness that never summarised. `_outputs` asks it which conversations ended at a
+    compaction seam rather than because the environment stepped; only CompactHarness ever
+    answers non-empty."""
+
+    summarised_conversations: set = set()
+
+
+
 MODEL = local_snapshot()
 
 PAD, VS, VE = 9, 8, 7          # placeholder, vision_start, vision_end
@@ -261,7 +270,7 @@ def test_the_batch_boundary_cuts_with_the_image_aware_helper():
     loop.config = OmegaConf.create({"trainer": {"harness": "concat", "compact_budget": 400}})
 
     out = GymLoop._outputs(loop, _Client(), _Env(), _Result(),
-                           {"group_idx": "g", "traj_idx": 0}, "ep")[0]
+                           {"group_idx": "g", "traj_idx": 0}, "ep", _NoCompaction())[0]
     kept = out.response_ids
     kept_frames = out.multi_modal_data.get("images", [])
     blocks = placeholder_blocks(kept, PH, SENT)
@@ -317,4 +326,4 @@ def test_a_vision_token_the_policy_invented_is_refused():
 
     with pytest.raises(SampledVisionToken, match="generated vision token"):
         GymLoop._outputs(loop, _Client(), _Env(), _Result(),
-                         {"group_idx": "g", "traj_idx": 0}, "ep")
+                         {"group_idx": "g", "traj_idx": 0}, "ep", _NoCompaction())

@@ -47,9 +47,179 @@ class VagenLogicMixin:
         """Called from the concrete trainer's ``__init__`` after ``super().__init__``."""
         from vagen.utils.upload_hugging_face import HFUploadManager
 
+        self._vagen_check_estimator_spans_the_layout()
+        self._vagen_check_estimator_has_its_critic()
+        self._vagen_check_estimator_is_undiscounted()
+        self._vagen_check_turn_level_loss_has_what_it_needs()
         self._hf_upload_manager = HFUploadManager(self.config)
         self._vagen_image_actors: dict = {}
         self._vagen_image_futures: list = []
+
+    #: Context policies that put one episode in several rows. Under these, an estimator
+    #: that scores a row at a time is scoring a truncated trajectory.
+    SPLITTING_HARNESSES = ("no_concat", "compact")
+
+    def _vagen_harness_mode(self) -> str:
+        """Which context policy the agent loop will actually run.
+
+        ★ Resolved the same way ``GymLoop._harness_mode`` resolves it, not read straight
+        off the key. ``vagen/configs/vagen_multiturn.yaml`` ships ``harness: null``, so
+        ``config.trainer.get("harness", "concat")`` returns ``None`` rather than the
+        default -- and a guard comparing ``None`` against the splitting policies accepts
+        everything. ``trainer.concat_multi_turn=False`` with no explicit harness runs
+        no_concat while the guard sees nothing at all.
+        """
+        return self.config.trainer.get("harness", None) or (
+            "concat" if self.config.trainer.get("concat_multi_turn", True) else "no_concat"
+        )
+
+    def _vagen_check_estimator_spans_the_layout(self) -> None:
+        """Refuse a row-local estimator under a policy that splits episodes across rows.
+
+        ★ This is a config error, so it stops the run rather than costing an episode.
+        The pairing it rejects does not fail on its own: verl's ``gae`` and ``grpo``
+        score each row independently and open every one with ``nextvalues=0``, which
+        under ``no_concat`` or ``compact`` means turn *t+1* is never credited to turn
+        *t*. Training runs, the curves look ordinary, and the multi-turn credit
+        assignment the harness exists to provide is simply absent -- there is no
+        downstream check that would notice.
+
+        Which estimators are safe is read from the registry the estimators populate
+        themselves (``custom_advantage/registry.py``), not from a list kept here, so a
+        new estimator cannot be forgotten in one place and remembered in the other.
+        """
+        from vagen.custom_advantage import TRAJECTORY_ESTIMATORS, spans_rows
+
+        harness = self._vagen_harness_mode()
+        if harness not in self.SPLITTING_HARNESSES:
+            return
+        estimator = self.config.algorithm.adv_estimator
+        if spans_rows(estimator):
+            return
+        raise ValueError(
+            f"algorithm.adv_estimator={str(getattr(estimator, 'value', estimator))!r} scores one "
+            f"row at a time, but trainer.harness={harness!r} splits an episode across rows -- "
+            "every turn after the first would be dropped from its predecessors' returns, "
+            "silently. Use one of "
+            f"{sorted(TRAJECTORY_ESTIMATORS)}, or trainer.harness=concat."
+        )
+
+    def _vagen_check_estimator_has_its_critic(self) -> None:
+        """Refuse a value-based estimator when no critic will be built.
+
+        ★ Also a config error, and also silent. verl builds a critic when
+        ``critic.enable`` is set; when it is *unset* it falls back to
+        ``adv_estimator == "gae"`` -- the literal string. Every estimator in this repo
+        fails that test, so an unset flag disables the critic, ``values`` reads as zeros,
+        and GAE degenerates into a whitened discounted reward sum. The run starts, uses
+        half the memory, trains faster, and the only evidence is a driver warning saying
+        "Disabled critic as algorithm.adv_estimator != gae" -- which is true of the string
+        and false of the algorithm.
+
+        The exposure grew when the PPO scripts moved off the name ``gae``: before, the
+        fallback happened to do the right thing.
+        """
+        from vagen.custom_advantage import needs_critic
+
+        estimator = self.config.algorithm.adv_estimator
+        # `self.use_critic` directly: verl's RayPPOTrainer.__init__ sets it well before
+        # `_vagen_init` runs, so a missing attribute means the call moved somewhere it
+        # should not be -- an AttributeError says that, a `getattr` default of False turns
+        # it into "every value-based run refuses to start".
+        if not needs_critic(estimator) or self.use_critic:
+            return
+        raise ValueError(
+            f"algorithm.adv_estimator={str(getattr(estimator, 'value', estimator))!r} reads the "
+            "critic's values, but no critic will be built. verl only infers one for the "
+            "literal estimator name 'gae', so this needs critic.enable=True explicitly -- "
+            "without it `values` is all zeros and the advantage silently becomes a "
+            "discounted reward sum with no baseline."
+        )
+
+    def _vagen_check_estimator_is_undiscounted(self) -> None:
+        """Refuse a two-clock estimator when ``gamma != 1``.
+
+        ★ ``bi_level_gae`` runs one recursion per token and switches lambda at turn
+        boundaries, so a single turn is discounted twice over by two different clocks:
+        the turn level pays one ``gamma`` to cross it, the token level pays
+        ``gamma ** (tokens in the turn)``. They agree only at ``gamma == 1``.
+
+        The size of the disagreement is set by how much the model wrote, not by anything
+        in the config: at ``gamma = 0.99`` a 200-token turn is over-weighted 7.5x and a
+        500-token turn 152x, so the effective horizon becomes a function of the policy's
+        verbosity -- which the policy changes as it trains. Measured relative error
+        against an exact policy gradient on a tabular multi-turn MDP: 0.11% at 0.999,
+        1.06% at 0.99, 4.9% at 0.95.
+
+        ``gamma`` defaults to something reasonable and every curve keeps its shape, so
+        this has to be refused at startup or it is never noticed.
+        """
+        from vagen.custom_advantage import requires_undiscounted
+
+        estimator = self.config.algorithm.adv_estimator
+        gamma = float(self.config.algorithm.gamma)
+        if not requires_undiscounted(estimator) or gamma == 1.0:
+            return
+        raise ValueError(
+            f"algorithm.adv_estimator={str(getattr(estimator, 'value', estimator))!r} combines a "
+            f"per-token recursion with a per-turn one, which is only defined at "
+            f"algorithm.gamma=1.0, but gamma={gamma}. Crossing one turn costs the turn "
+            f"level one gamma and the token level gamma**(turn length), so the two "
+            f"disagree by a factor that grows with how much the model writes "
+            f"({gamma}**500 = {gamma ** 500:.4g}). Set algorithm.gamma=1.0, or use "
+            f"token_level_gae, which has one clock and is defined at any gamma."
+        )
+
+    def _vagen_check_turn_level_loss_has_what_it_needs(self) -> None:
+        """``turn_gspo`` and ``turn_ppo`` each need two things the config can silently fail to provide.
+
+        ★ It runs in the **actor worker**, a different process from this one. Registering
+        it here registers it nowhere that matters: the worker builds its own registry from
+        whatever it imported, and ours is not on that list unless
+        ``actor_rollout_ref.model.external_lib`` names it. verl calls
+        ``import_external_libs`` on that field while constructing the model config in the
+        worker, which is the hook meant for exactly this.
+
+        ★ And it needs ``turn_id``, which only the trajectory advantage estimators
+        publish. Paired with verl's own ``gae`` or ``grpo`` there is no column saying
+        where a turn starts, and a loss that guessed would be guessing "the row" -- which
+        is verl's ``gspo``, the thing ``turn_gspo`` exists not to be.
+
+        Both are refused here rather than in the worker: the worker's version of the first
+        failure arrives several minutes into a run as ``Unsupported loss mode``, and its
+        version of the second is a ``ValueError`` from inside the first backward pass.
+        """
+        from vagen.custom_advantage import TRAJECTORY_ESTIMATORS, spans_rows
+        from vagen.custom_loss import TURN_LEVEL_LOSSES
+
+        actor = self.config.get("actor_rollout_ref", {}).get("actor", {})
+        loss_mode = (actor.get("policy_loss", {}) or {}).get("loss_mode", "vanilla")
+        if loss_mode not in TURN_LEVEL_LOSSES:
+            return
+
+        estimator = self.config.algorithm.adv_estimator
+        if not spans_rows(estimator):
+            raise ValueError(
+                f"actor.policy_loss.loss_mode={loss_mode!r} needs a `turn_id` column, and "
+                f"algorithm.adv_estimator={str(getattr(estimator, 'value', estimator))!r} "
+                f"does not publish one. Use one of {sorted(TRAJECTORY_ESTIMATORS)}, which "
+                f"locate the turns while computing the advantage. Nothing else in the "
+                f"batch says where a turn starts, and the only fallback would be to treat "
+                f"a row as a turn -- which is verl's own `gspo`, and is an entire episode "
+                f"under concat."
+            )
+
+        external = self.config.get("actor_rollout_ref", {}).get("model", {}).get("external_lib", None)
+        named = [external] if isinstance(external, str) else list(external or [])
+        if "vagen.custom_loss" not in named:
+            raise ValueError(
+                f"actor.policy_loss.loss_mode={loss_mode!r} but the actor worker will not "
+                "import it. The policy loss runs in a separate process and builds its own "
+                "registry, so add:\n\n"
+                "    actor_rollout_ref.model.external_lib=vagen.custom_loss\n\n"
+                f"Without it the worker raises 'Unsupported loss mode: {loss_mode}' at the "
+                f"first update step. Currently external_lib={external!r}."
+            )
 
     # -------------------------------------------------------------- advantage
     def _vagen_after_advantage(self, batch):
@@ -69,7 +239,14 @@ class VagenLogicMixin:
         Only for estimators that emit sentinel returns. ``needs_value_mask`` reads the
         registry the estimators themselves populate, so it cannot drift from the set of
         estimators that actually emit sentinels (see custom_advantage/registry.py).
+
+        ★ A fallback, not the main path. An estimator built on ``AdvantageOutputs``
+        states its own ``value_mask`` and has already written it here -- that is one
+        source of truth instead of two that can disagree. Recovering the mask by
+        scanning for the sentinel is what an estimator returning a bare tuple gets.
         """
+        if "value_mask" in batch.batch:
+            return batch
         if needs_value_mask(self.config.algorithm.adv_estimator):
             batch.batch["value_mask"] = value_mask_from_returns(
                 batch.batch["returns"], batch.batch["response_mask"]
