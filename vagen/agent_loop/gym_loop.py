@@ -96,13 +96,21 @@ class GymEnvAdapter:
     speaks in messages.
     """
 
-    def __init__(self, env, env_name: str, kwargs: dict):
+    def __init__(self, env, env_name: str, kwargs: dict, score_names=()):
         self.env, self.env_name, self.kwargs = env, env_name, kwargs
         self.success = False
-        # Summed over the episode. Reported on every row whether or not the agent ever
-        # produced a description: verl reads the set of extra keys from the first row,
-        # so a key missing there hides the metric for the whole batch.
-        self.state_scores: dict[str, float] = {name: 0.0 for name in (*TAGS, "format")}
+        # ★ Only the scores that are actually switched on. Anything in here is published
+        # as a `<name>_reward` extra field, and verl turns every extra field into a
+        # val_aux curve -- so declaring all of them unconditionally drew a flat zero line
+        # for `state_estimation_reward`, `transition_prediction_reward` and
+        # `format_reward` in every run that had state_reward off, which reads as "the
+        # reward is on and the agent is scoring nothing" rather than "the reward is off".
+        # `format` belongs to this set too: it is the state-reward gate, not a separate
+        # signal, so with state_reward off there is no format reward to report.
+        #
+        # Empty when nothing is enabled, which is the point: a metric that does not exist
+        # is the honest representation of a term that is not being computed.
+        self.state_scores: dict[str, float] = {name: 0.0 for name in score_names}
 
     async def reset(self, seed=None):
         obs, info = await self.env.reset(seed=seed)
@@ -183,12 +191,12 @@ class GymLoop(VagenGymAgentLoopBase):
         episode_id = uuid4().hex
 
         env_cls = self.resolve_env_class(kwargs["env_name"])
+        scored_env = self._maybe_state_reward(
+            env_cls(env_config=kwargs["config"]), kwargs["env_name"], max_turns
+        )
         env = GymEnvAdapter(
-            self._maybe_state_reward(
-                env_cls(env_config=kwargs["config"]), kwargs["env_name"], max_turns
-            ),
-            kwargs["env_name"],
-            kwargs,
+            scored_env, kwargs["env_name"], kwargs,
+            score_names=self._enabled_state_rewards(),
         )
 
         per_turn = min(int(kwargs.get("response_length_per_turn") or self.response_length), self.response_length)
@@ -229,6 +237,16 @@ class GymLoop(VagenGymAgentLoopBase):
                            episode_id, type(exc).__name__, exc)
             return []
         return self._outputs(client, env, result, kwargs, episode_id, harness)
+
+    def _enabled_state_rewards(self) -> tuple[str, ...]:
+        """The score names this run will actually compute, in publication order.
+
+        ``format`` rides along whenever anything else is on: it gates the others rather
+        than being a signal of its own, so it exists exactly when they do.
+        """
+        cfg = self.config.trainer.get("state_reward", {}) or {}
+        names = tuple(n for n in TAGS if (cfg.get(n) or {}).get("enable", False))
+        return (*names, "format") if names else ()
 
     def _maybe_state_reward(self, env, env_name: str, max_turns: int = 1):
         """Wrap the environment so the reasoning is scored, if configured.
