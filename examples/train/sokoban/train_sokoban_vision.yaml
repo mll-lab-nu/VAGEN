@@ -7,5 +7,9 @@ envs:
     response_length_per_turn: 512 # max response length per turn
     config: # env-specific config
       render_mode: vision
+      # 0.01 a turn, not the 0.1 default: at max_turns=5 the default pays 0.5 for
+      # formatting alone, half of what solving the level is worth. Half of the 0.1
+      # auxiliary budget; the state reward takes the other half.
+      format_reward: 0.01
       min_solution_steps: [1,5]
       
