@@ -10,7 +10,17 @@
 #   RUNS='name1|env|est|lam|loss|lam_low|harness|extra   name2|...' \
 #     sbatch --account=$SLURM_ACCOUNT --qos=$GPU_QOS --nodes=1 \
 #            --gpus-per-node=$GPU_TYPE:8   # 8 = the whole node; two 4-GPU runs --cpus-per-task=96 --mem=800G \
-#            --time=48:00:00 --requeue examples/slurm/pack.sbatch
+#            --mem=0 --time=48:00:00 --requeue examples/slurm/pack.sbatch
+#
+# --mem=0 (the node's whole memory), not a figure: one 3B run peaks near 790 GB of host
+# RAM, so two of them do not fit in the 800 GB that looks generous. Under-requesting does
+# not fail cleanly -- the OOM killer takes a Ray worker and the run dies with
+# ActorDiedError several minutes in.
+#
+# Pack runs of similar speed together. no_concat emits one training row per turn where
+# concat emits one per episode, so it is ~2.4x slower per step (214 s vs 89 s measured on
+# 5-turn Sokoban); pairing it with a fast policy leaves half the node idle for hours once
+# the fast one finishes.
 #
 # One pipe-separated record per run, whitespace between records. Empty fields are allowed
 # ('name|sokoban|token_level_gae|1.0||||'). GPUS_PER_RUN defaults to 4.
@@ -23,6 +33,7 @@ TRAIN=$CODE_ROOT/VAGEN/examples/slurm/train.sbatch
 [ -f "$TRAIN" ] || { echo "no train.sbatch at $TRAIN -- is CODE_ROOT right?"; exit 1; }
 
 i=0
+pids=(); names=()
 for rec in $RUNS; do
   IFS='|' read -r name env est lam loss low harness extra <<< "$rec"
   first=$((i * G)); last=$((first + G - 1))
@@ -33,9 +44,18 @@ for rec in $RUNS; do
   LOSS_MODE=$loss LAM_LOW=$low HARNESS=${harness:-concat} EXTRA_ARGS=$extra \
   STATE_REWARD=off \
     bash "$TRAIN" &
+  pids+=($!); names+=("$name")
   i=$((i + 1))
   # Stagger: several Ray clusters coming up at once contend for ports and shared memory,
   # and the first one to start warms the weights in page cache for the rest.
   sleep 120
 done
-wait
+# ★ Collect every run's exit status. Without this the script ends on `wait`, which
+# succeeds regardless, and Slurm reports COMPLETED for a job whose runs all died in the
+# first minutes -- observed exactly once, and only noticed by comparing step counts.
+rc=0
+for j in "${!pids[@]}"; do
+  if wait "${pids[$j]}"; then echo "[pack] ok   ${names[$j]}"
+  else echo "[pack] FAIL ${names[$j]}"; rc=1; fi
+done
+exit $rc
