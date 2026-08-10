@@ -7,11 +7,13 @@ Two rewards, independently switchable:
 * **transition prediction** -- it says where they will be after
   (``<prediction>``), scored against the state it acted *into*.
 
-★ Each score is paid to the tokens that carry it. A scalar added to the turn tells credit
-assignment only that the turn went well; putting the estimation score on the estimation
-tokens and the prediction score on the prediction tokens is a signal *within* a turn,
-which is the level a token- or bi-level estimator can act on. It is available because the
-environment interface returns a vector aligned to the response.
+★ Both scores are paid on the turn's **last** token, together with the outcome and the
+format bonus. This was per-span -- each score on the last token of the section that earned
+it, a signal *within* a turn -- which is the better placement for ``token_level_gae`` and
+the variable-lambda ``bi_level_gae``, and the wrong one for the paper's nested Bi-Level
+GAE, whose outer chain has a single reward slot per turn. Placement and advantage
+estimator are one choice, not two; ``_place`` has the measurements. The per-section
+breakdown moves to ``info`` rather than disappearing.
 
 Whichever rewards are on decide the response format the agent is asked for, and the
 format bonus is paid only when exactly those sections are present -- asking for a section
@@ -24,7 +26,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
 from vagen.rewards.judge import NullJudge
-from vagen.rewards.spans import spread, tagged_span, token_offsets, tokens_covering
+from vagen.rewards.spans import tagged_span
 from vagen.rewards.spatial import grouped_f1
 
 #: reward name -> the tag the agent writes it in
@@ -128,7 +130,7 @@ class StateRewardWrapper:
             # Nothing to place anything on; degrade to a scalar rather than vanish.
             return obs, float(reward) + sum(self.last_scores.values()), done, info
 
-        return obs, self._place(scored, float(reward), response_token_ids, tokenizer), done, info
+        return obs, self._place(scored, float(reward), response_token_ids), done, info
 
     async def _score(self, action: str, gold: dict[str, list[dict]]) -> dict:
         spans = {name: tagged_span(action, tag) for name, tag in TAGS.items() if name in self.enabled}
@@ -160,36 +162,45 @@ class StateRewardWrapper:
         scores["format"] = self.format_reward
         return scores
 
-    def _place(self, scored: dict, outcome: float, token_ids, tokenizer) -> list[float]:
-        offsets = token_offsets(list(token_ids), tokenizer)
-        vector = [0.0] * len(offsets)
+    def _place(self, scored: dict, outcome: float, token_ids) -> list[float]:
+        """Everything a turn earned, on the turn's last token.
 
+        ★ This was per-span: each section's score on the last token of the section that
+        earned it. That is the better placement for ``token_level_gae`` and for the
+        variable-lambda ``bi_level_gae`` -- measured -28% variance at lam 0.9 and -45% at
+        0.8, and exactly invariant once the critic is self-consistent, because a lumped
+        score has to be *remembered* by ``V`` for the rest of the turn.
+
+        It is the wrong placement for the paper's nested Bi-Level GAE, which this repo
+        also has to reproduce. That form has one reward slot per turn --
+        ``r_t = r_reason + r_format + R(s_t, a_t)`` enters the outer turn-level chain as a
+        single scalar -- so a reward sitting mid-turn is credited once by the inner token
+        chain and then again by the outer one. Measured against an exact policy gradient
+        on a tabular multi-turn MDP: bias 0.177, and a critic fixed-point error of exactly
+        ``beta_s + beta_w``. Placement and estimator are not independent choices, and this
+        is the placement the paper's estimator is defined against.
+
+        What the other estimators pay: they now see a turn's auxiliary reward at the turn
+        boundary rather than where it was earned. They stay unbiased -- the per-turn total
+        is unchanged, so no length-hacking channel opens either -- and pay the variance
+        above.
+
+        Dropping the span lookup also drops the tokenizer work. Locating a span needed
+        ``token_offsets``, which decodes every prefix of the response: O(n) decodes over
+        O(n) characters, once per turn per rollout. The turn's last token is known without
+        decoding anything.
+        """
+        total = 0.0
         for name in self.enabled:
-            span, value = scored["spans"].get(name), scored.get(name)
-            if span is None or not value:
+            value = scored.get(name)
+            # A section with no span scored nothing anyway -- `_score` gates on every
+            # section being present -- but a score without the span that justifies it
+            # must never be paid, however `_score` is changed later.
+            if scored["spans"].get(name) is None or not value:
                 continue
-            covered = tokens_covering(span, offsets)
-            if not covered:
-                continue
-            # ★ On the span's LAST token, not spread across it. A span's score is a
-            # property of the whole span -- you cannot tell whether a state estimation is
-            # right from half of it -- so the reward is determined at the step that
-            # completes the span, and that is where it belongs. The recursion then hands
-            # it back to every token that caused it.
-            #
-            # Spreading gave the opposite gradient: with `value/K` at each of K tokens,
-            # G_j (the return from j) collects only the shares at or after j, so the
-            # span's FIRST token received the whole value and its LAST received value/K.
-            # That is backwards -- the last token is the one that finished the thing being
-            # scored.
-            #
-            # Same rule as `outcome` below, which already sits on the turn's last token:
-            # every score lands on the last token of whatever it scores. The total is
-            # unchanged, so the length-hacking channel `spread` was guarding stays shut.
-            vector[covered[-1]] += value
+            total += value
 
-        # Outcome and format belong to the turn as a whole, so they sit on its last
-        # token -- the position a return is bootstrapped from.
+        vector = [0.0] * len(token_ids)
         if vector:
-            vector[-1] += outcome + scored.get("format", 0.0)
+            vector[-1] += total + outcome + scored.get("format", 0.0)
         return vector
