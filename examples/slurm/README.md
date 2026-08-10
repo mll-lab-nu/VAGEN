@@ -114,7 +114,21 @@ has three cells rather than six.
   `RUNNING` indefinitely and tailing the wrapper's stdout shows fresh lines from the
   wrapper itself. Check `stat -c %y $OUT/run.log` against the wall clock; a step is
   ~90-215 s depending on the context policy, so anything over ~15 minutes stale is hung.
-* **Never pack `no_concat` with anything.** It emits one row per turn against `concat`'s
-  one per episode and runs ~2.4x slower per step, so a co-scheduled partner finishes
-  hours early and its half of the node sits idle for the rest. Give it a node to itself,
-  or pair it with another `no_concat` run.
+* **Prefer one Slurm job per run over `pack.sbatch`.** Packing exists because the QOS
+  caps *submitted* jobs (see below), not because it is better. Measured over one night:
+  all three runs packed into a single job failed -- one never got past vLLM startup, one
+  died at step 15 in verl's bucketed CUDA-IPC weight transfer with `TypeError: 'str'
+  object is not callable` (a handle arriving off the wrong ZMQ message), and the third
+  only became healthy once resubmitted standalone -- while nine separately submitted jobs
+  ran seven hours without incident. The IPC socket path is
+  `/tmp/rl-colocate-zmq-<ray_job_id>-replica-N-rank-M.sock`, and a Ray job id is a
+  per-cluster counter rather than a global one, so two Ray clusters inside one Slurm
+  allocation can agree on it; separate Slurm jobs get separate `/tmp` namespaces and
+  cannot.
+* **If you do pack, never pack `no_concat`.** It emits one row per turn against `concat`'s
+  one per episode and runs ~2.4x slower per step, so a co-scheduled partner finishes hours
+  early and its half of the node sits idle for the rest.
+* **The QOS caps submitted jobs, pending included** (10 here), so an 11th run cannot be
+  parked with `--dependency` -- `sbatch` refuses it outright. Queue the overflow in a file
+  and drain it from a *CPU* job, which is charged against a different QOS and so does not
+  consume one of the ten.
