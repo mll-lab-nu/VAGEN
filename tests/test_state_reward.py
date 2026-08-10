@@ -2,6 +2,10 @@
 
 What matters is where the credit lands, not only how much of it there is. A scalar that
 sums correctly but sits on the wrong tokens is exactly as invisible as a misplaced mask.
+
+Since 2026-08-10 everything a turn earns is paid on the turn's last token; the per-section
+breakdown lives in ``info`` instead. See ``StateRewardWrapper._place`` for why that is
+coupled to which advantage estimator is in use.
 """
 
 import types
@@ -119,9 +123,20 @@ async def test_only_the_enabled_reward_is_scored():
 
 
 @pytest.mark.asyncio
-async def test_each_score_lands_on_its_own_section():
-    """★ The reason for doing this at all. A scalar on the turn tells credit assignment
-    only that the turn went well; this says which half of the reasoning was right."""
+async def test_everything_a_turn_earned_lands_on_its_last_token():
+    """★ Every score a turn earns is paid at the turn's last token, not at the section
+    that earned it.
+
+    This was per-span, and per-span is the better placement for ``token_level_gae`` and
+    the variable-lambda ``removed_estimator_gae``. It is the wrong one for the paper's nested
+    removed_estimator GAE, whose outer chain has a single reward slot per turn: a score sitting
+    mid-turn is credited by the inner token chain and then again by the outer one
+    (measured bias 0.177 against an exact policy gradient). The estimator and the
+    placement have to be chosen together, and this is the pair the paper defines.
+
+    The per-section breakdown is not lost, it moves -- see the ``info`` assertions
+    below. What is lost is the *within-turn* gradient signal, which is the price.
+    """
     action = "<observation>A</observation>zz<prediction>B</prediction>"
     moved = [{"object_id": "box", "vertical_relation": "above", "horizontal_relation": "same"}]
     w = _wrapper(
@@ -129,11 +144,19 @@ async def test_each_score_lands_on_its_own_section():
         enabled={"state_estimation": 1.0, "transition_prediction": 1.0}, format_reward=0.0,
     )
 
-    _, vector, _, _ = await w.step(action, [ord(c) for c in action], CharTokenizer())
+    _, vector, _, info = await w.step(action, [ord(c) for c in action], CharTokenizer())
 
-    assert vector[action.index("A")] == pytest.approx(1.0)
-    assert vector[action.index("B")] == pytest.approx(1.0)
-    assert vector[action.index("zz")] == pytest.approx(0.0), "credit leaked outside both sections"
+    # 1.0 estimation + 1.0 prediction + Env's own 1.0 outcome, all on one token: the
+    # outcome already sat there, and the two description scores now join it.
+    assert vector[-1] == pytest.approx(3.0), "the turn's whole reward belongs on its last token"
+    assert sum(vector[:-1]) == pytest.approx(0.0), "nothing may be paid before the turn ends"
+    # The total is what it always was -- this moves reward, it does not create any, so
+    # no length-hacking channel opens.
+    assert sum(vector) == pytest.approx(3.0)
+    # ★ Which half of the reasoning was right is still reported, on the channel that
+    # survives the move. Without this the two terms become indistinguishable everywhere.
+    assert info["state_reward/state_estimation"] == pytest.approx(1.0)
+    assert info["state_reward/transition_prediction"] == pytest.approx(1.0)
 
 
 @pytest.mark.asyncio
@@ -179,12 +202,15 @@ async def test_a_judge_outage_costs_the_process_reward_not_the_rollout():
 
 @pytest.mark.asyncio
 async def test_the_outcome_reward_stays_on_the_last_token():
+    """The outcome always sat there; now the description score joins it, so the last
+    token carries the turn's whole 3.0 + 1.0 rather than the outcome alone."""
     action = "<observation>A</observation>zz"
     w = _wrapper(Env(BOX, BOX, reward=3.0), Judge(BOX), format_reward=0.0)
 
     _, vector, _, _ = await w.step(action, [ord(c) for c in action], CharTokenizer())
 
-    assert vector[-1] == pytest.approx(3.0)
+    assert vector[-1] == pytest.approx(4.0)
+    assert sum(vector) == pytest.approx(4.0)
 
 
 @pytest.mark.asyncio
