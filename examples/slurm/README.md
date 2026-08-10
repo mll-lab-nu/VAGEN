@@ -128,6 +128,15 @@ has three cells rather than six.
 * **If you do pack, never pack `no_concat`.** It emits one row per turn against `concat`'s
   one per episode and runs ~2.4x slower per step, so a co-scheduled partner finishes hours
   early and its half of the node sits idle for the rest.
+* **`sbatch --parsable` is not the only thing `sbatch` prints.** A site plugin here writes
+  `sbatch: Job submitted to Partition: a100` to *stderr*, so capturing with `2>&1` gives
+  you a two-line string and any `^[0-9]+$` test on it fails. Use `2>/dev/null` and read
+  the id off stdout. This cost a run six times over: an auto-submitter treated the parse
+  failure as "submission failed", kept the entry queued, and refilled every slot that
+  freed with another copy of the same experiment -- same `EXP_NAME`, so one output dir,
+  one `run.log` with six writers, one checkpoint dir. **Never retry an action whose
+  outcome you could not parse**; dequeue it and say so. And guard idempotency separately
+  from the parse: refuse to submit a `--job-name` that `squeue -h -o %j` already lists.
 * **The QOS caps submitted jobs, pending included** (10 here), so an 11th run cannot be
   parked with `--dependency` -- `sbatch` refuses it outright. Queue the overflow in a file
   and drain it from a *CPU* job, which is charged against a different QOS and so does not
