@@ -55,7 +55,7 @@ RUNS='mode_concat|sokoban|token_level_gae|1.0||||
       mode_no_concat|sokoban|token_level_gae|1.0|||no_concat|
       mode_compact|sokoban|token_level_gae|1.0|||compact|trainer.compact_budget=2000' \
 sbatch --account=$SLURM_ACCOUNT --qos=$GPU_QOS --nodes=1 \
-       --gpus-per-node=$GPU_TYPE:12 --cpus-per-task=96 --mem=800G \
+       --gpus-per-node=$GPU_TYPE:8 --cpus-per-task=96 --mem=800G \
        --time=48:00:00 --requeue examples/slurm/pack.sbatch
 ```
 
