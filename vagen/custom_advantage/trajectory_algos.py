@@ -523,7 +523,7 @@ def compute_bi_level_gae(inputs: AdvantageInputs):
         )
 
 
-@advantage_estimator("bi_level_gae_paper", needs_critic=True)
+@advantage_estimator("bi_level_gae_paper", needs_critic=True, turn_lumped_reward=True)
 def compute_bi_level_gae_paper(inputs: AdvantageInputs):
     """The **published** VAGEN Bi-Level GAE, reproduced as released rather than as fixed.
 

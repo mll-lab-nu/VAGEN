@@ -168,6 +168,30 @@ class GymEnvAdapter:
 # nothing selects it -- kept so a config that does still resolves.
 @register("gym_agent")
 @register("gym_agent_v2")
+
+def resolve_reward_placement(config, configured: str = "auto") -> str:
+    """Where a turn's scores are paid, resolved from the advantage estimator by default.
+
+    ★ Placement and estimator are one choice. An estimator whose outer chain has a single
+    reward slot per turn reads a turn's reward only at the turn's last token, so a score
+    paid mid-turn is credited twice (measured bias 0.177); the per-token estimators prefer
+    the opposite, because a lumped score has to be remembered by ``V`` for the rest of the
+    turn (-28% variance at lam 0.9 from per-span). Neither mistake raises and neither is
+    visible in a curve, so the estimator decides and ``placement`` exists to be overridden
+    rather than to be set.
+
+    ``auto`` is the default for the same reason ``lam_low`` has none on ``bi_level_gae``:
+    a value that must be kept in step with another setting by hand is one that eventually
+    disagrees with it, silently.
+    """
+    from vagen.custom_advantage import wants_turn_lumped_reward
+
+    if configured != "auto":
+        return configured
+    algorithm = config.get("algorithm", {}) or {}
+    estimator = algorithm.get("adv_estimator", "") if hasattr(algorithm, "get") else ""
+    return "turn_end" if wants_turn_lumped_reward(estimator) else "per_span"
+
 class GymLoop(VagenGymAgentLoopBase):
     """Runner + harness + client. The mode comes from config, not from the class."""
 
@@ -287,8 +311,8 @@ class GymLoop(VagenGymAgentLoopBase):
             judge=shared_judge(cfg["judge_base_url"], cfg["judge_model"]),
             enabled=enabled,
             format_reward=float(cfg.get("format_reward", 0.1)),
+            placement=resolve_reward_placement(self.config, str(cfg.get("placement", "auto"))),
         )
-
     def _summary_request_len(self) -> int:
         """What the summary request costs as the client will actually send it.
 
