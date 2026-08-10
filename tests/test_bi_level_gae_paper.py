@@ -269,3 +269,48 @@ def test_registry_declarations():
     # ★ Two explicit gammas, so unlike bi_level_gae it is well-defined away from 1.0 and
     # must NOT be caught by the single-clock startup assertion.
     assert "bi_level_gae_paper" not in UNDISCOUNTED_ESTIMATORS
+
+
+# ------------------------------------------------- the fact that decides the experiment
+
+
+def test_it_is_token_level_gae_when_the_two_clocks_agree():
+    """★ At ``high_level_gamma == gamma`` and ``lam == 1`` this estimator IS
+    ``token_level_gae`` -- not close to it, identical.
+
+    Pass 1 telescopes to ``A_t = G_t - V(e_t)`` and pass 2 inside the turn telescopes to
+    ``V(e_t) - V(j)``; the afterstate anchor cancels and every token gets ``G_t - V(j)``.
+    Nothing in a training curve would reveal this, so a run configured that way is the
+    token-level baseline wearing the paper baseline's name -- which is exactly how the
+    first three `bi_level_new` jobs were launched on 2026-08-10.
+    """
+    paper, _, mask = _call("bi_level_gae_paper", _concat(), gamma=1.0, lam=1.0, high_level_gamma=1.0)
+    token, _, _ = _call("token_level_gae", _concat(), gamma=1.0, lam=1.0)
+    assert _at(paper, mask) == pytest.approx(_at(token, mask), abs=1e-12)
+
+
+@pytest.mark.parametrize("high,floor", [(0.99, 1e-2), (0.9, 1e-1)])
+def test_the_published_settings_are_genuinely_a_different_algorithm(high, floor):
+    """...and away from that point it is not. The released config ships
+    ``high_level_gamma=0.99`` and the released sokoban script ``0.9``, which is where the
+    estimator earns its name. The floors are loose on purpose: the claim is that the gap
+    is real and grows as the clocks separate, not that it has a particular size."""
+    paper, _, mask = _call("bi_level_gae_paper", _concat(), gamma=1.0, lam=1.0, high_level_gamma=high)
+    token, _, _ = _call("token_level_gae", _concat(), gamma=1.0, lam=1.0)
+    gap = max(abs(a - b) for a, b in zip(_at(paper, mask), _at(token, mask)))
+    assert gap > floor, f"high_level_gamma={high} is indistinguishable from token_level_gae"
+
+
+def test_the_degenerate_setting_warns(caplog):
+    """A guard nothing says out loud is not a guard. The run has to be able to say, in its
+    own log, that it reproduced the wrong thing."""
+    import logging
+
+    with caplog.at_level(logging.WARNING):
+        _call("bi_level_gae_paper", _concat(), gamma=1.0, lam=1.0, high_level_gamma=1.0)
+    assert any("IDENTICAL to token_level_gae" in r.message for r in caplog.records)
+
+    caplog.clear()
+    with caplog.at_level(logging.WARNING):
+        _call("bi_level_gae_paper", _concat(), gamma=1.0, lam=1.0, high_level_gamma=0.9)
+    assert not any("IDENTICAL" in r.message for r in caplog.records)

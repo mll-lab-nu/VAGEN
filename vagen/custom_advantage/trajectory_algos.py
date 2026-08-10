@@ -438,9 +438,13 @@ def compute_bi_level_gae(inputs: AdvantageInputs):
     which the paper's own published settings or its appendix already imply:
 
     1. the outer chain is anchored at the turn's **first** action token, not at
-       ``V(tau_{<=a_t})`` -- the value of a prefix that includes the action. Measured
-       against an exact policy gradient on a tabular multi-turn MDP, the post-action
-       anchor costs 0.316 relative error and the released code's variant 0.177.
+       ``V(tau_{<=a_t})`` -- the value of a prefix that includes the action. That matters
+       for a turn-level chain used *on its own*, where the afterstate anchor gives exactly
+       zero gradient on every non-final token of a turn (relative error 0.949). It does
+       **not** describe a defect of the released composite, where the anchor cancels
+       against the inner pass exactly -- see ``bi_level_gae_paper``, which measures this.
+       The earlier figure of 0.177 quoted here belonged to a different defect entirely (a
+       mid-turn reward credited by both chains) and had been transplanted onto the anchor.
     2. the turn advantage is **added** to the last token's own delta rather than
        replacing it. Algorithm 2 line 18 composes; only the prose overwrites. Overwriting
        hands that token a conditionally zero-mean quantity, so the token carrying the
@@ -555,11 +559,38 @@ def compute_bi_level_gae_paper(inputs: AdvantageInputs):
     So the turn's last token receives exactly ``A_t`` -- its own delta is discarded, not
     added -- and each turn's inner chain is independent of every other's.
 
-    ★ What that costs, measured against an exact policy gradient on a tabular multi-turn
-    MDP: the post-action anchor 0.316 relative error, this released variant 0.177. The
-    zeroed accumulator is why intra-turn reward cannot propagate across a turn boundary at
-    all, and the overwrite hands the token that carries the outcome reward and the stop
-    decision a conditionally zero-mean quantity in place of its own delta.
+    ★ The afterstate anchor is real but **self-cancelling here**, and this is the most
+    important thing to know about the estimator. Pass 1 telescopes to ``A_t = G_t - V(e_t)``
+    and pass 2 inside the turn telescopes to ``V(e_t) - V(j)``; the ``V(e_t)`` terms cancel
+    and every token receives ``G_t - V(j)``, the correct advantage. Measured on a tabular
+    multi-turn MDP with an exact critic and an exact policy gradient:
+
+    * ``high_level_gamma == gamma`` and ``lam == 1``: **identical to token_level_gae**, to
+      4e-16. Not approximately -- the same numbers.
+    * the outer chain *in isolation* (i.e. lifted out to be a turn-level estimator) is
+      catastrophic: relative error 0.949, and **exactly zero gradient** on every
+      non-final token of a turn, because ``G_t - E[G_t | s_t, a_t^{1..L-1}]`` is
+      conditionally zero-mean given all but the last token. Only the final token -- usually
+      a near-deterministic EOS -- keeps any signal.
+    * "fixing" the anchor to the turn's first token *without* moving the write-back
+      position makes it **worse than the bug**: relative error 0.156 and a gradient 1.92x
+      too large, because the value is then subtracted twice. Anchor and deposit position
+      must move together, which is what ``turn_level_gae`` does and why the corrected
+      first-anchor estimator already exists under that name.
+
+    So do not "correct" the anchor here. The defect is in how the outer chain is
+    *described*, not in what the composite computes.
+
+    ★ Therefore ``high_level_gamma`` is the only thing separating this from
+    ``token_level_gae``, and at ``high_level_gamma == gamma`` there is nothing left. The
+    released config ships ``gamma 1.0 / lam 1.0 / high_level_gamma 0.99`` and the released
+    sokoban script uses ``0.9``; measured divergence from token-level GAE on the same
+    fixture is 4e-16 at 1.0, 1.8e-2 at 0.99 and 2.1e-1 at 0.9. Running this at
+    ``high_level_gamma = gamma`` reproduces nothing.
+
+    The zeroed accumulator is separately why intra-turn reward cannot propagate across a
+    turn boundary, and the overwrite is why the token carrying the outcome reward learns
+    from the turn advantage rather than its own delta.
 
     ★ Requires the turn's reward to sit on the turn's last token, because pass 1 reads the
     reward only there. ``vagen/rewards/state_reward.py`` places it that way; a reward left
@@ -574,6 +605,19 @@ def compute_bi_level_gae_paper(inputs: AdvantageInputs):
     gamma = float(inputs.config.gamma)
     lam = float(inputs.config.lam)
     high_gamma = float(inputs.param("high_level_gamma", gamma))
+
+    if high_gamma == gamma and lam == 1.0:
+        # Not an error -- it is what the released code does with those numbers -- but a run
+        # started this way is token_level_gae wearing the baseline's name, and the curves
+        # give no hint of it.
+        logger.warning(
+            "bi_level_gae_paper: high_level_gamma == gamma == %s and lam == 1.0, at which "
+            "the two passes telescope and this estimator is IDENTICAL to token_level_gae "
+            "(verified to 4e-16). The outer chain's V(afterstate) cancels against the "
+            "inner chain exactly. Reproducing the published setting means "
+            "high_level_gamma < gamma -- the released config uses 0.99 and the released "
+            "sokoban script 0.9.", gamma,
+        )
 
     with torch.no_grad():
         packed = _pack(inputs)
