@@ -56,10 +56,20 @@ RUNS='mode_concat|sokoban|token_level_gae|1.0||||
       mode_compact|sokoban|token_level_gae|1.0|||compact|trainer.compact_budget=2000' \
 sbatch --account=$SLURM_ACCOUNT --qos=$GPU_QOS --nodes=1 \
        --gpus-per-node=$GPU_TYPE:8 --cpus-per-task=96 --mem=800G \
-       --time=48:00:00 --requeue examples/slurm/pack.sbatch
+       --mem=0 --time=48:00:00 --requeue examples/slurm/pack.sbatch
 ```
 
 Fields: `name|env|adv_estimator|lam|loss_mode|lam_low|harness|extra_args`.
+
+Two constraints that are not obvious and do not fail cleanly:
+
+* **`--mem=0`**, not a number. One 3B run peaks near 790 GB of host RAM, so two do not fit
+  in the 800 GB that looks generous; the OOM killer takes a Ray worker and the run dies
+  with `ActorDiedError` minutes in, while Slurm still reports the job COMPLETED.
+* **Pack runs of similar speed.** `no_concat` emits one training row per turn where
+  `concat` emits one per episode, so it is about 2.4x slower per step (214 s against 89 s,
+  measured on 5-turn Sokoban). Pairing a slow policy with a fast one leaves half the node
+  idle for hours.
 
 ## The algorithm grid
 
