@@ -26,11 +26,14 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
 from vagen.rewards.judge import NullJudge
-from vagen.rewards.spans import tagged_span
+from vagen.rewards.spans import tagged_span, token_offsets, tokens_covering
 from vagen.rewards.spatial import grouped_f1
 
 #: reward name -> the tag the agent writes it in
 TAGS = {"state_estimation": "observation", "transition_prediction": "prediction"}
+
+#: where a turn's scores are paid. See `StateRewardWrapper._place`.
+PLACEMENTS = ("turn_end", "per_span")
 
 
 @dataclass
@@ -59,11 +62,19 @@ class StateRewardWrapper:
     #: reward name -> weight; only the names present here are asked for and scored
     enabled: dict[str, float] = field(default_factory=dict)
     format_reward: float = 0.1
+    #: "turn_end" -- the whole turn's reward on its last token, which is what an
+    #: estimator with one reward slot per turn requires; "per_span" -- each section's
+    #: score on the last token of the section that earned it. See `_place`. Resolved from
+    #: the advantage estimator in use by `gym_loop`, not set independently, because the
+    #: two are one choice.
+    placement: str = "turn_end"
 
     def __post_init__(self):
         unknown = set(self.enabled) - set(TAGS)
         if unknown:
             raise ValueError(f"unknown state rewards {sorted(unknown)}; choose from {sorted(TAGS)}")
+        if self.placement not in PLACEMENTS:
+            raise ValueError(f"unknown placement {self.placement!r}; choose from {sorted(PLACEMENTS)}")
         self.last_scores: dict[str, float] = {}
 
     # ------------------------------------------------------------------ env facade
@@ -130,7 +141,7 @@ class StateRewardWrapper:
             # Nothing to place anything on; degrade to a scalar rather than vanish.
             return obs, float(reward) + sum(self.last_scores.values()), done, info
 
-        return obs, self._place(scored, float(reward), response_token_ids), done, info
+        return obs, self._place(scored, float(reward), response_token_ids, tokenizer), done, info
 
     async def _score(self, action: str, gold: dict[str, list[dict]]) -> dict:
         spans = {name: tagged_span(action, tag) for name, tag in TAGS.items() if name in self.enabled}
@@ -162,34 +173,52 @@ class StateRewardWrapper:
         scores["format"] = self.format_reward
         return scores
 
-    def _place(self, scored: dict, outcome: float, token_ids) -> list[float]:
-        """Everything a turn earned, on the turn's last token.
+    def _place(self, scored: dict, outcome: float, token_ids, tokenizer) -> list[float]:
+        """Pay the turn's scores, either all on its last token or each on its own section.
 
-        ★ This was per-span: each section's score on the last token of the section that
-        earned it. That is the better placement for ``token_level_gae`` and for the
-        variable-lambda ``removed_estimator_gae`` -- measured -28% variance at lam 0.9 and -45% at
-        0.8, and exactly invariant once the critic is self-consistent, because a lumped
-        score has to be *remembered* by ``V`` for the rest of the turn.
+        ★ Which of the two is right is decided by the advantage estimator, not by taste,
+        and ``gym_loop`` resolves it from the estimator in use rather than letting the two
+        be configured apart:
 
-        It is the wrong placement for the paper's nested removed_estimator GAE, which this repo
-        also has to reproduce. That form has one reward slot per turn --
-        ``r_t = r_reason + r_format + R(s_t, a_t)`` enters the outer turn-level chain as a
-        single scalar -- so a reward sitting mid-turn is credited once by the inner token
-        chain and then again by the outer one. Measured against an exact policy gradient
-        on a tabular multi-turn MDP: bias 0.177, and a critic fixed-point error of exactly
-        ``beta_s + beta_w``. Placement and estimator are not independent choices, and this
-        is the placement the paper's estimator is defined against.
+        ``turn_end``
+            Everything on the turn's final token. Required by an estimator whose outer
+            chain has one reward slot per turn -- ``removed_estimator_gae_paper`` reads a turn's
+            reward only there, so a score left mid-turn is credited once by the inner
+            token chain and again by the outer turn chain (measured bias 0.177 against an
+            exact policy gradient, and a critic fixed-point error of exactly the misplaced
+            weight).
 
-        What the other estimators pay: they now see a turn's auxiliary reward at the turn
-        boundary rather than where it was earned. They stay unbiased -- the per-turn total
-        is unchanged, so no length-hacking channel opens either -- and pay the variance
-        above.
+        ``per_span``
+            Each section's score on the last token of the section that earned it -- on the
+            last, because a span's score is a property of the whole span, so it is
+            determined at the step that completes it. Better for ``token_level_gae`` and
+            the variable-lambda ``removed_estimator_gae``: measured -28% variance at lam 0.9 and
+            -45% at 0.8, and exactly invariant once the critic is self-consistent, because
+            a lumped score otherwise has to be *remembered* by ``V`` for the rest of the
+            turn.
 
-        Dropping the span lookup also drops the tokenizer work. Locating a span needed
-        ``token_offsets``, which decodes every prefix of the response: O(n) decodes over
-        O(n) characters, once per turn per rollout. The turn's last token is known without
-        decoding anything.
+        The per-turn total is identical either way, so nothing here opens a length-hacking
+        channel, and the per-section breakdown is reported through ``info`` regardless.
+
+        ``turn_end`` also skips the tokenizer entirely. Locating a span needs
+        ``token_offsets``, which decodes every prefix of the response -- O(n) decodes over
+        O(n) characters, once per turn per rollout.
         """
+        if self.placement == "per_span":
+            offsets = token_offsets(list(token_ids), tokenizer)
+            vector = [0.0] * len(offsets)
+            for name in self.enabled:
+                span, value = scored["spans"].get(name), scored.get(name)
+                if span is None or not value:
+                    continue
+                covered = tokens_covering(span, offsets)
+                if covered:
+                    vector[covered[-1]] += value
+            # The outcome and the format bonus belong to the turn as a whole either way.
+            if vector:
+                vector[-1] += outcome + scored.get("format", 0.0)
+            return vector
+
         total = 0.0
         for name in self.enabled:
             value = scored.get(name)

@@ -317,6 +317,7 @@ def advantage_estimator(
     needs_critic: bool = False,
     sentinel_returns: bool = False,
     undiscounted: bool = False,
+    turn_lumped_reward: bool = False,
 ) -> Callable:
     """Register a function of :class:`AdvantageInputs` as an advantage estimator.
 
@@ -333,6 +334,9 @@ def advantage_estimator(
             one, which is only defined at ``gamma == 1`` -- see
             ``registry.requires_undiscounted`` for why, and for the measured error at
             gamma < 1. The trainer refuses the pairing at startup.
+        turn_lumped_reward: set when the estimator reads a turn's reward only at the
+            turn's last token, so the reward wrapper must lump it there rather than pay
+            it where it was earned -- see ``registry.wants_turn_lumped_reward``.
 
     The estimator may return an :class:`AdvantageOutputs` or a plain
     ``(advantages, returns)`` tuple.
@@ -358,7 +362,12 @@ def advantage_estimator(
         adapter.vagen_estimator_fn = fn
 
         register = register_sentinel_adv_est if sentinel_returns else register_trajectory_adv_est
-        register(name, needs_critic=needs_critic, undiscounted=undiscounted)(adapter)
+        register(
+            name,
+            needs_critic=needs_critic,
+            undiscounted=undiscounted,
+            turn_lumped_reward=turn_lumped_reward,
+        )(adapter)
         return fn
 
     return decorator
