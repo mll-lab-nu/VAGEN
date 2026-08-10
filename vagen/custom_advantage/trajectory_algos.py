@@ -523,6 +523,99 @@ def compute_bi_level_gae(inputs: AdvantageInputs):
         )
 
 
+@advantage_estimator("bi_level_gae_paper", needs_critic=True)
+def compute_bi_level_gae_paper(inputs: AdvantageInputs):
+    """The **published** VAGEN Bi-Level GAE, reproduced as released rather than as fixed.
+
+    ``bi_level_gae`` above is this algorithm with three corrections. This is the thing
+    those corrections were made to, kept so the difference can be measured instead of
+    argued about. Ported from the released implementation
+    (``compute_bi_level_gae_advantage_return``, commit 4076507 in this repo's own
+    history), not from the paper's prose -- §4.2 and Algorithm 2 disagree about whether
+    the turn advantage is composed with the last token's delta or replaces it, and the
+    code is what produced the published numbers. It replaces.
+
+    Two nested passes:
+
+    1. **Turn level.** GAE over the turn-final tokens only, anchored at each turn's
+       *last* model-output token -- ``V(tau_{<=a_t})``, the value of a prefix that already
+       contains the action -- using ``high_level_gamma``::
+
+           delta_t = r_t + high_level_gamma * V(eos_{t+1}) - V(eos_t)
+           A_t     = delta_t + high_level_gamma * lam * A_{t+1}
+
+    2. **Token level.** The turn's *return* ``A_t + V(eos_t)`` is written back as the
+       reward at that token, then token-level GAE runs backward with ``gamma``, and at
+       every turn-final token both the bootstrap and the accumulator are zeroed::
+
+           at a turn end:  nextvalue = 0, lastgaelam = 0
+                           delta     = (A_t + V) - V = A_t     ->  advantage = A_t
+           inside a turn:  the ordinary token recursion, seeded from A_t
+
+    So the turn's last token receives exactly ``A_t`` -- its own delta is discarded, not
+    added -- and each turn's inner chain is independent of every other's.
+
+    ★ What that costs, measured against an exact policy gradient on a tabular multi-turn
+    MDP: the post-action anchor 0.316 relative error, this released variant 0.177. The
+    zeroed accumulator is why intra-turn reward cannot propagate across a turn boundary at
+    all, and the overwrite hands the token that carries the outcome reward and the stop
+    decision a conditionally zero-mean quantity in place of its own delta.
+
+    ★ Requires the turn's reward to sit on the turn's last token, because pass 1 reads the
+    reward only there. ``vagen/rewards/state_reward.py`` places it that way; a reward left
+    mid-turn is invisible to the outer chain and credited by the inner one alone.
+
+    ★ Two clocks, two gammas -- ``gamma`` for tokens, ``+algorithm.high_level_gamma`` for
+    turns. Unlike ``bi_level_gae`` this is therefore well-defined away from 1.0, which is
+    why it carries no ``undiscounted`` guard: the released code takes the two separately
+    and the paper's Table 23 sets the token one to 1.0. Left unset, ``high_level_gamma``
+    follows ``gamma``.
+    """
+    gamma = float(inputs.config.gamma)
+    lam = float(inputs.config.lam)
+    high_gamma = float(inputs.param("high_level_gamma", gamma))
+
+    with torch.no_grad():
+        packed = _pack(inputs)
+        valid, seq_r, seq_v = packed.valid, packed.seq_r, packed.seq_v
+        # The released code's `reward_mask`: one position per turn, at its last token.
+        turn_end = packed.boundary() & valid
+        n_traj, max_len = valid.shape
+        zeros = torch.zeros(n_traj, dtype=seq_v.dtype, device=seq_v.device)
+
+        # -- pass 1: turn level, stepping only over turn-final tokens.
+        turn_adv = torch.zeros_like(seq_v)
+        nextvalue, lastgaelam = zeros.clone(), zeros.clone()
+        for t in reversed(range(max_len)):
+            live = turn_end[:, t]
+            delta = seq_r[:, t] + high_gamma * nextvalue - seq_v[:, t]
+            lastgaelam = torch.where(live, delta + high_gamma * lam * lastgaelam, lastgaelam)
+            turn_adv[:, t] = torch.where(live, lastgaelam, torch.zeros_like(lastgaelam))
+            nextvalue = torch.where(live, seq_v[:, t], nextvalue)
+
+        # The turn's return becomes the reward at its last token; every other position
+        # keeps whatever token-level reward it had.
+        upd_r = torch.where(turn_end, turn_adv + seq_v, seq_r)
+
+        # -- pass 2: token level, restarting at every turn end.
+        seq_adv = torch.zeros_like(seq_v)
+        nextvalues, lastgaelam = zeros.clone(), zeros.clone()
+        for t in reversed(range(max_len)):
+            live = valid[:, t]
+            ends = turn_end[:, t]
+            nv = torch.where(ends, torch.zeros_like(nextvalues), nextvalues)
+            lg = torch.where(ends, torch.zeros_like(lastgaelam), lastgaelam)
+            delta = upd_r[:, t] + gamma * nv - seq_v[:, t]
+            lastgaelam = torch.where(live, delta + gamma * lam * lg, lastgaelam)
+            seq_adv[:, t] = torch.where(live, lastgaelam, torch.zeros_like(lastgaelam))
+            nextvalues = torch.where(live, seq_v[:, t], nextvalues)
+
+        return packed.emit(
+            advantages=packed.scatter(seq_adv),
+            returns=packed.scatter(seq_adv + packed.seq_v),
+        )
+
+
 @advantage_estimator("turn_level_gae", needs_critic=True, sentinel_returns=True)
 def compute_turn_level_gae(inputs: AdvantageInputs):
     """Turn-level GAE: one decision per turn, whatever rows the turn occupies.

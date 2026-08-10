@@ -1,0 +1,271 @@
+"""``bi_level_gae_paper`` -- the published VAGEN Bi-Level GAE, reproduced as released.
+
+The point of this estimator is fidelity, so the load-bearing test is differential:
+``_released`` below is ``compute_bi_level_gae_advantage_return`` copied verbatim out of
+this repo's own history (commit 4076507), and the vectorised implementation has to agree
+with it token for token. Everything else here pins a property that would otherwise only
+be visible by reading that loop.
+
+Why a reproduction at all: ``bi_level_gae`` is this algorithm with three corrections
+(anchor at the turn's first token, add rather than overwrite, no intra-turn reset). Those
+corrections are worth what they measure, and they can only be measured against the thing
+they were made to.
+"""
+
+from __future__ import annotations
+
+import numpy as np
+import pytest
+import torch
+from tensordict import TensorDict
+from verl.trainer.ppo.core_algos import get_adv_estimator_fn
+
+import verl.utils.torch_functional as verl_F
+
+import vagen.custom_advantage  # noqa: F401  importing is what registers the estimators
+
+
+# --------------------------------------------------------------------- the original
+#
+# Verbatim from commit 4076507 `vagen/trainer/ppo/core_algos.py`, reformatted but not
+# altered. Do not "clean this up": its value is that it is not our code.
+
+
+def _released(token_level_rewards, reward_mask, values, loss_mask, gamma, lam, high_level_gamma):
+    with torch.no_grad():
+        batch_size, gen_len = token_level_rewards.shape
+        advantages = torch.zeros_like(token_level_rewards)
+        returns = torch.zeros_like(token_level_rewards)
+        updated_reward = token_level_rewards.clone()
+
+        for b in range(batch_size):
+            eos_positions = reward_mask[b].nonzero(as_tuple=True)[0]
+            lastgaelam = 0.0
+            for i in range(len(eos_positions) - 1, -1, -1):
+                curr_pos = eos_positions[i]
+                if i < len(eos_positions) - 1:
+                    next_pos = eos_positions[i + 1]
+                    nextvalue = values[b, next_pos]
+                else:
+                    nextvalue = 0.0
+                delta = updated_reward[b, curr_pos] + high_level_gamma * nextvalue - values[b, curr_pos]
+                lastgaelam = delta + high_level_gamma * lam * lastgaelam
+                advantages[b, curr_pos] = lastgaelam
+
+            for i, pos in enumerate(eos_positions):
+                returns[b, pos] = advantages[b, pos] + values[b, pos]
+                updated_reward[b, pos] = advantages[b, pos] + values[b, pos]
+
+            lastgaelam = 0.0
+            valid_positions = loss_mask[b].nonzero(as_tuple=True)[0]
+            for i in range(len(valid_positions) - 1, -1, -1):
+                curr_pos = valid_positions[i]
+                if curr_pos not in eos_positions:
+                    next_pos = valid_positions[i + 1]
+                    nextvalue = values[b, next_pos]
+                else:
+                    nextvalue = 0.0
+                    lastgaelam = 0.0
+                delta = updated_reward[b, curr_pos] + gamma * nextvalue - values[b, curr_pos]
+                lastgaelam = delta + gamma * lam * lastgaelam
+                advantages[b, curr_pos] = lastgaelam
+                returns[b, curr_pos] = lastgaelam + values[b, curr_pos]
+
+        advantages = verl_F.masked_whiten(advantages, loss_mask)
+    return advantages, returns
+
+
+# ------------------------------------------------------------------------- fixtures
+
+
+class _Cfg(dict):
+    def __init__(self, gamma=1.0, lam=0.95, **extra):
+        super().__init__()
+        self.gamma, self.lam = gamma, lam
+        for k, v in extra.items():
+            setattr(self, k, v)
+
+    def get(self, key, default=None):
+        return getattr(self, key, default)
+
+
+#: One episode, three turns of unequal length, an observation between each.
+#: ``.`` = model token, ``o`` = observation. Reward sits on each turn's LAST model token,
+#: which is where `state_reward._place` now puts it and where pass 1 reads it.
+MASK = [1, 1, 1, 0, 1, 1, 0, 1]           # turns: [0,1,2] [4,5] [7]
+SCORES = [0.0, 0.0, 0.3, 0.0, 0.0, -0.2, 0.0, 1.0]
+VALUES = [0.10, 0.25, 0.40, 9.9, 0.55, 0.70, 9.9, 0.85]
+REWARD_MASK = [0, 0, 1, 0, 0, 1, 0, 1]    # each turn's last model token
+
+
+def _concat(n_traj=2):
+    scale = [1.0, 2.0][:n_traj]
+    return (
+        [[s * k for s in SCORES] for k in scale],
+        [MASK for _ in scale],
+        [VALUES for _ in scale],
+        ["g"] * n_traj, list(range(n_traj)), [0] * n_traj,
+    )
+
+
+def _split():
+    """The same episode, one row per turn -- same tokens, values and rewards.
+
+    Right-padded to a common width, because rows of a batch are one tensor. The padding
+    is masked out, so the model tokens are the same six in the same order as `_concat`.
+    """
+    return (
+        [[0.0, 0.0, 0.3], [0.0, -0.2, 0.0], [1.0, 0.0, 0.0]],
+        [[1, 1, 1], [1, 1, 0], [1, 0, 0]],
+        [[0.10, 0.25, 0.40], [0.55, 0.70, 9.9], [0.85, 9.9, 9.9]],
+        ["g", "g", "g"], [0, 0, 0], [0, 1, 2],
+    )
+
+
+def _tensors(layout):
+    scores, masks, values, group, traj, turn = layout
+    batch = TensorDict(
+        {
+            "token_level_scores": torch.tensor(scores, dtype=torch.float64),
+            "response_mask": torch.tensor(masks, dtype=torch.long),
+            "values": torch.tensor(values, dtype=torch.float64),
+        },
+        batch_size=[len(scores)],
+    )
+    non_tensor = {
+        "group_idx": np.array(group, dtype=object),
+        "traj_idx": np.array(traj),
+        "turn_idx": np.array(turn),
+    }
+    return batch, non_tensor, torch.tensor(masks, dtype=torch.bool)
+
+
+def _call(name, layout, **cfg):
+    batch, non_tensor, mask = _tensors(layout)
+    adv, ret = get_adv_estimator_fn(name)(batch=batch, non_tensor_batch=non_tensor, config=_Cfg(**cfg))
+    return adv, ret, mask
+
+
+def _at(tensor, mask):
+    return [float(v) for row, m in zip(tensor, mask) for v in row[m]]
+
+
+# ------------------------------------------------------- the claim: it is the original
+
+
+@pytest.mark.parametrize("gamma,lam,high", [(1.0, 0.95, 1.0), (1.0, 1.0, 1.0),
+                                            (0.99, 0.9, 0.95), (1.0, 0.5, 0.8)])
+def test_matches_the_released_implementation_token_for_token(gamma, lam, high):
+    """★ The whole reason this estimator exists. A reproduction that is merely
+    *inspired by* the released code reproduces nothing; the published numbers came from
+    that loop, so the test is a differential against that loop and not against a reading
+    of the paper -- whose §4.2 and Algorithm 2 disagree with each other about the
+    overwrite."""
+    layout = _concat()
+    batch, _, mask = _tensors(layout)
+    want_adv, want_ret = _released(
+        token_level_rewards=batch["token_level_scores"],
+        reward_mask=torch.tensor([REWARD_MASK] * len(layout[0]), dtype=torch.long),
+        values=batch["values"],
+        loss_mask=batch["response_mask"],
+        gamma=gamma, lam=lam, high_level_gamma=high,
+    )
+    got_adv, got_ret, _ = _call("bi_level_gae_paper", layout, gamma=gamma, lam=lam, high_level_gamma=high)
+
+    # Returns, and the advantage *before* whitening (`return - V`, which is what both
+    # implementations actually compute). Exact equality, not a tolerance: same recursion,
+    # same order, same float64 inputs, so anything but 0.0 is a difference in the
+    # algorithm. The whitened advantage is deliberately not compared -- `masked_whiten` is
+    # verl's, both call it on identical input, and comparing it only measures how it
+    # amplifies float noise.
+    v = batch["values"]
+    assert _at(got_ret, mask) == _at(want_ret, mask)
+    assert _at(got_ret - v, mask) == _at(want_ret - v, mask)
+    # `want_adv` (whitened) is intentionally unused: see the comment above.
+
+
+def test_high_level_gamma_follows_gamma_when_unset():
+    """Left unset it must not silently become 1.0 (or 0.0); it follows the token gamma,
+    which is what a single-gamma config expects."""
+    a, b = (_call("bi_level_gae_paper", _concat(), gamma=0.97, lam=0.9, high_level_gamma=g)
+            for g in (0.97, 0.5))
+    default, _, mask = _call("bi_level_gae_paper", _concat(), gamma=0.97, lam=0.9)
+    assert _at(default, mask) == pytest.approx(_at(a[0], mask))
+    assert _at(default, mask) != pytest.approx(_at(b[0], mask))
+
+
+# --------------------------------------------------------- the properties, stated once
+
+
+def test_a_turns_last_token_gets_the_turn_advantage_and_not_its_own_delta():
+    """★ The overwrite. At a turn end the released code zeroes both the bootstrap and the
+    accumulator, so ``delta = (A_turn + V) - V = A_turn`` exactly -- that token's own
+    delta is discarded rather than added. ``bi_level_gae`` adds instead, which is the
+    single line the two differ by at ``lam_low=1``.
+
+    Checked on `returns`, which is unwhitened: ``return = A_turn + V(eos)`` is the turn's
+    own return, so the last turn's must be its reward plus nothing, 1.0, because it
+    bootstraps from zero.
+    """
+    _, ret, mask = _call("bi_level_gae_paper", _concat(1), gamma=1.0, lam=1.0, high_level_gamma=1.0)
+    at = _at(ret, mask)
+    # Final turn (one token, reward 1.0, bootstrap 0): A = 1.0 - 0.85, return = 1.0.
+    assert at[-1] == pytest.approx(1.0)
+
+
+def test_each_turns_inner_chain_is_independent():
+    """★ The reset. Changing a reward in a later turn must not reach an earlier turn's
+    *non-final* tokens through the inner chain -- only through the outer chain, which
+    enters at the earlier turn's own last token. This is exactly the property the
+    corrected estimator drops, and the reason intra-turn reward cannot propagate here.
+
+    So: perturb the last turn's reward, and hold the earlier turns' values fixed. The
+    earlier turns' last tokens move (outer chain); the tokens before them move only by
+    what the outer chain handed to their turn end.
+    """
+    base = list(SCORES)
+    bumped = list(SCORES)
+    bumped[-1] += 5.0
+
+    def run(scores):
+        layout = ([scores], [MASK], [VALUES], ["g"], [0], [0])
+        _, ret, mask = _call("bi_level_gae_paper", layout, gamma=1.0, lam=0.0, high_level_gamma=0.0)
+        return _at(ret, mask)
+
+    # lam=0 and high_level_gamma=0 sever the outer chain entirely: with no discounting of
+    # a future turn and no lambda, each turn's advantage is its own delta alone. Then a
+    # change in the last turn must not move ANY earlier token.
+    before, after = run(base), run(bumped)
+    assert before[:-1] == pytest.approx(after[:-1]), "credit crossed a turn boundary with the chains cut"
+    assert before[-1] != pytest.approx(after[-1]), "the perturbed turn did not move at all"
+
+
+def test_it_is_not_the_corrected_estimator():
+    """The two must actually differ on the same input, or the comparison the sweep is
+    running has nothing to measure."""
+    paper, _, mask = _call("bi_level_gae_paper", _concat(), gamma=1.0, lam=0.95, high_level_gamma=1.0)
+    fixed, _, _ = _call("bi_level_gae", _concat(), gamma=1.0, lam=0.95, lam_low=1.0)
+    assert _at(paper, mask) != pytest.approx(_at(fixed, mask))
+
+
+def test_the_two_layouts_agree():
+    """It must not be a concat-only algorithm. The released code is: it takes one row and
+    opens it at ``nextvalues=0``, so under no_concat every turn would be its own episode.
+    Running it through the packing is the one thing here that is not a straight port."""
+    a_concat, r_concat, m_concat = _call("bi_level_gae_paper", _concat(1), lam=0.9)
+    a_split, r_split, m_split = _call("bi_level_gae_paper", _split(), lam=0.9)
+    assert _at(r_concat, m_concat) == pytest.approx(_at(r_split, m_split))
+    assert _at(a_concat, m_concat) == pytest.approx(_at(a_split, m_split))
+
+
+def test_registry_declarations():
+    from vagen.custom_advantage import (
+        TRAJECTORY_ESTIMATORS, UNDISCOUNTED_ESTIMATORS, needs_critic, needs_value_mask,
+    )
+
+    assert "bi_level_gae_paper" in TRAJECTORY_ESTIMATORS
+    assert needs_critic("bi_level_gae_paper") is True
+    assert needs_value_mask("bi_level_gae_paper") is False
+    # ★ Two explicit gammas, so unlike bi_level_gae it is well-defined away from 1.0 and
+    # must NOT be caught by the single-clock startup assertion.
+    assert "bi_level_gae_paper" not in UNDISCOUNTED_ESTIMATORS
