@@ -1,0 +1,95 @@
+# Running VAGEN sweeps on a Slurm cluster
+
+Three files. Nothing here contains a site's account names, paths or hostnames -- supply
+those through the environment.
+
+| file | what it does |
+|---|---|
+| `bootstrap.sh` | clone code, build the python env, download weights. Submit as a **CPU** job. |
+| `train.sbatch` | one training run. |
+| `pack.sbatch`  | several 4-GPU runs inside one allocation, split by `CUDA_VISIBLE_DEVICES`. |
+
+## Site configuration
+
+```bash
+export CODE_ROOT=/path/on/your/home/fs      # holds VAGEN/ and verl/ as siblings; small
+export DATA_ROOT=/path/on/your/shared/fs    # env, HF cache, checkpoints; tens of GB
+export FLASH_ATTN_WHEEL=https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.1/flash_attn-2.8.1+cu12torch2.8cxx11abiFALSE-cp312-cp312-linux_x86_64.whl
+```
+
+`CODE_ROOT` and `DATA_ROOT` are separate on purpose: a home filesystem is usually a few
+hundred GB and shared with everything else, while the environment alone is ~25 GB and
+checkpoints are far larger.
+
+## 1. Bootstrap (once)
+
+```bash
+sbatch --account=$SLURM_ACCOUNT --qos=$CPU_QOS --nodes=1 \
+       --cpus-per-task=16 --mem=64G --time=05:00:00 \
+       examples/slurm/bootstrap.sh
+```
+
+Idempotent -- rerun it after a partial failure and it resumes.
+
+## 2. One run
+
+```bash
+sbatch --account=$SLURM_ACCOUNT --qos=$GPU_QOS --nodes=1 \
+       --gpus-per-node=$GPU_TYPE:4 --cpus-per-task=48 --mem=400G \
+       --time=48:00:00 --requeue --job-name=sokoban_token \
+       --export=ALL,EXP_NAME=sokoban_token,ENV_NAME=sokoban,ADV_EST=token_level_gae,LAM=1.0 \
+       examples/slurm/train.sbatch
+```
+
+With `STATE_REWARD=on`, ask for **one more GPU** than the trainer uses: the run starts its
+own judge on the last one. Separate Slurm jobs land on separate nodes and cannot share a
+judge over localhost, so each pays for its own.
+
+## 3. A packed sweep
+
+A QOS usually caps jobs-per-user well below GPUs-per-user, so packing is what lets a sweep
+use the quota it has.
+
+```bash
+RUNS='mode_concat|sokoban|token_level_gae|1.0||||
+      mode_no_concat|sokoban|token_level_gae|1.0|||no_concat|
+      mode_compact|sokoban|token_level_gae|1.0|||compact|trainer.compact_budget=2000' \
+sbatch --account=$SLURM_ACCOUNT --qos=$GPU_QOS --nodes=1 \
+       --gpus-per-node=$GPU_TYPE:12 --cpus-per-task=96 --mem=800G \
+       --time=48:00:00 --requeue examples/slurm/pack.sbatch
+```
+
+Fields: `name|env|adv_estimator|lam|loss_mode|lam_low|harness|extra_args`.
+
+## The algorithm grid
+
+| variant | `ADV_EST` | `LOSS_MODE` | `LAM` | `LAM_LOW` |
+|---|---|---|---|---|
+| token-level | `token_level_gae` | *(vanilla)* | 1.0 | |
+| turn-level  | `turn_level_gae`  | `turn_gspo` | 0.95 | |
+| bi-level    | `bi_level_gae`    | `turn_gspo` | 0.95 | 1.0 |
+
+`gamma` is 1.0 throughout and the trainer refuses anything else for `bi_level_gae`: a
+per-token clock and a per-turn clock disagree by `gamma ** turn_length`, which is a factor
+set by how much the model wrote rather than by anything in the config.
+
+`lam_low=1.0` is not a tuning choice. The turn-level signal reaches a token `d` positions
+before the turn's end with weight `lam_low ** d`, so `0.95` delivers it to the last ~20
+tokens of an action and to none of the others.
+
+**State reward exists for Sokoban only** (`STATE_REWARD_SPECS`), so that axis of the grid
+has three cells rather than six.
+
+## Things that cost a day to learn
+
+* **`max_model_len`.** Without it vLLM sizes the KV cache against the model's full context
+  (128k here) and refuses to start. The message reports a memory figure, so it reads as an
+  out-of-memory problem; raising or lowering `gpu_memory_utilization` cannot fix it, and
+  each direction fails differently. Both the trainer's rollout and the judge need the cap.
+* **`HF_HUB_OFFLINE=1`.** Many workers revalidating one shared-filesystem snapshot at once
+  intermittently resolve an empty file list, which surfaces as `IndexError` deep inside a
+  processor loader.
+* **`RAY_TMPDIR` must be node-local and short.** Ray puts a unix socket under it and
+  AF_UNIX caps the whole path at 107 bytes.
+* **`TORCH_CUDA_ARCH_LIST`.** Unset, torch compiles the CUDA extensions for every
+  architecture -- 30+ minutes before the first step, paid per job.
