@@ -79,8 +79,12 @@ trainer:
     # What a whole episode of perfect description is worth, against 1.0 for solving the
     # level. Split across turns and across whichever rewards are on.
     #
-    # ★ 0.05, with the environment's own format_reward set to 0.01 a turn, so the whole
-    # auxiliary bundle maxes out at 0.05 + 5*0.01 = 0.10 -- one tenth of the task reward.
+    # ★ 0.1, split evenly across the enabled rewards and across the turns, so at
+    # max_turns=5 with both on each is worth **0.01 a turn** -- 2 * 0.01 * 5 = 0.10 over
+    # the episode. Paired with the environment's format_reward at 0.02 a turn (0.10 over
+    # the episode), the whole auxiliary bundle maxes at 0.20 against a success_reward of
+    # 1.0.
+    #
     # The two have to be set together: they are separate knobs paying into the same
     # budget, and tuning either alone moves the ratio.
     #
@@ -89,7 +93,7 @@ trainer:
     # -- half the task reward for producing well-formed text. Measured at the older fixed
     # weights, eight trajectories with traj_success 0 scored up to 2.25, all of it
     # description.
-    budget: 0.05
+    budget: 0.1
     # Format is a gate, not a line item. A turn that skipped a section it was asked for
     # scores nothing for the sections it did write, and writing them all pays nothing by
     # itself -- otherwise the budget is not the budget.
