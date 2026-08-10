@@ -76,12 +76,20 @@ trainer:
     transition_prediction:       # <prediction>, scored against the state acted into
       enable: False
       weight: 0.5
-    # What a whole episode of perfect description is worth, against 1 for solving the
-    # level. Split across turns and across whichever rewards are on, so at max_turns=5
-    # with both on each is worth 0.1 a turn. Without this the auxiliary reward outbids
-    # the task: measured at the old fixed weights, eight trajectories with traj_success
-    # 0 scored up to 2.25, all of it description.
-    budget: 1.0
+    # What a whole episode of perfect description is worth, against 1.0 for solving the
+    # level. Split across turns and across whichever rewards are on.
+    #
+    # ★ 0.05, with the environment's own format_reward set to 0.01 a turn, so the whole
+    # auxiliary bundle maxes out at 0.05 + 5*0.01 = 0.10 -- one tenth of the task reward.
+    # The two have to be set together: they are separate knobs paying into the same
+    # budget, and tuning either alone moves the ratio.
+    #
+    # Both defaults were far too large. The state reward's was 1.0, equal to solving the
+    # level; the environment's format_reward is 0.1 *a turn*, which at max_turns=5 is 0.5
+    # -- half the task reward for producing well-formed text. Measured at the older fixed
+    # weights, eight trajectories with traj_success 0 scored up to 2.25, all of it
+    # description.
+    budget: 0.05
     # Format is a gate, not a line item. A turn that skipped a section it was asked for
     # scores nothing for the sections it did write, and writing them all pays nothing by
     # itself -- otherwise the budget is not the budget.
