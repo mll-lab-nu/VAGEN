@@ -14,6 +14,7 @@ from vagen.custom_advantage.registry import (  # noqa: F401
     CRITIC_ESTIMATORS,
     SENTINEL_RETURN_ESTIMATORS,
     TRAJECTORY_ESTIMATORS,
+    TURN_LUMPED_REWARD_ESTIMATORS,
     UNDISCOUNTED_ESTIMATORS,
     needs_critic,
     needs_value_mask,
@@ -21,6 +22,7 @@ from vagen.custom_advantage.registry import (  # noqa: F401
     register_sentinel_adv_est,
     register_trajectory_adv_est,
     spans_rows,
+    wants_turn_lumped_reward,
 )
 from vagen.custom_advantage import trajectory_algos  # noqa: F401,E402  (import for side effect)
 
@@ -31,6 +33,7 @@ __all__ = [
     "CRITIC_ESTIMATORS",
     "SENTINEL_RETURN_ESTIMATORS",
     "TRAJECTORY_ESTIMATORS",
+    "TURN_LUMPED_REWARD_ESTIMATORS",
     "UNDISCOUNTED_ESTIMATORS",
     "needs_critic",
     "needs_value_mask",
@@ -38,4 +41,5 @@ __all__ = [
     "register_sentinel_adv_est",
     "register_trajectory_adv_est",
     "spans_rows",
+    "wants_turn_lumped_reward",
 ]

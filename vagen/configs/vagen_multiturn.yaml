@@ -67,6 +67,14 @@ trainer:
   # <prediction> are scored against the real layout and the scores are paid to the
   # tokens that carry them. Needs a judge endpoint; see scripts/launch_judge.sh.
   state_reward:
+    # Where a turn's scores are paid: auto | turn_end | per_span.
+    #
+    # ★ auto resolves it from `algorithm.adv_estimator`, and should stay that way. An
+    # a turn's reward only at the turn's last token, so a score paid mid-turn is credited
+    # twice -- measured bias 0.177. The per-token estimators want the opposite (-28%
+    # variance at lam 0.9 from per-span). Neither mistake raises or shows in a curve, so
+    # setting this by hand means keeping two knobs in step forever.
+    placement: auto
     # Independently switchable. Whichever are on decide the response format the agent
     # is asked for, so turning one on is enough -- no separate prompt setting to keep
     # in step with it.
