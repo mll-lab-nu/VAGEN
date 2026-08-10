@@ -18,8 +18,15 @@ import pytest
 import torch
 from omegaconf import OmegaConf
 
+import vagen.custom_advantage  # noqa: F401  registers the estimators these lists read
+from vagen.custom_advantage import CRITIC_ESTIMATORS, TRAJECTORY_ESTIMATORS
 from vagen.trainer.logic import IGNORE_RETURN
 from vagen.trainer.mixin import VagenV0Mixin
+
+#: Read from the registry, never listed. A parametrize list that goes stale keeps
+#: passing while quietly not covering whatever was added last.
+SPANNING = sorted(TRAJECTORY_ESTIMATORS)
+VALUE_BASED = sorted(CRITIC_ESTIMATORS)
 
 
 # --------------------------------------------------------------------- fakes
@@ -103,7 +110,7 @@ def test_row_local_estimator_is_refused_under_a_splitting_harness(adv, harness):
         t._vagen_check_estimator_spans_the_layout()
 
 
-@pytest.mark.parametrize("adv", ["token_level_gae", "bi_level_gae", "turn_level_gae", "trajectory_grpo"])
+@pytest.mark.parametrize("adv", SPANNING)
 @pytest.mark.parametrize("harness", ["concat", "no_concat", "compact"])
 def test_trajectory_estimators_are_allowed_everywhere(adv, harness):
     """The other half of the claim: these stitch the rows back together, so every policy
@@ -141,14 +148,14 @@ def test_the_guard_reads_the_registry_rather_than_a_local_list():
 
     src = inspect.getsource(VagenLogicMixin._vagen_check_estimator_spans_the_layout)
     assert "spans_rows" in src
-    for name in ("token_level_gae", "bi_level_gae", "trajectory_grpo"):
+    for name in SPANNING:
         assert name not in src, f"{name} is hard-coded in the trainer; read the registry"
 
 
 # ------------------------------------------------------------- critic guard
 
 
-@pytest.mark.parametrize("adv", ["token_level_gae", "bi_level_gae", "turn_level_gae"])
+@pytest.mark.parametrize("adv", VALUE_BASED)
 def test_a_value_based_estimator_without_a_critic_is_refused(adv):
     """★ verl builds a critic from `critic.enable`, and when that is unset it falls back
     to `adv_estimator == "gae"` -- the literal string. Every estimator here fails that
@@ -163,7 +170,7 @@ def test_a_value_based_estimator_without_a_critic_is_refused(adv):
         t._vagen_check_estimator_has_its_critic()
 
 
-@pytest.mark.parametrize("adv", ["token_level_gae", "bi_level_gae", "turn_level_gae"])
+@pytest.mark.parametrize("adv", VALUE_BASED)
 def test_the_same_estimators_pass_with_a_critic(adv):
     import vagen.custom_advantage  # noqa: F401
 

@@ -67,7 +67,7 @@ say "verify"
 PYTHONPATH="$CODE_ROOT/verl:$CODE_ROOT/VAGEN" $PY -c "
 import vagen.custom_advantage, vagen.custom_loss
 from verl.trainer.ppo.core_algos import POLICY_LOSS_REGISTRY, ADV_ESTIMATOR_REGISTRY
-need = {'token_level_gae','turn_level_gae','bi_level_gae'} - set(ADV_ESTIMATOR_REGISTRY)
+need = {'episode_gae','token_level_gae','turn_level_gae','bi_level_gae'} - set(ADV_ESTIMATOR_REGISTRY)
 need |= {'turn_gspo','turn_ppo'} - set(POLICY_LOSS_REGISTRY)
 assert not need, f'missing: {sorted(need)}'
 print('BOOTSTRAP OK')"

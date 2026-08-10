@@ -14,7 +14,11 @@ import re
 
 import pytest
 
-from vagen.custom_advantage import SENTINEL_RETURN_ESTIMATORS, needs_value_mask
+from vagen.custom_advantage import (
+    SENTINEL_RETURN_ESTIMATORS,
+    TRAJECTORY_ESTIMATORS,
+    needs_value_mask,
+)
 from vagen.custom_advantage import trajectory_algos as impl
 
 
@@ -28,10 +32,16 @@ def test_sentinel_estimators_need_value_mask():
     assert needs_value_mask("turn_level_gae") is True
 
 
-@pytest.mark.parametrize("name", ["gae", "grpo", "token_level_gae", "bi_level_gae", "trajectory_grpo"])
+#: Everything that is not sentinel-writing, read from the registry rather than listed --
+#: a list here would go stale the moment an estimator is added, and going stale means
+#: *not testing* the new one while still looking like full coverage.
+PLAIN_ESTIMATORS = ["gae", "grpo"] + sorted(TRAJECTORY_ESTIMATORS - SENTINEL_RETURN_ESTIMATORS)
+
+
+@pytest.mark.parametrize("name", PLAIN_ESTIMATORS)
 def test_plain_estimators_do_not(name):
-    """★ The three we train with supervise every model-output token, so a value_mask
-    would be wrong for them, not merely unnecessary."""
+    """★ These supervise every model-output token, so a value_mask would be wrong for
+    them, not merely unnecessary."""
     assert needs_value_mask(name) is False
 
 
@@ -158,7 +168,7 @@ def test_that_guard_can_fail():
 # --------------------------------------------------- verl 0.8 calling convention
 
 
-ALL_VAGEN_ESTIMATORS = ["token_level_gae", "bi_level_gae", "turn_level_gae", "trajectory_grpo"]
+ALL_VAGEN_ESTIMATORS = sorted(TRAJECTORY_ESTIMATORS)
 
 
 @pytest.mark.parametrize("name", ALL_VAGEN_ESTIMATORS)
