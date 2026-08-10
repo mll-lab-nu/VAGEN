@@ -162,13 +162,6 @@ class GymEnvAdapter:
         return {"role": role, "content": convert_obs_to_content(obs, **self.kwargs), "images": images}
 
 
-# Registered under both names: the dataset emits "gym_agent"
-# (gym_agent_dataset.py) and that is what actually dispatches, via
-# configs/agent_v2.yaml. "gym_agent_v2" is the decorator's own name and
-# nothing selects it -- kept so a config that does still resolves.
-@register("gym_agent")
-@register("gym_agent_v2")
-
 def resolve_reward_placement(config, configured: str = "auto") -> str:
     """Where a turn's scores are paid, resolved from the advantage estimator by default.
 
@@ -192,6 +185,13 @@ def resolve_reward_placement(config, configured: str = "auto") -> str:
     estimator = algorithm.get("adv_estimator", "") if hasattr(algorithm, "get") else ""
     return "turn_end" if wants_turn_lumped_reward(estimator) else "per_span"
 
+
+# Registered under both names: the dataset emits "gym_agent"
+# (gym_agent_dataset.py) and that is what actually dispatches, via
+# configs/agent_v2.yaml. "gym_agent_v2" is the decorator's own name and
+# nothing selects it -- kept so a config that does still resolves.
+@register("gym_agent")
+@register("gym_agent_v2")
 class GymLoop(VagenGymAgentLoopBase):
     """Runner + harness + client. The mode comes from config, not from the class."""
 
