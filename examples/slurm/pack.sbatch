@@ -9,7 +9,7 @@
 #
 #   RUNS='name1|env|est|lam|loss|lam_low|harness|extra   name2|...' \
 #     sbatch --account=$SLURM_ACCOUNT --qos=$GPU_QOS --nodes=1 \
-#            --gpus-per-node=$GPU_TYPE:8 --cpus-per-task=96 --mem=800G \
+#            --gpus-per-node=$GPU_TYPE:8   # 8 = the whole node; two 4-GPU runs --cpus-per-task=96 --mem=800G \
 #            --time=48:00:00 --requeue examples/slurm/pack.sbatch
 #
 # One pipe-separated record per run, whitespace between records. Empty fields are allowed
@@ -17,7 +17,10 @@
 set -uo pipefail
 : "${CODE_ROOT:?}" "${DATA_ROOT:?}" "${RUNS:?set RUNS to the pipe-separated run list}"
 G=${GPUS_PER_RUN:-4}
-HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# Not $BASH_SOURCE: Slurm copies the batch script into /var/spool/slurmd/job<id>/ before
+# running it, so the script's own path says nothing about where the repo is.
+TRAIN=$CODE_ROOT/VAGEN/examples/slurm/train.sbatch
+[ -f "$TRAIN" ] || { echo "no train.sbatch at $TRAIN -- is CODE_ROOT right?"; exit 1; }
 
 i=0
 for rec in $RUNS; do
@@ -29,7 +32,7 @@ for rec in $RUNS; do
   EXP_NAME=$name ENV_NAME=$env ADV_EST=$est LAM=$lam \
   LOSS_MODE=$loss LAM_LOW=$low HARNESS=${harness:-concat} EXTRA_ARGS=$extra \
   STATE_REWARD=off \
-    bash "$HERE/train.sbatch" &
+    bash "$TRAIN" &
   i=$((i + 1))
   # Stagger: several Ray clusters coming up at once contend for ports and shared memory,
   # and the first one to start warms the weights in page cache for the rest.
