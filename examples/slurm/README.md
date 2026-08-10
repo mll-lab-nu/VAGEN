@@ -75,11 +75,19 @@ Two constraints that are not obvious and do not fail cleanly:
 
 | variant | `ADV_EST` | `LOSS_MODE` | `LAM` | `LAM_LOW` |
 |---|---|---|---|---|
+| **baseline** | `episode_gae` | *(vanilla)* | 1.0 | |
 | token-level | `token_level_gae` | *(vanilla)* | 1.0 | |
 | turn-level  | `turn_level_gae`  | `turn_gspo` | 0.95 | |
 
 per-token clock and a per-turn clock disagree by `gamma ** turn_length`, which is a factor
 set by how much the model wrote rather than by anything in the config.
+
+`episode_gae` is the control the other three are read against: the same recursion, the
+same critic, the same `lam`, with the episode's whole reward lumped onto its last token
+instead of left where it was earned. That is what single-turn RLHF does, so the gap
+between it and `token_level_gae` is the value of per-token placement, and the gap to
+whatever it is being compared with -- it stitches rows like the others, so `no_concat`
+and `compact` are both fair.
 
 `lam_low=1.0` is not a tuning choice. The turn-level signal reaches a token `d` positions
 before the turn's end with weight `lam_low ** d`, so `0.95` delivers it to the last ~20
@@ -101,3 +109,12 @@ has three cells rather than six.
   AF_UNIX caps the whole path at 107 bytes.
 * **`TORCH_CUDA_ARCH_LIST`.** Unset, torch compiles the CUDA extensions for every
   architecture -- 30+ minutes before the first step, paid per job.
+* **A job's liveness is `run.log`'s mtime, not its Slurm state.** `pack.sbatch` keeps
+  running while the training processes under it are dead or wedged, so `squeue` reports
+  `RUNNING` indefinitely and tailing the wrapper's stdout shows fresh lines from the
+  wrapper itself. Check `stat -c %y $OUT/run.log` against the wall clock; a step is
+  ~90-215 s depending on the context policy, so anything over ~15 minutes stale is hung.
+* **Never pack `no_concat` with anything.** It emits one row per turn against `concat`'s
+  one per episode and runs ~2.4x slower per step, so a co-scheduled partner finishes
+  hours early and its half of the node sits idle for the rest. Give it a node to itself,
+  or pair it with another `no_concat` run.
