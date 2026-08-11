@@ -14,7 +14,7 @@ length one -- so no estimator here needs a per-policy branch.
   is part of the state, never an action, and the recursion steps over it. The recursion
   also carries across row boundaries, which is the only thing that makes one estimator
   cover all three policies (see below).
-* ``bi_level_gae`` -- the same token-level chain with a second lambda at turn boundaries.
+* ``bi_level_gae_varlam`` -- the same token-level chain with a second lambda at turn boundaries.
 * ``turn_level_gae`` -- one decision per turn instead of per token.
 * ``trajectory_grpo`` -- one advantage for the whole trajectory, normalised against the other
   trajectories of its prompt group and broadcast to all of its tokens.
@@ -241,7 +241,7 @@ def _backward_gae(seq_r, seq_v, valid, gamma: float, lam) -> torch.Tensor:
 
     ``lam`` is either a scalar -- plain token-level GAE -- or a tensor the shape of the
     sequences, which is Sutton & Barto's variable-lambda return and is what separates
-    ``bi_level_gae`` from ``token_level_gae``.
+    ``bi_level_gae_varlam`` from ``token_level_gae``.
 
     Padding sits on the right, so the first steps of the loop must leave the recursion
     untouched rather than folding zeros into it.
@@ -310,7 +310,7 @@ def compute_episode_gae(inputs: AdvantageInputs):
     keeps the three context policies comparable, and is the reason this is a registered
     estimator rather than a config flag.
 
-    ★ No seam handling, deliberately. ``bi_level_gae`` forces ``lambda = 1`` at a
+    ★ No seam handling, deliberately. ``bi_level_gae_varlam`` forces ``lambda = 1`` at a
     compaction seam because a seam is not an environment transition. This does not, for
     the same reason it does not distinguish turns: a baseline that quietly imports the
     fixes gets credit for them. At the recommended ``gamma = 1, lam = 1`` the question is
@@ -400,9 +400,23 @@ def _is_turn_boundary(index: torch.Tensor, valid: torch.Tensor, width: int) -> t
     return boundary | _last_valid(valid)
 
 
-@advantage_estimator("bi_level_gae", needs_critic=True, undiscounted=True)
-def compute_bi_level_gae(inputs: AdvantageInputs):
+@advantage_estimator("bi_level_gae_varlam", needs_critic=True, undiscounted=True)
+def compute_bi_level_gae_varlam(inputs: AdvantageInputs):
     """GAE with one lambda inside a turn and another across turns.
+
+    ★ **Superseded, and it failed in every run.** ``bi_level_gae`` is now the published
+    VAGEN algorithm; this is the variable-lambda variant that used to hold that name.
+    Kept under an explicit name rather than deleted, because its two limits are exact and
+    the tests that pin them are the clearest statement of what the bi-level idea *is*.
+
+    Do not reach for it without a reason. Measured on Sokoban at ``lam_low=1.0``, twice:
+    success 0.277 -> 0.102 with response length 486 -> 1975 in the pre-fix environment,
+    and 0.152 -> 0.457 -> **0.000** with length 563 -> 2567 in the fixed one, ending in
+    pure degenerate repetition with 0% of responses containing an ``<answer>`` at all.
+    The mechanism is visible in the design: at ``lam_low = 1`` every token of a turn
+    receives the same turn credit, so nothing inside a turn distinguishes a short answer
+    from a long one, and with no KL term (the sweep runs ``kl_coef=0``) there is nothing
+    else holding length down.
 
     The two views of a multi-turn episode -- one step per token, one step per turn --
     optimise the same objective when gamma is 1, so neither is more correct; they differ
@@ -442,7 +456,7 @@ def compute_bi_level_gae(inputs: AdvantageInputs):
        for a turn-level chain used *on its own*, where the afterstate anchor gives exactly
        zero gradient on every non-final token of a turn (relative error 0.949). It does
        **not** describe a defect of the released composite, where the anchor cancels
-       against the inner pass exactly -- see ``bi_level_gae_paper``, which measures this.
+       against the inner pass exactly -- see ``bi_level_gae``, which measures this.
        The earlier figure of 0.177 quoted here belonged to a different defect entirely (a
        mid-turn reward credited by both chains) and had been transplanted onto the anchor.
     2. the turn advantage is **added** to the last token's own delta rather than
@@ -479,7 +493,7 @@ def compute_bi_level_gae(inputs: AdvantageInputs):
     ``AlgoConfig`` has no such field, so it has to be added from the command line with
     hydra's append syntax::
 
-        algorithm.adv_estimator=bi_level_gae +algorithm.lam_low=0.95
+        algorithm.adv_estimator=bi_level_gae_varlam +algorithm.lam_low=0.95
     """
     gamma = float(inputs.config.gamma)
     lam_high = float(inputs.config.lam)
@@ -501,7 +515,7 @@ def compute_bi_level_gae(inputs: AdvantageInputs):
         # across a turn boundary, where it is least. Bootstrapping *harder* on the less
         # reliable side is a choice worth making on purpose.
         logger.warning(
-            "bi_level_gae: lam_low=%s < lam=%s. lam_low bootstraps within a turn and lam "
+            "bi_level_gae_varlam: lam_low=%s < lam=%s. lam_low bootstraps within a turn and lam "
             "across turns, so this trusts the critic more across a turn boundary than "
             "inside one -- the opposite of the usual reason for two lambdas. The "
             "recommended setting is lam_low=1.0.", lam_low, lam_high,
@@ -527,11 +541,11 @@ def compute_bi_level_gae(inputs: AdvantageInputs):
         )
 
 
-@advantage_estimator("bi_level_gae_paper", needs_critic=True, turn_lumped_reward=True)
-def compute_bi_level_gae_paper(inputs: AdvantageInputs):
+@advantage_estimator("bi_level_gae", needs_critic=True, turn_lumped_reward=True)
+def compute_bi_level_gae(inputs: AdvantageInputs):
     """The **published** VAGEN Bi-Level GAE, reproduced as released rather than as fixed.
 
-    ``bi_level_gae`` above is this algorithm with three corrections. This is the thing
+    ``bi_level_gae_varlam`` above is this algorithm with three corrections. This is the thing
     those corrections were made to, kept so the difference can be measured instead of
     argued about. Ported from the released implementation
     (``compute_bi_level_gae_advantage_return``, commit 4076507 in this repo's own
@@ -597,7 +611,7 @@ def compute_bi_level_gae_paper(inputs: AdvantageInputs):
     mid-turn is invisible to the outer chain and credited by the inner one alone.
 
     ★ Two clocks, two gammas -- ``gamma`` for tokens, ``+algorithm.high_level_gamma`` for
-    turns. Unlike ``bi_level_gae`` this is therefore well-defined away from 1.0, which is
+    turns. Unlike ``bi_level_gae_varlam`` this is therefore well-defined away from 1.0, which is
     why it carries no ``undiscounted`` guard: the released code takes the two separately
     and the paper's Table 23 sets the token one to 1.0. Left unset, ``high_level_gamma``
     follows ``gamma``.
@@ -611,7 +625,7 @@ def compute_bi_level_gae_paper(inputs: AdvantageInputs):
         # started this way is token_level_gae wearing the baseline's name, and the curves
         # give no hint of it.
         logger.warning(
-            "bi_level_gae_paper: high_level_gamma == gamma == %s and lam == 1.0, at which "
+            "bi_level_gae: high_level_gamma == gamma == %s and lam == 1.0, at which "
             "the two passes telescope and this estimator is IDENTICAL to token_level_gae "
             "(verified to 4e-16). The outer chain's V(afterstate) cancels against the "
             "inner chain exactly. Reproducing the published setting means "

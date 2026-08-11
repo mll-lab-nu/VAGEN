@@ -3,7 +3,7 @@
 Placement and estimator are one choice made in two files, which is exactly the shape of
 mistake that does not raise and does not show in a curve:
 
-* an estimator with one reward slot per turn (``bi_level_gae_paper`` reads a turn's reward
+* an estimator with one reward slot per turn (``bi_level_gae`` reads a turn's reward
   only at its last token) credits a mid-turn score twice -- once through the inner token
   chain, once through the outer turn chain;
 * the per-token estimators pay variance for a lumped score, because ``V`` then has to
@@ -42,10 +42,10 @@ def _cfg(estimator):
     "estimator,expected",
     [
         # The one estimator whose outer chain has a single reward slot per turn.
-        ("bi_level_gae_paper", "turn_end"),
+        ("bi_level_gae", "turn_end"),
         # Everything else supervises per token and wants the score where it was earned.
         ("token_level_gae", "per_span"),
-        ("bi_level_gae", "per_span"),
+        ("bi_level_gae_varlam", "per_span"),
         ("turn_level_gae", "per_span"),
         ("episode_gae", "per_span"),
         ("trajectory_grpo", "per_span"),
@@ -66,7 +66,7 @@ def test_a_typo_in_the_estimator_name_does_not_silently_lump():
 
 def test_an_explicit_setting_overrides_auto():
     assert resolve_reward_placement(_cfg("token_level_gae"), "turn_end") == "turn_end"
-    assert resolve_reward_placement(_cfg("bi_level_gae_paper"), "per_span") == "per_span"
+    assert resolve_reward_placement(_cfg("bi_level_gae"), "per_span") == "per_span"
 
 
 def test_a_missing_algorithm_block_does_not_explode():

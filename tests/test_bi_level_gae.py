@@ -1,4 +1,4 @@
-"""``bi_level_gae_paper`` -- the published VAGEN Bi-Level GAE, reproduced as released.
+"""``bi_level_gae`` -- the published VAGEN Bi-Level GAE, reproduced as released.
 
 The point of this estimator is fidelity, so the load-bearing test is differential:
 ``_released`` below is ``compute_bi_level_gae_advantage_return`` copied verbatim out of
@@ -6,7 +6,7 @@ this repo's own history (commit 4076507), and the vectorised implementation has 
 with it token for token. Everything else here pins a property that would otherwise only
 be visible by reading that loop.
 
-Why a reproduction at all: ``bi_level_gae`` is this algorithm with three corrections
+Why a reproduction at all: ``bi_level_gae_varlam`` is this algorithm with three corrections
 (anchor at the turn's first token, add rather than overwrite, no intra-turn reset). Those
 corrections are worth what they measure, and they can only be measured against the thing
 they were made to.
@@ -170,7 +170,7 @@ def test_matches_the_released_implementation_token_for_token(gamma, lam, high):
         loss_mask=batch["response_mask"],
         gamma=gamma, lam=lam, high_level_gamma=high,
     )
-    got_adv, got_ret, _ = _call("bi_level_gae_paper", layout, gamma=gamma, lam=lam, high_level_gamma=high)
+    got_adv, got_ret, _ = _call("bi_level_gae", layout, gamma=gamma, lam=lam, high_level_gamma=high)
 
     # Returns, and the advantage *before* whitening (`return - V`, which is what both
     # implementations actually compute). Exact equality, not a tolerance: same recursion,
@@ -187,9 +187,9 @@ def test_matches_the_released_implementation_token_for_token(gamma, lam, high):
 def test_high_level_gamma_follows_gamma_when_unset():
     """Left unset it must not silently become 1.0 (or 0.0); it follows the token gamma,
     which is what a single-gamma config expects."""
-    a, b = (_call("bi_level_gae_paper", _concat(), gamma=0.97, lam=0.9, high_level_gamma=g)
+    a, b = (_call("bi_level_gae", _concat(), gamma=0.97, lam=0.9, high_level_gamma=g)
             for g in (0.97, 0.5))
-    default, _, mask = _call("bi_level_gae_paper", _concat(), gamma=0.97, lam=0.9)
+    default, _, mask = _call("bi_level_gae", _concat(), gamma=0.97, lam=0.9)
     assert _at(default, mask) == pytest.approx(_at(a[0], mask))
     assert _at(default, mask) != pytest.approx(_at(b[0], mask))
 
@@ -200,14 +200,14 @@ def test_high_level_gamma_follows_gamma_when_unset():
 def test_a_turns_last_token_gets_the_turn_advantage_and_not_its_own_delta():
     """★ The overwrite. At a turn end the released code zeroes both the bootstrap and the
     accumulator, so ``delta = (A_turn + V) - V = A_turn`` exactly -- that token's own
-    delta is discarded rather than added. ``bi_level_gae`` adds instead, which is the
+    delta is discarded rather than added. ``bi_level_gae_varlam`` adds instead, which is the
     single line the two differ by at ``lam_low=1``.
 
     Checked on `returns`, which is unwhitened: ``return = A_turn + V(eos)`` is the turn's
     own return, so the last turn's must be its reward plus nothing, 1.0, because it
     bootstraps from zero.
     """
-    _, ret, mask = _call("bi_level_gae_paper", _concat(1), gamma=1.0, lam=1.0, high_level_gamma=1.0)
+    _, ret, mask = _call("bi_level_gae", _concat(1), gamma=1.0, lam=1.0, high_level_gamma=1.0)
     at = _at(ret, mask)
     # Final turn (one token, reward 1.0, bootstrap 0): A = 1.0 - 0.85, return = 1.0.
     assert at[-1] == pytest.approx(1.0)
@@ -229,7 +229,7 @@ def test_each_turns_inner_chain_is_independent():
 
     def run(scores):
         layout = ([scores], [MASK], [VALUES], ["g"], [0], [0])
-        _, ret, mask = _call("bi_level_gae_paper", layout, gamma=1.0, lam=0.0, high_level_gamma=0.0)
+        _, ret, mask = _call("bi_level_gae", layout, gamma=1.0, lam=0.0, high_level_gamma=0.0)
         return _at(ret, mask)
 
     # lam=0 and high_level_gamma=0 sever the outer chain entirely: with no discounting of
@@ -243,8 +243,8 @@ def test_each_turns_inner_chain_is_independent():
 def test_it_is_not_the_corrected_estimator():
     """The two must actually differ on the same input, or the comparison the sweep is
     running has nothing to measure."""
-    paper, _, mask = _call("bi_level_gae_paper", _concat(), gamma=1.0, lam=0.95, high_level_gamma=1.0)
-    fixed, _, _ = _call("bi_level_gae", _concat(), gamma=1.0, lam=0.95, lam_low=1.0)
+    paper, _, mask = _call("bi_level_gae", _concat(), gamma=1.0, lam=0.95, high_level_gamma=1.0)
+    fixed, _, _ = _call("bi_level_gae_varlam", _concat(), gamma=1.0, lam=0.95, lam_low=1.0)
     assert _at(paper, mask) != pytest.approx(_at(fixed, mask))
 
 
@@ -252,8 +252,8 @@ def test_the_two_layouts_agree():
     """It must not be a concat-only algorithm. The released code is: it takes one row and
     opens it at ``nextvalues=0``, so under no_concat every turn would be its own episode.
     Running it through the packing is the one thing here that is not a straight port."""
-    a_concat, r_concat, m_concat = _call("bi_level_gae_paper", _concat(1), lam=0.9)
-    a_split, r_split, m_split = _call("bi_level_gae_paper", _split(), lam=0.9)
+    a_concat, r_concat, m_concat = _call("bi_level_gae", _concat(1), lam=0.9)
+    a_split, r_split, m_split = _call("bi_level_gae", _split(), lam=0.9)
     assert _at(r_concat, m_concat) == pytest.approx(_at(r_split, m_split))
     assert _at(a_concat, m_concat) == pytest.approx(_at(a_split, m_split))
 
@@ -263,12 +263,12 @@ def test_registry_declarations():
         TRAJECTORY_ESTIMATORS, UNDISCOUNTED_ESTIMATORS, needs_critic, needs_value_mask,
     )
 
-    assert "bi_level_gae_paper" in TRAJECTORY_ESTIMATORS
-    assert needs_critic("bi_level_gae_paper") is True
-    assert needs_value_mask("bi_level_gae_paper") is False
-    # ★ Two explicit gammas, so unlike bi_level_gae it is well-defined away from 1.0 and
+    assert "bi_level_gae" in TRAJECTORY_ESTIMATORS
+    assert needs_critic("bi_level_gae") is True
+    assert needs_value_mask("bi_level_gae") is False
+    # ★ Two explicit gammas, so unlike bi_level_gae_varlam it is well-defined away from 1.0 and
     # must NOT be caught by the single-clock startup assertion.
-    assert "bi_level_gae_paper" not in UNDISCOUNTED_ESTIMATORS
+    assert "bi_level_gae" not in UNDISCOUNTED_ESTIMATORS
 
 
 # ------------------------------------------------- the fact that decides the experiment
@@ -284,7 +284,7 @@ def test_it_is_token_level_gae_when_the_two_clocks_agree():
     token-level baseline wearing the paper baseline's name -- which is exactly how the
     first three `bi_level_new` jobs were launched on 2026-08-10.
     """
-    paper, _, mask = _call("bi_level_gae_paper", _concat(), gamma=1.0, lam=1.0, high_level_gamma=1.0)
+    paper, _, mask = _call("bi_level_gae", _concat(), gamma=1.0, lam=1.0, high_level_gamma=1.0)
     token, _, _ = _call("token_level_gae", _concat(), gamma=1.0, lam=1.0)
     assert _at(paper, mask) == pytest.approx(_at(token, mask), abs=1e-12)
 
@@ -295,7 +295,7 @@ def test_the_published_settings_are_genuinely_a_different_algorithm(high, floor)
     ``high_level_gamma=0.99`` and the released sokoban script ``0.9``, which is where the
     estimator earns its name. The floors are loose on purpose: the claim is that the gap
     is real and grows as the clocks separate, not that it has a particular size."""
-    paper, _, mask = _call("bi_level_gae_paper", _concat(), gamma=1.0, lam=1.0, high_level_gamma=high)
+    paper, _, mask = _call("bi_level_gae", _concat(), gamma=1.0, lam=1.0, high_level_gamma=high)
     token, _, _ = _call("token_level_gae", _concat(), gamma=1.0, lam=1.0)
     gap = max(abs(a - b) for a, b in zip(_at(paper, mask), _at(token, mask)))
     assert gap > floor, f"high_level_gamma={high} is indistinguishable from token_level_gae"
@@ -307,10 +307,10 @@ def test_the_degenerate_setting_warns(caplog):
     import logging
 
     with caplog.at_level(logging.WARNING):
-        _call("bi_level_gae_paper", _concat(), gamma=1.0, lam=1.0, high_level_gamma=1.0)
+        _call("bi_level_gae", _concat(), gamma=1.0, lam=1.0, high_level_gamma=1.0)
     assert any("IDENTICAL to token_level_gae" in r.message for r in caplog.records)
 
     caplog.clear()
     with caplog.at_level(logging.WARNING):
-        _call("bi_level_gae_paper", _concat(), gamma=1.0, lam=1.0, high_level_gamma=0.9)
+        _call("bi_level_gae", _concat(), gamma=1.0, lam=1.0, high_level_gamma=0.9)
     assert not any("IDENTICAL" in r.message for r in caplog.records)

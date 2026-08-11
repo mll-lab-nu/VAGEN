@@ -78,9 +78,9 @@ Two constraints that are not obvious and do not fail cleanly:
 | **baseline** | `episode_gae` | *(vanilla)* | 1.0 | |
 | token-level | `token_level_gae` | *(vanilla)* | 1.0 | |
 | turn-level  | `turn_level_gae`  | `turn_gspo` | 0.95 | |
-| bi-level    | `bi_level_gae`    | `turn_gspo` | 0.95 | 1.0 |
+| bi-level    | `bi_level_gae_varlam`    | `turn_gspo` | 0.95 | 1.0 |
 
-`gamma` is 1.0 throughout and the trainer refuses anything else for `bi_level_gae`: a
+`gamma` is 1.0 throughout and the trainer refuses anything else for `bi_level_gae_varlam`: a
 per-token clock and a per-turn clock disagree by `gamma ** turn_length`, which is a factor
 set by how much the model wrote rather than by anything in the config.
 
@@ -88,7 +88,7 @@ set by how much the model wrote rather than by anything in the config.
 same critic, the same `lam`, with the episode's whole reward lumped onto its last token
 instead of left where it was earned. That is what single-turn RLHF does, so the gap
 between it and `token_level_gae` is the value of per-token placement, and the gap to
-`bi_level_gae` is the value of the turn structure on top. Run it in the same layout as
+`bi_level_gae_varlam` is the value of the turn structure on top. Run it in the same layout as
 whatever it is being compared with -- it stitches rows like the others, so `no_concat`
 and `compact` are both fair.
 

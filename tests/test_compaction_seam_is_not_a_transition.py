@@ -5,7 +5,7 @@ to summarise, writes one, and the next conversation opens on the *same* world st
 model emissions are separated by that seam -- the summary and the next action -- so the
 token stream shows two turn endings where one environment transition happened.
 
-``bi_level_gae`` spends ``algorithm.lam`` crossing a turn. Spending it at the seam too
+``bi_level_gae_varlam`` spends ``algorithm.lam`` crossing a turn. Spending it at the seam too
 attenuates credit by ``lam ** 2`` where an ordinary turn costs ``lam``, and how often
 that happens is set by how often the policy compacts, which is set by how much it writes.
 The effective horizon then moves as the policy's verbosity moves, which is not a
@@ -114,7 +114,7 @@ def test_an_absent_column_means_no_seams_rather_than_an_error():
 # ------------------------------------------------------------------ what it buys
 
 def _lambdas(ends_with_summary, lam_low, lam_high):
-    """The per-position lambda `bi_level_gae` builds, as the estimator builds it."""
+    """The per-position lambda `bi_level_gae_varlam` builds, as the estimator builds it."""
     packed = _pack(_Inputs(_compact_layout(), ends_with_summary))
     seq_lam = torch.where(packed.boundary(), lam_high, lam_low)
     return torch.where(packed.seam(ends_with_summary), 1.0, seq_lam)[0]
@@ -186,14 +186,14 @@ def test_more_compactions_do_not_mean_less_credit():
 
 def test_bi_level_gae_actually_spends_the_seam_lambda():
     """★ Everything above tests that the seam is *computed*. This tests that it is
-    *used*: deleting the one line in ``compute_bi_level_gae`` that consults it leaves
+    *used*: deleting the one line in ``compute_bi_level_gae_varlam`` that consults it leaves
     every other test in this file green, because they all reach the helper directly.
 
     A reward at the end of the episode, no values, lam_low=1: the advantage at the
     episode's first token is then exactly the reward times whatever lambdas were spent
     getting there. Flagging the seam must make more of it survive.
     """
-    from vagen.custom_advantage.trajectory_algos import compute_bi_level_gae
+    from vagen.custom_advantage.trajectory_algos import compute_bi_level_gae_varlam
 
     mask = _compact_layout()
     rewards = torch.zeros(mask.shape, dtype=torch.float32)
@@ -223,10 +223,10 @@ def test_bi_level_gae_actually_spends_the_seam_lambda():
 
     # And the estimator itself must produce the same difference, which is the part a
     # helper-level test cannot see.
-    a = compute_bi_level_gae(_Inputs(mask, [True, False], rewards=rewards))
-    b = compute_bi_level_gae(_Inputs(mask, [False, False], rewards=rewards))
+    a = compute_bi_level_gae_varlam(_Inputs(mask, [True, False], rewards=rewards))
+    b = compute_bi_level_gae_varlam(_Inputs(mask, [False, False], rewards=rewards))
     assert not torch.allclose(a.advantages, b.advantages), (
-        "compute_bi_level_gae ignores the seam flag -- the advantage is identical "
+        "compute_bi_level_gae_varlam ignores the seam flag -- the advantage is identical "
         "whether or not the row ended at a compaction"
     )
 

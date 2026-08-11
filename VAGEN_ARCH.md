@@ -35,7 +35,7 @@ sections, substitute:
 | `CompactHarness` | ✅ built, with the budget arithmetic in `harness/budget.py` |
 | Token accounting / budget checks | ✅ built 2026-08-06. See §12 |
 | Image placeholder ↔ frame alignment | ✅ built 2026-08-06. `utils/image_token_utils.py` |
-| Algorithm layer | ✅ `episode_gae` (baseline), `token_level_gae`, `bi_level_gae`, `turn_level_gae`, `trajectory_grpo`, all on `TrajectoryView`. `no_concat_gae` deleted 2026-08-08; `episode_gae` added 2026-08-09; `bi_level_gae_paper` (the released VAGEN algorithm, for reproduction) 2026-08-10 |
+| Algorithm layer | ✅ `episode_gae` (baseline), `token_level_gae`, `bi_level_gae_varlam`, `turn_level_gae`, `trajectory_grpo`, all on `TrajectoryView`. `no_concat_gae` deleted 2026-08-08; `episode_gae` added 2026-08-09; `bi_level_gae` (the released VAGEN algorithm, for reproduction) 2026-08-10 |
 | Row-local estimator under a splitting harness | ✅ refused at startup (`_vagen_check_estimator_spans_the_layout`) |
 | VLM beyond Qwen | ✅ Qwen / LLaVA / InternVL all training |
 | Compact loss reweighting | ❌ deferred, algorithm layer |
@@ -584,8 +584,8 @@ def turn_gae(v: BatchView, cfg):
     return adv, ret
 
 
-@register_algo("bi_level_gae", needs_critic=True)
-def bi_level_gae(v: BatchView, cfg):
+@register_algo("bi_level_gae_varlam", needs_critic=True)
+def bi_level_gae_varlam(v: BatchView, cfg):
     """High level: turn_gae over the turn sequence.
     Low level:  per-token GAE inside each turn, using the turn advantage as its
                 terminal bootstrap.
@@ -698,7 +698,7 @@ Engineer-days for one person familiar with the codebase, **tests included**.
 | **2** | VLM generalization: make `utils/tokenizer.py:227`'s silent failure a hard error, add the `get_rope_index` fallback, get InternVL training, upstream the patch | **2** | low · **parallelizable with 3–5** |
 | **3** | Package split + `core/ports.py` + `TokenTape` + T2 contract tests | **3.5** | low |
 | **4** | `BaseHarness` + Concat/NoConcat + `EpisodeRunner`; split `terminated`/`truncated` across envs; merge the two gym agent loops | **4** | medium |
-| **5** | Algorithm layer: `BatchView` + registry; port `no_concat_gae` (338) → `turn_gae` (~20); add `token_gae` and `bi_level_gae` | **3** | medium |
+| **5** | Algorithm layer: `BatchView` + registry; port `no_concat_gae` (338) → `turn_gae` (~20); add `token_gae` and `bi_level_gae_varlam` | **3** | medium |
 | | | **21–23** | |
 
 ### Phase 0 — status (2026-08-02)

@@ -277,7 +277,7 @@ def test_token_gae_runs_without_a_turn_column():
 
 # ------------------------------------------------------------------- bi-level GAE
 
-BILEVEL = get_adv_estimator_fn("bi_level_gae")
+BILEVEL = get_adv_estimator_fn("bi_level_gae_varlam")
 
 
 class _BiCfg(_Cfg):
@@ -379,7 +379,7 @@ def test_bilevel_supervises_every_token_so_needs_no_value_mask():
         config=cfg,
     )
 
-    assert needs_value_mask("bi_level_gae") is False
+    assert needs_value_mask("bi_level_gae_varlam") is False
     assert float(ret.min()) > -1.0, "a sentinel return leaked into the output"
 
 

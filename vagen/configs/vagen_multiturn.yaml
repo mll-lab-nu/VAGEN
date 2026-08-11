@@ -70,7 +70,7 @@ trainer:
     # Where a turn's scores are paid: auto | turn_end | per_span.
     #
     # ★ auto resolves it from `algorithm.adv_estimator`, and should stay that way. An
-    # estimator whose outer chain has one reward slot per turn (bi_level_gae_paper) reads
+    # estimator whose outer chain has one reward slot per turn (bi_level_gae) reads
     # a turn's reward only at the turn's last token, so a score paid mid-turn is credited
     # twice -- measured bias 0.177. The per-token estimators want the opposite (-28%
     # variance at lam 0.9 from per-span). Neither mistake raises or shows in a curve, so
