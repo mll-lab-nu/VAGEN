@@ -2,7 +2,17 @@ envs:
   - name: SpatialGym          # registered env name in env_registry.yaml
     n_envs: 50
     data_source: spatial_gym           # nickname for logging
-    seed: [0, 49, 1]         # sample n_envs seeds from seed[0] to seed[1], each used at most seed[2] times
+    # Unlike frozenlake/sokoban, the seed here is not a generator seed -- it is an index
+    # into a fixed dataset. ImageHandler.load_data resolves it as `run{seed:02d}` under
+    # data_dir and asserts the directory exists, so the range cannot exceed what was
+    # downloaded. yw12356/spatial_gym_dataset ships run00..run19; this takes the first 16
+    # and leaves run16..run19 to val_spatial_gym_vision.yaml.
+    #
+    # Third element is 4 rather than 1 because 16 rooms cannot fill n_envs=50 at one use
+    # each -- the dataset builder raises "seed range with given limit cannot supply enough
+    # unique seeds" -- so each room is drawn up to 4 times. The repeats are the same room
+    # from the same start; they differ only in what the policy samples.
+    seed: [0, 15, 4]         # sample n_envs seeds from seed[0] to seed[1], each used at most seed[2] times
     max_turns: 11              # max interaction turns (15 explore steps + 1 cogmap turn)
     # Below data.max_response_length (2000). Above it, the loop clamps per_turn up
     # to the region, and the derived observation ceiling collapses with it.
