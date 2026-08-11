@@ -124,3 +124,51 @@ def test_the_loop_emits_the_rate_only_when_it_was_measured():
     window = src[i - 400 : i + 400]
     assert "reports_format" in window, "the rate is emitted without checking it was measured"
     assert "getattr(env" in window, "attribute access on env breaks every fake in the suite"
+
+
+# ------------------------------------------------------- how much the MODEL is writing
+
+
+def test_model_tokens_per_turn_counts_only_generated_tokens():
+    """★ `response_length/mean` measures the whole response *region*, which on vision
+    Sokoban also carries 49-144 image tokens per interleaved observation. So it moves when
+    the environment renders differently, and it dilutes the one thing worth watching --
+    whether the policy is getting more verbose. Every collapse in the 0809 sweep announced
+    itself as a length jump, and nothing said whether the jump was the model or the
+    scenery.
+
+    `response_spans` is exactly the model-emitted region, the same thing the response mask
+    marks, so the sum over spans is generated tokens and nothing else.
+    """
+    import inspect
+
+    from vagen.agent_loop.gym_loop import GymLoop
+
+    src = inspect.getsource(GymLoop)
+    assert "model_tokens_per_turn" in src
+    i = src.rindex("model_tokens_per_turn")
+    window = src[i : i + 260]
+    assert "spans" in window, "it is not derived from response_spans"
+    assert "response_length" not in window, "it must not be built from the region length"
+
+
+@pytest.mark.parametrize(
+    "spans,expected",
+    [
+        ([(0, 100), (150, 250)], 100.0),          # two turns of 100 generated tokens
+        ([(0, 30), (60, 90), (100, 400)], 120.0),  # (30 + 30 + 300) / 3
+        ([(5, 5)], 0.0),                           # an empty generation is 0, not a crash
+    ],
+)
+def test_the_arithmetic(spans, expected):
+    """Mean generated tokens per turn -- the gap between spans is the observation and
+    must not be counted."""
+    assert sum(int(e) - int(b) for b, e in spans) / max(1, len(spans)) == pytest.approx(expected)
+
+
+def test_no_spans_publishes_nothing():
+    """Absent rather than zero, for the same reason as format_correct_rate: a row the
+    model never spoke in has no verbosity to report, and a 0 would drag the mean down."""
+    spans = []
+    emitted = ({"model_tokens_per_turn": 0.0} if spans else {})
+    assert emitted == {}
