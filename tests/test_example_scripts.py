@@ -59,10 +59,14 @@ def test_estimators_with_a_required_hyperparameter_set_it(path):
 
 @pytest.mark.parametrize("path", SCRIPTS, ids=lambda p: "/".join(p.split("/")[-2:]))
 def test_state_reward_is_only_switched_on_where_a_spec_exists(path):
-    """★ STATE_REWARD_SPECS has Sokoban and nothing else, and `_maybe_state_reward`
-    raises on a missing spec. Turning it on elsewhere is a run that dies on the first
+    """★ Only Sokoban declares a STATE_REWARD_SPEC, and `_maybe_state_reward`
+    raises when the environment declares none. Turning it on elsewhere is a run that dies on the first
     step."""
-    from vagen.agent_loop.gym_loop import STATE_REWARD_SPECS
+    import vagen.envs.registry as R
+    from vagen.envs.state_reward import state_reward_spec_of
+
+    R._load_registry()
+    STATE_REWARD_SPECS = {n: c for n, c in R._ENV_REGISTRY.items() if state_reward_spec_of(c)}
 
     text = open(path).read()
     if "state_reward" not in text or ".enable=True" not in text:
@@ -87,3 +91,45 @@ def test_the_yaml_it_points_at_exists(path):
         if "$" in val:      # built from a variable; not resolvable here
             continue
         assert os.path.exists(val), f"{path}: {key}={val} does not exist"
+
+
+# --------------------------------------------- an environment declares its own capability
+
+
+def test_the_capability_lives_on_the_environment_not_in_a_table():
+    """★ The point of moving the spec next to the environment.
+
+    `STATE_REWARD_SPECS = {"Sokoban": ...}` in the agent loop meant the loop had to be
+    edited whenever an environment gained the capability, the environment could not be
+    read to find out whether it had it, and a name spelled one way in the registry and
+    another in the table failed only once a run was up. Sokoban now declares
+    `STATE_REWARD_SPEC` and the loop asks the class.
+    """
+    import inspect
+
+    import vagen.agent_loop.gym_loop as loop
+    from vagen.envs.sokoban.sokoban_env import Sokoban
+    from vagen.envs.state_reward import state_reward_spec_of, supports_state_reward
+
+    assert supports_state_reward(Sokoban), "Sokoban no longer declares its spec"
+    assert state_reward_spec_of(Sokoban).object_weights, "the declared spec is empty"
+
+    assert not hasattr(loop, "STATE_REWARD_SPECS"), (
+        "the central table is back; an environment's capability belongs on the environment"
+    )
+    src = inspect.getsource(loop.GymLoop._maybe_state_reward)
+    assert "state_reward_spec_of" in src, "the loop no longer asks the environment class"
+
+
+def test_env_specific_reward_code_is_not_in_the_generic_package():
+    """`vagen/rewards/` is the machinery -- judge client, F1, spans, wrapper. Anything
+    that knows what a *box* is belongs next to the environment that has boxes."""
+    import os
+
+    generic = set(os.listdir("vagen/rewards"))
+    for env_name in ("sokoban", "frozenlake", "navigation", "primitive_skill", "spatial_gym"):
+        assert f"{env_name}.py" not in generic, (
+            f"vagen/rewards/{env_name}.py is environment-specific; move it under "
+            f"vagen/envs/{env_name}/"
+        )
+    assert os.path.exists("vagen/envs/sokoban/state_reward_spec.py")
