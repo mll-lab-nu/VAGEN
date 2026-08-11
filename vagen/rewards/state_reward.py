@@ -35,6 +35,20 @@ TAGS = {"state_estimation": "observation", "transition_prediction": "prediction"
 #: where a turn's scores are paid. See `StateRewardWrapper._place`.
 PLACEMENTS = ("turn_end", "per_span")
 
+#: What a description that looked at nothing already scores. Subtracted before paying.
+#:
+#: ★ `grouped_f1` pays 0.5 for getting one of two axes right and each axis is a 3-way
+#: choice, so merely *naming* a relation scores about a third. Measured over 300 real
+#: Sokoban starts: uniform random 0.334, and the best constant answer ("same", "same") --
+#: which describes nothing and looks at nothing -- 0.391. The reward's usable range was
+#: 0.39 to 1.00, not 0 to 1, and observed model scores of 0.45-0.52 sat barely above it.
+#: That is what "the description is visibly wrong but the reward is high" looks like.
+#:
+#: 0.334 is the uniform-random floor rather than the 0.391 constant-answer floor, so a
+#: policy that finds the most common relation and repeats it still earns a little. Raise
+#: it to 0.391 to take that away too.
+DEFAULT_SCORE_BASE = 0.334
+
 
 @dataclass
 class StateRewardSpec:
@@ -62,6 +76,12 @@ class StateRewardWrapper:
     #: reward name -> weight; only the names present here are asked for and scored
     enabled: dict[str, float] = field(default_factory=dict)
     format_reward: float = 0.1
+    #: Subtracted from each f1 before it is paid, then the remainder is rescaled so a
+    #: perfect description still earns the full weight: ``max(0, (f1 - base)/(1 - base))``.
+    #: Rescaled rather than merely shifted so that `budget` keeps meaning what it says --
+    #: "what a whole episode of perfect description is worth". 0.0 restores the legacy
+    #: reward exactly. See `DEFAULT_SCORE_BASE` for where the number comes from.
+    score_base: float = DEFAULT_SCORE_BASE
     #: "turn_end" -- the whole turn's reward on its last token, which is what an
     #: estimator with one reward slot per turn requires; "per_span" -- each section's
     #: score on the last token of the section that earned it. See `_place`. Resolved from
@@ -168,10 +188,29 @@ class StateRewardWrapper:
             # A description the judge could not structure scores nothing rather than
             # zero-by-default, so an outage reads as absence, not as failure.
             scores[name] = (
-                0.0 if items is None else self.enabled[name] * grouped_f1(items, gold[name], self.spec.object_weights)
+                0.0 if items is None
+                else self.enabled[name] * self._above_base(
+                    grouped_f1(items, gold[name], self.spec.object_weights)
+                )
             )
         scores["format"] = self.format_reward
         return scores
+
+    def _above_base(self, f1: float) -> float:
+        """How much of the description was better than saying something at random.
+
+        ``max(0, (f1 - base) / (1 - base))``. The rescale is what keeps `budget` honest:
+        a perfect description still earns the full weight, so "an episode of perfect
+        description is worth `budget`" stays true. A plain subtraction would quietly cap
+        the achievable auxiliary reward at ``(1 - base)`` of what the config promises.
+
+        Clipped at zero: a description worse than chance is not a debt, it is just worth
+        nothing, and a negative auxiliary reward would push against the task reward.
+        """
+        base = float(self.score_base or 0.0)
+        if base <= 0.0:
+            return f1
+        return max(0.0, (f1 - base) / (1.0 - base))
 
     def _place(self, scored: dict, outcome: float, token_ids, tokenizer) -> list[float]:
         """Pay the turn's scores, either all on its last token or each on its own section.

@@ -25,7 +25,7 @@ from vagen.agent_loop.base import VagenGymAgentLoopBase
 from vagen.agent_loop.obs import _normalize_images, convert_obs_to_content, extract_success
 from vagen.rewards import sokoban as sokoban_spec
 from vagen.rewards.judge import shared_judge
-from vagen.rewards.state_reward import TAGS, StateRewardWrapper
+from vagen.rewards.state_reward import DEFAULT_SCORE_BASE, TAGS, StateRewardWrapper
 from vagen.agent_loop.verl_client import VerlClient
 from vagen.harness import HARNESSES, build_harness
 from vagen.harness.budget import (
@@ -341,6 +341,7 @@ class GymLoop(VagenGymAgentLoopBase):
             judge=shared_judge(cfg["judge_base_url"], cfg["judge_model"]),
             enabled=enabled,
             format_reward=float(cfg.get("format_reward", 0.1)),
+            score_base=float(cfg.get("score_base", DEFAULT_SCORE_BASE)),
             placement=resolve_reward_placement(self.config, str(cfg.get("placement", "auto"))),
         )
     def _summary_request_len(self) -> int:

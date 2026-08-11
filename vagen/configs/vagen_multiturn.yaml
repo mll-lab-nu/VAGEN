@@ -103,6 +103,19 @@ trainer:
     # weights, eight trajectories with traj_success 0 scored up to 2.25, all of it
     # description.
     budget: 0.1
+    # ★ Subtracted from each description's f1 before it is paid, then rescaled so a
+    # perfect description still earns the full budget: max(0, (f1 - base)/(1 - base)).
+    #
+    # grouped_f1 pays 0.5 for one of two axes and each axis is a 3-way choice, so merely
+    # naming a relation scores about a third. Measured over 300 real Sokoban starts:
+    # uniform random 0.334, and the best constant answer -- "same, same", which looks at
+    # nothing -- 0.391. Without this the reward's range was 0.39 to 1.00 and the model's
+    # 0.45-0.52 sat barely above the floor, which is why descriptions that are visibly
+    # wrong were still scoring well.
+    #
+    # 0.0 restores the legacy reward exactly. 0.391 would also take away what a policy
+    # earns by finding the most common relation and repeating it.
+    score_base: 0.334
     # Format is a gate, not a line item. A turn that skipped a section it was asked for
     # scores nothing for the sections it did write, and writing them all pays nothing by
     # itself -- otherwise the budget is not the budget.
