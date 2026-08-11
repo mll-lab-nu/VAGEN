@@ -1,5 +1,5 @@
 #!/bin/bash
-# spatial_gym - gae - ppo_qwen25vl3b
+# navigation - gae - ppo_qwen25vl7b
 #
 # Per-experiment settings only. Everything that makes a VAGEN run work at all lives in
 # vagen/configs/baseline_vllm.flags and is read below -- in particular the two flags that
@@ -14,10 +14,10 @@ set -eo pipefail
 
 V=$(cd "$(dirname "$0")/../../.." && pwd)
 SCRIPTDIR=$(cd "$(dirname "$0")" && pwd)
-PROJECT_NAME=${PROJECT_NAME:-vagen_spatial_gym}
-EXPERIMENT_NAME=${EXPERIMENT_NAME:-ppo_qwen25vl3b}
+PROJECT_NAME=${PROJECT_NAME:-vagen_experiments}
+EXPERIMENT_NAME=${EXPERIMENT_NAME:-navigation_ppo_qwen25vl7b}
 EXPERIMENT_DIR=${EXPERIMENT_DIR:-$V/exps/$PROJECT_NAME/$EXPERIMENT_NAME}
-MODEL=${MODEL:-Qwen/Qwen2.5-VL-3B-Instruct}
+MODEL=${MODEL:-Qwen/Qwen2.5-VL-7B-Instruct}
 mkdir -p "$EXPERIMENT_DIR"
 
 # verl is not installed as a package here; it is the sibling checkout, and it has to
@@ -26,23 +26,21 @@ VERL=${VERL:-$(cd "$V/../verl" 2>/dev/null && pwd)}
 export PYTHONPATH=${VERL:+$VERL:}$V${PYTHONPATH:+:$PYTHONPATH}
 mapfile -t BASE < <(grep -vE '^\s*(#|$)' "$V/vagen/configs/baseline_vllm.flags" | sed "s|\$V|$V|g")
 
-# train_batch_size is 32, not 128: the dataset is n_envs=50 and the loader drops
-# the last partial batch, so 128 yields zero batches and the trainer asserts.
 PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     --config-path="$V/vagen/configs" --config-name=vagen_multiturn \
     hydra.searchpath="[file://$VERL/verl/trainer/config]" \
     data.custom_cls.path="$V/vagen/gym_agent_dataset.py" \
     "${BASE[@]}" \
-    data.train_files="$SCRIPTDIR/train_spatial_gym_vision.yaml" \
-    data.val_files="$SCRIPTDIR/val_spatial_gym_vision.yaml" \
+    data.train_files="$SCRIPTDIR/train_navigation.yaml" \
+    data.val_files="$SCRIPTDIR/val_navigation.yaml" \
     actor_rollout_ref.model.path="$MODEL" \
     critic.model.path="$MODEL" \
     critic.enable=True \
-    algorithm.adv_estimator=vanilla_gae \
+    algorithm.adv_estimator=default_gae \
     trainer.harness=concat \
-    data.train_batch_size=32 \
-    data.max_prompt_length=4000 \
-    data.max_response_length=2000 \
+    data.train_batch_size=128 \
+    data.max_prompt_length=3000 \
+    data.max_response_length=10000 \
     actor_rollout_ref.actor.ppo_mini_batch_size=32 \
     actor_rollout_ref.rollout.n=1 \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
@@ -54,9 +52,9 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     trainer.n_gpus_per_node=8 \
     trainer.nnodes=1 \
     trainer.critic_warmup=0 \
-    trainer.save_freq=5 \
-    trainer.test_freq=2 \
-    trainer.total_training_steps=10 \
+    trainer.save_freq=20 \
+    trainer.test_freq=20 \
+    trainer.total_training_steps=401 \
     trainer.project_name="$PROJECT_NAME" \
     trainer.experiment_name="$EXPERIMENT_NAME" \
     trainer.default_local_dir="$EXPERIMENT_DIR/verl_checkpoints" \

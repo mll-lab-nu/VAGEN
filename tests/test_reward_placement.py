@@ -47,7 +47,7 @@ def _cfg(estimator):
         ("token_level_gae", "per_span"),
         ("bi_level_gae_varlam", "per_span"),
         ("turn_level_gae", "per_span"),
-        ("vanilla_gae", "per_span"),
+        ("default_gae", "per_span"),
         ("trajectory_grpo", "per_span"),
         ("gae", "per_span"),
     ],

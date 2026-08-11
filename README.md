@@ -215,9 +215,9 @@ trainer:
 # time and would drop every turn's credit at the row boundary; the trainer refuses that
 # pairing at startup rather than training on it.
 algorithm:
-  adv_estimator: token_level_gae   # or vanilla_gae | bi_level_gae_varlam | bi_level_gae
+  adv_estimator: token_level_gae   # or default_gae | bi_level_gae_varlam | bi_level_gae
                                    #    | turn_level_gae | trajectory_grpo
-  # vanilla_gae is the vanilla baseline: the episode's whole reward lumped onto its
+  # default_gae is the vanilla baseline: the episode's whole reward lumped onto its
   # last token, which is what single-turn RLHF does. It stitches rows like the others,
   # so it stays comparable under no_concat and compact where verl's `gae` would not.
 

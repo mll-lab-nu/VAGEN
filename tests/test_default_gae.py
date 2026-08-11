@@ -1,4 +1,4 @@
-"""``vanilla_gae`` -- the vanilla baseline the multi-turn estimators are measured against.
+"""``default_gae`` -- the vanilla baseline the multi-turn estimators are measured against.
 
 It is ``token_level_gae`` with one thing changed: the episode's rewards are summed and
 moved to its last model-output token before the recursion runs. Everything here pins
@@ -113,7 +113,7 @@ def test_every_token_is_handed_the_whole_episode_total():
     -- the turn that scored is not distinguished from the turn that did not, and only the
     critic can tell them apart.
     """
-    _, ret, mask = _call("vanilla_gae", _concat(), gamma=1.0, lam=1.0)
+    _, ret, mask = _call("default_gae", _concat(), gamma=1.0, lam=1.0)
     assert _at_tokens(ret, mask) == pytest.approx([TOTAL] * 4)
 
 
@@ -129,9 +129,9 @@ def test_where_the_reward_sat_makes_no_difference():
     """★ The strongest statement of what "lumped" means: three placements of the same
     1.5, byte-identical outputs. If any of the reward were being credited in place, the
     front-loaded layout would not match the back-loaded one."""
-    spread = _call("vanilla_gae", _concat((0.0, MID, 0.0, END)), lam=0.7)
-    up_front = _call("vanilla_gae", _concat((TOTAL, 0.0, 0.0, 0.0)), lam=0.7)
-    at_the_end = _call("vanilla_gae", _concat((0.0, 0.0, 0.0, TOTAL)), lam=0.7)
+    spread = _call("default_gae", _concat((0.0, MID, 0.0, END)), lam=0.7)
+    up_front = _call("default_gae", _concat((TOTAL, 0.0, 0.0, 0.0)), lam=0.7)
+    at_the_end = _call("default_gae", _concat((0.0, 0.0, 0.0, TOTAL)), lam=0.7)
 
     for other in (up_front, at_the_end):
         assert _at_tokens(other[0], other[2]) == pytest.approx(_at_tokens(spread[0], spread[2]))
@@ -142,7 +142,7 @@ def test_the_episode_total_is_conserved():
     """Lumping moves reward, it does not create or destroy any: the first token's return
     is the same as ``token_level_gae`` would give it, since nothing is credited before it
     either way."""
-    _, lumped, mask = _call("vanilla_gae", _concat(), gamma=1.0, lam=1.0)
+    _, lumped, mask = _call("default_gae", _concat(), gamma=1.0, lam=1.0)
     _, per_token, _ = _call("token_level_gae", _concat(), gamma=1.0, lam=1.0)
     assert _at_tokens(lumped, mask)[0] == pytest.approx(_at_tokens(per_token, mask)[0])
 
@@ -152,7 +152,7 @@ def test_only_the_critic_distinguishes_two_tokens():
     values agree must receive the same advantage, however far apart they are and whatever
     happened between them. Whitening is affine, so it preserves the equality."""
     values = [0.10, 0.25, 0.30, 0.25]  # tokens 1 and 3 share a value
-    adv, _, mask = _call("vanilla_gae", _concat(values=values), gamma=1.0, lam=1.0)
+    adv, _, mask = _call("default_gae", _concat(values=values), gamma=1.0, lam=1.0)
     at = _at_tokens(adv, mask)
     assert at[1] == pytest.approx(at[3])
     # ...and the ones that differ in value are genuinely told apart, so the test above is
@@ -163,8 +163,8 @@ def test_only_the_critic_distinguishes_two_tokens():
 def test_lambda_is_honoured():
     """A guard against the recursion silently running at ``lam = 1``, which would make
     most of this file pass for the wrong reason."""
-    strict, _, mask = _call("vanilla_gae", _concat(), lam=1.0)
-    bootstrapped, _, _ = _call("vanilla_gae", _concat(), lam=0.3)
+    strict, _, mask = _call("default_gae", _concat(), lam=1.0)
+    bootstrapped, _, _ = _call("default_gae", _concat(), lam=0.3)
     assert _at_tokens(strict, mask) != pytest.approx(_at_tokens(bootstrapped, mask))
 
 
@@ -189,7 +189,7 @@ def test_under_concat_it_is_exactly_verls_gae():
     produces -- the two agree token for token. Returns, not advantages: ours are whitened
     and verl's are not, and whitening is the trainer's business, not the estimator's."""
     already_lumped = _concat((0.0, 0.0, 0.0, TOTAL))
-    _, mine, mask = _call("vanilla_gae", already_lumped, gamma=1.0, lam=0.9)
+    _, mine, mask = _call("default_gae", already_lumped, gamma=1.0, lam=0.9)
     _, theirs, _ = _verl_gae(already_lumped, gamma=1.0, lam=0.9)
     assert _at_tokens(mine, mask) == pytest.approx(_at_tokens(theirs, mask), rel=1e-5, abs=1e-6)
 
@@ -208,7 +208,7 @@ def test_verls_gae_would_credit_every_row_under_no_concat():
     assert _at_tokens(theirs, mask) == pytest.approx([TOTAL, TOTAL, TOTAL, TOTAL])
 
     # Ours, given the un-lumped episode in the same layout, credits 1.5 once.
-    _, mine, mask = _call("vanilla_gae", _split(), gamma=1.0, lam=1.0)
+    _, mine, mask = _call("default_gae", _split(), gamma=1.0, lam=1.0)
     assert _at_tokens(mine, mask) == pytest.approx([TOTAL] * 4)
     rewards_seen = sum(sum(r) for r in split_and_lumped[0])
     assert rewards_seen == pytest.approx(2 * TOTAL), "verl was handed the episode twice over"
@@ -218,8 +218,8 @@ def test_the_two_layouts_agree():
     """Already covered by the contract battery, restated here because for *this*
     estimator it is a stronger claim than usual: the lump has to be found across rows,
     so a per-row sum would pass every other test in this file and fail this one."""
-    a_concat, r_concat, m_concat = _call("vanilla_gae", _concat(), lam=0.8)
-    a_split, r_split, m_split = _call("vanilla_gae", _split(), lam=0.8)
+    a_concat, r_concat, m_concat = _call("default_gae", _concat(), lam=0.8)
+    a_split, r_split, m_split = _call("default_gae", _split(), lam=0.8)
     assert _at_tokens(a_concat, m_concat) == pytest.approx(_at_tokens(a_split, m_split))
     assert _at_tokens(r_concat, m_concat) == pytest.approx(_at_tokens(r_split, m_split))
 
@@ -228,11 +228,11 @@ def test_the_two_layouts_agree():
 
 
 def test_declares_what_the_trainer_needs_to_know():
-    assert "vanilla_gae" in TRAJECTORY_ESTIMATORS, "must stitch an episode's rows together"
-    assert spans_rows("vanilla_gae") is True
-    assert needs_critic("vanilla_gae") is True
+    assert "default_gae" in TRAJECTORY_ESTIMATORS, "must stitch an episode's rows together"
+    assert spans_rows("default_gae") is True
+    assert needs_critic("default_gae") is True
     # It supervises every model-output token, so a value_mask would be wrong for it.
-    assert needs_value_mask("vanilla_gae") is False
+    assert needs_value_mask("default_gae") is False
 
 
 def test_is_not_a_two_clock_estimator():
@@ -240,15 +240,15 @@ def test_is_not_a_two_clock_estimator():
     is merely a choice rather than undefined -- and the startup assertion must not fire.
     (It is a bad choice: at gamma 0.99 a 4000-token episode delivers 2e-18 of its reward
     to the first token. That is a documented caveat, not something to refuse.)"""
-    assert "vanilla_gae" not in UNDISCOUNTED_ESTIMATORS
-    assert requires_undiscounted("vanilla_gae") is False
+    assert "default_gae" not in UNDISCOUNTED_ESTIMATORS
+    assert requires_undiscounted("default_gae") is False
 
 
 def test_publishes_turn_id_like_every_other_packing_estimator():
     """The actor's only channel for turn boundaries. Which advantage estimator is in use
     must not decide whether a turn-level loss can run."""
     batch, non_tensor, _ = _tensors(_concat())
-    get_adv_estimator_fn("vanilla_gae")(batch=batch, non_tensor_batch=non_tensor, config=_Cfg())
+    get_adv_estimator_fn("default_gae")(batch=batch, non_tensor_batch=non_tensor, config=_Cfg())
     assert "turn_id" in batch.keys()
     assert batch["turn_id"].tolist() == [[0, 0, -1, 1, 1]]
 
@@ -271,7 +271,7 @@ def test_a_shorter_trajectory_still_gets_its_own_total():
         [[0.1, 0.2, 9.9, 0.3, 0.4], [0.5, 0.6, 9.9, 9.9, 9.9]],
         ["g", "g"], [0, 1], [0, 0],
     )
-    _, ret, mask = _call("vanilla_gae", layout, gamma=1.0, lam=1.0)
+    _, ret, mask = _call("default_gae", layout, gamma=1.0, lam=1.0)
     per_row = [[float(v) for v in row[m]] for row, m in zip(ret, mask)]
     assert per_row[0] == pytest.approx([long_reward] * 4)
     assert per_row[1] == pytest.approx([short_reward] * 2), "the short trajectory lost its reward"
@@ -312,6 +312,6 @@ def test_a_trajectory_with_no_model_output_does_not_blow_up():
         [[9.9, 9.9], [VALUES[0], VALUES[1]]],
         ["g", "g"], [0, 1], [0, 0],
     )
-    adv, ret, mask = _call("vanilla_gae", layout)
+    adv, ret, mask = _call("default_gae", layout)
     assert torch.isfinite(adv).all() and torch.isfinite(ret).all()
     assert torch.all(adv[~mask] == 0)
