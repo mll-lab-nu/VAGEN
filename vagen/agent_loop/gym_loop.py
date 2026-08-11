@@ -657,6 +657,25 @@ class GymLoop(VagenGymAgentLoopBase):
                                 if getattr(env, "reports_format", False) and getattr(env, "turns_seen", 0)
                                 else {}
                             ),
+                            # ★ How much the model itself wrote, per turn. `response_spans`
+                            # is exactly the model-emitted region -- the same thing the
+                            # response mask marks -- so this counts generated tokens and
+                            # nothing else.
+                            #
+                            # `response_length/mean` cannot answer this: it measures the
+                            # whole response *region*, which also carries the observations
+                            # interleaved between turns. On vision Sokoban an observation
+                            # is 49-144 image tokens, so that metric moves when the
+                            # environment renders differently and dilutes the thing we
+                            # actually watch for -- whether the policy is getting more
+                            # verbose. Every collapse in the 0809 sweep showed up first as
+                            # a length jump, and this is the number that would have said
+                            # whether the jump was the model or the scenery.
+                            **(
+                                {"model_tokens_per_turn": sum(int(e) - int(b) for b, e in spans)
+                                                          / max(1, len(spans))}
+                                if spans else {}
+                            ),
                         },
                         "image_data": images,
                         "last_turn": row is rows[-1],
