@@ -111,6 +111,17 @@ class GymEnvAdapter:
         # Empty when nothing is enabled, which is the point: a metric that does not exist
         # is the honest representation of a term that is not being computed.
         self.state_scores: dict[str, float] = {name: 0.0 for name in score_names}
+        # ★ How often the environment judged the turn well-formed. Nothing else reports
+        # this: `format_reward` (the state-reward one) is a constant zero by config, the
+        # environment's format reward is not published at all, and `turn_metrics` never
+        # reaches the logger. So the one question the world-modeling prompt exists to ask
+        # -- is the model writing the sections? -- had no curve, and a policy that
+        # collapsed to a bare `<answer>` was invisible until someone read a rollout by
+        # eye. Counted only for environments that report `format_correct`, so a metric
+        # appearing at all means it is being measured.
+        self.turns_seen = 0
+        self.turns_well_formed = 0
+        self.reports_format = False
 
     async def reset(self, seed=None):
         obs, info = await self.env.reset(seed=seed)
@@ -139,6 +150,10 @@ class GymEnvAdapter:
         self.success = extract_success(info)
         for key in self.state_scores:
             self.state_scores[key] += float(info.get(f"state_reward/{key}", 0.0) or 0.0)
+        if "format_correct" in info:
+            self.reports_format = True
+            self.turns_seen += 1
+            self.turns_well_formed += bool(info["format_correct"])
         return self._message(obs), reward, bool(done), False, info
 
     async def close(self):
@@ -265,12 +280,20 @@ class GymLoop(VagenGymAgentLoopBase):
     def _enabled_state_rewards(self) -> tuple[str, ...]:
         """The score names this run will actually compute, in publication order.
 
-        ``format`` rides along whenever anything else is on: it gates the others rather
-        than being a signal of its own, so it exists exactly when they do.
+        ``format`` rides along only when it can be non-zero. It is the gate on the others
+        rather than a signal of its own, and the shipped setting is
+        ``state_reward.format_reward: 0.0`` -- so publishing it unconditionally drew a
+        flat zero line called ``format_reward`` in every state-reward run. That reads as
+        "the agent never once produced the right format", which is both alarming and
+        false; the format reward that is actually paid is the *environment's*
+        (``SokobanEnvConfig.format_reward``), a different knob that this curve never
+        showed. ``format_correct_rate`` below is the honest version of the question.
         """
         cfg = self.config.trainer.get("state_reward", {}) or {}
         names = tuple(n for n in TAGS if (cfg.get(n) or {}).get("enable", False))
-        return (*names, "format") if names else ()
+        if not names:
+            return ()
+        return (*names, "format") if float(cfg.get("format_reward", 0.0) or 0.0) > 0 else names
 
     def _maybe_state_reward(self, env, env_name: str, max_turns: int = 1):
         """Wrap the environment so the reasoning is scored, if configured.
@@ -615,6 +638,17 @@ class GymLoop(VagenGymAgentLoopBase):
                             # Always present, so the metric exists even in runs where the
                             # agent never described anything.
                             **{f"{k}_reward": v for k, v in env.state_scores.items()},
+                            # Fraction of the episode's turns the environment judged
+                            # well-formed. Absent when the environment does not report it,
+                            # rather than a zero that would read as "never well-formed".
+                            # getattr, not attribute access: `env` here is whatever the
+                            # runner was handed, and the tests' fakes are not the adapter.
+                            **(
+                                {"format_correct_rate": getattr(env, "turns_well_formed", 0)
+                                                        / getattr(env, "turns_seen", 0)}
+                                if getattr(env, "reports_format", False) and getattr(env, "turns_seen", 0)
+                                else {}
+                            ),
                         },
                         "image_data": images,
                         "last_turn": row is rows[-1],
