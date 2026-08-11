@@ -32,7 +32,7 @@ def test_there_are_scripts_to_check():
 @pytest.mark.parametrize("path", SCRIPTS, ids=lambda p: "/".join(p.split("/")[-2:]))
 def test_the_estimator_exists(path):
     """★ A renamed estimator turns every script that used it into a run that dies at
-    startup. episode_gae -> vanilla_gae and removed_estimator_gae_paper -> removed_estimator_gae both
+    startup. episode_gae -> default_gae and removed_estimator_gae_paper -> removed_estimator_gae both
     happened; this is what would have caught a missed one."""
     est = _flag(open(path).read(), "algorithm.adv_estimator")
     if est is None:

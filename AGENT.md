@@ -105,7 +105,7 @@ three policies — which is the property `TrajectoryView` exists to provide.
 
 | `algorithm.adv_estimator` | one MDP step is | notes |
 |---|---|---|
-| **`vanilla_gae`** | one model-emitted token | **the baseline.** Ordinary single-turn GAE: the episode's whole reward is summed onto its *last* model-output token before the recursion runs, so at `lam=1` every token is handed the same return and only the critic apportions it. Identical to `token_level_gae` in every other respect, which is what makes the comparison mean something. Under `concat` it is verl's `gae` exactly; under the other two it is not, because verl would credit each row separately. |
+| **`default_gae`** | one model-emitted token | **the baseline.** Ordinary single-turn GAE: the episode's whole reward is summed onto its *last* model-output token before the recursion runs, so at `lam=1` every token is handed the same return and only the critic apportions it. Identical to `token_level_gae` in every other respect, which is what makes the comparison mean something. Under `concat` it is verl's `gae` exactly; under the other two it is not, because verl would credit each row separately. |
 | `token_level_gae` | one model-emitted token | the same recursion with each reward left where it was earned. State = everything seen before the token; action = the token. Anything the model did not emit (observations, template scaffolding) is state, never action, and the recursion steps over it. |
 | `turn_level_gae` | one turn | writes a return only at each turn's first token; needs `value_mask`. |
 | `trajectory_grpo` | — | one advantage per episode, normalised within its prompt group. No critic. |
