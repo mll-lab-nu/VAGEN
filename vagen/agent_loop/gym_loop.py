@@ -23,8 +23,9 @@ from verl.utils.rollout_trace import rollout_trace_op
 
 from vagen.agent_loop.base import VagenGymAgentLoopBase
 from vagen.agent_loop.obs import _normalize_images, convert_obs_to_content, extract_success
-from vagen.rewards import sokoban as sokoban_spec
 from vagen.rewards.judge import shared_judge
+from vagen.envs.registry import get_env_cls
+from vagen.envs.state_reward import state_reward_spec_of
 from vagen.rewards.state_reward import DEFAULT_SCORE_BASE, TAGS, StateRewardWrapper
 from vagen.agent_loop.verl_client import VerlClient
 from vagen.harness import HARNESSES, build_harness
@@ -43,8 +44,8 @@ from vagen.core.runner import run_episode
 logger = logging.getLogger(__file__)
 logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
 
-# Environments that can score the agent's descriptions. Keyed by the registry name.
-STATE_REWARD_SPECS = {"Sokoban": sokoban_spec.SPEC}
+# Which environments can have their reasoning scored is no longer a table here: each
+# environment declares its own `STATE_REWARD_SPEC`. See `vagen/envs/state_reward.py`.
 
 
 class SampledVisionToken(EpisodeUnusable, ValueError):
@@ -329,11 +330,13 @@ class GymLoop(VagenGymAgentLoopBase):
         total = sum(enabled.values()) or 1.0
         enabled = {n: budget * (w / total) / max(1, int(max_turns)) for n, w in enabled.items()}
 
-        spec = STATE_REWARD_SPECS.get(env_name)
+        spec = state_reward_spec_of(get_env_cls(env_name))
         if spec is None:
             raise ValueError(
-                f"a state reward is on but {env_name!r} has no spec; add one to STATE_REWARD_SPECS "
-                f"(available: {sorted(STATE_REWARD_SPECS)})"
+                f"a state reward is on but the environment {env_name!r} declares no "
+                f"STATE_REWARD_SPEC. Add one next to the environment (see "
+                f"vagen/envs/sokoban/state_reward_spec.py) and set it on the class, "
+                f"rather than registering it anywhere central."
             )
         return StateRewardWrapper(
             env=env,

@@ -13,6 +13,8 @@ from .utils.utils import parse_response, numpy_to_pil
 
 
 from vagen.envs.gym_image_env import GymImageEnv
+from vagen.envs.state_reward import HasStateReward
+from vagen.envs.sokoban.state_reward_spec import SPEC as SOKOBAN_STATE_REWARD_SPEC
 
 import asyncio
 from dataclasses import dataclass
@@ -67,7 +69,7 @@ class SokobanEnvConfig:
     # only remaining pressure and it is worth 0.02 against a 1.0 success reward.
     strict_format: bool = True
     
-class Sokoban(GymImageEnv):
+class Sokoban(GymImageEnv, HasStateReward):
     """
     Sokoban environment that implements the EnvImageBase async interface.
     Uses asyncio.to_thread(...) to offload blocking gym calls (reset/step/render/close)
@@ -84,6 +86,11 @@ class Sokoban(GymImageEnv):
         5: " P ",  # player
         6: " S ",  # player on target
     }
+
+    # What `trainer.state_reward` needs to score this environment's descriptions. Declared
+    # here rather than in a table in the agent loop, so the capability is a property of the
+    # environment and cannot disagree with the registry name.
+    STATE_REWARD_SPEC = SOKOBAN_STATE_REWARD_SPEC
 
     # Action mapping
     ACTION_LOOKUP = {

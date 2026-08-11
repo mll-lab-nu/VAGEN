@@ -12,7 +12,7 @@ import types
 
 import pytest
 
-from vagen.rewards.sokoban import relations
+from vagen.envs.sokoban.state_reward_spec import relations
 from vagen.rewards.state_reward import TAGS, StateRewardSpec, StateRewardWrapper
 
 

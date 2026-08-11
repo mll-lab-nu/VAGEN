@@ -14,7 +14,29 @@ import pytest
 
 from model_path import local_snapshot
 
-from vagen.agent_loop.gym_loop import STATE_REWARD_SPECS
+from vagen.envs.state_reward import state_reward_spec_of
+
+def _state_reward_specs() -> dict:
+    """Every environment that declares a state-reward spec, keyed by registry name.
+
+    Derived from the registry rather than from a table, which is the point of the move:
+    an environment gains the capability by declaring `STATE_REWARD_SPEC`, and nothing
+    central has to be edited to agree with it.
+    """
+    import vagen.envs.registry as R
+    from vagen.envs.state_reward import state_reward_spec_of
+
+    R._load_registry()
+    out = {}
+    for name, cls in R._ENV_REGISTRY.items():
+        spec = state_reward_spec_of(cls)
+        if spec is not None:
+            out[name] = spec
+    return out
+
+
+STATE_REWARD_SPECS = _state_reward_specs()
+
 
 
 @pytest.mark.parametrize("env_name,spec", sorted(STATE_REWARD_SPECS.items()))
