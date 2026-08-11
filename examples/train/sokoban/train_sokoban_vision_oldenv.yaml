@@ -1,0 +1,24 @@
+# Sokoban as it was BEFORE the 2026-08-10 format fix, for reproducing or extending the
+# `*_old` runs in wandb. Two settings, both deliberate:
+#
+#   strict_format: false  -- a response failing `format_correct` still has its action
+#                            salvaged and executed, AND still collects the format reward.
+#                            One switch covers both halves; see SokobanEnvConfig.
+#   format_reward: 0.1    -- the dataclass default those runs used. The train yaml did not
+#                            override it until 95ad6da, so they paid 0.1 a turn, which at
+#                            max_turns=5 is 0.5 for formatting against 1.0 for solving.
+#
+# Use the ordinary train_sokoban_vision.yaml for anything new. This exists so the old and
+# new environments differ by a knob rather than by a checkout.
+envs:
+  - name: Sokoban
+    n_envs: 10000
+    data_source: sokoban
+    seed: [1,10000,1]
+    max_turns: 20
+    response_length_per_turn: 512
+    config:
+      render_mode: vision
+      strict_format: false
+      format_reward: 0.1
+      min_solution_steps: [1,5]

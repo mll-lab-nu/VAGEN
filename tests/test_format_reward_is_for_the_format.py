@@ -108,19 +108,56 @@ def _gate_source(env_module: str, fn: str = "step") -> str:
 def test_the_format_reward_is_gated_on_format_correct(env_module):
     """★ The structural guard, over every env that pays a per-turn format reward.
 
-    Asserted on the source rather than by running the env, because constructing a real
-    gym env needs rendering and the property is about which flag the branch reads. The
-    failure it catches -- `if self.valid_actions:` without the conjunct -- is one line and
-    reads as correct.
+    Asserted on the source rather than by running the env, because constructing a real gym
+    env needs rendering and the property is about which flag the branch reads. The failure
+    it catches -- `if self.valid_actions:` without the conjunct -- is one line and reads as
+    correct.
+
+    Parsed with `ast` rather than matched line by line: the sokoban guard became a
+    multi-line condition when `strict_format` was folded into it, and a line-based version
+    of this test silently started reading only `if self.valid_actions and (`.
     """
-    src = _gate_source(env_module)
-    lines = [ln.strip() for ln in src.splitlines()]
-    paying = [i for i, ln in enumerate(lines) if "+= self.config.format_reward" in ln]
-    assert paying, f"{env_module} no longer pays a format reward; update this test"
-    for i in paying:
-        # The guard is the nearest preceding `if`.
-        guard = next(ln for ln in reversed(lines[:i]) if ln.startswith("if "))
-        assert "format_correct" in guard, (
-            f"{env_module} pays format_reward under `{guard}`, which does not require "
-            "format_correct -- so any response with a salvageable <answer> collects it"
+    import ast
+
+    import textwrap
+
+    tree = ast.parse(textwrap.dedent(_gate_source(env_module)))
+    guards = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.If) and "format_reward" in ast.unparse(node.body)
+    ]
+    assert guards, f"{env_module} no longer pays a format reward; update this test"
+    for node in guards:
+        cond = ast.unparse(node.test)
+        assert "format_correct" in cond, (
+            f"{env_module} pays format_reward under `{cond}`, which does not consult "
+            "format_correct -- any response with a salvageable <answer> collects it"
         )
+
+
+def test_strict_format_is_one_switch_for_the_whole_environment():
+    """★ Reproducing a pre-fix run must be one knob, not two kept in step by hand.
+
+    `strict_format=False` has to restore *both* halves -- run the salvaged action and pay
+    the format reward for it -- or "the old environment" is not a thing anyone can
+    actually configure, and the old/new comparison quietly comes from a third environment
+    that never existed.
+    """
+    import ast
+    import inspect
+
+    from vagen.envs.sokoban.sokoban_env import Sokoban
+
+    import textwrap
+
+    tree = ast.parse(textwrap.dedent(inspect.getsource(Sokoban.step)))
+
+    pay = next(n for n in ast.walk(tree)
+               if isinstance(n, ast.If) and "format_reward" in ast.unparse(n.body))
+    assert "strict_format" in ast.unparse(pay.test), (
+        "the format-reward gate ignores strict_format, so strict_format=False cannot "
+        "reproduce the pre-fix environment"
+    )
+    drop = next(n for n in ast.walk(tree)
+                if isinstance(n, ast.If) and "action_list = []" in ast.unparse(n.body))
+    assert "strict_format" in ast.unparse(drop.test)
