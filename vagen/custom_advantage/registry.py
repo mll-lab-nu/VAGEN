@@ -150,7 +150,7 @@ def wants_turn_lumped_reward(adv_estimator) -> bool:
     """Whether a turn's reward must sit on the turn's last token for this estimator.
 
     ★ Reward placement and advantage estimator are one choice, not two. An estimator
-    whose outer chain has a single reward slot per turn -- ``removed_estimator_gae_paper`` reads
+    whose outer chain has a single reward slot per turn -- ``removed_estimator_gae`` reads
     the reward only at each turn-final token -- credits a mid-turn reward once through
     the inner token chain and again through the outer turn chain: measured bias 0.177
     against an exact policy gradient, and a critic fixed-point error of exactly the

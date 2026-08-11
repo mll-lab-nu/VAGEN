@@ -276,7 +276,7 @@ def test_token_gae_runs_without_a_turn_column():
 
 
 
-removed_estimator = get_adv_estimator_fn("removed_estimator_gae")
+removed_estimator = get_adv_estimator_fn("removed_estimator_gae_varlam")
 
 
 class _BiCfg(_Cfg):
