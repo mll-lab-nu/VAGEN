@@ -23,7 +23,7 @@ ESTIMATORS = sorted(TRAJECTORY_ESTIMATORS)
 
 #: Hyperparameters an estimator requires before it will run at all.
 PARAMS: dict[str, dict] = {
-    "removed_estimator_gae": {"lam_low": 0.8},
+    "removed_estimator_gae_varlam": {"lam_low": 0.8},
 }
 
 

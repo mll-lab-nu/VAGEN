@@ -1,4 +1,4 @@
-"""``removed_estimator_gae`` runs two clocks, and they only agree at ``gamma == 1``.
+"""``removed_estimator_gae_varlam`` runs two clocks, and they only agree at ``gamma == 1``.
 
 Crossing one turn costs the turn-level chain a single ``gamma``. It costs the token-level
 chain ``gamma ** (tokens in that turn)``. Both factors are applied to the same span of
@@ -33,7 +33,7 @@ class _Trainer(VagenLogicMixin):
 
 def test_the_two_clock_estimator_is_declared_and_the_one_clock_ones_are_not():
     """A declaration, not a hard-coded list somewhere else that can drift from it."""
-    assert requires_undiscounted("removed_estimator_gae")
+    assert requires_undiscounted("removed_estimator_gae_varlam")
     # token_level_gae has one clock; turn_level_gae is a self-consistent turn MDP where
     # gamma means "per turn". Neither mixes granularities, so both are fine at gamma < 1.
     assert not requires_undiscounted("token_level_gae")
@@ -46,13 +46,13 @@ def test_the_refusal_says_how_wrong_it_would_have_been():
     what makes the case: 0.99 ** 500 is 0.0066, so a long turn's bootstrap is over-weighted
     by more than a hundredfold against the turn-level chain's single 0.99."""
     with pytest.raises(ValueError) as exc:
-        _Trainer("removed_estimator_gae", 0.99)._vagen_check_estimator_is_undiscounted()
+        _Trainer("removed_estimator_gae_varlam", 0.99)._vagen_check_estimator_is_undiscounted()
     assert "0.99**500" in str(exc.value) or "0.006" in str(exc.value)
     assert "token_level_gae" in str(exc.value), "say what to use instead"
 
 
 def test_gamma_one_passes():
-    _Trainer("removed_estimator_gae", 1.0)._vagen_check_estimator_is_undiscounted()
+    _Trainer("removed_estimator_gae_varlam", 1.0)._vagen_check_estimator_is_undiscounted()
 
 
 def test_a_one_clock_estimator_may_discount():

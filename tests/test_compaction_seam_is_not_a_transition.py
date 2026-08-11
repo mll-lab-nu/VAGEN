@@ -5,7 +5,7 @@ to summarise, writes one, and the next conversation opens on the *same* world st
 model emissions are separated by that seam -- the summary and the next action -- so the
 token stream shows two turn endings where one environment transition happened.
 
-``removed_estimator_gae`` spends ``algorithm.lam`` crossing a turn. Spending it at the seam too
+``removed_estimator_gae_varlam`` spends ``algorithm.lam`` crossing a turn. Spending it at the seam too
 attenuates credit by ``lam ** 2`` where an ordinary turn costs ``lam``, and how often
 that happens is set by how often the policy compacts, which is set by how much it writes.
 The effective horizon then moves as the policy's verbosity moves, which is not a
@@ -114,7 +114,7 @@ def test_an_absent_column_means_no_seams_rather_than_an_error():
 # ------------------------------------------------------------------ what it buys
 
 def _lambdas(ends_with_summary, lam_low, lam_high):
-    """The per-position lambda `removed_estimator_gae` builds, as the estimator builds it."""
+    """The per-position lambda `removed_estimator_gae_varlam` builds, as the estimator builds it."""
     packed = _pack(_Inputs(_compact_layout(), ends_with_summary))
     seq_lam = torch.where(packed.boundary(), lam_high, lam_low)
     return torch.where(packed.seam(ends_with_summary), 1.0, seq_lam)[0]

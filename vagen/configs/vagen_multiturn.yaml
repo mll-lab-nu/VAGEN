@@ -66,6 +66,18 @@ trainer:
   # Reward the reasoning as well as the outcome: the agent's <observation> and
   # <prediction> are scored against the real layout and the scores are paid to the
   # tokens that carry them. Needs a judge endpoint; see scripts/launch_judge.sh.
+  # Keep a copy of the actor from the best-validating step, selected on
+  # mean val-core/<env>/reward/mean@1.
+  #
+  # ★ The actor only, in its own `best_actor/` directory, and it deliberately does not
+  # touch `latest_checkpointed_iteration.txt`: the periodic checkpoint exists to *resume*
+  # (critic + optimiser), this one exists to be *used*. Writing that file would make a
+  # resume rewind to whichever step validated best, which is not where training was.
+  #
+  # Note what "reward" includes: the format bonus is 0.10 of a 1.20 maximum at the shipped
+  # weights, so selection mildly prefers writing tags over solving. Select on
+  # val-aux/<env>/traj_success/mean@1 instead if that matters more.
+  save_best_actor: True
   state_reward:
     # Where a turn's scores are paid: auto | turn_end | per_span.
     #

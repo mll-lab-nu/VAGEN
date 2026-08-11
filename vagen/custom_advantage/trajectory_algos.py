@@ -14,7 +14,7 @@ length one -- so no estimator here needs a per-policy branch.
   is part of the state, never an action, and the recursion steps over it. The recursion
   also carries across row boundaries, which is the only thing that makes one estimator
   cover all three policies (see below).
-* ``removed_estimator_gae`` -- the same token-level chain with a second lambda at turn boundaries.
+* ``removed_estimator_gae_varlam`` -- the same token-level chain with a second lambda at turn boundaries.
 * ``turn_level_gae`` -- one decision per turn instead of per token.
 * ``trajectory_grpo`` -- one advantage for the whole trajectory, normalised against the other
   trajectories of its prompt group and broadcast to all of its tokens.
@@ -241,7 +241,7 @@ def _backward_gae(seq_r, seq_v, valid, gamma: float, lam) -> torch.Tensor:
 
     ``lam`` is either a scalar -- plain token-level GAE -- or a tensor the shape of the
     sequences, which is Sutton & Barto's variable-lambda return and is what separates
-    ``removed_estimator_gae`` from ``token_level_gae``.
+    ``removed_estimator_gae_varlam`` from ``token_level_gae``.
 
     Padding sits on the right, so the first steps of the loop must leave the recursion
     untouched rather than folding zeros into it.
@@ -310,7 +310,7 @@ def compute_episode_gae(inputs: AdvantageInputs):
     keeps the three context policies comparable, and is the reason this is a registered
     estimator rather than a config flag.
 
-    ★ No seam handling, deliberately. ``removed_estimator_gae`` forces ``lambda = 1`` at a
+    ★ No seam handling, deliberately. ``removed_estimator_gae_varlam`` forces ``lambda = 1`` at a
     compaction seam because a seam is not an environment transition. This does not, for
     the same reason it does not distinguish turns: a baseline that quietly imports the
     fixes gets credit for them. At the recommended ``gamma = 1, lam = 1`` the question is
