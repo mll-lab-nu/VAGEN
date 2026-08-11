@@ -4,7 +4,7 @@ All of them work under all three context policies. :class:`TrajectoryView` prese
 trajectory as an ordered list of rows, and concat is simply the case where that list has
 length one -- so no estimator here needs a per-policy branch.
 
-* ``episode_gae`` -- **the baseline.** Ordinary GAE with the episode's whole reward
+* ``vanilla_gae`` -- **the baseline.** Ordinary GAE with the episode's whole reward
   lumped onto its last token, which is what single-turn RLHF does. Every token is then
   handed the same return and the critic alone has to apportion it.
 * ``token_level_gae`` -- the same recursion, but each reward left at the token that
@@ -149,7 +149,7 @@ class _Packed:
 
         The trajectory's total is unchanged -- only where it is credited moves -- so the
         undiscounted return of the *first* token is identical either way. What changes is
-        every token after it. See ``episode_gae``.
+        every token after it. See ``vanilla_gae``.
         """
         total = (self.seq_r * self.valid).sum(dim=1, keepdim=True)
         return torch.where(
@@ -276,8 +276,8 @@ def compute_token_level_gae(inputs: AdvantageInputs):
         )
 
 
-@advantage_estimator("episode_gae", needs_critic=True)
-def compute_episode_gae(inputs: AdvantageInputs):
+@advantage_estimator("vanilla_gae", needs_critic=True)
+def compute_vanilla_gae(inputs: AdvantageInputs):
     """**The baseline the others are measured against.** Ordinary single-turn GAE.
 
     Identical to ``token_level_gae`` in every respect but one: before the recursion runs,
@@ -302,7 +302,7 @@ def compute_episode_gae(inputs: AdvantageInputs):
     whitening, the lambda, the row stitching -- is held identical.
 
     ★ Why not verl's own ``gae``. Under ``concat`` this *is* verl's ``gae`` and
-    ``tests/test_episode_gae.py`` pins that they agree token for token. Under
+    ``tests/test_vanilla_gae.py`` pins that they agree token for token. Under
     ``no_concat`` and ``compact`` it is not: verl scores one row at a time and opens each
     with ``nextvalues = 0``, so the episode total would be lumped onto the last token of
     *every row* -- each turn separately credited with the whole episode's reward, several
