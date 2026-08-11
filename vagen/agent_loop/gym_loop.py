@@ -263,6 +263,14 @@ class GymLoop(VagenGymAgentLoopBase):
         try:
             result = await run_episode(env, harness, client, seed=kwargs["seed"],
                                        max_turns=max_turns)
+            # ★ `_outputs` is inside the guard, not after it. It calls
+            # `_refuse_sampled_vision_tokens`, which raises `SampledVisionToken` -- an
+            # `EpisodeUnusable` whose whole point is to cost one rollout rather than the
+            # run. Built outside, it escaped instead: `sokoban_turn_nosr_fmt` died at step
+            # 99 of 401 after 2h33m because one rollout sampled an image token. The
+            # exception class, the docstring and the handler all said "drop the episode";
+            # only the placement of one line said otherwise.
+            return self._outputs(client, env, result, kwargs, episode_id, harness)
         except EpisodeUnusable as exc:
             # This rollout cannot be finished, and that is evidence about this rollout
             # rather than about the run. Letting it out takes the whole batch with it:
@@ -275,7 +283,6 @@ class GymLoop(VagenGymAgentLoopBase):
             logger.warning("[vagen] dropping episode %s: %s: %s",
                            episode_id, type(exc).__name__, exc)
             return []
-        return self._outputs(client, env, result, kwargs, episode_id, harness)
 
     def _enabled_state_rewards(self) -> tuple[str, ...]:
         """The score names this run will actually compute, in publication order.
