@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections import defaultdict, Counter
 from typing import Any, Dict, List, Tuple, Optional
 
@@ -15,6 +16,8 @@ from vagen.utils.image_token_utils import (
 
 PAD_TOKEN_ID = 0
 
+
+logger = logging.getLogger(__name__)
 
 def _as_1d_object_array(items: List[Any]) -> np.ndarray:
     """
@@ -92,27 +95,45 @@ def concat_val_multi_turn(
     group_arr = nt["group_idx"]
     traj_arr = nt["traj_idx"]
     turn_arr = nt.get("turn_idx", [0] * n)
-    # ★ KNOWN BUG, deliberately not fixed here. This groups by (group_idx, traj_idx),
-    # which identifies a *rollout*, not an episode -- and on this path the two provably
-    # differ: `_validate` pads the generation batch to a multiple of the worker count by
-    # duplicating rows from the front, those duplicates run as genuinely separate
-    # episodes, and `_vagen_assign_indices` re-tiles traj_idx positionally so a copy
-    # lands on the same pair as its original. The strict count check below then fires,
-    # every validation, on val_navigation (n_envs=30 and 60) and val_spatial_gym (50).
-    # `episode_id` is the column that would fix it, and `TrajectoryView` already prefers
-    # it -- but switching here changes what a "trajectory" means to this whole file and
-    # breaks the fixtures in tests/test_val_merge_carries_identity.py, so it needs its
-    # own pass rather than a one-line swap. Tracked in AGENT.md.
+    # ★ What identifies a trajectory here: `episode_id` when the loop published one,
+    # falling back to `(group_idx, traj_idx)`. Same rule as `TrajectoryView.build`, and
+    # for the same reason -- that pair identifies a *rollout*, not an episode.
+    #
+    # On this path the two provably differ. `_validate` pads the generation batch to a
+    # multiple of the worker count by duplicating rows from the front; the duplicates run
+    # as genuinely separate episodes, and `_vagen_assign_indices` re-tiles traj_idx
+    # positionally so a copy lands on the same pair as its original. Grouping by the pair
+    # then merges two distinct episodes into one, which shows up as the strict count check
+    # below firing -- 126 trajectories against 256 prompts on the compact run that found
+    # this, i.e. half the validation set silently folded into the other half. It had
+    # already been reported on val_navigation (n_envs 30 and 60) and val_spatial_gym (50).
+    #
+    # `group_idx`/`traj_idx` are still carried on every merged entry; only the grouping
+    # key changes, so the uid bucketing below is unaffected.
 
     # ------------------------------------------------------------------
     # 1) Group turns by (group_idx, traj_idx)
     # ------------------------------------------------------------------
+    episode_arr = nt.get("episode_id")
+    if episode_arr is None:
+        logger.warning(
+            "concat_val_multi_turn: no `episode_id` column; grouping by "
+            "(group_idx, traj_idx) instead. That pair identifies a rollout, and on the "
+            "validation path padding duplicates make one rollout hold several episodes -- "
+            "they will be merged into a single row."
+        )
+
     trajectory_groups: Dict[Tuple[str, int], List[Tuple[int, int]]] = defaultdict(list)
+    # Keeps the (group_idx, traj_idx) each key came from, so the merged entry can still
+    # report them even when the key is an episode_id.
+    key_identity: Dict[Tuple[str, int], Tuple[str, int]] = {}
     for i in range(n):
         g = str(group_arr[i])
         t = int(traj_arr[i])
         ti = int(turn_arr[i])
-        trajectory_groups[(g, t)].append((ti, i))
+        key = (str(episode_arr[i]), 0) if episode_arr is not None else (g, t)
+        trajectory_groups[key].append((ti, i))
+        key_identity[key] = (g, t)
 
     # Sort turns inside each trajectory by turn_idx
     for k in trajectory_groups:
@@ -123,7 +144,8 @@ def concat_val_multi_turn(
     # ------------------------------------------------------------------
     # 2) Concatenate per trajectory
     # ------------------------------------------------------------------
-    for (group_idx_str, traj_idx), turns in sorted(trajectory_groups.items()):
+    for key, turns in sorted(trajectory_groups.items()):
+        group_idx_str, traj_idx = key_identity[key]
         first_i = turns[0][1]
         concat_prompt = test_output_gen_batch.batch["prompts"][first_i]
 
