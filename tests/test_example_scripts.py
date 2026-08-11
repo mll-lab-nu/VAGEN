@@ -133,3 +133,78 @@ def test_env_specific_reward_code_is_not_in_the_generic_package():
             f"vagen/envs/{env_name}/"
         )
     assert os.path.exists("vagen/envs/sokoban/state_reward_spec.py")
+
+
+# ------------------------------------------- a seed that indexes data, not a generator
+
+
+#: Envs whose seed selects a fixed on-disk sample rather than seeding a generator, with
+#: the directory each seed resolves to. frozenlake and sokoban generate their layouts, so
+#: any seed is valid for them and none of this applies.
+DATASET_BACKED = {"SpatialGym": lambda seed: f"run{seed:02d}"}
+
+DATA_YAMLS = sorted(glob.glob("examples/train/*/*.yaml"))
+
+
+def _dataset_specs(path):
+    import yaml
+
+    for spec in (yaml.safe_load(open(path)) or {}).get("envs", []) or []:
+        if spec.get("name") in DATASET_BACKED:
+            yield spec
+
+
+@pytest.mark.parametrize("path", DATA_YAMLS, ids=lambda p: "/".join(p.split("/")[-2:]))
+def test_every_seed_a_config_asks_for_resolves_to_data_that_exists(path):
+    """★ For a dataset-backed env the seed is an array index, so a range wider than the
+    dataset is a crash rather than more variety.
+
+    val_spatial_gym_vision.yaml asked for [1000,1049] to be disjoint from train, and the
+    training half asked for [0,49] against a 20-room download. ImageHandler.load_data
+    asserts the directory exists, so both failed -- but only once a rollout had started,
+    on a box that took minutes to reach that point.
+    """
+    import random
+
+    from vagen.gym_agent_dataset import _generate_from_len_three
+
+    for spec in _dataset_specs(path):
+        data_dir = spec["config"]["data_dir"]
+        if not os.path.isdir(data_dir):
+            pytest.skip(f"{data_dir} not downloaded; see the env README")
+        lo, hi, limit = spec["seed"]
+        naming = DATASET_BACKED[spec["name"]]
+        # Check the whole declared range, not a sample of it: the sampler is random, so
+        # sampling would make this test flaky in exactly the case it is meant to catch.
+        missing = [s for s in range(lo, hi + 1) if not os.path.isdir(os.path.join(data_dir, naming(s)))]
+        assert not missing, (
+            f"{path}: seed range [{lo},{hi}] includes {missing[:5]} which have no data "
+            f"under {data_dir}"
+        )
+        assert (hi - lo + 1) * limit >= spec["n_envs"], (
+            f"{path}: {hi - lo + 1} seeds used {limit}x cannot supply n_envs="
+            f"{spec['n_envs']}; the dataset builder raises rather than sampling fewer"
+        )
+
+
+def test_train_and_val_do_not_share_a_dataset_sample():
+    """★ Held-out means held out. These were identical ranges once, and validation was
+    reporting training performance -- a number that looks like generalisation and is not.
+    """
+    import collections
+
+    by_env = collections.defaultdict(dict)
+    for path in DATA_YAMLS:
+        kind = "val" if os.path.basename(path).startswith("val") else "train"
+        for spec in _dataset_specs(path):
+            lo, hi, _ = spec["seed"]
+            by_env[(os.path.dirname(path), spec["name"])][kind] = set(range(lo, hi + 1))
+
+    checked = 0
+    for (where, env), halves in by_env.items():
+        if len(halves) < 2:
+            continue
+        checked += 1
+        overlap = sorted(halves["train"] & halves["val"])
+        assert not overlap, f"{where}: {env} trains and validates on samples {overlap[:5]}"
+    assert checked, "no env had both a train and a val yaml; this test checked nothing"
