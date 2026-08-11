@@ -35,7 +35,7 @@ sections, substitute:
 | `CompactHarness` | ✅ built, with the budget arithmetic in `harness/budget.py` |
 | Token accounting / budget checks | ✅ built 2026-08-06. See §12 |
 | Image placeholder ↔ frame alignment | ✅ built 2026-08-06. `utils/image_token_utils.py` |
-| Algorithm layer | ✅ `episode_gae` (baseline), `token_level_gae`, `bi_level_gae_varlam`, `turn_level_gae`, `trajectory_grpo`, all on `TrajectoryView`. `no_concat_gae` deleted 2026-08-08; `episode_gae` added 2026-08-09; `bi_level_gae` (the released VAGEN algorithm, for reproduction) 2026-08-10 |
+| Algorithm layer | ✅ `vanilla_gae` (baseline), `token_level_gae`, `bi_level_gae_varlam`, `turn_level_gae`, `trajectory_grpo`, all on `TrajectoryView`. `no_concat_gae` deleted 2026-08-08; `vanilla_gae` added 2026-08-09; `bi_level_gae` (the released VAGEN algorithm, for reproduction) 2026-08-10 |
 | Row-local estimator under a splitting harness | ✅ refused at startup (`_vagen_check_estimator_spans_the_layout`) |
 | VLM beyond Qwen | ✅ Qwen / LLaVA / InternVL all training |
 | Compact loss reweighting | ❌ deferred, algorithm layer |
