@@ -42,8 +42,20 @@ class SokobanEnvConfig:
     prompt_format: str = "wm"  # "free_think" or "wm"
     format_reward: float = 0.1  # Reward for following the format correctly
     success_reward: float = 1.0
-    # ★ Whether a response that fails `format_correct` may still have an action salvaged
-    # from it. True (the default) means it may not: asking for the world-modeling format
+    # ★ Whether the world-modeling format is enforced. One switch, governing both halves,
+    # so that "the environment before/after the 2026-08-10 fix" is a single knob rather
+    # than two that can be set inconsistently:
+    #
+    #   True  (default) -- a response failing `format_correct` has its salvaged action
+    #                      discarded AND earns no format reward.
+    #   False           -- the pre-fix behaviour exactly: the salvaged action runs, and
+    #                      the format reward is paid for any runnable action.
+    #
+    # Reproducing a pre-2026-08-10 sokoban run therefore needs `strict_format: false`
+    # *and* `format_reward: 0.1` (the dataclass default those runs used, since the train
+    # yaml did not override it until 95ad6da).
+    #
+    # The salvage half in detail: asking for the world-modeling format
     # and then executing a bare `<answer>` teaches the policy that the other three
     # sections are optional, which is exactly what happened -- sokoban rollouts collapsed
     # to `<answer>Left, Left</answer>`. frozenlake has always been strict this way.
@@ -201,7 +213,9 @@ class Sokoban(GymImageEnv):
         # earned. Sokoban rollouts duly collapsed to that. frozenlake, navigation and
         # primitive_skill all gate on `format_correct`; sokoban was the only one that did
         # not, and it computes the flag ~25 lines above for `action_is_valid`.
-        if self.valid_actions and parsed.get("format_correct", False):
+        if self.valid_actions and (
+            parsed.get("format_correct", False) or not getattr(self.config, "strict_format", True)
+        ):
             reward += self.config.format_reward
 
         # Effective action: detect player position change
