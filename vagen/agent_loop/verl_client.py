@@ -191,8 +191,13 @@ class VerlClient(InferenceClient):
                 )
                 self._prefix_cache = self.processor(text=[text], return_tensors="pt")["input_ids"].squeeze(0).tolist()
             else:
+                # `_text_only`, as on every other tokenizer-path render. A bare tokenizer's
+                # template concatenates `message['content']` as a string, so handing it the
+                # parts list raises TypeError -- which is what a text-only model did here,
+                # on the first continuation, while both other call sites converted.
                 self._prefix_cache = self.tokenizer.apply_chat_template(
-                    placeholder, add_generation_prompt=False, tokenize=True, return_dict=False,
+                    [{"role": m["role"], "content": _text_only(m)} for m in placeholder],
+                    add_generation_prompt=False, tokenize=True, return_dict=False,
                     **self.apply_chat_template_kwargs,
                 )
         return self._prefix_cache
