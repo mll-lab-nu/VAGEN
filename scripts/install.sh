@@ -77,19 +77,15 @@ python3 -m pip install --no-cache-dir \
     accelerate codetiming datasets dill hydra-core numpy pandas peft pyarrow \
     pybind11 pylatexenc ray tensordict torchdata wandb
 
-# ------------------------------------------------------------------------- 4. trl
-say "trl"
-python3 -m pip install --no-cache-dir "trl==0.26.2"
-
 # ---------------------------------------------------------------------- verification
 say "checking the install"
 python3 - <<'PY'
-import importlib, os, sys
+import importlib, importlib.util, os, sys
 
 backend = os.environ.get("BACKEND", "vllm")
 skipped = os.environ.get("SKIP_ENGINE") == "1"
 
-mods = ["torch", "transformers", "verl", "vagen"]
+mods = ["torch", "transformers", "trl", "verl", "vagen"]
 if not skipped:
     mods.insert(1, backend)
 
@@ -117,6 +113,15 @@ try:
         pass          # absent is fine; peft only objects to a stale one
 except Exception as exc:
     problems.append(f"version check failed: {exc}")
+
+# verl hardcodes attn_implementation="flash_attention_2" when it builds the critic's
+# value head, so one of these two has to be able to answer for it. The flash-attn package
+# is the direct route but has no wheel for torch 2.11; `kernels` lets transformers fetch a
+# prebuilt kernels-community/flash-attn2 from the Hub instead. With neither, the run dies
+# several minutes in, at model load, saying only that flash-attn is not installed.
+if not importlib.util.find_spec("flash_attn") and not importlib.util.find_spec("kernels"):
+    problems.append("no flash attention: install `kernels` (pip install -e '.[vllm]' does) "
+                    "so transformers can use kernels-community/flash-attn2, or build flash-attn")
 
 if not skipped:
     # The import whose absence is how a too-old engine shows up: as a ModuleNotFoundError

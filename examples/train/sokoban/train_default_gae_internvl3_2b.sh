@@ -1,24 +1,19 @@
 #!/bin/bash
-# sokoban - default_gae - concat - Qwen/Qwen3.5-4B
+# sokoban - default_gae - concat - OpenGVLab/InternVL3-2B-hf
 #
-# Qwen3.5 is natively multimodal: there is no `-VL` variant to look for. The
-# `Qwen3.5-VL-*` repos on the Hub are third-party derivatives.
+# The `-hf` repo, not `OpenGVLab/InternVL3-2B`: the plain one ships its own modelling code
+# and only loads under trust_remote_code, which the rollout engine does not use.
 #
-# Needs a newer stack than the rest of these scripts, and says so only as
-# `KeyError: 'qwen3_5'`:
-#   transformers >= 5.2.0   4.57 has qwen3_vl but not this
-#   vllm                    the text stack interleaves linear_attention with
-#                           full_attention, so the engine has to know the architecture
-# Both are satisfied by the pinned versions. The config resolves there; no training run
-# has been done on this model.
+# Not an mrope model, so its processor has no get_rope_index and the agent loop takes the
+# plain-position-ids path. tests/test_vlm_families.py covers that branch on this family.
 set -eo pipefail
 
 V=$(cd "$(dirname "$0")/../../.." && pwd)
 SCRIPTDIR=$(cd "$(dirname "$0")" && pwd)
 PROJECT_NAME=${PROJECT_NAME:-vagen_experiments}
-EXPERIMENT_NAME=${EXPERIMENT_NAME:-sokoban_default_gae_qwen35_4b}
+EXPERIMENT_NAME=${EXPERIMENT_NAME:-sokoban_default_gae_internvl3_2b}
 EXPERIMENT_DIR=${EXPERIMENT_DIR:-$V/exps/$PROJECT_NAME/$EXPERIMENT_NAME}
-MODEL=${MODEL:-Qwen/Qwen3.5-4B}
+MODEL=${MODEL:-OpenGVLab/InternVL3-2B-hf}
 mkdir -p "$EXPERIMENT_DIR"
 
 # verl is not imported as an installed package; it is a checkout, and it has to come
