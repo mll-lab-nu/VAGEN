@@ -87,17 +87,38 @@ We frame multi-turn VLM agentic tasks as a Partially Observable Markov Decision 
 conda create -n vagen python=3.12 -y
 conda activate vagen
 
-git clone https://github.com/mll-lab-nu/VAGEN.git
+git clone --recursive https://github.com/mll-lab-nu/VAGEN.git
 cd VAGEN
-git submodule update --init --recursive
+bash scripts/install.sh
+```
+
+`scripts/install.sh` fetches the pinned verl submodule, installs the vLLM/SGLang stack
+through verl's own installer, then verl and VAGEN, and checks the result. It is
+idempotent, so it is safe to re-run. `SKIP_ENGINE=1` skips step 2 if vLLM and SGLang are
+already installed.
+
+<details>
+<summary>Doing it by hand</summary>
+
+```bash
+git submodule update --init --recursive   # verl, pinned; the scripts will not run without it
 
 cd verl
 USE_MEGATRON=0 bash scripts/install_vllm_sglang_mcore.sh
-pip install --no-deps -e .
+pip install --no-deps -e .                # --no-deps: verl's pins would downgrade the stack above
 cd ..
 pip install -e .
 pip install "trl==0.26.2"
 ```
+
+verl is imported from the checkout rather than from PyPI, and the training scripts find
+it at `VAGEN/verl` (the submodule) or `../verl` (a sibling checkout), in that order. Set
+`VERL=/path/to/verl` to override.
+</details>
+
+Some environments need their own setup: [spatial_gym](vagen/envs/spatial_gym/README.md)
+(dataset download), [navigation](vagen/envs/navigation/README.md) (AI2-THOR),
+[primitive_skill](vagen/envs/primitive_skill/README.md) (ManiSkill).
 
 
 ## Quick Start
@@ -115,7 +136,7 @@ bash examples/train/sokoban/train_ppo_qwen25vl3b.sh
 
 ```bash
 # Qwen/Qwen3-VL-4B-Instruct
-# pip install transformers==4.57.1
+# needs transformers>=4.57 (pinned in setup.py) for the qwen3_vl model type
 # pip install "sglang[all]==0.5.3.post3"
 cd VAGEN
 bash examples/train/sokoban/train_grpo_qwen3vl4b.sh
