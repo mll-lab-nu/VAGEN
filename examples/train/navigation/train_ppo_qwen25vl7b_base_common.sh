@@ -20,9 +20,21 @@ EXPERIMENT_DIR=${EXPERIMENT_DIR:-$V/exps/$PROJECT_NAME/$EXPERIMENT_NAME}
 MODEL=${MODEL:-Qwen/Qwen2.5-VL-7B-Instruct}
 mkdir -p "$EXPERIMENT_DIR"
 
-# verl is not installed as a package here; it is the sibling checkout, and it has to
-# come first so this fork is what gets imported rather than any other copy.
-VERL=${VERL:-$(cd "$V/../verl" 2>/dev/null && pwd)}
+# verl is not imported as an installed package; it is a checkout, and it has to come
+# first on PYTHONPATH so this fork wins over any other copy.
+# Both layouts: the submodule at VAGEN/verl that the README creates, and a sibling
+# checkout next to VAGEN. Probed for a file rather than the directory -- an uninitialised
+# submodule leaves VAGEN/verl there but empty. Left unresolved this used to go on with
+# VERL empty, which made hydra.searchpath "file:///verl/trainer/config" and failed later
+# on something that does not mention verl.
+VERL=${VERL:-$(for d in "$V/verl" "$V/../verl"; do
+    [ -f "$d/verl/trainer/config/ppo_trainer.yaml" ] && (cd "$d" && pwd) && break
+done)}
+if [ -z "$VERL" ]; then
+    echo "verl not found at $V/verl or $V/../verl." >&2
+    echo "Run: git submodule update --init --recursive   (or set VERL=/path/to/verl)" >&2
+    exit 1
+fi
 export PYTHONPATH=${VERL:+$VERL:}$V${PYTHONPATH:+:$PYTHONPATH}
 mapfile -t BASE < <(grep -vE '^\s*(#|$)' "$V/vagen/configs/baseline_vllm.flags" | sed "s|\$V|$V|g")
 
