@@ -136,7 +136,6 @@ bash examples/train/sokoban/train_ppo_qwen25vl3b.sh
 ```bash
 # Qwen/Qwen3-VL-4B-Instruct
 # needs transformers>=4.57 (pinned in setup.py) for the qwen3_vl model type
-# pip install "sglang[all]==0.5.3.post3"
 cd VAGEN
 bash examples/train/sokoban/train_grpo_qwen3vl4b.sh
 ```
