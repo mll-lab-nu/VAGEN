@@ -61,23 +61,26 @@ class VagenLogicMixin:
         self._vagen_image_actors: dict = {}
         self._vagen_image_futures: list = []
 
-    #: Context policies that put one episode in several rows. Under these, an estimator
-    #: that scores a row at a time is scoring a truncated trajectory.
-    SPLITTING_HARNESSES = ("no_concat", "compact")
+    def _vagen_harness_splits_rows(self) -> bool:
+        """Whether this run's context policy puts one episode in several rows.
+
+        ★ Asked of the harness class rather than matched against a tuple kept here --
+        the same argument the docstring below makes for estimators. An unregistered name
+        is treated as splitting, matching the base class default.
+        """
+        from vagen.harness import HARNESSES
+
+        cls = HARNESSES.get(self._vagen_harness_mode())
+        return True if cls is None else cls.splits_episode_across_rows
 
     def _vagen_harness_mode(self) -> str:
         """Which context policy the agent loop will actually run.
 
         ★ Resolved the same way ``GymLoop._harness_mode`` resolves it, not read straight
-        off the key. ``vagen/configs/vagen_multiturn.yaml`` ships ``harness: null``, so
-        ``config.trainer.get("harness", "concat")`` returns ``None`` rather than the
-        default -- and a guard comparing ``None`` against the splitting policies accepts
-        everything. ``trainer.concat_multi_turn=False`` with no explicit harness runs
-        no_concat while the guard sees nothing at all.
+        off the key: the yaml may ship ``harness: null``, and a guard that compares
+        ``None`` against the splitting policies accepts everything.
         """
-        return self.config.trainer.get("harness", None) or (
-            "concat" if self.config.trainer.get("concat_multi_turn", True) else "no_concat"
-        )
+        return self.config.trainer.get("harness", None) or "concat"
 
     def _vagen_check_estimator_spans_the_layout(self) -> None:
         """Refuse a row-local estimator under a policy that splits episodes across rows.
@@ -97,7 +100,7 @@ class VagenLogicMixin:
         from vagen.custom_advantage import TRAJECTORY_ESTIMATORS, spans_rows
 
         harness = self._vagen_harness_mode()
-        if harness not in self.SPLITTING_HARNESSES:
+        if not self._vagen_harness_splits_rows():
             return
         estimator = self.config.algorithm.adv_estimator
         if spans_rows(estimator):

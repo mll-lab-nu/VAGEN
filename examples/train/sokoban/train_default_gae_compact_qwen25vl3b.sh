@@ -1,21 +1,15 @@
 #!/bin/bash
-# frozenlake - bi_level_gae - concat - Qwen/Qwen2.5-VL-3B-Instruct
+# sokoban - default_gae - compact - Qwen/Qwen2.5-VL-3B-Instruct
 #
-# Per-experiment settings only. Everything that makes a VAGEN run work at all lives in
-# vagen/configs/baseline_vllm.flags and is read below -- in particular the two flags that
-# select VAGEN's agent loop. Without them verl runs its own, and the job comes up looking
-# healthy while none of this repo's rollout code executes. All twenty of these scripts
-# were in that state, and the duplication is why: each carried its own copy of the stack
-# settings, and the copies stopped including the loop.
-#
-# Anything after "${BASE[@]}" overrides it, and anything on the command line overrides
-# that, so a one-off sweep needs no edit here.
+# harness and adv_estimator are orthogonal -- the harness lays an episode out in rows,
+# the estimator stitches them back -- so any trajectory estimator can be swapped in from
+# the command line.
 set -eo pipefail
 
 V=$(cd "$(dirname "$0")/../../.." && pwd)
 SCRIPTDIR=$(cd "$(dirname "$0")" && pwd)
 PROJECT_NAME=${PROJECT_NAME:-vagen_experiments}
-EXPERIMENT_NAME=${EXPERIMENT_NAME:-frozenlake_ppo_qwen25vl3b}
+EXPERIMENT_NAME=${EXPERIMENT_NAME:-sokoban_compact_qwen25vl3b}
 EXPERIMENT_DIR=${EXPERIMENT_DIR:-$V/exps/$PROJECT_NAME/$EXPERIMENT_NAME}
 MODEL=${MODEL:-Qwen/Qwen2.5-VL-3B-Instruct}
 mkdir -p "$EXPERIMENT_DIR"
@@ -26,19 +20,36 @@ VERL=${VERL:-$(cd "$V/../verl" 2>/dev/null && pwd)}
 export PYTHONPATH=${VERL:+$VERL:}$V${PYTHONPATH:+:$PYTHONPATH}
 mapfile -t BASE < <(grep -vE '^\s*(#|$)' "$V/vagen/configs/baseline_vllm.flags" | sed "s|\$V|$V|g")
 
+# Sized for a compaction every ~5 turns. Sokoban vision, measured (budget.py header):
+# system prompt 589, observation ~58, a real turn ~164, summarise request 15.
+#
+# A conversation opened on a summary holds 589 + k + 222n after n turns and compacts when
+# the next would not fit, so n=5 needs 589 + k + 1110 <= m < 589 + k + 1332.
+#
+# k is set rather than derived: derived it is min(g, m//4) = 512, which pushes m to ~2300
+# and lets the first conversation -- no summary to carry -- run 7 turns against 5 for
+# every one after it. At k=300, m in [1999, 2221] and the first gets 6. A 20-turn episode
+# then compacts 3 times: 6 + 5 + 5 + 4.
+#
+# The trigger reads real usage, so a policy that writes longer compacts sooner. Check
+# where it actually fires before comparing against concat.
+COMPACT_BUDGET=${COMPACT_BUDGET:-2100}
+COMPACT_SUMMARY_BUDGET=${COMPACT_SUMMARY_BUDGET:-300}
+
 PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     --config-path="$V/vagen/configs" --config-name=vagen_multiturn \
     hydra.searchpath="[file://$VERL/verl/trainer/config]" \
     data.custom_cls.path="$V/vagen/gym_agent_dataset.py" \
     "${BASE[@]}" \
-    data.train_files="$SCRIPTDIR/train_frozenlake_vision.yaml" \
-    data.val_files="$SCRIPTDIR/val_frozenlake_vision.yaml" \
+    data.train_files="$SCRIPTDIR/train_sokoban_vision.yaml" \
+    data.val_files="$SCRIPTDIR/val_sokoban_vision.yaml" \
     actor_rollout_ref.model.path="$MODEL" \
     critic.model.path="$MODEL" \
     critic.enable=True \
-    algorithm.adv_estimator=bi_level_gae \
-    +algorithm.high_level_gamma=0.9 \
-    trainer.harness=concat \
+    algorithm.adv_estimator=default_gae \
+    trainer.harness=compact \
+    trainer.compact_budget=$COMPACT_BUDGET \
+    trainer.compact_summary_budget=$COMPACT_SUMMARY_BUDGET \
     data.train_batch_size=128 \
     data.max_response_length=4000 \
     actor_rollout_ref.actor.ppo_mini_batch_size=32 \

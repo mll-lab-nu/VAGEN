@@ -1,5 +1,5 @@
 #!/bin/bash
-# primitive_skill - gae - ppo_qwen25vl3b
+# primitive_skill - bi_level_gae - concat - Qwen/Qwen2.5-VL-3B-Instruct
 #
 # Per-experiment settings only. Everything that makes a VAGEN run work at all lives in
 # vagen/configs/baseline_vllm.flags and is read below -- in particular the two flags that

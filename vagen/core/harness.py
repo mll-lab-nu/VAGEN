@@ -49,6 +49,14 @@ class BaseHarness(ABC):
     the other two stop.
     """
 
+    #: Whether one episode can end up in more than one row. Declared here so the trainer
+    #: can ask any harness instead of keeping a list of the ones it knows.
+    #:
+    #: True by default, because the wrong answer is not symmetric: under a harness that
+    #: splits, a row-local estimator scores a truncated trajectory and nothing fails --
+    #: it trains, the curves look ordinary, and the credit assignment is just absent.
+    splits_episode_across_rows: bool = True
+
     def __init__(self, response_len: int | None = None, floor: int = 1, **cfg):
         self.cfg = cfg
         self._system: Msg | None = None

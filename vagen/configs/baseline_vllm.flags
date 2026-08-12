@@ -4,7 +4,7 @@
 #
 # What belongs here: settings that make the run go at all, or that select VAGEN's own
 # code path. What does not: anything an experiment varies (batch sizes, adv_estimator,
-# concat_multi_turn, rollout.n) and anything host-shaped (gpu count, memory fraction).
+# harness, rollout.n) and anything host-shaped (gpu count, memory fraction).
 # Both callers append their own after these, and hydra takes the last value.
 #
 # `$V` is the VAGEN checkout; the caller exports it before reading this file.

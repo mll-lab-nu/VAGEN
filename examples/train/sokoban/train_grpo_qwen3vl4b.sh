@@ -1,5 +1,5 @@
 #!/bin/bash
-# sokoban - grpo - grpo_qwen3vl4b
+# sokoban - grpo - concat - Qwen/Qwen3-VL-4B-Instruct
 #
 # Per-experiment settings only. Everything that makes a VAGEN run work at all lives in
 # vagen/configs/baseline_vllm.flags and is read below -- in particular the two flags that
