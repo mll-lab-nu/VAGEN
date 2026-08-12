@@ -17,6 +17,7 @@ only thing that distinguishes the silent failure from a correct cut.
 
 from __future__ import annotations
 
+import inspect
 import pytest
 
 from vagen.utils.image_token_utils import (
@@ -179,8 +180,16 @@ def test_every_cut_survives_the_real_position_id_path(keep):
             grid = sub["image_grid_thw"]
         t = torch.tensor([kept])
         try:
+            # transformers>=5.3 requires mm_token_type_ids; the real processor emits it,
+            # so mark the image-pad positions the way the training path does.
+            rope_kwargs = {}
+            if "mm_token_type_ids" in inspect.signature(processor.get_rope_index).parameters:
+                mm = torch.zeros_like(t)
+                pad_id = processor.tokenizer.convert_tokens_to_ids("<|image_pad|>")
+                mm[t == pad_id] = 1
+                rope_kwargs["mm_token_type_ids"] = mm
             processor.get_rope_index(input_ids=t, image_grid_thw=grid,
-                                     attention_mask=torch.ones_like(t))
+                                     attention_mask=torch.ones_like(t), **rope_kwargs)
         except Exception as exc:  # noqa: BLE001 - the failure is the finding
             pytest.fail(f"{keep} budget={budget}: position ids rejected the cut: "
                         f"{type(exc).__name__}: {exc}")

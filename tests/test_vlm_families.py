@@ -52,7 +52,12 @@ def test_position_ids_match_what_the_family_needs(repo, expects_mrope, expected_
     position_ids = worker._compute_position_ids(
         input_ids=torch.tensor([[5, 6, 7, 0]]),
         attention_mask=torch.tensor([[1, 1, 1, 0]]),
-        multi_modal_inputs={"image_grid_thw": None, "video_grid_thw": None},
+        # `mm_token_type_ids` because transformers>=5.3 made it a required argument of
+        # get_rope_index, and the agent loop only builds one when the processor emitted
+        # one. The real Qwen processor does emit it, so training is fine; a hand-built
+        # dict that omits it takes a branch no real run takes.
+        multi_modal_inputs={"image_grid_thw": None, "video_grid_thw": None,
+                            "mm_token_type_ids": torch.zeros(1, 4, dtype=torch.long)},
     )
 
     expected = (1, 4, 4) if expects_mrope else (1, 4)
