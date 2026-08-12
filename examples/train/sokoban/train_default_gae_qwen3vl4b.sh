@@ -1,24 +1,16 @@
 #!/bin/bash
-# sokoban - default_gae - concat - Qwen/Qwen3.5-4B
+# sokoban - default_gae - concat - Qwen/Qwen3-VL-4B-Instruct
 #
-# Qwen3.5 is natively multimodal: there is no `-VL` variant to look for. The
-# `Qwen3.5-VL-*` repos on the Hub are third-party derivatives.
-#
-# Needs a newer stack than the rest of these scripts, and says so only as
-# `KeyError: 'qwen3_5'`:
-#   transformers >= 5.2.0   4.57 has qwen3_vl but not this
-#   vllm                    the text stack interleaves linear_attention with
-#                           full_attention, so the engine has to know the architecture
-# Both are satisfied by the pinned versions. The config resolves there; no training run
-# has been done on this model.
+# model_type qwen3_vl, which needs transformers >= 4.57 and reports its absence as
+# KeyError('qwen3_vl').
 set -eo pipefail
 
 V=$(cd "$(dirname "$0")/../../.." && pwd)
 SCRIPTDIR=$(cd "$(dirname "$0")" && pwd)
 PROJECT_NAME=${PROJECT_NAME:-vagen_experiments}
-EXPERIMENT_NAME=${EXPERIMENT_NAME:-sokoban_default_gae_qwen35_4b}
+EXPERIMENT_NAME=${EXPERIMENT_NAME:-sokoban_default_gae_qwen3vl4b}
 EXPERIMENT_DIR=${EXPERIMENT_DIR:-$V/exps/$PROJECT_NAME/$EXPERIMENT_NAME}
-MODEL=${MODEL:-Qwen/Qwen3.5-4B}
+MODEL=${MODEL:-Qwen/Qwen3-VL-4B-Instruct}
 mkdir -p "$EXPERIMENT_DIR"
 
 # verl is not imported as an installed package; it is a checkout, and it has to come

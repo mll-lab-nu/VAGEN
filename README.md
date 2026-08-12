@@ -92,10 +92,19 @@ cd VAGEN
 bash scripts/install.sh
 ```
 
-`scripts/install.sh` fetches the pinned verl submodule, installs the vLLM/SGLang stack
-through verl's own installer, then verl and VAGEN, and checks the result. It is
-idempotent, so it is safe to re-run. `SKIP_ENGINE=1` skips step 2 if vLLM and SGLang are
-already installed.
+`scripts/install.sh` fetches the pinned verl submodule, installs VAGEN with a rollout
+engine, then verl, and checks the result. It is idempotent, so it is safe to re-run.
+`SKIP_ENGINE=1` installs VAGEN without an engine if you already have one.
+
+vLLM is the default and the verified path. For SGLang:
+
+```bash
+BACKEND=sglang bash scripts/install.sh
+```
+
+**Use one engine per environment.** They are mutually exclusive, and not by preference:
+each pins a different `flashinfer` patch version, so pip refuses to install them together.
+Use two conda environments if you want both.
 
 <details>
 <summary>Doing it by hand</summary>
@@ -103,13 +112,18 @@ already installed.
 ```bash
 git submodule update --init --recursive   # verl, pinned; the scripts will not run without it
 
-cd verl
-USE_MEGATRON=0 bash scripts/install_vllm_sglang_mcore.sh
-pip install --no-deps -e .                # --no-deps: verl's pins would downgrade the stack above
-cd ..
-pip install -e .
-pip install "trl==0.26.2"
+pip install -e ".[vllm]"                  # or ".[sglang]" -- pick one, never both
+pip install --no-deps -e ./verl           # --no-deps: verl's pins would undo the line above
+pip install accelerate codetiming datasets dill hydra-core numpy pandas peft pyarrow \
+            pybind11 pylatexenc ray tensordict torchdata wandb
 ```
+
+The engine, `torch` and `transformers` versions all live in `setup.py`'s
+`extras_require`, so there is one place that says which versions go together.
+
+No `flash-attn` step: it publishes no wheel past torch 2.9, so on a newer torch installing
+it means a source build. `transformers[kernels]`, which the extras pull in, instead fetches
+a prebuilt `kernels-community/flash-attn2` from the Hub on first use.
 
 verl is imported from the checkout rather than from PyPI, and the training scripts find
 it at `VAGEN/verl` (the submodule) or `../verl` (a sibling checkout), in that order. Set

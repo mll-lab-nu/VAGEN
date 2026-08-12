@@ -28,7 +28,19 @@ setup(
         # and below 4.57 it raises the same for 'qwen3_vl' -- naming the model type and
         # not the reason. The engine extras pin this exactly; the floor is for anyone
         # installing VAGEN without one.
-        "transformers>=5.2.0",
+        #
+        # [kernels] is how flash attention gets here at all. verl asks for
+        # attn_implementation="flash_attention_2" -- hardcoded, in the critic's value-head
+        # path -- and the flash-attn package has no wheel for this torch: upstream builds
+        # up to torch 2.9 and we are on 2.11, so installing it means a source build.
+        # transformers avoids that by pulling a prebuilt kernels-community/flash-attn2
+        # from the Hub, but only when `kernels` is importable; otherwise it raises
+        # "FlashAttention2 has been toggled on, but ... doesn't seem to be installed"
+        # and blames the missing package rather than the missing fallback. Written as an
+        # extra so the version range stays transformers' to declare -- it is currently
+        # kernels<0.13,>=0.12.0, and a plain `pip install kernels` picks up 0.16, whose
+        # get_kernel() requires an explicit revision and fails the fallback.
+        "transformers[kernels]>=5.2.0",
         # Not a direct dependency -- it arrives with something else -- but peft's
         # is_torchao_available() *raises* below 0.16 instead of returning False, so a
         # stale copy breaks LoRA even though nothing here quantises. Absent is fine;
@@ -39,6 +51,20 @@ setup(
         # use it. Nothing else in the stack pulls it in, so those all died with
         # ModuleNotFoundError on a clean machine.
         "fire",
+        # verl's critic loads its value head from trl, so every GAE estimator needs it.
+        # verl installs with --no-deps, so it has to be named here or the run dies at
+        # critic construction with "is not a value head model, please install trl".
+        #
+        # Both bounds are load-bearing:
+        #   >=0.27  below it, trl's __init__ monkey-patches vllm behind a bare
+        #           `if is_vllm_available()`, importing vllm.transformers_utils.tokenizer,
+        #           which vllm moved to vllm/tokenizers/hf.py. `import trl` then raises
+        #           ModuleNotFoundError just because vllm is installed.
+        #   <0.29   0.29 drops the top-level AutoModelForCausalLMWithValueHead, which
+        #           verl's utils/model.py imports unqualified. Its monkey_patch.py already
+        #           prefers trl.experimental.ppo; utils/model.py was not updated to match,
+        #           so raising this ceiling means patching verl too.
+        "trl>=0.27,<0.29",
     ],
     # ------------------------------------------------------------- the two rollout engines
     #
@@ -61,7 +87,7 @@ setup(
         "vllm": [
             "torch==2.11.0",
             "vllm==0.22.0",          # verl main needs >=0.18.0 for vllm.entrypoints.openai.parser
-            "transformers==5.12.1",
+            "transformers[kernels]==5.12.1",
         ],
         # sglang 0.5.15, not the 0.5.8 verl main declares: 0.5.8 pins torch==2.9.1, which
         # would make the two extras disagree on torch for no benefit. 0.5.15 still exports
@@ -70,7 +96,7 @@ setup(
         "sglang": [
             "torch==2.11.0",
             "sglang[srt,openai]==0.5.15",
-            "transformers==5.12.1",
+            "transformers[kernels]==5.12.1",
         ],
     },
     # 3.12, not 3.10: the source parses under 3.10, but verl's installer fetches a
