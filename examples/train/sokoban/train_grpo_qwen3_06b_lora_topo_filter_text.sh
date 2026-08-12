@@ -1,6 +1,12 @@
 #!/bin/bash
 # sokoban - grpo - concat - Qwen/Qwen3-0.6B
 #
+# No KL term, though this script used to ask for one. It needs a reference policy and
+# this trainer path has none to give: under LoRA the reference is the actor with the
+# adapter off, so main_ppo registers no RefPolicy worker while the separated trainer asks
+# for one regardless -- KeyError before step 0. Without LoRA it registers ActorRolloutRef
+# instead, which that trainer does not look for either.
+#
 # Per-experiment settings only. Everything that makes a VAGEN run work at all lives in
 # vagen/configs/baseline_vllm.flags and is read below -- in particular the two flags that
 # select VAGEN's agent loop. Without them verl runs its own, and the job comes up looking
@@ -37,9 +43,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     critic.model.path="$MODEL" \
     algorithm.adv_estimator=grpo \
     actor_rollout_ref.actor.optim.lr=3e-5 \
-    actor_rollout_ref.actor.use_kl_loss=True \
-    actor_rollout_ref.actor.kl_loss_coef=0.001 \
-    algorithm.kl_ctrl.kl_coef=0.001 \
+    actor_rollout_ref.actor.use_kl_loss=False \
     actor_rollout_ref.rollout.max_model_len=5000 \
     trainer.log_val_generations=16 \
     trainer.harness=concat \
