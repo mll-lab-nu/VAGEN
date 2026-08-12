@@ -144,29 +144,6 @@ def default_env_response(mode: str, b: Budgets) -> int:  # noqa: D401
     return max(b.response_len // 4, b.response_len - b.per_turn, 1)
 
 
-def compact_budget_bounds(b: Budgets) -> tuple[int, int]:
-    """``(lowest, highest)`` workable ``m``, derived from everything else.
-
-    The top is where a conversation stops being summarisable inside the window. The
-    trigger fires on a measured turn cost, so a conversation can be admitted at ``m - 1``
-    and then overshoot by at most one turn before it is closed -- ``E + g``, the ceilings,
-    which is the one thing they are good for. Add the summary request and the summary and
-    that is the peak the window has to hold.
-
-    The bottom is only the compression rule, ``2k <= m``. Whether ``m`` is large enough to
-    buy more than one turn depends on ``S`` and on what a turn actually costs, neither of
-    which is known here; ``CompactionMakesNoProgress`` answers that at runtime, when both
-    have been measured.
-    """
-    k = b.summary_budget or default_summary_budget(b.compact_budget or 4, b.per_turn)
-    lowest = 2 * k
-    overhead = b.summary_request_len + k + b.env_response + b.per_turn
-    # Against the response region and not the window. Almost all of a conversation lands
-    # in the response region -- only the opening call becomes the prompt region -- so a
-    # large max_prompt_length hides an overflow rather than absorbing one. Charging the
-    # opening at zero is the safe direction, since its real size is the system prompt and
-    # that is not known until an episode starts.
-    return lowest, min(b.window, b.response_len) - overhead
 
 
 # ----------------------------------------------------------------------------- checks
