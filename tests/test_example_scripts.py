@@ -219,3 +219,24 @@ def test_train_and_val_do_not_share_a_dataset_sample():
         overlap = sorted(halves["train"] & halves["val"])
         assert not overlap, f"{where}: {env} trains and validates on samples {overlap[:5]}"
     assert checked, "no env had both a train and a val yaml; this test checked nothing"
+
+
+@pytest.mark.parametrize("path", SCRIPTS, ids=lambda p: "/".join(p.split("/")[-2:]))
+def test_no_comment_hides_inside_a_line_continuation(path):
+    """★ A `#` line after a trailing `\\` is not a comment -- it is arguments.
+
+    These scripts are one long backslash-continued command, so a comment written between
+    two flags is passed to hydra word by word. `bash -n` accepts it, the script is still
+    executable, and the failure arrives as an unparseable override from a run that has
+    already allocated GPUs. Caught while explaining why a flag had been turned off.
+    """
+    lines = open(path).read().splitlines()
+    offenders = [
+        (i + 1, ln.strip()[:60])
+        for i, ln in enumerate(lines)
+        if i and ln.lstrip().startswith("#") and lines[i - 1].rstrip().endswith("\\")
+    ]
+    assert not offenders, (
+        f"{path}: these follow a line continuation, so they are arguments and not "
+        f"comments: {offenders}"
+    )
