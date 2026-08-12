@@ -128,3 +128,97 @@ async def test_rows_carry_the_mask_and_the_scores():
     assert row.response_mask == [1, 1]
     assert row.scores == [0.0, 1.0]
     assert row.logprobs == [0.1, 0.2]
+
+
+# ------------------------------------------------------------------ text-only models
+
+
+class TextTok(Tok):
+    """A tokenizer whose chat template concatenates content, as real ones do.
+
+    The `+` is the point: a Jinja template writes ``... + message['content'] + ...``, so
+    handing it the parts list raises TypeError rather than rendering something odd. Every
+    other fake here is a processor, which accepts both shapes, so the text-only path had
+    no coverage at all.
+    """
+
+    def apply_chat_template(self, messages, add_generation_prompt=True, tokenize=True, **kw):
+        text = ""
+        for m in messages:
+            text = text + m["content"]          # TypeError if content is a list
+        return [ord(c) for c in text] if tokenize else text
+
+
+def _text_client(server=None, **kw):
+    return VerlClient(server or Server(), TextTok(), None, **kw)
+
+
+@pytest.mark.asyncio
+async def test_a_text_only_model_can_continue_a_conversation():
+    """★ The regression. The opening call renders fine; the *continuation* asks for
+    `_template_prefix`, which rendered the placeholder turn as a parts list on a bare
+    tokenizer and died with "can only concatenate str (not list) to str". A text-only
+    model therefore could not reach turn two, and the only script that uses one failed at
+    step 0 after allocating GPUs.
+    """
+    server = Server()
+    c = _text_client(server)
+
+    r = await c.send([{"role": "user", "content": [{"type": "text", "text": "a"}]}])
+    await c.send([{"role": "user", "content": [{"type": "text", "text": "b"}]}], r.conversation_id)
+
+    assert len(server.calls) == 2, "the continuation never reached the server"
+
+
+def test_every_tokenizer_path_flattens_parts_to_text():
+    """The structural guard: `apply_chat_template` on `self.tokenizer` must go through
+    `_text_only`. Three call sites share that convention and one of them forgot."""
+    import ast
+    import inspect
+
+    from vagen.agent_loop import verl_client
+
+    tree = ast.parse(inspect.getsource(verl_client))
+
+    def literal_str_messages(fn):
+        """Names bound in `fn` to a dict literal whose content is a plain string.
+
+        `_separator_reproduces_the_template` builds its own two-turn exchange from such
+        literals to derive the message separator. Those never hold a parts list, so
+        requiring `_text_only` of them would be noise -- and a guard that cries wolf on
+        correct code is one someone edits until it stops firing.
+        """
+        out = set()
+        for n in ast.walk(fn):
+            if not (isinstance(n, ast.Assign) and isinstance(n.value, ast.Dict)):
+                continue
+            for k, v in zip(n.value.keys, n.value.values):
+                if (isinstance(k, ast.Constant) and k.value == "content"
+                        and isinstance(v, ast.Constant) and isinstance(v.value, str)):
+                    out.update(t.id for t in n.targets if isinstance(t, ast.Name))
+        return out
+
+    offenders = []
+    for fn in ast.walk(tree):
+        if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        safe = literal_str_messages(fn)
+        for node in ast.walk(fn):
+            if not isinstance(node, ast.Call):
+                continue
+            f = node.func
+            if not (isinstance(f, ast.Attribute) and f.attr == "apply_chat_template"):
+                continue
+            if "self.tokenizer" not in ast.unparse(f.value) or not node.args:
+                continue
+            arg = ast.unparse(node.args[0])
+            if "_text_only" in arg:
+                continue
+            names = {n.id for n in ast.walk(node.args[0]) if isinstance(n, ast.Name)}
+            if names and names <= safe:
+                continue
+            offenders.append(f"{fn.name}: {arg[:50]}")
+    assert not offenders, (
+        f"these render through the bare tokenizer without flattening to text, so a "
+        f"parts list reaches a template that concatenates strings: {offenders}"
+    )
