@@ -16,7 +16,7 @@ trainer:
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `replace_image_tokens_for_logging` | bool | `True` | Replace `<image>` tokens with placeholder for cleaner logs |
-| `log_image.enable` | bool | `True` | Enable image logging to local folder |
+| `log_image.enable` | bool | `false` | Enable image logging to local folder |
 | `log_image.max_pending` | int | `2` | Maximum pending image uploads |
 | `log_image.png_compress_level` | int | `0` | PNG compression level (0=none, 9=max) |
 
@@ -25,14 +25,14 @@ trainer:
 
 ```yaml
 filter:
-  name: reward_variance
+  name: reward_variance_top_p
   filter_kwargs: {}
   enable: False
 ```
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `name` | str | `reward_variance` | Filter name (must be registered via `@register_filter`) |
+| `name` | str | `reward_variance_top_p` | Filter name (must be registered via `@register_filter`) |
 | `filter_kwargs` | dict | `{}` | Arguments passed to filter function as `**kwargs` |
 | `enable` | bool | `False` | Enable/disable filtering |
 
@@ -43,7 +43,7 @@ See [Custom Filter](custom-filter.md) for creating your own filters.
 **`reward_variance`**
 ```yaml
 filter:
-  name: reward_variance
+  name: reward_variance_top_p
   filter_kwargs:
     topk: 0.2      # Keep top 20% groups by variance
     ddof: 0        # Degrees of freedom for variance calculation
