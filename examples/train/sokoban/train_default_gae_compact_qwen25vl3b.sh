@@ -28,11 +28,13 @@ mapfile -t BASE < <(grep -vE '^\s*(#|$)' "$V/vagen/configs/baseline_vllm.flags" 
 #
 # k is set rather than derived: derived it is min(g, m//4) = 512, which pushes m to ~2300
 # and lets the first conversation -- no summary to carry -- run 7 turns against 5 for
-# every one after it. At k=300, m in [1999, 2221] and the first gets 6. A 20-turn episode
-# then compacts 3 times: 6 + 5 + 5 + 4.
+# every one after it. At k=300, m in [1999, 2221] and the first gets 6.
 #
-# The trigger reads real usage, so a policy that writes longer compacts sooner. Check
-# where it actually fires before comparing against concat.
+# Measured, not predicted: 32 episodes produced 57 rows, 7 of them one row and 25 of them
+# two, so ~0.8 compactions per episode. The turn arithmetic above is per conversation and
+# holds; what it does not tell you is episode length. max_turns=20 is a cap and these
+# episodes end well before it, so most fit in one conversation plus a bit. Sizing m from
+# max_turns would have been sizing for an episode that does not occur.
 COMPACT_BUDGET=${COMPACT_BUDGET:-2100}
 COMPACT_SUMMARY_BUDGET=${COMPACT_SUMMARY_BUDGET:-300}
 
