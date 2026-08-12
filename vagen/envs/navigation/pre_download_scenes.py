@@ -5,7 +5,7 @@ every unique scene, then creates a Controller and resets each scene
 once so AI2-THOR caches the binary + scene assets under ~/.ai2thor/.
 
 Usage:
-    conda activate viewsuite
+    conda activate vagen
     python -m vagen.envs.navigation.pre_download_scenes
 """
 

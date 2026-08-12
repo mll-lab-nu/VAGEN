@@ -74,7 +74,7 @@ backends:
 
 | Field | Type | Description |
 |---|---|---|
-| `name` | str | Registered environment class (e.g. `FrozenLake`, `Sokoban`, `RemoteEnv`, `ScannetTool`) |
+| `name` | str | Registered environment class (e.g. `FrozenLake`, `Sokoban`, `RemoteEnv`, `SpatialGym`) |
 | `n_envs` | int | Number of episodes to run |
 | `tag_id` | int/str | Output subdirectory name: `tag_{tag_id}/` |
 | `seed` | list | `[start, end, step]` to generate a range, or explicit list of seeds |

@@ -44,7 +44,6 @@ class EnvSpecs:
 
 
 def load_envspecs(yaml_path: str) -> EnvSpecs:
-    print(yaml_path)
     cfg = OmegaConf.load(yaml_path)
     specs = [EnvSpec(**OmegaConf.to_container(s, resolve=True)) for s in cfg.get("envs", [])]
     return EnvSpecs(specs=specs)

@@ -303,7 +303,7 @@ def _expand_jobs(
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Evaluate ViewSuite agents across multiple env specs.")
+    parser = argparse.ArgumentParser(description="Evaluate VAGEN agents across multiple env specs.")
     parser.add_argument("--config", type=str, default=None, help="Path to evaluation YAML config.")
     parser.add_argument(
         "overrides",
