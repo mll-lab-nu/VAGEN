@@ -9,6 +9,9 @@ class NoConcatHarness(BaseHarness):
     """A conversation per turn: the model sees the system prompt and the latest
     observation, never the history."""
 
+    #: One row per turn.
+    splits_episode_across_rows = True
+
     def continues_conversation(self) -> bool:
         """Never. Every turn opens a new conversation, so the room is always a whole one."""
         return False

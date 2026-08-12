@@ -21,7 +21,18 @@ VERL_OWN = {"gae", "grpo", "reinforce_plus_plus", "rloo", "remax"}
 
 
 def _flag(text, name):
-    m = re.search(rf"{re.escape(name)}=([^\s\\]+)", text)
+    """The value a script actually passes for `name`, ignoring anything commented out.
+
+    Comment lines are stripped first because these scripts document their flags. The
+    compact script explains that `algorithm.adv_estimator=removed_estimator_gae` can be swapped in
+    from the command line, and a plain search over the whole file found that sentence
+    before the real flag -- capturing the trailing backtick along with it, so the script
+    was reported as naming an estimator that does not exist. Reading a comment as
+    configuration fails in the noisier direction too: a flag someone commented out to
+    disable would still be seen as set.
+    """
+    live = "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith("#"))
+    m = re.search(rf"{re.escape(name)}=([^\s\\]+)", live)
     return m.group(1) if m else None
 
 

@@ -65,6 +65,9 @@ class CompactHarness(BaseHarness):
     these two have to satisfy together.
     """
 
+    #: One row per conversation, and an episode has as many as it compacts.
+    splits_episode_across_rows = True
+
     SUMMARY_REQUEST = "Summarise the conversation so far. Keep every fact needed to continue."
     #: What the summary is wrapped in when it seeds the next conversation. Named because
     #: the accounting has to charge it: a relation written as ``S + k + E`` is short by

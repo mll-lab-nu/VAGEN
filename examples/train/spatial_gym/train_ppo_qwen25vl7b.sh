@@ -1,5 +1,5 @@
 #!/bin/bash
-# spatial_gym - gae - ppo_qwen25vl7b
+# spatial_gym - default_gae - concat - Qwen/Qwen2.5-VL-7B-Instruct
 #
 # Per-experiment settings only. Everything that makes a VAGEN run work at all lives in
 # vagen/configs/baseline_vllm.flags and is read below -- in particular the two flags that
@@ -38,7 +38,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     actor_rollout_ref.model.path="$MODEL" \
     critic.model.path="$MODEL" \
     critic.enable=True \
-    algorithm.adv_estimator=token_level_gae \
+    algorithm.adv_estimator=default_gae \
     trainer.harness=concat \
     data.train_batch_size=32 \
     data.max_prompt_length=4000 \

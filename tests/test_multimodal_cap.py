@@ -140,9 +140,9 @@ def test_the_overflow_hint_differs_by_mode():
     assert "switch trainer.harness to compact" in hint({"harness": "concat"})
     assert "compact_budget=400" in hint({"harness": "compact", "compact_budget": 400})
     assert "single" in hint({"harness": "no_concat"})
-    # Unset harness follows the legacy flag rather than reporting no mode at all.
-    assert "harness=concat" in hint({"harness": None, "concat_multi_turn": True})
-    assert "harness=no_concat" in hint({"harness": None, "concat_multi_turn": False})
+    # Unset harness still names a mode rather than reporting none at all. It resolves to
+    # concat, which is also what the shipped config now says outright.
+    assert "harness=concat" in hint({"harness": None})
 
 
 def test_gym_loop_defers_to_the_guard_rather_than_slicing():

@@ -481,9 +481,10 @@ class GymLoop(VagenGymAgentLoopBase):
         return f" Running trainer.harness={mode}: {fix}" if fix else ""
 
     def _harness_mode(self) -> str:
-        return self.config.trainer.get("harness", None) or (
-            "concat" if self.config.trainer.get("concat_multi_turn", True) else "no_concat"
-        )
+        """Which context policy this run uses. One key: the old ``concat_multi_turn``
+        boolean is deleted rather than deprecated, so a stale override is rejected by
+        hydra rather than quietly outvoted by ``harness``."""
+        return self.config.trainer.get("harness", None) or "concat"
 
     def _build_harness(self, per_turn: int, max_turns: int, env_response=None,
                        per_turn_configured: bool = True):
