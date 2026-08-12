@@ -71,7 +71,7 @@ class GymImageEnvClient(GymImageEnv):
                 - base_urls (str | List[str]): Server URL(s). If not provided,
                   URLs are loaded from url_file.
                 - url_file (str): Path to a text file with one URL per line.
-                  Default: /root/projects/viewsuite/client_url.txt
+                  Required when base_urls is absent; there is no default.
                 - timeout (float): Request timeout in seconds (default: 120.0)
                 - retries (int): Number of retries (default: 6)
                 - backoff (float): Backoff multiplier (default: 2.0)
@@ -83,9 +83,18 @@ class GymImageEnvClient(GymImageEnv):
         super().__init__(env_config)
 
         # Extract client config — resolve URLs
-        raw_urls = env_config.get("base_urls",None)
+        raw_urls = env_config.get("base_urls", None)
         if not raw_urls:
-            url_file = env_config.get("url_file", "/root/projects/viewsuite/client_url.txt")
+            # No default path. It used to fall back to an absolute path under /root that
+            # only existed on one machine, so a config without base_urls failed with a
+            # FileNotFoundError naming a directory the reader had never heard of.
+            url_file = env_config.get("url_file")
+            if not url_file:
+                raise ValueError(
+                    "RemoteEnv needs the server address: set env_config['base_urls'] to a "
+                    "URL or list of URLs, or env_config['url_file'] to a file with one URL "
+                    "per line."
+                )
             with open(url_file) as f:
                 raw_urls = f.read()
         self.base_urls: List[str] = self._parse_urls(raw_urls)

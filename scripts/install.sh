@@ -21,11 +21,14 @@ say() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
 die() { printf '\033[1;31m[error] %s\033[0m\n' "$*" >&2; exit 1; }
 
 USE_MEGATRON=${USE_MEGATRON:-0}
-SKIP_ENGINE=${SKIP_ENGINE:-0}     # set to 1 if vllm/sglang are already installed
+export SKIP_ENGINE=${SKIP_ENGINE:-0}   # 1 = vllm/sglang already installed; exported so the verification block can see it
 
 command -v python3 >/dev/null || die "no python3 on PATH"
-python3 - <<'PY' || die "VAGEN needs Python 3.10 or newer"
-import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)
+# 3.12 specifically, not ">=3.10": the source parses under 3.10, but verl's installer
+# fetches a cp312-only flash-attn wheel, so an older interpreter gets "not a supported
+# wheel on this platform" partway through step 2 rather than a clear message here.
+python3 - <<'PY' || die "VAGEN needs Python 3.12 (verl's flash-attn wheel is cp312-only)"
+import sys; sys.exit(0 if sys.version_info[:2] == (3, 12) else 1)
 PY
 
 # ---------------------------------------------------------------------- 1. verl source
@@ -43,30 +46,40 @@ if [ "$SKIP_ENGINE" = "1" ]; then
     say "skipping the engine stack (SKIP_ENGINE=1)"
 else
     say "vllm / sglang (via verl's installer; this is the long one)"
-    ( cd "$V/verl" && USE_MEGATRON=$USE_MEGATRON bash scripts/install_vllm_sglang_mcore.sh )
+    # `bash -e`, not `bash`: set -e does not cross into a script invoked this way, and
+    # verl's installer sets none of its own -- its last line is an unconditional
+    # "Successfully installed all packages" echo, so a failed pip inside it exited 0 and
+    # this step could not fail. The flash-attn step is the likely one: it is
+    # `wget ... && pip install ...`, which silently does nothing if the download fails.
+    ( cd "$V/verl" && USE_MEGATRON=$USE_MEGATRON bash -e scripts/install_vllm_sglang_mcore.sh )
+    python3 -c "import vllm, flash_attn" 2>/dev/null \
+        || die "the engine stack did not install cleanly (vllm / flash_attn do not import); see the output above"
 fi
 
 # ------------------------------------------------------------------------ 3. verl
 say "verl (--no-deps)"
 # --no-deps on purpose: verl pins versions of the engine stack that step 2 just resolved,
 # and letting pip re-resolve them downgrades vllm underneath a working install.
-pip install --no-deps -e "$V/verl"
+python3 -m pip install --no-deps -e "$V/verl"
 
 # ----------------------------------------------------------------------- 4. vagen
 say "vagen"
-pip install -e "$V"
+python3 -m pip install -e "$V"
 
 # ------------------------------------------------------------------------- 5. trl
 say "trl"
-pip install "trl==0.26.2"
+python3 -m pip install "trl==0.26.2"
 
 # ---------------------------------------------------------------------- verification
 say "checking the install"
-python3 - <<'PY'
-import importlib, sys
+SKIP_ENGINE=$SKIP_ENGINE python3 - <<'PY'
+import importlib, os, sys
 
 problems = []
-for mod in ("torch", "vllm", "transformers", "verl", "vagen"):
+mods = ["torch", "transformers", "verl", "vagen"]
+if os.environ.get("SKIP_ENGINE") != "1":
+    mods.insert(1, "vllm")
+for mod in mods:
     try:
         m = importlib.import_module(mod)
         print(f"  {mod:<14} {getattr(m, '__version__', 'ok')}")

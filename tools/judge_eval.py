@@ -16,7 +16,7 @@ would learn not to. This measures that directly.
 """
 import asyncio, json, os, sys
 from vagen.rewards.judge import StructuredJudge
-from vagen.rewards.sokoban import JUDGE_PROMPT
+from vagen.envs.sokoban.state_reward_spec import JUDGE_PROMPT
 
 B = lambda v, h: {"object_id": "box", "vertical_relation": v, "horizontal_relation": h}
 T = lambda v, h: {"object_id": "target", "vertical_relation": v, "horizontal_relation": h}

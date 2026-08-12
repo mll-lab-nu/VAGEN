@@ -58,7 +58,6 @@ nohup.out
 .venv/
 .env
 .netrc
-_mast/
 
 # Cluster launchers: site-specific, kept local rather than published.
 examples/slurm/

@@ -11,24 +11,27 @@
 ### Setup
 
 ```bash
-# Create conda environment
 conda create -n vagen python=3.12 -y
 conda activate vagen
 
-# Clone repository
-git clone https://github.com/mll-lab-nu/VAGEN.git
+git clone --recursive https://github.com/mll-lab-nu/VAGEN.git
 cd VAGEN
+bash scripts/install.sh
+```
+
+`scripts/install.sh` is idempotent and verifies the result. `SKIP_ENGINE=1` skips the
+vLLM/SGLang step if you already have them.
+
+To do it by hand, the order matters — the engine stack first, then verl, then VAGEN:
+
+```bash
 git submodule update --init --recursive
 
-# Install VAGEN
-pip install -e .
-
-# Install VERL
 cd verl
 USE_MEGATRON=0 bash scripts/install_vllm_sglang_mcore.sh
-# verl is used from the sibling checkout, on PYTHONPATH -- not installed
-
-# Additional dependencies
+pip install --no-deps -e .    # --no-deps: verl's pins would downgrade the stack above
+cd ..
+pip install -e .              # after verl, so VAGEN's transformers/torchao floors win
 pip install "trl==0.26.2"
 ```
 
@@ -36,7 +39,7 @@ pip install "trl==0.26.2"
 
 ### Training Paradigms
 
-VAGEN supports two multi-turn training paradigms:
+VAGEN supports three multi-turn training paradigms:
 
 #### 1. Concatenated Training
 
