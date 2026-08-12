@@ -103,7 +103,7 @@ pip install "trl==0.26.2"
 ## Quick Start
 
 ### Training
-VAGEN currently supports PPO / GRPO with two multi-turn training paradigms:
+VAGEN currently supports PPO / GRPO with three multi-turn training paradigms:
 
 **Multi-turn Concatenated Training**: All turns in a trajectory are concatenated into a single training instance.
 
@@ -133,6 +133,23 @@ bash examples/train/frozenlake/train_grpo_qwen25vl3b_filtertopp_vision.sh
 ```bash
 cd VAGEN
 bash examples/train/sokoban/train_ppo_no_concat_qwen25vl3b.sh
+```
+
+**Multi-turn Compacted Training**: Turns are concatenated until a token budget is reached, then summarised so the next conversation starts from the summary. One training instance per conversation.
+
+```bash
+cd VAGEN
+bash examples/train/sokoban/train_default_gae_compact_qwen25vl3b.sh
+```
+
+The paradigm is chosen with `trainer.harness=concat|no_concat|compact`, and it is independent of `algorithm.adv_estimator` — the harness decides how an episode is laid out in rows and the estimator stitches those rows back into one trajectory. Note that verl's own `gae`/`grpo` score a row at a time, so they are only correct under `concat`; the trainer refuses the other two rather than training on truncated trajectories.
+
+```bash
+# LoRA. peft raises on an outdated torchao rather than skipping it, so
+# a too-old version breaks LoRA even though nothing here quantises:
+# pip install "torchao>=0.16.0"   (or uninstall torchao entirely)
+cd VAGEN
+bash examples/train/frozenlake/train_ppo_no_concat_lora_qwen25vl3b.sh
 ```
 ### Evaluation
 
