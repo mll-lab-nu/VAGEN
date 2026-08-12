@@ -18,16 +18,18 @@ import pytest
 
 from model_path import local_snapshot
 
-MODEL = glob.glob(
-    (local_snapshot() or "") + "/"
-)
-pytestmark = pytest.mark.skipif(not MODEL, reason="Qwen2.5-VL snapshot not present")
+#: The snapshot itself, not a glob of it. `glob.glob((None or "") + "/")` is
+#: `glob.glob("/")`, which returns `["/"]` -- truthy -- so with no snapshot cached the
+#: skip never fired and the fixture called `from_pretrained("/")`. On a machine without
+#: the model that is six errors where the file promises six skips.
+MODEL = local_snapshot()
+pytestmark = pytest.mark.skipif(MODEL is None, reason="Qwen2.5-VL snapshot not present")
 
 
 @pytest.fixture(scope="module")
 def tok():
     transformers = pytest.importorskip("transformers")
-    return transformers.AutoTokenizer.from_pretrained(MODEL[0], trust_remote_code=True)
+    return transformers.AutoTokenizer.from_pretrained(MODEL, trust_remote_code=True)
 
 
 class _Started:
