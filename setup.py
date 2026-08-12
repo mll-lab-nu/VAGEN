@@ -24,9 +24,11 @@ setup(
         "gymnasium",
         "gymnasium[toy-text]",
         "uvicorn<0.41",
-        # Qwen3-VL. Older versions raise KeyError('qwen3_vl') from AutoConfig, which
-        # names the model type and not the reason.
-        "transformers>=4.57.0",
+        # 5.2 is where `qwen3_5` lands; below it AutoConfig raises KeyError('qwen3_5'),
+        # and below 4.57 it raises the same for 'qwen3_vl' -- naming the model type and
+        # not the reason. The engine extras pin this exactly; the floor is for anyone
+        # installing VAGEN without one.
+        "transformers>=5.2.0",
         # Not a direct dependency -- it arrives with something else -- but peft's
         # is_torchao_available() *raises* below 0.16 instead of returning False, so a
         # stale copy breaks LoRA even though nothing here quantises. Absent is fine;
@@ -38,7 +40,39 @@ setup(
         # ModuleNotFoundError on a clean machine.
         "fire",
     ],
-    extras_require={"test": ["pytest", "pytest-asyncio"]},
+    # ------------------------------------------------------------- the two rollout engines
+    #
+    # Pick exactly one:  pip install -e ".[vllm]"   or   pip install -e ".[sglang]"
+    #
+    # They are mutually exclusive, and not by preference -- every (vllm, sglang) pair in
+    # this torch tier pins a different flashinfer patch version, so pip refuses the two
+    # together:
+    #     vllm   0.22.0  -> flashinfer 0.6.11.post2
+    #     sglang 0.5.15  -> flashinfer 0.6.12
+    # verl models them the same way, as separate extras. Installing both into one
+    # environment is not a supported configuration; use two environments.
+    #
+    # torch and transformers are pinned identically on both sides so the two environments
+    # differ only in the engine, and transformers 5.12.1 is what gives Qwen3.5.
+    extras_require={
+        "test": ["pytest", "pytest-asyncio"],
+        # The verified default: the whole VAGEN suite and the sokoban concat / no_concat /
+        # compact scripts run on this.
+        "vllm": [
+            "torch==2.11.0",
+            "vllm==0.22.0",          # verl main needs >=0.18.0 for vllm.entrypoints.openai.parser
+            "transformers==5.12.1",
+        ],
+        # sglang 0.5.15, not the 0.5.8 verl main declares: 0.5.8 pins torch==2.9.1, which
+        # would make the two extras disagree on torch for no benefit. 0.5.15 still exports
+        # `ContinueGenerationReqInput`, the symbol verl's sglang rollout imports and the
+        # one whose absence broke sglang on the old pin.
+        "sglang": [
+            "torch==2.11.0",
+            "sglang[srt,openai]==0.5.15",
+            "transformers==5.12.1",
+        ],
+    },
     # 3.12, not 3.10: the source parses under 3.10, but verl's installer fetches a
     # cp312-only flash-attn wheel, so an older interpreter fails partway through the
     # install rather than here.

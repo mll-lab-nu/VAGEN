@@ -1,84 +1,99 @@
 #!/bin/bash
 # One-command install for VAGEN.
 #
-#   bash scripts/install.sh
+#   bash scripts/install.sh                  vLLM   (default, and the verified path)
+#   BACKEND=sglang bash scripts/install.sh   SGLang
 #
-# Assumes you are already in the conda env you want to install into, and that the repo
-# was cloned. Safe to re-run: every step is idempotent.
+# Assumes you are already in the conda env you want to install into. Safe to re-run.
 #
-# What it installs, and why the order matters:
-#   1. the verl submodule            everything else imports it
-#   2. verl's engine stack           vllm / sglang, via verl's own installer
-#   3. verl itself, --no-deps        its pins would fight the stack just installed
-#   4. vagen                         picks up transformers / torchao floors from setup.py
-#   5. trl                           pinned; newer versions moved what verl imports
+# Pick one engine per environment. They are mutually exclusive, and not by preference:
+# every (vllm, sglang) pair pins a different flashinfer patch version, so pip refuses
+# them together. verl models them the same way, as separate extras. flashinfer itself
+# needs no attention here -- each engine pulls the version it wants.
+#
+# The pins live in setup.py's extras_require, so there is one place that says which
+# versions go together. This script does not call verl's
+# scripts/install_vllm_sglang_mcore.sh, which was the previous approach and had three
+# problems:
+#   - it installs sglang 0.5.2, while verl requires 0.5.8+. verl's sglang rollout imports
+#     `ContinueGenerationReqInput`, absent before 0.5.6, so `rollout.name=sglang` died
+#     with an ImportError naming neither sglang nor a version.
+#   - it sets no `set -e` and ends in an unconditional success echo, so any pip failure
+#     inside it still exited 0 and flowed into the next step.
+#   - it wgets a hardcoded cp312 flash-attn wheel, which silently no-ops if the download
+#     fails and rules out every other Python version.
 set -euo pipefail
 
 V=$(cd "$(dirname "$0")/.." && pwd)
 cd "$V"
 
-say() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
-die() { printf '\033[1;31m[error] %s\033[0m\n' "$*" >&2; exit 1; }
+say()  { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
+warn() { printf '\033[1;33m[!] %s\033[0m\n' "$*" >&2; }
+die()  { printf '\033[1;31m[error] %s\033[0m\n' "$*" >&2; exit 1; }
 
-USE_MEGATRON=${USE_MEGATRON:-0}
-export SKIP_ENGINE=${SKIP_ENGINE:-0}   # 1 = vllm/sglang already installed; exported so the verification block can see it
+export BACKEND=${BACKEND:-vllm}
+export SKIP_ENGINE=${SKIP_ENGINE:-0}   # 1 = engine already installed; exported for the check below
+
+case "$BACKEND" in
+    vllm)   ;;
+    sglang) warn "the sglang extra is not the verified path; the example scripts are tested on vLLM" ;;
+    *)      die "BACKEND must be 'vllm' or 'sglang', got '$BACKEND'" ;;
+esac
 
 command -v python3 >/dev/null || die "no python3 on PATH"
-# 3.12 specifically, not ">=3.10": the source parses under 3.10, but verl's installer
-# fetches a cp312-only flash-attn wheel, so an older interpreter gets "not a supported
-# wheel on this platform" partway through step 2 rather than a clear message here.
-python3 - <<'PY' || die "VAGEN needs Python 3.12 (verl's flash-attn wheel is cp312-only)"
+python3 - <<'PY' || die "VAGEN needs Python 3.12"
 import sys; sys.exit(0 if sys.version_info[:2] == (3, 12) else 1)
 PY
 
 # ---------------------------------------------------------------------- 1. verl source
 say "verl submodule"
-# Checking for a file, not the directory: an uninitialised submodule leaves an empty
-# `verl/` behind, which every "is it there" test passes and every import fails.
+# Probes for a file, not the directory: an uninitialised submodule leaves `verl/` present
+# and empty, which passes every existence check and fails every import.
 if [ ! -f "$V/verl/verl/trainer/config/ppo_trainer.yaml" ]; then
     git submodule update --init --recursive \
-        || die "could not fetch the verl submodule; check network or clone with --recursive"
+        || die "could not fetch the verl submodule; check the network, or clone with --recursive"
 fi
 [ -f "$V/verl/verl/trainer/config/ppo_trainer.yaml" ] || die "verl/ is still empty after submodule update"
 
-# ------------------------------------------------------------------- 2. engine stack
+# ------------------------------------------------------------ 2. vagen + engine extra
 if [ "$SKIP_ENGINE" = "1" ]; then
-    say "skipping the engine stack (SKIP_ENGINE=1)"
+    say "vagen (no engine; SKIP_ENGINE=1)"
+    python3 -m pip install --no-cache-dir -e "$V"
 else
-    say "vllm / sglang (via verl's installer; this is the long one)"
-    # `bash -e`, not `bash`: set -e does not cross into a script invoked this way, and
-    # verl's installer sets none of its own -- its last line is an unconditional
-    # "Successfully installed all packages" echo, so a failed pip inside it exited 0 and
-    # this step could not fail. The flash-attn step is the likely one: it is
-    # `wget ... && pip install ...`, which silently does nothing if the download fails.
-    ( cd "$V/verl" && USE_MEGATRON=$USE_MEGATRON bash -e scripts/install_vllm_sglang_mcore.sh )
-    python3 -c "import vllm, flash_attn" 2>/dev/null \
-        || die "the engine stack did not install cleanly (vllm / flash_attn do not import); see the output above"
+    say "vagen[$BACKEND] -- this is the long one"
+    # One pip call so the resolver sees torch, the engine and transformers together and
+    # reports a conflict, rather than resolving in sequence and letting the last pin
+    # silently downgrade torch under an already-built engine.
+    python3 -m pip install --no-cache-dir -e "$V[$BACKEND]" \
+        || die "the $BACKEND extra did not resolve. The two engines pin different flashinfer versions and cannot share an environment -- if the other one is already installed here, use a fresh env."
 fi
 
 # ------------------------------------------------------------------------ 3. verl
-say "verl (--no-deps)"
-# --no-deps on purpose: verl pins versions of the engine stack that step 2 just resolved,
-# and letting pip re-resolve them downgrades vllm underneath a working install.
-python3 -m pip install --no-deps -e "$V/verl"
+say "verl (--no-deps) and its own requirements"
+# --no-deps: verl pins engine versions of its own that would re-resolve and undo step 2.
+python3 -m pip install --no-cache-dir --no-deps -e "$V/verl"
+# What --no-deps skipped. Not the engine -- that is step 2 -- just verl's plain deps.
+python3 -m pip install --no-cache-dir \
+    accelerate codetiming datasets dill hydra-core numpy pandas peft pyarrow \
+    pybind11 pylatexenc ray tensordict torchdata wandb
 
-# ----------------------------------------------------------------------- 4. vagen
-say "vagen"
-python3 -m pip install -e "$V"
-
-# ------------------------------------------------------------------------- 5. trl
+# ------------------------------------------------------------------------- 4. trl
 say "trl"
-python3 -m pip install "trl==0.26.2"
+python3 -m pip install --no-cache-dir "trl==0.26.2"
 
 # ---------------------------------------------------------------------- verification
 say "checking the install"
-SKIP_ENGINE=$SKIP_ENGINE python3 - <<'PY'
+python3 - <<'PY'
 import importlib, os, sys
 
-problems = []
+backend = os.environ.get("BACKEND", "vllm")
+skipped = os.environ.get("SKIP_ENGINE") == "1"
+
 mods = ["torch", "transformers", "verl", "vagen"]
-if os.environ.get("SKIP_ENGINE") != "1":
-    mods.insert(1, "vllm")
+if not skipped:
+    mods.insert(1, backend)
+
+problems = []
 for mod in mods:
     try:
         m = importlib.import_module(mod)
@@ -86,23 +101,38 @@ for mod in mods:
     except Exception as exc:
         problems.append(f"{mod}: {exc}")
 
-# The two floors that fail late and blame something else. transformers below 4.57 raises
-# KeyError('qwen3_vl') from AutoConfig; peft *raises* on a torchao older than 0.16 rather
-# than skipping it, which breaks LoRA even though nothing here quantises.
+# The floors that otherwise fail late and blame something else.
 try:
     from packaging.version import parse
     import transformers
-    if parse(transformers.__version__) < parse("4.57.0"):
-        problems.append(f"transformers {transformers.__version__} < 4.57.0; Qwen3-VL will not load")
+    if parse(transformers.__version__) < parse("5.2.0"):
+        problems.append(f"transformers {transformers.__version__} < 5.2.0; AutoConfig raises "
+                        f"KeyError('qwen3_5') for Qwen3.5")
     try:
         import torchao
         if parse(torchao.__version__) < parse("0.16.0"):
-            problems.append(f"torchao {torchao.__version__} < 0.16.0; peft raises on it and LoRA breaks "
+            problems.append(f"torchao {torchao.__version__} < 0.16.0; peft raises on it, breaking LoRA "
                             f"(uninstalling torchao also works)")
     except ImportError:
         pass          # absent is fine; peft only objects to a stale one
 except Exception as exc:
     problems.append(f"version check failed: {exc}")
+
+if not skipped:
+    # The import whose absence is how a too-old engine shows up: as a ModuleNotFoundError
+    # or ImportError from deep inside verl, naming neither the engine nor a version.
+    if backend == "vllm":
+        try:
+            importlib.import_module("vllm.entrypoints.openai.parser")
+        except Exception:
+            problems.append("vllm is too old for this verl: it lacks "
+                            "vllm.entrypoints.openai.parser. Install vllm>=0.18.0.")
+    else:
+        try:
+            from sglang.srt.managers.io_struct import ContinueGenerationReqInput  # noqa: F401
+        except Exception:
+            problems.append("sglang is too old for this verl: it lacks "
+                            "ContinueGenerationReqInput, added in 0.5.6. Install sglang>=0.5.6.")
 
 if problems:
     print("\n\033[1;31mproblems:\033[0m")
