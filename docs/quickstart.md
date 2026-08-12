@@ -19,20 +19,20 @@ cd VAGEN
 bash scripts/install.sh
 ```
 
-`scripts/install.sh` is idempotent and verifies the result. `SKIP_ENGINE=1` skips the
-vLLM/SGLang step if you already have them.
+`scripts/install.sh` is idempotent and verifies the result. It installs vLLM by default;
+`BACKEND=sglang bash scripts/install.sh` picks SGLang instead, and `SKIP_ENGINE=1` skips
+the engine if you already have one. Install **one** engine per environment — each pins a
+different `flashinfer` patch version, so pip refuses the two together.
 
-To do it by hand, the order matters — the engine stack first, then verl, then VAGEN:
+To do it by hand, the order matters — VAGEN with its engine first, then verl:
 
 ```bash
 git submodule update --init --recursive
 
-cd verl
-USE_MEGATRON=0 bash scripts/install_vllm_sglang_mcore.sh
-pip install --no-deps -e .    # --no-deps: verl's pins would downgrade the stack above
-cd ..
-pip install -e .              # after verl, so VAGEN's transformers/torchao floors win
-pip install "trl==0.26.2"
+pip install -e ".[vllm]"           # or ".[sglang]" -- pick one, never both
+pip install --no-deps -e ./verl    # --no-deps: verl's pins would undo the line above
+pip install accelerate codetiming datasets dill hydra-core numpy pandas peft pyarrow \
+            pybind11 pylatexenc ray tensordict torchdata wandb
 ```
 
 ## Quick Start
