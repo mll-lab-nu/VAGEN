@@ -1,23 +1,23 @@
 #!/bin/bash
-# sokoban - grpo - concat - Qwen/Qwen2.5-VL-3B-Instruct
+# sokoban - default_gae - concat - Qwen/Qwen3.5-4B
 #
-# Per-experiment settings only. Everything that makes a VAGEN run work at all lives in
-# vagen/configs/baseline_vllm.flags and is read below -- in particular the two flags that
-# select VAGEN's agent loop. Without them verl runs its own, and the job comes up looking
-# healthy while none of this repo's rollout code executes. All twenty of these scripts
-# were in that state, and the duplication is why: each carried its own copy of the stack
-# settings, and the copies stopped including the loop.
+# Qwen3.5 is natively multimodal: there is no `-VL` variant to look for. The
+# `Qwen3.5-VL-*` repos on the Hub are third-party derivatives.
 #
-# Anything after "${BASE[@]}" overrides it, and anything on the command line overrides
-# that, so a one-off sweep needs no edit here.
+# Needs a newer stack than the rest of these scripts, and says so only as
+# `KeyError: 'qwen3_5'`:
+#   transformers >= 5.2.0   4.57 has qwen3_vl but not this
+#   vllm         >= ?       the text stack interleaves linear_attention with
+#                           full_attention, so the engine has to know the architecture
+# Untested here for that reason.
 set -eo pipefail
 
 V=$(cd "$(dirname "$0")/../../.." && pwd)
 SCRIPTDIR=$(cd "$(dirname "$0")" && pwd)
 PROJECT_NAME=${PROJECT_NAME:-vagen_experiments}
-EXPERIMENT_NAME=${EXPERIMENT_NAME:-sokoban_grpo_qwen25vl3b_filter}
+EXPERIMENT_NAME=${EXPERIMENT_NAME:-sokoban_default_gae_qwen35_4b}
 EXPERIMENT_DIR=${EXPERIMENT_DIR:-$V/exps/$PROJECT_NAME/$EXPERIMENT_NAME}
-MODEL=${MODEL:-Qwen/Qwen2.5-VL-3B-Instruct}
+MODEL=${MODEL:-Qwen/Qwen3.5-4B}
 mkdir -p "$EXPERIMENT_DIR"
 
 # verl is not installed as a package here; it is the sibling checkout, and it has to
@@ -35,19 +35,19 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     data.val_files="$SCRIPTDIR/val_sokoban_vision.yaml" \
     actor_rollout_ref.model.path="$MODEL" \
     critic.model.path="$MODEL" \
-    algorithm.adv_estimator=grpo \
+    critic.enable=True \
+    algorithm.adv_estimator=default_gae \
     trainer.harness=concat \
-    data.train_batch_size=32 \
+    data.train_batch_size=128 \
     data.max_response_length=4000 \
     actor_rollout_ref.actor.ppo_mini_batch_size=32 \
-    actor_rollout_ref.rollout.n=8 \
+    actor_rollout_ref.rollout.n=1 \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
     actor_rollout_ref.rollout.max_num_batched_tokens=10000 \
     actor_rollout_ref.rollout.enforce_eager=True \
     actor_rollout_ref.rollout.free_cache_engine=True \
     actor_rollout_ref.rollout.enable_chunked_prefill=True \
-    filter.enable=True \
     trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \
     trainer.critic_warmup=0 \

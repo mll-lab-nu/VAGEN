@@ -62,7 +62,6 @@ trainer:
   # are for looking at something specific while chasing it.
   val_log_select: balanced
   val_log_success_ratio: 0.5
-  concat_multi_turn: True                 # Concatenate multi-turn messages for rollout and training
   # Reward the reasoning as well as the outcome: the agent's <observation> and
   # <prediction> are scored against the real layout and the scores are paid to the
   # tokens that carry them. Needs a judge endpoint; see scripts/launch_judge.sh.
@@ -137,9 +136,12 @@ trainer:
     # transformers than verl is pinned to here.
     judge_model: "Qwen/Qwen3-4B-Instruct-2507"
 
-  # Context policy. Defaults to concat_multi_turn when unset, so existing scripts
-  # select the same layout as before.
-  harness: null                    # concat | no_concat | compact
+  # Context policy, and the only thing that selects one. Named rather than left null so
+  # "the default is concat" is a fact you can read here instead of one you learn by
+  # finding the line that resolves it. Not a closed set: `harness` is looked up in
+  # vagen/harness/HARNESSES, and anything registered there that subclasses BaseHarness
+  # works, including one added outside this repo.
+  harness: concat                  # concat | no_concat | compact
   # The largest a conversation may become before CompactHarness summarises and restarts.
   # It has to hold the system prompt, which is re-sent every time a conversation opens,
   # plus a summary and more than one turn -- on Sokoban the system prompt alone is 589
@@ -162,8 +164,15 @@ trainer:
 # Algorithm Configuration
 # ============================================================================
 algorithm:
-  gamma: 1.0                 
-  lam: 1.0                   
+  gamma: 1.0
+  lam: 1.0
+  # VAGEN's default, overriding verl's `gae` from ppo_trainer.yaml. verl's own estimators
+  # score one row at a time and open each with nextvalues=0, which is right when a row is
+  # an episode and wrong here -- under no_concat and compact a row is one turn or one
+  # compaction window, so `gae` would cut the trajectory at every row boundary and call
+  # each piece terminal. `default_gae` stitches the rows back into one trajectory first.
+  # Inheriting the name `gae` made that a silent difference rather than an error.
+  adv_estimator: default_gae
 
 # ============================================================================
 # Data Filter Configuration

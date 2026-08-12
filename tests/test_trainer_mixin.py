@@ -637,3 +637,86 @@ def test_image_token_is_read_from_the_tokenizer_when_only_an_id_is_exposed():
         tokenizer = _Tok()
 
     assert get_image_token(_P()) == "<IMG>"
+
+
+# ------------------------------------- the capability lives on the harness, not a list
+
+
+def test_the_splitting_property_is_declared_by_each_harness():
+    """★ Every registered harness must answer the question itself.
+
+    The trainer used to carry `SPLITTING_HARNESSES = ("no_concat", "compact")`. A tuple
+    of names is the arrangement the guard's own docstring rejects for estimators, and for
+    the same reason: a harness added later is treated as non-splitting by default, so the
+    guard silently stops guarding for it and a row-local estimator is accepted under a
+    policy that truncates every trajectory.
+    """
+    from vagen.core.harness import BaseHarness
+    from vagen.harness import HARNESSES
+
+    assert HARNESSES, "no harnesses registered; this test is vacuous"
+    for name, cls in HARNESSES.items():
+        assert issubclass(cls, BaseHarness), f"{name} is not a BaseHarness"
+        assert isinstance(cls.splits_episode_across_rows, bool), (
+            f"{name} does not declare splits_episode_across_rows"
+        )
+    assert HARNESSES["concat"].splits_episode_across_rows is False
+    assert HARNESSES["no_concat"].splits_episode_across_rows is True
+    assert HARNESSES["compact"].splits_episode_across_rows is True
+
+
+def test_the_trainer_does_not_keep_its_own_list_of_them():
+    """The structural half: the tuple must not come back.
+
+    Checked against every mixin class in the module rather than one name. A
+    `not hasattr` assertion is the kind that passes for free if the name it is given
+    stops existing, so the class list is derived instead of written down -- the first
+    draft of this test named a class that does not exist and would have been vacuous had
+    the import not failed outright.
+    """
+    import inspect
+
+    from vagen.trainer import mixin
+
+    classes = [c for _, c in inspect.getmembers(mixin, inspect.isclass)
+               if c.__module__ == mixin.__name__]
+    assert classes, "found no mixin classes; this test is vacuous"
+    for cls in classes:
+        assert not hasattr(cls, "SPLITTING_HARNESSES"), (
+            f"{cls.__name__} carries the central tuple again; a harness's layout "
+            "belongs on the harness"
+        )
+
+
+def test_a_harness_defined_outside_this_repo_is_honoured():
+    """★ The point of the refactor: any BaseHarness subclass, not the three we ship.
+
+    Registers a splitting harness the trainer has never heard of and requires the guard
+    to fire for it. Under the old tuple this passed silently -- the unknown name was not
+    listed, so the run proceeded with an estimator that drops every turn after the first.
+    """
+    from vagen.core.harness import BaseHarness
+    from vagen.harness import HARNESSES
+
+    class ThirdPartyHarness(BaseHarness):
+        splits_episode_across_rows = True
+
+        def next_call(self):  # pragma: no cover - never invoked
+            raise NotImplementedError
+
+    HARNESSES["third_party"] = ThirdPartyHarness
+    try:
+        t = _Trainer(_cfg(adv="gae", harness="third_party"))
+        with pytest.raises(ValueError, match="scores one row at a time"):
+            t._vagen_check_estimator_spans_the_layout()
+    finally:
+        del HARNESSES["third_party"]
+
+
+def test_an_unregistered_harness_is_assumed_to_split():
+    """Fail safe. A name that resolves to nothing must not be read as concat -- refusing
+    a row-local estimator is an error message, allowing one is a wrong run."""
+    t = _Trainer(_cfg(adv="gae", harness="not_registered_anywhere"))
+    assert t._vagen_harness_splits_rows() is True
+    with pytest.raises(ValueError, match="scores one row at a time"):
+        t._vagen_check_estimator_spans_the_layout()

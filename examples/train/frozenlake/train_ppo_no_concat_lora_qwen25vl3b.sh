@@ -1,5 +1,5 @@
 #!/bin/bash
-# frozenlake - token_level_gae - ppo_no_concat_lora_qwen25vl3b
+# frozenlake - default_gae - no_concat - Qwen/Qwen2.5-VL-3B-Instruct
 #
 # Per-experiment settings only. Everything that makes a VAGEN run work at all lives in
 # vagen/configs/baseline_vllm.flags and is read below -- in particular the two flags that
@@ -36,7 +36,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     actor_rollout_ref.model.path="$MODEL" \
     critic.model.path="$MODEL" \
     critic.enable=True \
-    algorithm.adv_estimator=token_level_gae \
+    algorithm.adv_estimator=default_gae \
     trainer.harness=no_concat \
     data.train_batch_size=128 \
     data.max_response_length=512 \

@@ -8,6 +8,10 @@ from vagen.core.harness import BaseHarness, Call
 class ConcatHarness(BaseHarness):
     """One conversation for the episode."""
 
+    #: The only one that does not. One conversation is one row, so a row-local estimator
+    #: sees the whole trajectory and verl's own `gae`/`grpo` are safe here.
+    splits_episode_across_rows = False
+
     def next_call(self) -> Call:
         limit = self.max_new_tokens()
         params = {"max_new_tokens": limit} if limit is not None else None
