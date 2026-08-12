@@ -693,7 +693,7 @@ Engineer-days for one person familiar with the codebase, **tests included**.
 
 | Phase | Work | Days | Risk |
 |---|---|---|---|
-| **0** ✅ **DONE** | Branch `vagen-lite-v0.8.0` off `release/v0.8.0`. Re-apply only 2 patches: VLM ValueHead `forward`, and `value_mask` → `workers/utils/losses.py::value_loss` (§8.4). Drop the 3 that landed upstream | 0.5 | — |
+| **0** ✅ **DONE** | Branch `v0.8.0-vagen` off `release/v0.8.0`. Re-apply only 2 patches: VLM ValueHead `forward`, and `value_mask` → `workers/utils/losses.py::value_loss` (§8.4). Drop the 3 that landed upstream | 0.5 | — |
 | **1** | Upgrade + mixin refactor, done together. Re-copy `main_ppo.py`; `ray_trainer.py` → `VagenLogicMixin`/`VagenV0Mixin`; fix imports and config; delete `agent_loop_no_concat.py` (825) via §8.1 | **8–10** | 🔴 **dominant risk** — 1008 upstream commits; the time actually goes into baseline comparison |
 | **2** | VLM generalization: make `utils/tokenizer.py:227`'s silent failure a hard error, add the `get_rope_index` fallback, get InternVL training, upstream the patch | **2** | low · **parallelizable with 3–5** |
 | **3** | Package split + `core/ports.py` + `TokenTape` + T2 contract tests | **3.5** | low |
@@ -703,7 +703,7 @@ Engineer-days for one person familiar with the codebase, **tests included**.
 
 ### Phase 0 — status (2026-08-02)
 
-Branch `vagen-lite-v0.8.0` @ `upstream/release/v0.8.0` (`bee9f6f4`), three commits:
+Branch `v0.8.0-vagen` @ `upstream/release/v0.8.0` (`bee9f6f4`), three commits:
 
 ```
 644ab712 [vagen] test: correct the empty-mask expectation in value_mask tests
