@@ -4,6 +4,10 @@
 # Qwen3.5 is natively multimodal: there is no `-VL` variant to look for. The
 # `Qwen3.5-VL-*` repos on the Hub are third-party derivatives.
 #
+# free_wm, not the wm the Qwen2.5-VL scripts use: Qwen3.5 reserves `<think>`/`</think>` as
+# single control tokens (248068/248069), so the four-tag format is unreachable and every
+# action gets discarded. See train_sokoban_vision_free_wm.yaml.
+#
 # Needs a newer stack than the rest of these scripts, and says so only as
 # `KeyError: 'qwen3_5'`:
 #   transformers >= 5.2.0   4.57 has qwen3_vl but not this
@@ -44,8 +48,8 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     hydra.searchpath="[file://$VERL/verl/trainer/config]" \
     data.custom_cls.path="$V/vagen/gym_agent_dataset.py" \
     "${BASE[@]}" \
-    data.train_files="$SCRIPTDIR/train_sokoban_vision.yaml" \
-    data.val_files="$SCRIPTDIR/val_sokoban_vision.yaml" \
+    data.train_files="$SCRIPTDIR/train_sokoban_vision_free_wm.yaml" \
+    data.val_files="$SCRIPTDIR/val_sokoban_vision_free_wm.yaml" \
     actor_rollout_ref.model.path="$MODEL" \
     critic.model.path="$MODEL" \
     critic.enable=True \

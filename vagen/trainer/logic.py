@@ -52,12 +52,18 @@ def value_mask_from_returns(
 
 
 def collect_registry_metrics(
-    registry: Mapping[str, Callable[[Any], float]],
+    registry: Mapping[str, Callable[[Any], float | Mapping[str, float]]],
     data: Any,
     prefix: str = "custom_metrics",
     strict: bool = False,
 ) -> dict[str, float]:
     """Run every metric in ``registry`` over ``data``.
+
+    A metric returns either a scalar, logged as ``{prefix}/{name}``, or a mapping, logged
+    as ``{prefix}/{name}/{key}``. The mapping form is for the quantities that are only
+    meaningful as a spread -- a turn count wants min/max/mean together, and registering
+    three entries for one concept would both read badly and recompute the same reduction
+    three times.
 
     A misbehaving metric must not take down a training step, so by default failures
     are caught. But a metric that silently vanishes from the dashboard is its own kind
@@ -69,7 +75,11 @@ def collect_registry_metrics(
     out: dict[str, float] = {}
     for name, fn in registry.items():
         try:
-            out[f"{prefix}/{name}"] = fn(data)
+            value = fn(data)
+            if isinstance(value, Mapping):
+                out.update({f"{prefix}/{name}/{k}": v for k, v in value.items()})
+            else:
+                out[f"{prefix}/{name}"] = value
         except Exception as exc:  # noqa: BLE001 - one bad metric must not kill the step
             if strict:
                 raise

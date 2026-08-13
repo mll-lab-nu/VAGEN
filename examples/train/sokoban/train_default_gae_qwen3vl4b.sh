@@ -3,6 +3,11 @@
 #
 # model_type qwen3_vl, which needs transformers >= 4.57 and reports its absence as
 # KeyError('qwen3_vl').
+#
+# free_wm, not the wm the Qwen2.5-VL scripts use: this family reserves `<think>`/`</think>`
+# as single control tokens (151667/151668) and the Instruct variant will not emit them, so
+# the four-tag format is unreachable and every action gets discarded. Measured: format
+# correctness 0.0 and reward 0.0 across a whole run. See train_sokoban_vision_free_wm.yaml.
 set -eo pipefail
 
 V=$(cd "$(dirname "$0")/../../.." && pwd)
@@ -36,8 +41,8 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     hydra.searchpath="[file://$VERL/verl/trainer/config]" \
     data.custom_cls.path="$V/vagen/gym_agent_dataset.py" \
     "${BASE[@]}" \
-    data.train_files="$SCRIPTDIR/train_sokoban_vision.yaml" \
-    data.val_files="$SCRIPTDIR/val_sokoban_vision.yaml" \
+    data.train_files="$SCRIPTDIR/train_sokoban_vision_free_wm.yaml" \
+    data.val_files="$SCRIPTDIR/val_sokoban_vision_free_wm.yaml" \
     actor_rollout_ref.model.path="$MODEL" \
     critic.model.path="$MODEL" \
     critic.enable=True \
