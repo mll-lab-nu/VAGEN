@@ -267,6 +267,40 @@ class VagenLogicMixin:
             self.metrics.update(
                 collect_registry_metrics(METRIC_REGISTRY, batch, prefix="custom_metrics/train")
             )
+        self._vagen_rescope_row_metrics_to_episodes()
+
+    def _vagen_rescope_row_metrics_to_episodes(self) -> None:
+        """Report episode-level quantities per episode, not per row.
+
+        In concat an episode is one row and the two agree. In no_concat and compact an
+        episode becomes several rows, and an episode's reward divided over them reads as
+        ``episode_reward / rows_per_episode`` -- so the headline training reward is low by
+        the split factor, and only for the harnesses that split.
+
+        On the 2026-08-12 sweep this inverted the ranking outright. The concat arms matched
+        validation (0.571 vs 0.573, 0.843 vs 0.823) while compact read 0.539 against 0.776
+        and no_concat read 0.375 against 0.918 -- each low by exactly its rows-per-episode
+        factor. By the row metric no_concat was the worst arm; by episode it was the best.
+
+        Only ``critic/score`` is rescoped, because ``episode_score`` recomputes exactly that
+        quantity per episode. ``critic/rewards`` differs from it by the KL penalty and has
+        no episode-grouped counterpart yet, so it is left alone rather than rescaled by a
+        factor that would only be a guess.
+
+        The row-scoped values are kept under ``.../by_row`` rather than dropped: they are
+        what verl computed, and a number that changes meaning without changing name is how
+        this went unnoticed for a whole sweep.
+        """
+        episode = self.metrics.get("custom_metrics/train/episode_score/mean")
+        if episode is None:
+            return  # the metric failed or episode_id was absent; leave verl's numbers alone
+        if "critic/score/mean" not in self.metrics:
+            return
+        for stat in ("mean", "max", "min"):
+            value = self.metrics.pop(f"critic/score/{stat}", None)
+            if value is not None:
+                self.metrics[f"critic/score/by_row/{stat}"] = value
+        self.metrics["critic/score/mean"] = episode
 
     def _vagen_filter(self, batch):
         """STARPO-S / DAPO style batch filtering for effective updates.
