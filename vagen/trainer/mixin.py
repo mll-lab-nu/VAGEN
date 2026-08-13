@@ -31,13 +31,20 @@ import logging
 import os
 
 import numpy as np
+import torch
+from verl import DataProto
 from verl.protocol import pad_dataproto_to_divisor
 from verl.utils.debug import marked_timer
 
 from vagen.custom_advantage import needs_value_mask
 from vagen.custom_filter.filter import FILTER_REGISTRY
 from vagen.custom_metric.metric import METRIC_REGISTRY
-from vagen.trainer.logic import collect_registry_metrics, value_mask_from_returns
+from vagen.trainer.logic import (
+    collect_registry_metrics,
+    pad_to_multiple,
+    row_multiple_required,
+    value_mask_from_returns,
+)
 from vagen.utils.image_token_utils import replace_image_tokens_for_logging
 from vagen.utils.episode_log import describe_columns, rows_from_validation
 from vagen.utils.wandb_episodes import EpisodeTableLogger
@@ -240,7 +247,76 @@ class VagenLogicMixin:
         batch = self._vagen_write_value_mask(batch)
         self._vagen_collect_train_metrics(batch)
         batch = self._vagen_filter(batch)
+        batch = self._vagen_pad_rows_for_split(batch)
         return batch
+
+    #: Zeroed on a padding row so it cannot reach a loss. ``response_mask`` is what the
+    #: policy and value losses average over; the rest are zeroed so a row that somehow
+    #: escapes the mask still contributes nothing rather than a copy of row 0's reward.
+    _NEUTRALISED_ON_PAD = (
+        "response_mask",
+        "loss_mask",
+        "advantages",
+        "returns",
+        "token_level_scores",
+        "token_level_rewards",
+        "value_mask",
+    )
+
+    def _vagen_pad_rows_for_split(self, batch):
+        """Make the row count divisible by everything that is about to divide it.
+
+        ``DataProto.split`` asserts ``batch_size[0] % mini_batch_size == 0``. Under concat
+        an episode is one row and the count is whatever ``train_batch_size * rollout.n``
+        says, so it always divides; under no_concat an episode becomes a *variable* number
+        of rows and the count is whatever the rollouts happened to produce. That only
+        divides by luck, and the luck runs out once the batch is small -- 32 prompts x 4
+        rollouts produced 76 rows against a mini batch of 16 and the step died on
+        ``AssertionError: 76 % 16 != 0``.
+
+        Padding existed only inside ``_vagen_filter``, so it never ran with the filter off,
+        and it aligned to the DP world size only -- neither constraint being the one that
+        failed.
+
+        The filler rows are copies of row 0 with every loss-bearing tensor zeroed, so they
+        occupy split slots without contributing gradient. Repeating a real row *unmasked*
+        -- which is what ``pad_dataproto_to_divisor`` does -- would quietly weight that
+        episode more heavily than the others.
+        """
+        b = getattr(batch, "batch", None)
+        if b is None or "response_mask" not in b.keys():
+            return batch
+
+        n = b.batch_size[0]
+        # Read defensively: a trainer assembled without one of these sections must not
+        # lose its batch padding to an AttributeError on a config key.
+        arr = self.config.get("actor_rollout_ref", None) or {}
+        actor_mini = (arr.get("actor", None) or {}).get("ppo_mini_batch_size", 0)
+        critic_cfg = self.config.get("critic", None) or {}
+        critic_mini = critic_cfg.get("ppo_mini_batch_size", 0) if critic_cfg.get("enable", False) else 0
+        # ★ Both mini batches are counted in *prompts*; verl multiplies them by rollout.n
+        # to get rows (ray_trainer.py: `ppo_mini_batch_size * rollout.n`) and then divides
+        # by the DP size. Padding against the unscaled number looks right, divides evenly
+        # at the driver, and still leaves each worker's shard indivisible -- which is how
+        # the first version of this passed its own arithmetic and the run still died.
+        rollout_n = (arr.get("rollout", None) or {}).get("n", 1) or 1
+        multiple = row_multiple_required(
+            self.actor_rollout_wg.world_size, actor_mini * rollout_n, critic_mini * rollout_n
+        )
+
+        extra = pad_to_multiple(n, multiple)
+        if not extra:
+            return batch
+
+        filler = batch.select_idxs([0] * extra)
+        for key in self._NEUTRALISED_ON_PAD:
+            if key in filler.batch.keys():
+                filler.batch[key] = torch.zeros_like(filler.batch[key])
+        padded = DataProto.concat([batch, filler])
+        print(f"[vagen] split-pad: {n} -> {n + extra} rows for multiple {multiple} "
+              f"(dp={self.actor_rollout_wg.world_size}, actor_mini={actor_mini}, critic_mini={critic_mini})")
+        self.metrics["custom_metrics/train/split_pad_rows"] = float(extra)
+        return padded
 
     def _vagen_write_value_mask(self, batch):
         """Tell the critic which positions carry return supervision.
@@ -267,7 +343,6 @@ class VagenLogicMixin:
             self.metrics.update(
                 collect_registry_metrics(METRIC_REGISTRY, batch, prefix="custom_metrics/train")
             )
-        self._vagen_rescope_row_metrics_to_episodes()
 
     def _vagen_rescope_row_metrics_to_episodes(self) -> None:
         """Report episode-level quantities per episode, not per row.
@@ -409,6 +484,20 @@ class VagenV0Mixin(VagenLogicMixin):
     def _fit_compute_advantage(self, batch):
         batch = super()._fit_compute_advantage(batch)
         return self._vagen_after_advantage(batch)
+
+    def _fit_collect_metrics(self, *args, **kwargs):
+        """Rescope after verl has computed its data metrics, not before.
+
+        ``critic/score/*`` is produced by ``compute_data_metrics`` inside this hook, which
+        runs several hooks *after* ``_fit_compute_advantage``. Rescoping from the earlier
+        hook -- where the custom metrics are collected -- meant the key did not exist yet,
+        the rescope took its "leave verl's numbers alone" branch every step, and the fix
+        was inert. Caught by a live no_concat run reporting
+        ``episode_score/mean 0.456`` beside ``critic/score/mean 0.027``.
+        """
+        out = super()._fit_collect_metrics(*args, **kwargs)
+        self._vagen_rescope_row_metrics_to_episodes()
+        return out
 
     def _dump_generations(self, inputs, outputs, *args, **kwargs):
         """Shorten image placeholder runs before verl writes the JSONL.

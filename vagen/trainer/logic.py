@@ -11,6 +11,7 @@ hooks and unwraps ``DataProto``.
 
 from __future__ import annotations
 
+import math
 from typing import Any, Callable, Mapping
 
 import numpy as np
@@ -107,6 +108,26 @@ def pad_to_multiple(size: int, multiple: int) -> int:
     if multiple <= 0:
         raise ValueError(f"multiple must be positive, got {multiple}")
     return (-size) % multiple
+
+
+def row_multiple_required(world_size: int, *mini_batch_sizes: int) -> int:
+    """Row count the batch has to be a multiple of before it can be split.
+
+    Two independent divisibility constraints apply and only one of them was ever
+    enforced. ``_balance_batch`` needs a multiple of the DP world size, and
+    ``DataProto.split`` asserts ``batch_size[0] % mini_batch_size == 0`` for each of the
+    actor's and the critic's mini batch. Padding to the world size alone leaves the
+    second to chance -- which no_concat loses as soon as the row count is small, e.g.
+    ``AssertionError: 76 % 16 != 0``.
+
+    The least common multiple satisfies both at once, and is the world size itself in the
+    common case where the mini batches already divide it.
+    """
+    multiple = max(1, int(world_size))
+    for size in mini_batch_sizes:
+        if size and size > 0:
+            multiple = math.lcm(multiple, int(size))
+    return multiple
 
 
 # ------------------------------------------------------------------ no-concat indices

@@ -42,6 +42,10 @@ class _FakeBase:
         self.calls.append("super_advantage")
         return batch
 
+    def _fit_collect_metrics(self, batch):
+        # The real base fills critic/score/* here, several hooks after advantage.
+        self.calls.append("super_collect_metrics")
+
     def _fit_save_checkpoint(self, force=False):
         self.calls.append(f"super_save(force={force})")
 
@@ -734,3 +738,104 @@ def test_a_metric_returning_a_mapping_is_spread_over_subkeys(monkeypatch):
     assert t.metrics["custom_metrics/train/spread/min"] == 1.0
     assert t.metrics["custom_metrics/train/spread/max"] == 9.0
     assert "custom_metrics/train/spread" not in t.metrics
+
+
+# --------------------------------------------- split padding (no_concat divisibility)
+
+
+def _split_batch(n, width=3):
+    """A batch shaped like one that has reached _vagen_after_advantage."""
+    from verl import DataProto
+
+    return DataProto.from_single_dict(
+        {
+            "attention_mask": torch.ones(n, width, dtype=torch.long),
+            "response_mask": torch.ones(n, width, dtype=torch.long),
+            "advantages": torch.full((n, width), 2.0),
+            "token_level_scores": torch.full((n, width), 3.0),
+        }
+    )
+
+
+def _pad_cfg(actor_mini=16, critic_mini=0, critic_enable=False, rollout_n=1):
+    cfg = _cfg()
+    cfg.actor_rollout_ref = OmegaConf.create(
+        {"actor": {"ppo_mini_batch_size": actor_mini}, "rollout": {"n": rollout_n}}
+    )
+    cfg.critic = OmegaConf.create({"enable": critic_enable, "ppo_mini_batch_size": critic_mini})
+    return cfg
+
+
+def test_a_row_count_that_does_not_divide_the_mini_batch_is_padded_up():
+    """no_concat produced 76 rows against a mini batch of 16 and the step died on
+    `AssertionError: 76 % 16 != 0`. The world size alone would not have caught it."""
+    t = _Trainer(_pad_cfg(actor_mini=16))
+    t.actor_rollout_wg = types.SimpleNamespace(world_size=4)
+    out = t._vagen_pad_rows_for_split(_split_batch(76))
+    assert out.batch.batch_size[0] == 80  # lcm(4, 16) = 16 -> next multiple
+    assert t.metrics["custom_metrics/train/split_pad_rows"] == 4.0
+
+
+def test_padding_rows_cannot_reach_a_loss():
+    """Repeating a real row unmasked -- what pad_dataproto_to_divisor does -- would weight
+    that episode more heavily than the others."""
+    t = _Trainer(_pad_cfg(actor_mini=16))
+    t.actor_rollout_wg = types.SimpleNamespace(world_size=4)
+    out = t._vagen_pad_rows_for_split(_split_batch(76))
+    tail = out.batch[76:]
+    assert tail["response_mask"].sum() == 0
+    assert tail["advantages"].abs().sum() == 0
+    assert tail["token_level_scores"].abs().sum() == 0
+    # the real rows are untouched
+    assert out.batch[:76]["response_mask"].sum() == 76 * 3
+
+
+def test_an_already_divisible_batch_is_returned_untouched():
+    t = _Trainer(_pad_cfg(actor_mini=16))
+    t.actor_rollout_wg = types.SimpleNamespace(world_size=4)
+    b = _split_batch(80)
+    assert t._vagen_pad_rows_for_split(b) is b
+    assert "custom_metrics/train/split_pad_rows" not in t.metrics
+
+
+def test_the_critic_mini_batch_is_honoured_too():
+    """Both the actor's and the critic's split assert on the same row count."""
+    t = _Trainer(_pad_cfg(actor_mini=16, critic_mini=24, critic_enable=True))
+    t.actor_rollout_wg = types.SimpleNamespace(world_size=4)
+    out = t._vagen_pad_rows_for_split(_split_batch(76))
+    n = out.batch.batch_size[0]
+    assert n % 16 == 0 and n % 24 == 0 and n % 4 == 0, n
+    assert n == 96  # lcm(4, 16, 24) = 48 -> 96
+
+
+def test_the_mini_batch_is_scaled_by_rollout_n_before_padding():
+    """verl multiplies ppo_mini_batch_size by rollout.n to get rows, then divides by the
+    DP size. Padding against the unscaled number divides evenly at the driver and still
+    leaves each worker's shard indivisible -- the real run died on `340 % 16 != 0` while
+    its 1360-row driver batch was a clean multiple of the unscaled 16."""
+    t = _Trainer(_pad_cfg(actor_mini=16, rollout_n=4))
+    t.actor_rollout_wg = types.SimpleNamespace(world_size=4)
+    out = t._vagen_pad_rows_for_split(_split_batch(1360))
+    n = out.batch.batch_size[0]
+    assert n == 1408, n            # lcm(4, 16*4) = 64 -> next multiple above 1360
+    assert (n // 4) % ((16 * 4) // 4) == 0  # per-worker shard divides its per-gpu mini
+
+
+def test_the_rescope_runs_after_verl_computes_its_data_metrics():
+    """critic/score/* is produced inside _fit_collect_metrics, several hooks after
+    _fit_compute_advantage. Rescoping from the earlier hook found no key to rewrite and
+    silently did nothing -- the metric fix shipped inert until a live no_concat run showed
+    episode_score/mean 0.456 beside critic/score/mean 0.027."""
+    t = _Trainer(_pad_cfg())
+    t.metrics = {
+        "custom_metrics/train/episode_score/mean": 0.456,
+        "critic/score/mean": 0.027,
+        "critic/score/max": 0.9,
+        "critic/score/min": 0.0,
+    }
+    t._fit_collect_metrics(_batch())
+
+    assert t.metrics["critic/score/mean"] == 0.456
+    assert t.metrics["critic/score/by_row/mean"] == 0.027
+    assert t.metrics["critic/score/by_row/max"] == 0.9
+    assert "critic/score/max" not in t.metrics
