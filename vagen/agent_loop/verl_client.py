@@ -27,8 +27,28 @@ def images_of(message: dict) -> list[Any]:
 
 
 #: Prepended to a continuation span so the template emits no system block of its own,
-#: then stripped. Both uses must be the same turn or the strip is the wrong length.
-_PLACEHOLDER_TURN = {"role": "system", "content": "placeholder"}
+#: then stripped. Every use must render the same turns or the strip is the wrong length.
+#:
+#: The system turn is what suppresses the template's default system block ("You are a
+#: helpful assistant."), which would otherwise appear in the continuation render but not
+#: in the prefix and leave its tail spliced ahead of every observation.
+#:
+#: The user turn is for Qwen3.5, whose template scans for a non-``<tool_response>`` user
+#: message and calls ``raise_exception('No user query found in messages.')`` when there is
+#: none -- so a system turn alone cannot even be rendered to compute the prefix, let alone
+#: prepended to an assistant-only span. Verified on Qwen2.5-VL, Qwen3-VL and Qwen3.5:
+#: with both turns the prefix is 12 tokens on all three, no default system block is
+#: injected anywhere, and ``render([*placeholder, *delta])`` begins with
+#: ``render(placeholder)`` for assistant-only, user-only and mixed spans.
+_PLACEHOLDER_TURNS = [
+    {"role": "system", "content": "placeholder"},
+    {"role": "user", "content": "placeholder"},
+]
+
+
+def _placeholder_flat() -> list[dict]:
+    """The placeholder in the same parts-list shape as every other rendered message."""
+    return [{"role": t["role"], "content": _parts(t)} for t in _PLACEHOLDER_TURNS]
 
 
 class VerlClient(InferenceClient):
@@ -84,7 +104,7 @@ class VerlClient(InferenceClient):
             # In the same shape as the rest, and the same shape _template_prefix renders.
             # A template can tokenize a plain string differently from a one-element parts
             # list, and then the strip is measured against a render that never happened.
-            flat = [{"role": _PLACEHOLDER_TURN["role"], "content": _parts(_PLACEHOLDER_TURN)}, *flat]
+            flat = [*_placeholder_flat(), *flat]
 
         if self.processor is not None:
             text = self.processor.apply_chat_template(
@@ -139,7 +159,7 @@ class VerlClient(InferenceClient):
         self._sep_cache = []
         try:
             eos = getattr(self.tokenizer, "eos_token_id", None)
-            one = self._render_plain([_PLACEHOLDER_TURN])
+            one = self._render_plain(_PLACEHOLDER_TURNS)
             if eos is not None and eos in one:
                 sep = one[len(one) - 1 - one[::-1].index(eos):][1:]
                 if sep and self._separator_reproduces_the_template(sep):
@@ -184,7 +204,7 @@ class VerlClient(InferenceClient):
         Cached: rendering it costs a template application and it never changes.
         """
         if getattr(self, "_prefix_cache", None) is None:
-            placeholder = [{"role": _PLACEHOLDER_TURN["role"], "content": _parts(_PLACEHOLDER_TURN)}]
+            placeholder = _placeholder_flat()
             if self.processor is not None:
                 text = self.processor.apply_chat_template(
                     placeholder, add_generation_prompt=False, tokenize=False, **self.apply_chat_template_kwargs

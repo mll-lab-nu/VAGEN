@@ -1,0 +1,31 @@
+# train_sokoban_vision.yaml, with the one difference that `<think>` is not required.
+#
+# Qwen3-VL, Qwen3.5 and GLM-4.1V reserve `<think>`/`</think>` as single control tokens
+# tied to their thinking mechanism (Qwen3-VL 151667/151668, Qwen3.5 248068/248069), and
+# the non-thinking Instruct variants are trained not to emit them. Under `wm` those models
+# write <observation>, <answer> and <prediction> -- all ordinary text -- and silently skip
+# <think>, so `format_correct` is False for every turn, and sokoban_env.py then discards
+# the action outright (strict_format). Measured on Qwen3-VL-4B-Instruct: format_correct_rate
+# 0.0 and reward 0.0 for the whole run, while the parser had in fact recovered the action.
+# `free_wm` asks for the same three tags and drops the fourth.
+#
+# Qwen2.5-VL keeps `wm` (train_sokoban_vision.yaml): there `<think>` is three ordinary text
+# tokens, so nothing is reserved and the strict format is reachable.
+#
+# Everything else is copied from train_sokoban_vision.yaml deliberately -- seeds, turn
+# budget and format_reward all have to match for the two families to be comparable.
+envs:
+  - name: Sokoban # registered env name
+    n_envs: 10000
+    data_source: sokoban # nickname for logging
+    seed: [1,10000,1] # sample n_env seeds from seed[0] to seed[1] with each seed repeat at most seed[2] times
+    max_turns: 20 # max number of interaction turns per episode
+    response_length_per_turn: 512 # max response length per turn
+    config: # env-specific config
+      render_mode: vision
+      prompt_format: free_wm
+      # 0.02 a turn, not the 0.1 default: at max_turns=5 the default pays 0.5 for
+      # formatting alone, half of what solving the level is worth. 0.02 pays 0.10 over
+      # the episode, matching what the two state rewards pay together.
+      format_reward: 0.02
+      min_solution_steps: [1,5]
