@@ -98,19 +98,33 @@ def test_the_opening_span_is_left_alone(tok):
 
 
 def test_the_placeholder_used_to_strip_is_the_one_prepended():
-    """Two copies of this turn is two chances for the strip to be the wrong length."""
-    import inspect
+    """A second copy of the placeholder is a second chance for the strip to be wrong.
 
+    The placeholder is more than one turn now -- a system turn to suppress the template's
+    default system block, plus a user turn because Qwen3.5's template raises
+    ``No user query found in messages.`` without one -- so a bare count of the literal no
+    longer expresses the invariant. What has to hold is that every render path reads the
+    same single definition, which is checked three ways below.
+    """
     import pathlib
+
+    module = verl_client_module()
+    root = pathlib.Path(module.__file__).parent
 
     # Scoped to the package, not one module: the duplicate this guards against lived in
     # a *different* file, so scanning only verl_client could never have seen it.
-    root = pathlib.Path(verl_client_module().__file__).parent
-    hits = sum(
-        p.read_text().count('"content": "placeholder"')
+    elsewhere = {
+        p.name: n
         for p in root.glob("*.py")
-    )
-    assert hits == 1, f"the placeholder turn is written out {hits} times across the package"
+        if p.name != "verl_client.py" and (n := p.read_text().count('"content": "placeholder"'))
+    }
+    assert not elsewhere, f"the placeholder turn is restated outside verl_client: {elsewhere}"
+
+    src = (root / "verl_client.py").read_text()
+    assert src.count("_PLACEHOLDER_TURNS = [") == 1, "more than one placeholder definition"
+    # Tied to the constant rather than to a fixed number, so adding or dropping a turn
+    # keeps this honest instead of quietly permitting a restated copy alongside it.
+    assert src.count('"content": "placeholder"') == len(module._PLACEHOLDER_TURNS)
 
 
 def verl_client_module():
@@ -134,3 +148,58 @@ def test_the_guard_refuses_to_strip_a_span_that_does_not_start_with_the_prefix(t
     monkeypatch.setattr(c, "_template_prefix", lambda: [999999, 999998])
     with pytest.raises(ValueError, match="did not begin the continuation"):
         c.encode([{"role": "user", "content": "OBS"}])
+
+
+#: Qwen3.5's rule, reduced to the two clauses that interact with the placeholder: inject a
+#: default system block when the caller supplied none, and refuse a message list with no
+#: user turn. Written out rather than pulled from the Hub so the regression is pinned
+#: without a 4B download -- the real template's own wording is quoted in verl_client.
+_DEMANDS_A_USER_TURN = (
+    "{%- if messages[0].role != 'system' %}"
+    "{{- '<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n' }}"
+    "{%- endif %}"
+    "{%- set ns = namespace(has_user=false) %}"
+    "{%- for m in messages %}{%- if m.role == 'user' %}{%- set ns.has_user = true %}"
+    "{%- endif %}{%- endfor %}"
+    "{%- if not ns.has_user %}"
+    "{{- raise_exception('No user query found in messages.') }}"
+    "{%- endif %}"
+    "{%- for m in messages %}"
+    "{{- '<|im_start|>' + m.role + '\n' + m.content + '<|im_end|>\n' }}"
+    "{%- endfor %}"
+    "{%- if add_generation_prompt %}{{- '<|im_start|>assistant\n' }}{%- endif %}"
+)
+
+
+@pytest.fixture()
+def strict_tok(tok):
+    """The same tokenizer, wearing a template that demands a user turn."""
+    import copy
+
+    t = copy.deepcopy(tok)
+    t.chat_template = _DEMANDS_A_USER_TURN
+    return t
+
+
+def test_a_template_that_demands_a_user_turn_can_still_be_measured(strict_tok):
+    """Qwen3.5 raises on a message list with no user turn.
+
+    A system-only placeholder cannot even be rendered on its own under that rule, so
+    `_template_prefix` -- which renders exactly that -- died before any continuation was
+    reached, and the whole family was unrunnable. The placeholder carries a user turn for
+    this reason; the assertion is simply that measuring it no longer raises.
+    """
+    c = _client(strict_tok)
+    assert c._template_prefix(), "the prefix must be measurable under Qwen3.5's rule"
+
+
+def test_an_assistant_only_span_survives_a_template_that_demands_a_user_turn(strict_tok):
+    """The span that actually broke: a delta carrying no user message of its own."""
+    c = _client(strict_tok)
+    ids = c.encode([{"role": "assistant", "content": "REPLY"}])
+    text = strict_tok.decode(ids)
+    assert "REPLY" in text
+    # The placeholder is measurement scaffolding; none of it may reach the sequence.
+    assert "placeholder" not in text
+    # And the suppressed default block must not survive the strip either.
+    assert "helpful assistant" not in text

@@ -720,3 +720,17 @@ def test_an_unregistered_harness_is_assumed_to_split():
     assert t._vagen_harness_splits_rows() is True
     with pytest.raises(ValueError, match="scores one row at a time"):
         t._vagen_check_estimator_spans_the_layout()
+
+
+def test_a_metric_returning_a_mapping_is_spread_over_subkeys(monkeypatch):
+    """A turn count is only meaningful as min/max/mean together, so a metric may return
+    a mapping rather than forcing three registry entries for one concept."""
+    import vagen.trainer.mixin as m
+
+    monkeypatch.setattr(m, "METRIC_REGISTRY", {"spread": lambda b: {"min": 1.0, "max": 9.0}})
+    t = _Trainer(_cfg())
+    t._fit_compute_advantage(_batch())
+
+    assert t.metrics["custom_metrics/train/spread/min"] == 1.0
+    assert t.metrics["custom_metrics/train/spread/max"] == 9.0
+    assert "custom_metrics/train/spread" not in t.metrics

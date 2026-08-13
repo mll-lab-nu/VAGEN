@@ -26,6 +26,46 @@ def register_metric(name_or_enum: str) -> Any:
 
     return decorator
 
+@register_metric("episode_turns")
+def episode_turns(data: DataProto) -> dict[str, float]:
+    """How many turns the episodes in this batch actually ran.
+
+    verl's own ``num_turns/*`` metric reads ``__num_turns__``, which VAGEN fills with 1
+    per row by construction -- so the only turn count on the dashboard reports every
+    episode as single-turn no matter how long it was, and a run whose episodes collapse
+    to one turn (a broken action parser, say) looks exactly like a healthy one. The agent
+    loop already records the real count as ``episode_turns``; this is what puts it where
+    it can be read.
+
+    Deduplicated by ``episode_id``: in no_concat and compact mode one episode becomes
+    several rows that each carry the same count, and averaging over rows would weight
+    long episodes by how many rows they happened to be split into. In concat mode an
+    episode is one row and the dedup is a no-op.
+    """
+    import numpy as np
+
+    turns = data.non_tensor_batch.get("episode_turns")
+    if turns is None:
+        raise KeyError("episode_turns is not on the batch; the agent loop did not record it")
+
+    episode_ids = data.non_tensor_batch.get("episode_id")
+    if episode_ids is not None:
+        per_episode: dict[str, float] = {}
+        for eid, t in zip(episode_ids, turns):
+            per_episode.setdefault(str(eid), float(t))
+        values = np.array(list(per_episode.values()), dtype=float)
+    else:
+        values = np.asarray(turns, dtype=float)
+
+    if values.size == 0:
+        return {"min": 0.0, "max": 0.0, "mean": 0.0}
+    return {
+        "min": float(values.min()),
+        "max": float(values.max()),
+        "mean": float(values.mean()),
+    }
+
+
 @register_metric("reward_variance")
 def reward_variance(data: DataProto,ddof = 0) -> float:
     """Compute mean of within-group reward variances.

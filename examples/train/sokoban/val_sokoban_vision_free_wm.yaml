@@ -1,0 +1,20 @@
+# val_sokoban_vision.yaml for the models that cannot write `<think>`.
+# See train_sokoban_vision_free_wm.yaml for why, and keep the two in step.
+envs:
+  - name: Sokoban
+    n_envs: 256
+    data_source: sokoban
+    seed: [10001,10256,1]
+    max_turns: 20
+    response_length_per_turn: 512
+    config:
+      render_mode: vision
+      prompt_format: free_wm
+      # ★ Must match the train yaml. Absent, this falls back to SokobanEnvConfig's default
+      # of 0.1 a turn -- so validation was scoring 1.0 + 5*0.1 = 1.50 for a solved episode
+      # where training scored 1.0 + 5*0.02 = 1.10, and val reward stopped being comparable
+      # to train reward at all. Worse, formatting was then worth 0.5 against 1.0 for
+      # solving, so a run that never solved anything but wrote clean tags scored half a
+      # success. tests/test_train_and_val_agree_on_rewards.py pins the two together.
+      format_reward: 0.02
+      min_solution_steps: [1,5]

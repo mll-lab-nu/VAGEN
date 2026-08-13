@@ -6,6 +6,9 @@
 #
 # A thinking model: it emits reasoning before its answer, which the reward parser sees as
 # part of the response. Check the format reward before reading anything into the curves.
+# For the same reason it uses free_wm rather than wm -- `<think>` belongs to the model's
+# own thinking channel here, so it cannot also serve as one of the format's four tags.
+# See train_sokoban_vision_free_wm.yaml.
 set -eo pipefail
 
 V=$(cd "$(dirname "$0")/../../.." && pwd)
@@ -39,8 +42,8 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     hydra.searchpath="[file://$VERL/verl/trainer/config]" \
     data.custom_cls.path="$V/vagen/gym_agent_dataset.py" \
     "${BASE[@]}" \
-    data.train_files="$SCRIPTDIR/train_sokoban_vision.yaml" \
-    data.val_files="$SCRIPTDIR/val_sokoban_vision.yaml" \
+    data.train_files="$SCRIPTDIR/train_sokoban_vision_free_wm.yaml" \
+    data.val_files="$SCRIPTDIR/val_sokoban_vision_free_wm.yaml" \
     actor_rollout_ref.model.path="$MODEL" \
     critic.model.path="$MODEL" \
     critic.enable=True \

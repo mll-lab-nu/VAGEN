@@ -6,6 +6,11 @@
 #
 # Not an mrope model, so its processor has no get_rope_index and the agent loop takes the
 # plain-position-ids path. tests/test_vlm_families.py covers that branch on this family.
+#
+# free_wm, to keep every non-Qwen2.5 script on one format. Note this family does *not*
+# need it: InternVL3 tokenizes `<think>` as three ordinary text tokens, exactly like
+# Qwen2.5-VL, so `wm` is reachable here. Switch this pair back to train/val_sokoban_vision
+# .yaml if you would rather have it directly comparable with the Qwen2.5-VL runs.
 set -eo pipefail
 
 V=$(cd "$(dirname "$0")/../../.." && pwd)
@@ -39,8 +44,8 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     hydra.searchpath="[file://$VERL/verl/trainer/config]" \
     data.custom_cls.path="$V/vagen/gym_agent_dataset.py" \
     "${BASE[@]}" \
-    data.train_files="$SCRIPTDIR/train_sokoban_vision.yaml" \
-    data.val_files="$SCRIPTDIR/val_sokoban_vision.yaml" \
+    data.train_files="$SCRIPTDIR/train_sokoban_vision_free_wm.yaml" \
+    data.val_files="$SCRIPTDIR/val_sokoban_vision_free_wm.yaml" \
     actor_rollout_ref.model.path="$MODEL" \
     critic.model.path="$MODEL" \
     critic.enable=True \
