@@ -41,7 +41,7 @@ sections, substitute:
 | Image placeholder ↔ frame alignment | ✅ built 2026-08-06. `utils/image_token_utils.py` |
 | Algorithm layer | ✅ `default_gae` (baseline), `token_level_gae`, `bi_level_gae_varlam`, `turn_level_gae`, `trajectory_grpo`, all on `TrajectoryView`. `no_concat_gae` deleted 2026-08-08; `default_gae` added 2026-08-09; `bi_level_gae` (the released VAGEN algorithm, for reproduction) 2026-08-10 |
 | Row-local estimator under a splitting harness | ✅ refused at startup (`_vagen_check_estimator_spans_the_layout`) |
-| VLM beyond Qwen | ✅ Qwen / LLaVA / InternVL all training |
+| VLM beyond Qwen | ⚠️ Qwen2.5-VL, Qwen3-VL and Qwen3.5 train. Processor handling is family-agnostic (`tests/test_vlm_families.py`), but GLM-4.1V and InternVL3 each fail for their own reason -- see `docs/issues.md`. No LLaVA script or config ships. |
 | Compact loss reweighting | ❌ deferred, algorithm layer |
 | Black-box harness | interface exists (a conversation id is the whole protocol); no adapter written |
 | Eval unification / async trainers | package split only. See §13 for what adopting fully-async would take |
@@ -402,7 +402,15 @@ class GymImageEnv(ABC):
     async def system_prompt(self) -> Obs: ...
     async def reset(self, seed: int) -> tuple[Obs, dict]: ...
     async def step(self, action_str: str) -> tuple[Obs, float, bool, bool, dict]:
-        """★ The only change: split `done` into (terminated, truncated).
+        """★ AS DESIGNED, and not what `vagen/envs/gym_image_env.py` ships.
+
+        The class an environment author actually subclasses -- the one README.md points at
+        -- returns the 4-tuple `(obs, reward, done, info)`. `vagen/core/env.py`'s BaseEnv
+        and `vagen/core/runner.py` do use the 5-tuple, and `vagen/core/env_adapter.py`
+        bridges between them. Write the 4-tuple; the rationale below is why the inner
+        contract has five, not an instruction.
+
+        The split: `done` becomes (terminated, truncated).
 
         Not about gym compatibility — it is GAE correctness:
           terminated — real MDP terminal state   → bootstrap V = 0
@@ -420,7 +428,7 @@ class GymImageEnv(ABC):
 
 We do **not** add `observe()` / `state_digest()` / `on_compact()`: the harness holds every message, and the last user message *is* the current observation.
 
-> ⚠️ That assumes observations are Markov. True for FrozenLake / Sokoban / navigation / primitive_skill; **spatial_gym's may be incremental**. Relevant only once compaction lands — do not fix preemptively.
+> ⚠️ That assumes observations are Markov. True for FrozenLake / Sokoban / navigation / primitive_skill; **spatial_gym's may be incremental**. Relevant to compaction, which has since landed (`CompactHarness`).
 
 ---
 
@@ -581,7 +589,7 @@ def turn_gae(v: BatchView, cfg):
     advantage is broadcast across the turn's tokens.
 
     by_trajectory() is already time-sorted on global_step_idx, so this recursion
-    will cross compaction boundaries unchanged once compaction lands."""
+    cross compaction boundaries unchanged."""
     adv = torch.zeros_like(v.response_mask, dtype=torch.float32)
     ret = torch.full_like(adv, cfg.ignore_value)
     for traj in v.by_trajectory().values():

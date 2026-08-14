@@ -21,7 +21,7 @@ defaults:
 # ============================================================================
 data:
   max_prompt_length: 9000          # Max token length for input prompts (system prompt + first user turn message)
-  max_response_length: 8000        # Max token length for first assiastant turn response + subsequent multi-turn messages
+  max_response_length: 8000        # Max token length for first assistant turn response + subsequent multi-turn messages
   train_batch_size: 128            
   return_raw_chat: True            
   return_multi_modal_inputs: True

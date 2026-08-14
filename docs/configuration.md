@@ -30,8 +30,12 @@ harness decides how the first maps onto the second.
 
 ```yaml
 trainer:
-  harness: concat
-  compact_budget: 4000          # compact only: the conversation size that triggers a summary
+  harness: compact
+  compact_budget: 1200          # compact only: the conversation size that triggers a summary.
+                                # ★ Size it against max_turns -- see the tip below. The
+                                # shipped default is 4000, which at sokoban's max_turns: 5
+                                # holds a whole episode and so never fires. 1200 is what
+                                # train_default_gae_compact_qwen25vl3b.sh uses.
   compact_summary_budget: null  # null -> max(1, min(response_length_per_turn, compact_budget // 4))
 ```
 
@@ -244,6 +248,11 @@ FrozenLake's defaults are **not** the same — `prompt_format` defaults to `free
 An optional judge scoring the observation and prediction sections. Off by default, and it
 needs a judge server — `scripts/launch_judge.sh` starts one.
 
+    Before spending GPU time on it, check the judge can actually do the conversion on your
+    environment: `JUDGE_URL=http://127.0.0.1:8123/v1 python tools/judge_eval.py` scores it
+    against hand-labelled cases. A judge that reads the descriptions wrong pays a reward
+    signal that looks like learning.
+
 ```yaml
 trainer:
   state_reward:
@@ -275,6 +284,7 @@ trainer:
   max_actor_ckpt_to_keep: 1
   max_critic_ckpt_to_keep: 1
   rollout_data_dir: ...           # per-step rollout dumps, as jsonl
+  validation_data_dir: ...        # the same for validation. Every shipped script sets it
   replace_image_tokens_for_logging: true
   log_image: {enable: false, max_pending: 2, png_compress_level: 0}
 ```

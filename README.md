@@ -76,7 +76,7 @@ We frame multi-turn VLM agentic tasks as a Partially Observable Markov Decision 
 - Enhanced environment framework for easier creation of custom environments
 - New service architecture for efficient distributed training
 - Check out our new guides:
-  - [Creating Environments](./docs/custom-environment.md): New environment protocal.
+  - [Creating Environments](./docs/custom-environment.md): New environment protocol.
   - [Creating Services](./vagen/envs_remote/README.md): We now support hosting environments in a separate process
 
 **[2025/03]** We release VAGEN, a multi-turn reinforcement learning framework for training VLM Agents!
