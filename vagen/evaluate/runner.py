@@ -107,7 +107,12 @@ async def run_eval_parallel(
             dump_dir=dump_dir,
             dump_enabled=True,  # ignored in workflow; always dump executed episodes
             chat_config=data.get("chat_config") or {},
-            concat_multi_turn=data.get("concat_multi_turn", True),
+            harness=data.get("harness", "concat"),
+            response_length_per_turn=data.get("response_length_per_turn"),
+            max_env_response_per_turn=data.get("max_env_response_per_turn"),
+            compact_budget=data.get("compact_budget"),
+            compact_summary_budget=data.get("compact_summary_budget"),
+            tokens_per_image=data.get("tokens_per_image"),
         )
         async with episode_gate:
             logger.info(
