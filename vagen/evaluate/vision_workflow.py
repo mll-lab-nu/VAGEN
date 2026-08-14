@@ -10,6 +10,11 @@ import logging
 from vagen.evaluate.adapters.base_adapter import ModelAdapter
 from vagen.evaluate.utils.mm_utils import _now_tag, extract_images
 from vagen.evaluate.utils.json_utils import sanitize_for_json
+from vagen.core.env_adapter import GymEnvAdapter
+from vagen.core.runner import run_episode
+from vagen.evaluate.chat_client import ChatClient
+from vagen.harness import HARNESSES, build_harness
+from vagen.harness.budget import DEFAULT_MAX_ENV_RESPONSE, default_summary_budget
 
 logger = logging.getLogger(__name__)
 
@@ -34,11 +39,33 @@ class GenericVisionInferenceWorkflow:
         success_keys: Optional[List[str]] = None,
         success_threshold: float = 0.99,
         chat_config: Optional[Dict[str, Any]] = None,
-        concat_multi_turn: bool = True,
+        harness: str = "concat",
+        response_length_per_turn: Optional[int] = None,
+        max_env_response_per_turn: Optional[int] = None,
+        compact_budget: Optional[int] = None,
+        compact_summary_budget: Optional[int] = None,
+        tokenizer: Any = None,
+        tokens_per_image: Optional[int] = None,
     ):
         self.adapter = adapter
         self.dump_dir = dump_dir
-        self.concat_multi_turn = concat_multi_turn
+        # ★ The context policy is the same object training uses, chosen by name. It was a
+        # bool here (`concat_multi_turn`), which could express concat and approximately
+        # no_concat and could not express compaction at all -- training deleted that bool
+        # rather than deprecating it, precisely so a stale config would be rejected instead
+        # of quietly outvoting `harness`.
+        if harness not in HARNESSES:
+            raise ValueError(f"unknown harness {harness!r}; choose from {sorted(HARNESSES)}")
+        self.harness_name = harness
+        self.response_length_per_turn = response_length_per_turn
+        self.max_env_response_per_turn = max_env_response_per_turn
+        self.compact_budget = compact_budget
+        self.compact_summary_budget = compact_summary_budget
+        self.tokenizer = tokenizer
+        # See chat_client.DEFAULT_TOKENS_PER_IMAGE: this feeds the compaction trigger, not
+        # just an overflow guard, so a value far off the environment's real frame cost
+        # makes `compact` close conversations before they have bought a turn.
+        self.tokens_per_image = tokens_per_image
         # IMPORTANT: dump_enabled is ignored; we always dump for executed episodes
         self.dump_enabled = True
         self.success_keys = success_keys or ["success", "is_success", "solved"]
@@ -125,6 +152,42 @@ class GenericVisionInferenceWorkflow:
                 )
             )
 
+
+    def _build_harness(self, max_turns: int):
+        """The harness, and the two per-call ceilings the client enforces.
+
+        Deliberately no static budget check and no prompt region. Those exist in training
+        because a conversation has to fit a training row; evaluation builds no rows, which
+        is the case ``BaseHarness`` documents as ``response_len=None``. Setting
+        ``response_length_per_turn`` in the eval config turns the accounting back on, and
+        then a conversation is bounded exactly as it is in training.
+
+        ★ The opening ceiling is None rather than a number. Deriving it from a
+        prompt region that evaluation does not have gave zero, and a zero ceiling rejects
+        the system prompt itself -- every episode died at its first call, having made no
+        model call at all, and reported cleanly as a zero-turn episode.
+        """
+        per_turn = self.response_length_per_turn
+        response_len = per_turn * max_turns if per_turn else None
+
+        kw = {"response_len": response_len}
+        if per_turn:
+            kw["floor"] = per_turn
+        if self.harness_name == "compact":
+            budget = self.compact_budget
+            summary = self.compact_summary_budget
+            if budget and not summary:
+                summary = default_summary_budget(budget, per_turn or budget)
+            kw.update(budget=budget, summary_budget=summary)
+        harness = build_harness(self.harness_name, **kw)
+
+        # An observation is still bounded: that ceiling is a property of the environment,
+        # not of whether there is a row to fit.
+        continuation = self.max_env_response_per_turn
+        if continuation is None:
+            continuation = DEFAULT_MAX_ENV_RESPONSE
+        return harness, None, continuation
+
     async def arun_episode(
         self,
         env_cls,
@@ -165,83 +228,35 @@ class GenericVisionInferenceWorkflow:
         assert turn_limit > 0, f"Invalid max_turns={turn_limit} in workflow"
 
         try:
-            # Reset and obtain system/user initial messages
-            obs, info = await env.reset(seed=seed)
-            infos.append(info)
+            # ★ The shared episode loop, the same one training runs. `core/runner.py` was
+            # written to drive "a verl rollout and a closed chat API"; this is the second
+            # caller it was waiting for. Everything the old hand-rolled loop here did by
+            # hand -- deciding what history a call carries, when a conversation is full,
+            # how much of the budget a turn may spend -- is the harness's job, and doing it
+            # twice is how evaluation ended up unable to express compaction.
+            harness, opening, continuation = self._build_harness(turn_limit)
+            client_kw = {} if self.tokens_per_image is None else {
+                "tokens_per_image": self.tokens_per_image}
+            client = ChatClient(self.adapter, self.chat_config, tokenizer=self.tokenizer,
+                                response_limit=self.response_length_per_turn, **client_kw)
+            client.opening_limit, client.continuation_limit = opening, continuation
 
-            # Normal execution path (this episode WILL be dumped)
-            sys_obs = await env.system_prompt()
-            sys_text = sys_obs.get("obs_str", "")
-            sys_imgs = extract_images(sys_obs)
-            messages.append(self.adapter.format_system(sys_text, sys_imgs))
+            adapted = GymEnvAdapter(env, env_config.get("name", "env"), env_config)
+            outcome = await run_episode(adapted, harness, client, seed=seed,
+                                        max_turns=turn_limit)
 
-            user_text = obs.get("obs_str", "")
-            user_imgs = extract_images(obs)
-            messages.append(self.adapter.format_user_turn(user_text, user_imgs))
-            user_imgs_per_turn.append(user_imgs)
+            rewards = list(outcome.rewards)
+            cumulative_reward = float(outcome.total_reward)
+            terminated = bool(outcome.terminated)
+            infos.append(outcome.info or {})
+            finish_reason = "done" if terminated else "max_turns"
 
-            for t in range(turn_limit):
-                # Safeguard completion
-                try:
-                    # In non-concat mode, only send system prompt + current user message
-                    if self.concat_multi_turn:
-                        api_messages = messages
-                    else:
-                        api_messages = [messages[0], messages[-1]]
-                    reply = await self.adapter.acompletion(api_messages, **self.chat_config)
-                except OpenAIError as e:
-                    error_info = {
-                        "provider_error": repr(e),
-                        "error_type": type(e).__name__,
-                        "message": str(e),
-                    }
-                    logger.info("Rollout %s provider error: %s", rid, repr(e))
-                    finish_reason = "model_error"
-                    terminated = False
-                    break
-                except Exception as e:
-                    error_info = {
-                        "unexpected_error": repr(e),
-                        "error_type": type(e).__name__,
-                        "message": str(e),
-                    }
-                    logger.info("Rollout %s unexpected model error: %s", rid, repr(e))
-                    finish_reason = "model_error"
-                    terminated = False
-                    break
-
-                assistant_texts.append(reply)
-                messages.append(self.adapter.format_assistant_turn(reply))
-
-                try:
-                    next_obs, r, done, step_info = await env.step(reply)
-                except Exception as e:
-                    error_info = {
-                        "env_step_error": repr(e),
-                        "error_type": type(e).__name__,
-                        "message": str(e),
-                    }
-                    logger.info("Rollout %s env step error: %s", rid, repr(e))
-                    finish_reason = "env_error"
-                    terminated = False
-                    break
-
-                rewards.append(float(r))
-                cumulative_reward += float(r)
-                infos.append(step_info or {})
-
-                user_text = next_obs.get("obs_str", "")
-                user_imgs = extract_images(next_obs)
-                messages.append(self.adapter.format_user_turn(user_text, user_imgs))
-                user_imgs_per_turn.append(user_imgs)
-
-                if done:
-                    terminated = True
-                    finish_reason = "done"
-                    break
-                if t + 1 >= turn_limit:
-                    finish_reason = "max_turns"
-                    break
+            # The transcript is what the client actually sent, across every conversation
+            # the harness opened. Under no_concat and compact that is more than one, and
+            # reading only the last would report a fraction of the episode.
+            for conv in client.conversations():
+                messages.extend(client.messages(conv.conversation_id))
+            assistant_texts = [_text_of(m) for m in messages if m.get("role") == "assistant"]
 
             # Success heuristic
             success = False
@@ -370,3 +385,11 @@ class GenericVisionInferenceWorkflow:
                 await env.close()
             except Exception:
                 pass
+
+
+def _text_of(message: dict) -> str:
+    """The plain text of an API message, whatever content shape the adapter used."""
+    content = message.get("content", "")
+    if isinstance(content, str):
+        return content
+    return "".join(p.get("text", "") for p in content if isinstance(p, dict))

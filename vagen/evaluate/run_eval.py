@@ -7,7 +7,7 @@ import json
 import logging
 import os
 import shutil
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from omegaconf import DictConfig, OmegaConf, open_dict
@@ -38,7 +38,28 @@ class EnvSpec:
     seed: List[int] = field(default_factory=lambda: [0])
     seed_list: Optional[List[int]] = None
     max_turns: Optional[int] = None
-    concat_multi_turn: bool = True
+    # ★ The context policy, by name, exactly as training spells it in trainer.harness:
+    # concat | no_concat | compact. This replaces `concat_multi_turn`, a bool that could
+    # express concat and approximately no_concat and could not express compaction at all.
+    # Training deleted that bool rather than deprecating it so a stale override would be
+    # rejected instead of quietly outvoting the harness; eval was the one place it lived on.
+    harness: str = "concat"
+    # Optional, and off by default: evaluation builds no training row, so there is no
+    # region a conversation has to fit. Set response_length_per_turn to bound a turn the
+    # same way training does -- it becomes the API call's max_tokens -- and the rest
+    # follows from it.
+    response_length_per_turn: Optional[int] = None
+    max_env_response_per_turn: Optional[int] = None
+    compact_budget: Optional[int] = None
+    compact_summary_budget: Optional[int] = None
+    #: Only used when sizes have to be estimated (no tokenizer). It feeds the compaction
+    #: trigger as well as the overflow guard -- see chat_client.DEFAULT_TOKENS_PER_IMAGE.
+    tokens_per_image: Optional[int] = None
+
+
+#: Every key an env entry may set. Anything else is a typo or a setting that moved, and
+#: both are worth an error -- see _parse_env_specs.
+_ENV_SPEC_KEYS = {f.name for f in fields(EnvSpec)}
 
 
 def _looks_like_path_key(key: str) -> bool:
@@ -83,6 +104,17 @@ def _parse_env_specs(cfg: Dict[str, Any]) -> List[EnvSpec]:
     for item in envs_cfg:
         if not isinstance(item, dict):
             raise TypeError("Each env spec must be a mapping")
+        # ★ Refuse a key nobody reads. This function copies a fixed list out of each env
+        # entry and used to drop everything else without a word, so a `harness: compact`
+        # in an eval config was accepted, ignored, and ran concat -- and a misspelled key
+        # looked exactly like a working one. The failure it replaces is silent and the
+        # error is cheap.
+        unknown = set(item) - _ENV_SPEC_KEYS
+        if unknown:
+            raise ValueError(
+                f"env entry {item.get('name')!r} sets {sorted(unknown)}, which nothing "
+                f"reads. Known keys: {sorted(_ENV_SPEC_KEYS)}."
+            )
         if "tag_id" not in item or item.get("tag_id") is None:
             raise ValueError(f"Env spec '{item.get('name')}' is missing 'tag_id'. Provide a tag_id (int or str).")
 
@@ -116,7 +148,12 @@ def _parse_env_specs(cfg: Dict[str, Any]) -> List[EnvSpec]:
             seed=item.get("seed") if "seed" in item else [0],
             seed_list=item.get("seed_list"),
             max_turns=item.get("max_turns"),
-            concat_multi_turn=item.get("concat_multi_turn", True),
+            harness=str(item.get("harness", "concat")),
+            response_length_per_turn=item.get("response_length_per_turn"),
+            max_env_response_per_turn=item.get("max_env_response_per_turn"),
+            compact_budget=item.get("compact_budget"),
+            compact_summary_budget=item.get("compact_summary_budget"),
+            tokens_per_image=item.get("tokens_per_image"),
         )
         specs.append(spec)
     return specs
@@ -296,7 +333,12 @@ def _expand_jobs(
                 "env_name": spec.name,
                 "max_turns": job_max_turns,
                 "chat_config": chat_cfg,
-                "concat_multi_turn": spec.concat_multi_turn,
+                "harness": spec.harness,
+                "response_length_per_turn": spec.response_length_per_turn,
+                "max_env_response_per_turn": spec.max_env_response_per_turn,
+                "compact_budget": spec.compact_budget,
+                "compact_summary_budget": spec.compact_summary_budget,
+                "tokens_per_image": spec.tokens_per_image,
             }
             jobs.append({"data": job_data})
     return jobs
