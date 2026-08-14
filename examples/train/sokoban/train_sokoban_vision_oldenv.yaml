@@ -1,3 +1,12 @@
+# `max_turns: 20` is a CAP, not an expectation -- real sokoban episodes end well before
+# it (measured: 32 episodes gave 57 rows under compaction, ~0.8 compactions each). So the
+# startup warning that 20 x response_length_per_turn does not fit max_response_length is
+# EXPECTED and correct: it reports a worst case that does not occur. Generation is bounded
+# by the room actually left, which is why budget.py warns here instead of refusing.
+#
+# ★ Do not "fix" it by lowering max_turns to 5. compact_budget is sized against this cap;
+# at 5 a whole episode fits inside one conversation, compaction never fires, and the
+# compact arm silently measures concat instead.
 # Sokoban as it was BEFORE the 2026-08-10 format fix, for reproducing or extending the
 # `*_old` runs in wandb. Two settings, both deliberate:
 #
@@ -17,6 +26,12 @@ envs:
     seed: [1,10000,1]
     max_turns: 20
     response_length_per_turn: 512
+    # The largest one observation may be. Measured with the Qwen2.5-VL processor:
+    # sokoban vision is 80 tokens opening, 96 mid-episode. 256 leaves room for a larger frame without letting a
+    # runaway observation eat the response region. Undeclared this falls back to
+    # DEFAULT_MAX_ENV_RESPONSE=2048, which is not a bound on anything this env does
+    # and makes the episode-size warning fire on every run until nobody reads it.
+    max_env_response_per_turn: 256
     config:
       render_mode: vision
       strict_format: false

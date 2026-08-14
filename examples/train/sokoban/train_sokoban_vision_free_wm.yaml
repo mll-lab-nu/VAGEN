@@ -1,3 +1,12 @@
+# `max_turns: 20` is a CAP, not an expectation -- real sokoban episodes end well before
+# it (measured: 32 episodes gave 57 rows under compaction, ~0.8 compactions each). So the
+# startup warning that 20 x response_length_per_turn does not fit max_response_length is
+# EXPECTED and correct: it reports a worst case that does not occur. Generation is bounded
+# by the room actually left, which is why budget.py warns here instead of refusing.
+#
+# ★ Do not "fix" it by lowering max_turns to 5. compact_budget is sized against this cap;
+# at 5 a whole episode fits inside one conversation, compaction never fires, and the
+# compact arm silently measures concat instead.
 # train_sokoban_vision.yaml, with the one difference that `<think>` is not required.
 #
 # Qwen3-VL, Qwen3.5 and GLM-4.1V reserve `<think>`/`</think>` as single control tokens
@@ -21,6 +30,12 @@ envs:
     seed: [1,10000,1] # sample n_env seeds from seed[0] to seed[1] with each seed repeat at most seed[2] times
     max_turns: 20 # max number of interaction turns per episode
     response_length_per_turn: 512 # max response length per turn
+    # The largest one observation may be. Measured with the Qwen2.5-VL processor:
+    # sokoban vision is 80 tokens opening, 96 mid-episode. 256 leaves room for a larger frame without letting a
+    # runaway observation eat the response region. Undeclared this falls back to
+    # DEFAULT_MAX_ENV_RESPONSE=2048, which is not a bound on anything this env does
+    # and makes the episode-size warning fire on every run until nobody reads it.
+    max_env_response_per_turn: 256
     config: # env-specific config
       render_mode: vision
       prompt_format: free_wm
