@@ -50,7 +50,20 @@ DEFAULT_TOKENS_PER_IMAGE = 800
 
 
 class ChatClient(InferenceClient):
-    """Talks to an OpenAI-compatible endpoint through a ``ModelAdapter``."""
+    """Talks to an OpenAI-compatible endpoint through a ``ModelAdapter``.
+
+    ★ One per episode. ``generate`` writes the reply back to ``_api_messages[_active]``
+    *after* awaiting the endpoint, so a client shared between two concurrent episodes would
+    append one episode's reply to the other's conversation. ``arun_episode`` constructs it,
+    and nothing should hand it around.
+    """
+
+    #: ★ Zero, unlike the engine-backed client. The base class retries an empty generation
+    #: because an engine returning nothing is an interruption -- but a chat API returning
+    #: "" is a refusal or a content filter, and asking again three times just pays for it
+    #: four times. Measured: 4 calls per refusal, then a 0-turn episode the summary files
+    #: as normal.
+    empty_generation_retries = 0
 
     def __init__(self, adapter, chat_config: dict | None = None, tokenizer=None,
                  response_limit: int | None = None,
@@ -62,11 +75,7 @@ class ChatClient(InferenceClient):
         #: the first turn is the whole region -- so without this clamp a turn could spend
         #: the entire episode's budget. VerlClient does the same.
         self.response_limit = response_limit
-        #: Optional. Present, sizes are exact; absent, they are estimated. Note this also
-        #: decides ``returns_token_ids``, and therefore whether the runner treats an empty
-        #: generation as an interruption to retry -- a chat API returning "" for a refusal
-        #: is not an interruption, so leaving it None is the safer default for a closed
-        #: endpoint.
+        #: Optional. Present, sizes are exact; absent, they are estimated from characters.
         self.tokenizer = tokenizer
         self.tokens_per_image = tokens_per_image
         self._active: str | None = None

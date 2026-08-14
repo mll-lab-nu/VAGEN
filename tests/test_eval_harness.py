@@ -151,3 +151,89 @@ def test_response_length_per_turn_becomes_the_api_call_max_tokens():
     it does in training rather than leaving the endpoint to its own default."""
     adapter, _ = _run("concat", turns=2, response_length_per_turn=77)
     assert adapter.chat_config_seen.get("max_tokens") == 77
+
+
+# ------------------------------------------------- what the reviewers found, pinned
+#
+# Each of these is a defect the harness rewrite introduced and the suite did not catch.
+
+
+def test_an_episode_runs_the_turns_it_was_configured_for():
+    """★ The worst of them. Deriving the response region as response_length_per_turn *
+    max_turns looks like the episode's budget and is not -- under concat the observations
+    land in the same region, so the region runs out early. Measured on the shipped
+    frozenlake eval (g=512, T=5, one frame an observation): 3 turns of 5, reported as
+    `max_turns`."""
+    adapter, result = _run("concat", turns=5, response_length_per_turn=512)
+    assert result["num_turns"] == 5, f"lost turns: {result['num_turns']} of 5"
+    assert len(adapter.calls) == 5
+
+
+def test_num_turns_counts_environment_steps_not_transcript_messages():
+    """Under compact the transcript carries one extra assistant message per compaction,
+    so recomputing the count from it inflates avg_turns by the compaction rate -- a
+    quantity set by how verbosely the policy writes."""
+    adapter, result = _run("compact", turns=6, response_length_per_turn=64,
+                           compact_budget=200, compact_summary_budget=40)
+    assert result["num_turns"] == 6
+    assert len(adapter.calls) > 6, "this config was supposed to compact"
+
+
+def test_the_finish_reason_of_a_full_episode_is_one_the_summary_treats_as_normal():
+    """Anything outside NORMAL_FINISH_REASONS is filed as an error rollout and deleted by
+    _purge_error_rollouts on the next resumed run."""
+    from vagen.evaluate.runner import NORMAL_FINISH_REASONS
+
+    _, result = _run("concat", turns=3)
+    assert result["finish_reason"] in NORMAL_FINISH_REASONS
+
+
+def test_per_turn_infos_stay_aligned_with_rewards():
+    """summary_utils aligns per-turn fields on len(infos) == len(rewards) + 1. run_episode
+    merges every step's info into one dict, so passing that through left every turn past
+    the first reporting {}."""
+    _, result = _run("concat", turns=4)
+    assert len(result["infos"]) == len(result["rewards"]) + 1
+
+
+def test_a_failure_partway_through_keeps_the_turns_that_finished():
+    """The client and transcript used to be built inside the try, so a provider error on
+    call 3 of 6 reported num_turns=0 and an empty transcript -- and `error` is not a normal
+    finish reason, so the dump was then deleted on the next resumed run."""
+    class _Failing(_Adapter):
+        async def acompletion(self, messages, **cfg):
+            if len(self.calls) >= 2:
+                raise RuntimeError("provider exploded")
+            return await super().acompletion(messages, **cfg)
+
+    adapter = _Failing()
+    wf = GenericVisionInferenceWorkflow(adapter=adapter, dump_dir=None, harness="concat")
+    result = asyncio.run(wf.arun_episode(_Env, {"name": "Stub"}, seed=0, max_turns=6))
+    assert result["finish_reason"] == "error"
+    assert result["num_turns"] == 2, f"lost the finished turns: {result['num_turns']}"
+    assert len(result["rewards"]) == 2
+    assert any(m["role"] == "assistant" for m in result["messages"])
+
+
+def test_an_empty_reply_is_a_refusal_not_something_to_retry():
+    """The base client retries an empty generation three times because an engine returning
+    nothing is an interruption. A chat API returning "" is a refusal, and asking again just
+    pays for it four times."""
+    class _Empty(_Adapter):
+        async def acompletion(self, messages, **cfg):
+            await super().acompletion(messages, **cfg)
+            return ""
+
+    adapter = _Empty()
+    wf = GenericVisionInferenceWorkflow(adapter=adapter, dump_dir=None, harness="concat")
+    asyncio.run(wf.arun_episode(_Env, {"name": "Stub"}, seed=0, max_turns=1))
+    assert len(adapter.calls) == 1, f"{len(adapter.calls)} calls for one refusal"
+
+
+def test_compact_without_a_trigger_is_refused_rather_than_run_as_concat():
+    """With no compact_budget and no max_response_length neither trigger can fire, so the
+    conversation grows forever -- silently concat, under a name that says otherwise."""
+    with pytest.raises(ValueError, match="compact needs compact_budget"):
+        wf = GenericVisionInferenceWorkflow(adapter=_Adapter(), dump_dir=None,
+                                            harness="compact")
+        asyncio.run(wf.arun_episode(_Env, {"name": "Stub"}, seed=0, max_turns=3))

@@ -12,10 +12,7 @@ import logging
 from typing import Any
 
 from vagen.core.client import BackendOutput, InferenceClient
-from vagen.utils.image_token_utils import (
-    count_placeholder_runs, image_token_ids, truncate_keeping_images_whole,
-    vision_sentinel_ids,
-)
+from vagen.utils.image_token_utils import image_token_ids, vision_sentinel_ids
 
 logger = logging.getLogger(__name__)
 
@@ -79,30 +76,6 @@ class VerlClient(InferenceClient):
         if self._active is not None and images:
             self._images.setdefault(self._active, []).extend(images)
         return ids
-
-    def fit_context(self, context: list[int], limit: int) -> list[int]:
-        """Cut to ``limit`` without cutting through a picture, and drop its frame too.
-
-        ``encode`` has already recorded this span's images against the conversation, so a
-        cut that loses a placeholder block has to un-record the matching frame in the same
-        breath. ``multi_modal_inputs`` is rebuilt from the frames list *alone* -- the token
-        sequence is decoded with ``skip_special_tokens=True`` first, which erases every
-        placeholder -- so a frames list that outlives its placeholders is not caught by
-        anything downstream. It is handed to the model as a picture it was never shown.
-        """
-        placeholders, sentinels = self._placeholder_ids()
-        recorded = self._images.get(self._active) or []
-        # Only this span's frames are at risk; earlier turns are already in the prefix.
-        blocks_before = count_placeholder_runs(context, placeholders)
-        kept, _ = truncate_keeping_images_whole(
-            context, limit, keep="head", placeholders=placeholders,
-            frames=recorded[len(recorded) - blocks_before:] if blocks_before else [],
-            sentinels=sentinels,
-        )
-        dropped = blocks_before - count_placeholder_runs(kept, placeholders)
-        if dropped and self._active is not None:
-            del self._images[self._active][len(recorded) - dropped:]
-        return kept
 
     def _placeholder_ids(self):
         """The ids a picture sits behind, and the sentinels bracketing it. Cached: the

@@ -338,65 +338,47 @@ def test_a_vision_token_the_policy_invented_is_refused():
                          {"group_idx": "g", "traj_idx": 0}, "ep", _NoCompaction())
 
 
-# ------------------------------------- the env-response ceiling cutting an observation
+# ------------------------------- cutting an observation must not cut the turn boundary
 #
-# `max_env_response_per_turn` cuts an oversized observation instead of refusing it, and
-# `encode` has already recorded that span's frames against the conversation by then. So
-# the cut has to un-record the frames whose placeholders it dropped. Nothing downstream
-# catches a frames list that outlives its placeholders: multi_modal_inputs is rebuilt from
-# the frames *alone*, because the token sequence is decoded with skip_special_tokens=True
-# first and every placeholder is erased. The model is simply handed a picture it was never
-# shown, and every position after it shifts.
+# ★ The regression this file exists to pin. The obvious way to enforce
+# `max_env_response_per_turn` is to render the span and slice the token list -- and it is
+# wrong, because `render` tokenizes with add_generation_prompt=True, so the span ends
+# `<|im_end|>\n<|im_start|>assistant\n` and a head-keeping slice throws that away FIRST.
+# The engine then gets a prompt that stops mid-observation with no role boundary; the model
+# continues the user's sentence, `add_response` records it at mask 1, and `accept()` hands
+# it to env.step as an action. Nothing raises. One warning per client covers a whole run.
+#
+# So the cut is on the message text, before rendering: the template rebuilds the boundary
+# either way, and a trimmed observation is still a well-formed turn.
 
 
-def _client_with(placeholders, sentinels, images):
-    from vagen.agent_loop.verl_client import VerlClient
+def test_a_trimmed_continuation_still_ends_with_the_generation_prompt():
+    from transformers import AutoTokenizer
 
-    c = VerlClient(server_manager=None, tokenizer=None, processor=None)
-    c._ph_cache = (set(placeholders), set(sentinels))
-    c._active = "c1"
-    c._conversations["c1"] = None          # only the id is read on this path
-    c._images["c1"] = list(images)
-    return c
+    from vagen.core.client import BackendOutput, InferenceClient
+    from model_path import local_snapshot
 
+    tok = AutoTokenizer.from_pretrained(local_snapshot("Qwen/Qwen2.5-VL-3B-Instruct"))
 
-#: <vision_start> P P <vision_end> laid out the way a real span is.
-def _span(n_text, n_blocks, block=2, start=900, pad=901, end=902):
-    ids = [1] * n_text
-    for _ in range(n_blocks):
-        ids += [start] + [pad] * block + [end]
-    return ids
+    class _C(InferenceClient):
+        tokenizer = tok
 
+        def encode(self, messages):
+            return tok.apply_chat_template(
+                [{"role": m["role"], "content": m["content"]} for m in messages],
+                add_generation_prompt=True, tokenize=True, return_dict=False)
 
-def test_cutting_an_observation_drops_the_frames_whose_placeholders_went_with_it():
-    ids = _span(n_text=10, n_blocks=2)          # 10 text + 2 x 4 = 18 tokens
-    c = _client_with({901}, {900, 902}, ["frameA", "frameB"])
+        async def generate(self, prompt_ids, **kw):
+            return BackendOutput(text="x", token_ids=[1])
 
-    kept = c.fit_context(ids, 15)               # the cut lands inside the second picture
+    c = _C()
+    c.continuation_limit = 60
+    big = [{"role": "user", "content": "the board is unchanged. " * 200}]
 
-    assert 901 not in kept[14:], "a picture was cut in half"
-    assert c._images["c1"] == ["frameA"], "the dropped picture kept its frame"
-    from vagen.utils.image_token_utils import count_placeholder_runs
-    assert count_placeholder_runs(kept, {901}) == len(c._images["c1"])
+    kept = c.encode(c._fit_messages(big, opening=False))
+    tail = tok.decode(kept[-8:])
 
-
-def test_a_cut_that_takes_no_picture_leaves_every_frame_recorded():
-    ids = _span(n_text=10, n_blocks=1)          # pictures live at 10..13
-    c = _client_with({901}, {900, 902}, ["frameA"])
-
-    kept = c.fit_context(ids, 14)
-
-    assert len(kept) == 14
-    assert c._images["c1"] == ["frameA"]
-
-
-def test_frames_from_earlier_turns_are_not_touched_by_this_turns_cut():
-    """`_images` accumulates over the conversation; only the span being encoded now is at
-    risk. Trimming from the wrong end would drop the first turn's picture and leave the
-    oversized one in place."""
-    ids = _span(n_text=4, n_blocks=1)           # this turn carries one picture
-    c = _client_with({901}, {900, 902}, ["turn1", "turn2", "thisTurn"])
-
-    c.fit_context(ids, 5)                       # cuts inside this turn's picture
-
-    assert c._images["c1"] == ["turn1", "turn2"], "an earlier turn's frame was dropped"
+    assert "assistant" in tail, f"generation prompt was cut away; tail={tail!r}"
+    assert len(kept) <= 60 * 2, "the cut did not bring the span near the ceiling"
+    # and the observation itself survived, just shorter
+    assert "board" in tok.decode(kept)
