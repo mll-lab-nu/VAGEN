@@ -14,10 +14,12 @@ token ids, which a chat endpoint has no use for. So ``encode`` records the rende
 messages against the active conversation and ``generate`` reads them back -- the same
 pattern ``VerlClient`` uses for image frames.
 
-**Tokens may be estimated.** A closed API exposes no tokenizer. Pass one when the endpoint
-serves a known model (``vllm serve`` does) and the accounting is exact; without one, sizes
-are estimated from character counts, which is enough for the harness to decide when to
-compact and is never used to build a training row -- evaluation produces no rows.
+**Tokens may be estimated.** A closed API exposes no tokenizer. Set ``tokenizer:`` in the
+eval config when the endpoint serves a known model (``vllm serve`` does) and text sizing is
+exact; without one it is 4 characters to the token. Either way an image is priced by
+``tokens_per_image`` -- a tokenizer cannot measure a frame, only a processor can, and the
+number that matters is what the *server's* processor will charge. Neither is ever used to
+build a training row; evaluation produces no rows.
 """
 
 from __future__ import annotations

@@ -13,9 +13,9 @@ envs:
     # unique seeds" -- so each room is drawn up to 4 times. The repeats are the same room
     # from the same start; they differ only in what the policy samples.
     seed: [0, 15, 4]         # sample n_envs seeds from seed[0] to seed[1], each used at most seed[2] times
-    max_turns: 11              # max interaction turns (15 explore steps + 1 cogmap turn)
-    # Below data.max_response_length (2000). Above it, the loop clamps per_turn up
-    # to the region, and the derived observation ceiling collapses with it.
+    max_turns: 11              # max_exp_steps=10 exploration turns + 1 cogmap turn
+    # Below data.max_response_length, which the scripts set to 18432 -- see their headers
+    # for why the region is sized for the whole episode here rather than for a turn.
     response_length_per_turn: 1024
     # What one observation may be. Declared rather than derived: the derivation is
     # deliberately generous and the static checks are only exact against a real number.

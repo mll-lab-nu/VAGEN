@@ -191,16 +191,35 @@ VAGEN supports evaluation using different backends (OpenAI, Claude, Gemini, sgla
 
 ```bash
 cd VAGEN
-# FrozenLake evaluation with sglang
-bash examples/evaluate/frozenlake/sglang/eval_qwen25_vl_3b.sh
+# Sokoban with a local vLLM server -- starts one, evaluates, and shuts it down.
+# vLLM is the engine `scripts/install.sh` gives you by default.
+MODEL_PATH=Qwen/Qwen2.5-VL-3B-Instruct \
+  bash examples/evaluate/sokoban/vllm/eval_qwen25_vl_3b.sh
+```
+
+The context policy is a config key, the same one training uses, so comparing them is one
+override:
+
+```bash
+bash examples/evaluate/sokoban/vllm/eval_qwen25_vl_3b.sh 'envs.0.harness=no_concat'
 ```
 
 ```bash
 cd VAGEN
-# Sokoban evaluation
+# Against any OpenAI-compatible endpoint already running (set OPENAI_API_KEY first --
+# the shipped config defaults to gpt-4o-mini, which is a paid remote call).
 bash examples/evaluate/sokoban/run_eval.sh
-
 ```
+
+<details>
+<summary>With sglang instead</summary>
+
+Requires the sglang extra, which is mutually exclusive with vLLM — see Installation.
+
+```bash
+bash examples/evaluate/frozenlake/sglang/eval_qwen25_vl_3b.sh
+```
+</details>
 
 ## Customizing Your Environment
 

@@ -17,6 +17,12 @@
 #
 #     11 x response_length_per_turn(1024) + 10 x max_env_response_per_turn(700) = 18264
 #
+# ★ That charges the observations deliberately, and the static check in budget.py no longer
+# does -- it warns on T*g alone, because a worst-case ceiling should not size every run's
+# max_response_length. Here it should: the observations really do land in the response
+# region under concat, and this reward is paid only on the last turn, so a region that
+# usually fits would cut the one turn that matters on the episodes that reason longest.
+#
 # At the old 2000, `exhausted()` (floor = min(g, n_r/4) = 500) ended every episode around
 # turn 3 of 11 -- so the only scored turn was never reached and these runs could not score
 # at all, while every other metric looked ordinary. Sized for the worst case deliberately:

@@ -32,6 +32,20 @@ def _safe_read_json(p: Path) -> Optional[Dict[str, Any]]:
 #: an error rollout and DELETED by _purge_error_rollouts on the next resumed run, so a
 #: legitimate ending missing from here silently destroys results -- "no_room" is a real
 #: episode whose conversation ran out of response region, and its turns are real data.
+def _load_tokenizer(name):
+    """A tokenizer by id or path, or None. Failure is a warning, not a stop: exact sizing
+    is an improvement over the character estimate, never a requirement."""
+    if not name:
+        return None
+    try:
+        from transformers import AutoTokenizer
+        return AutoTokenizer.from_pretrained(name)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("could not load tokenizer %r (%s); sizes will be estimated from "
+                       "characters instead", name, exc)
+        return None
+
+
 NORMAL_FINISH_REASONS = {"done", "max_turns", "no_room"}
 
 
@@ -118,6 +132,7 @@ async def run_eval_parallel(
             compact_budget=data.get("compact_budget"),
             compact_summary_budget=data.get("compact_summary_budget"),
             tokens_per_image=data.get("tokens_per_image"),
+            tokenizer=_load_tokenizer(data.get("tokenizer")),
         )
         async with episode_gate:
             logger.info(

@@ -128,14 +128,14 @@ def test_the_room_check_turns_over_exactly_where_it_says():
     """A bound the error tells you to use, that then fails, costs a second submission."""
     from dataclasses import replace
 
-    # summary + request + generation + the floor below which the next generation is not
-    # worth making. The observation is deliberately NOT charged: E is a ceiling on a worst
-    # case, not a description of a typical observation.
+    # summary + request + generation + one observation + the floor below which the next
+    # generation is not worth making. The observation IS charged here -- a turn pays for
+    # one, and this is the one relation E belongs in (see budget.py's header).
     b = _b(compact_budget=None, summary_budget=500, per_turn=1000, env_response=300,
            prompt_len=4000, summary_request_len=13)
     for n_r in range(1800, 4000):
         floor = min(1000, max(1, n_r // 4))
-        if 500 + 13 + 1000 + floor <= n_r:
+        if 500 + 13 + 1000 + 300 + floor <= n_r:
             needed = n_r
             break
     check("compact", replace(b, response_len=needed))
@@ -532,3 +532,14 @@ def test_an_unset_budget_adds_no_key_at_all():
         if kwargs.get("thinking_token_budget"):
             sampling = {**sampling, "thinking_token_budget": int(kwargs["thinking_token_budget"])}
         assert "thinking_token_budget" not in sampling
+
+
+def test_compact_refuses_a_conversation_that_cannot_buy_a_turn_because_of_the_observation():
+    """★ The hole that opened when E was briefly taken out of every relation. Differential
+    search found 27 configurations refused before and accepted after; this is the smallest.
+    Accepted, it compacts after one turn on every episode, raises CompactionMakesNoProgress,
+    and returns an EMPTY BATCH deterministically -- with only a per-episode warning."""
+    with pytest.raises(BudgetError, match="no room to buy a turn"):
+        check("compact", _b(response_len=2000, per_turn=512, summary_budget=256,
+                            summary_request_len=70, env_response=2048,
+                            compact_budget=None, prompt_len=2000))
