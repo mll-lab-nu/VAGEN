@@ -21,10 +21,17 @@ import pytest
 from vagen.evaluate.vision_workflow import GenericVisionInferenceWorkflow
 
 
+#: A reply of a realistic size. The stub used to answer in 39 characters (~10 tokens)
+#: against response_length_per_turn=512, which is ~30x too small for any budget-driven
+#: behaviour to show up -- the test named "an episode runs the turns it was configured
+#: for" passed against the code that lost 40% of them.
+_REPLY_PAD = "reasoning. " * 180          # ~2000 chars, ~500 tokens
+
+
 class _Adapter:
     """Records the messages of every call and answers with a fixed action."""
 
-    def __init__(self, reply="<think>go</think><answer>Right</answer>"):
+    def __init__(self, reply=f"<think>{_REPLY_PAD}</think><answer>Right</answer>"):
         self.reply = reply
         self.calls: list[list[dict]] = []
 
@@ -55,26 +62,43 @@ class _Env:
         self.config = env_config
         self.i = 0
 
+    #: Set by _run(vision=True). One frame an observation, which is what makes
+    #: tokens_per_image part of the arithmetic instead of dead config.
+    vision = False
+
+    def _obs(self, i):
+        obs = {"obs_str": f"observation {i} {_PAD}"}
+        if self.vision:
+            # A real PIL image, not a placeholder object: the dump path calls img.save,
+            # and GymEnvAdapter runs the frames through _normalize_images.
+            from PIL import Image
+            obs["obs_str"] = "<image>\n" + obs["obs_str"]
+            obs["multi_modal_input"] = {"<image>": [Image.new("RGB", (16, 16))]}
+        return obs
+
     async def reset(self, seed=None):
         self.i = 0
-        return {"obs_str": f"observation 0 {_PAD}"}, {}
+        return self._obs(0), {}
 
     async def system_prompt(self):
         return {"obs_str": "you are a solver"}
 
     async def step(self, action, **kw):
         self.i += 1
-        return {"obs_str": f"observation {self.i} {_PAD}"}, 1.0, False, {}
+        return self._obs(self.i), 1.0, False, {"turn": self.i}
 
     async def close(self):
         self.closed = True
 
 
-def _run(harness, turns=4, **kw):
+def _run(harness, turns=4, vision=False, **kw):
     adapter = _Adapter()
+    env_cls = _Env
+    if vision:
+        env_cls = type("_VisionEnv", (_Env,), {"vision": True})
     wf = GenericVisionInferenceWorkflow(adapter=adapter, dump_dir=None,
                                         harness=harness, **kw)
-    result = asyncio.run(wf.arun_episode(_Env, {"name": "Stub"}, seed=0, max_turns=turns))
+    result = asyncio.run(wf.arun_episode(env_cls, {"name": "Stub"}, seed=0, max_turns=turns))
     return adapter, result
 
 
@@ -104,8 +128,9 @@ def test_no_concat_sends_only_the_system_prompt_and_the_latest_observation():
 def test_compact_summarises_and_reopens_rather_than_growing_forever():
     """The policy the old eval loop could not express at all. A conversation is closed by
     asking the model to summarise, and the next one opens on that summary."""
-    adapter, _ = _run("compact", turns=6, response_length_per_turn=64,
-                      compact_budget=200, compact_summary_budget=40)
+    adapter, _ = _run("compact", turns=6, response_length_per_turn=1024,
+                      max_response_length=16384, compact_budget=2500,
+                      compact_summary_budget=500)
     lengths = [len(c) for c in adapter.calls]
     # it must come back down at least once -- that is the reopen
     assert any(b < a for a, b in zip(lengths, lengths[1:])), lengths
@@ -113,9 +138,10 @@ def test_compact_summarises_and_reopens_rather_than_growing_forever():
 
 @pytest.mark.parametrize("harness", ["concat", "no_concat", "compact"])
 def test_every_harness_produces_a_scored_episode(harness):
-    _, result = _run(harness, turns=3, response_length_per_turn=256,
-                     compact_budget=600, compact_summary_budget=120)
-    assert result["num_turns"] >= 1
+    _, result = _run(harness, turns=3, response_length_per_turn=1024,
+                     max_response_length=8192, compact_budget=3000,
+                     compact_summary_budget=600)
+    assert result["num_turns"] == 3, f"{harness} ran {result['num_turns']} turns of 3"
     assert result["cumulative_reward"] > 0
 
 
@@ -164,7 +190,11 @@ def test_an_episode_runs_the_turns_it_was_configured_for():
     land in the same region, so the region runs out early. Measured on the shipped
     frozenlake eval (g=512, T=5, one frame an observation): 3 turns of 5, reported as
     `max_turns`."""
-    adapter, result = _run("concat", turns=5, response_length_per_turn=512)
+    # ★ max_response_length is given, so the accounting is ON -- without it response_len
+    # is None and this exercises the no-accounting branch instead of the arithmetic. And
+    # the env renders a frame, so an observation costs what one really costs.
+    adapter, result = _run("concat", turns=5, vision=True,
+                           response_length_per_turn=512, max_response_length=8192)
     assert result["num_turns"] == 5, f"lost turns: {result['num_turns']} of 5"
     assert len(adapter.calls) == 5
 
@@ -173,8 +203,9 @@ def test_num_turns_counts_environment_steps_not_transcript_messages():
     """Under compact the transcript carries one extra assistant message per compaction,
     so recomputing the count from it inflates avg_turns by the compaction rate -- a
     quantity set by how verbosely the policy writes."""
-    adapter, result = _run("compact", turns=6, response_length_per_turn=64,
-                           compact_budget=200, compact_summary_budget=40)
+    adapter, result = _run("compact", turns=6, response_length_per_turn=1024,
+                           max_response_length=16384, compact_budget=2500,
+                           compact_summary_budget=500)
     assert result["num_turns"] == 6
     assert len(adapter.calls) > 6, "this config was supposed to compact"
 
@@ -265,7 +296,7 @@ def test_one_normal_finish_reason_set_governs_deletion_and_reporting():
     from vagen.evaluate.runner import NORMAL_FINISH_REASONS as a
     from vagen.evaluate.utils.summary_utils import NORMAL_FINISH_REASONS as b
 
-    assert a is b
+    assert a == b
     _, result = _run("concat", turns=3)
     assert result["finish_reason"] in a
 
@@ -344,3 +375,59 @@ def test_shadowing_a_registered_harness_is_refused():
 
     with pytest.raises(ValueError, match="already registered"):
         register_harness("concat")(_custom_harness_cls())
+
+
+# --------------------------------------------------- the vision half, which had no tests
+#
+# The workflow is called GenericVisionInferenceWorkflow and every test above ran text-only,
+# so two regressions in the same commit went unnoticed: frames stopped being dumped
+# entirely, and tokens_per_image -- documented as the term that drives the compaction
+# trigger -- was never exercised.
+
+
+def test_vision_rollouts_keep_their_frames(tmp_path):
+    """★ `images/` was being created empty on every rollout. `run_episode` returns rewards
+    and a merged info; the frames only survive because the workflow records them per step."""
+    adapter = _Adapter()
+    wf = GenericVisionInferenceWorkflow(adapter=adapter, dump_dir=str(tmp_path),
+                                        harness="concat")
+    env_cls = type("_VisionEnv", (_Env,), {"vision": True})
+    asyncio.run(wf.arun_episode(env_cls, {"name": "Stub"}, seed=0, max_turns=3))
+
+    rollouts = [p for p in tmp_path.iterdir() if p.is_dir()]
+    assert rollouts, "nothing was dumped"
+    images = rollouts[0] / "images"
+    assert images.is_dir() and any(images.iterdir()), "images/ was created and left empty"
+
+
+def test_tokens_per_image_changes_what_the_harness_thinks_a_turn_costs():
+    """★ It is not just an overflow guard -- it feeds the compaction trigger. Set far above
+    the environment's real frame cost it made every compact episode die in
+    CompactionMakesNoProgress, on numbers that were wrong."""
+    # max_env_response_per_turn has to be above the image price, or the observation
+    # ceiling trims the frame away first and the price never reaches the accounting --
+    # which is itself the right behaviour, and was what made the first version of this
+    # test see no difference at all.
+    common = dict(turns=3, vision=True, response_length_per_turn=512,
+                  max_response_length=8192, max_env_response_per_turn=16384)
+    cheap, _ = _run("concat", tokens_per_image=32, **common)
+    dear, _ = _run("concat", tokens_per_image=4096, **common)
+    # Same episode, same replies; only the image price differs, and the expensive one
+    # exhausts the region first.
+    assert len(cheap.calls) > len(dear.calls), (
+        f"tokens_per_image had no effect: {len(cheap.calls)} vs {len(dear.calls)} calls")
+
+
+def test_a_crashed_environment_is_not_reported_as_a_solved_episode():
+    """The adapter turns any step exception into done=True, which without the env_error
+    check is indistinguishable from a normal terminal state -- so eval error rates
+    under-reported environment failures to zero."""
+    class _Broken(_Env):
+        async def step(self, action, **kw):
+            raise RuntimeError("simulator died")
+
+    adapter = _Adapter()
+    wf = GenericVisionInferenceWorkflow(adapter=adapter, dump_dir=None, harness="concat")
+    result = asyncio.run(wf.arun_episode(_Broken, {"name": "Stub"}, seed=0, max_turns=3))
+    assert result["finish_reason"] == "env_error", result["finish_reason"]
+    assert result["success"] is False

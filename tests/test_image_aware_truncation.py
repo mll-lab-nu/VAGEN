@@ -353,6 +353,16 @@ def test_a_vision_token_the_policy_invented_is_refused():
 
 
 def test_a_trimmed_continuation_still_ends_with_the_generation_prompt():
+    """★ Driven through `send`, not through `_fit_messages` directly.
+
+    The bug was an ORDERING inside `InferenceClient.send`: it encoded first and cut the
+    rendered span, which takes the trailing generation prompt with it. A test that calls
+    `_fit_messages` and then re-renders proves nothing -- re-rendering puts the prompt back
+    by construction, and the earlier version of this test passed against the buggy `send`.
+    So this asserts on the tokens the *conversation* ends up holding.
+    """
+    import asyncio
+
     from transformers import AutoTokenizer
 
     from vagen.core.client import BackendOutput, InferenceClient
@@ -363,22 +373,58 @@ def test_a_trimmed_continuation_still_ends_with_the_generation_prompt():
     class _C(InferenceClient):
         tokenizer = tok
 
+        def __init__(self):
+            super().__init__()
+            self.ran = None
+
         def encode(self, messages):
             return tok.apply_chat_template(
                 [{"role": m["role"], "content": m["content"]} for m in messages],
                 add_generation_prompt=True, tokenize=True, return_dict=False)
 
         async def generate(self, prompt_ids, **kw):
+            self.ran = list(prompt_ids)          # what the engine would have been given
             return BackendOutput(text="x", token_ids=[1])
 
     c = _C()
-    c.continuation_limit = 60
-    big = [{"role": "user", "content": "the board is unchanged. " * 200}]
+    c.opening_limit, c.continuation_limit = 10_000, 60
+    # open the conversation, then continue it with an oversized observation
+    cid = asyncio.run(c.send([{"role": "user", "content": "start"}])).conversation_id
+    asyncio.run(c.send([{"role": "user", "content": "the board is unchanged. " * 200}], cid))
 
-    kept = c.encode(c._fit_messages(big, opening=False))
-    tail = tok.decode(kept[-8:])
+    tail = tok.decode(c.ran[-8:])
+    assert "assistant" in tail, (
+        f"the generation prompt was cut off the prompt the engine ran; tail={tail!r}. "
+        f"A continuation ending mid-observation with no role boundary makes the model "
+        f"continue the user's sentence, and that gets recorded at mask 1 as an action.")
+    assert "board" in tok.decode(c.ran), "the observation was dropped entirely"
 
-    assert "assistant" in tail, f"generation prompt was cut away; tail={tail!r}"
-    assert len(kept) <= 60 * 2, "the cut did not bring the span near the ceiling"
-    # and the observation itself survived, just shorter
-    assert "board" in tok.decode(kept)
+
+def test_the_cut_happens_before_rendering_not_after():
+    """The same property, stated as the invariant rather than the symptom: whatever `send`
+    stores for a conversation must be something `encode` could have produced."""
+    import asyncio
+
+    from vagen.core.client import BackendOutput, InferenceClient
+
+    SENTINEL = 999_999          # stands in for the generation prompt
+
+    class _C(InferenceClient):
+        tokenizer = object()
+
+        def encode(self, messages):
+            n = sum(len(m["content"]) for m in messages)
+            return [1] * n + [SENTINEL]          # every render ends with the boundary
+
+        async def generate(self, prompt_ids, **kw):
+            return BackendOutput(text="x", token_ids=[2])
+
+    c = _C()
+    c.opening_limit, c.continuation_limit = 10_000, 50
+    cid = asyncio.run(c.send([{"role": "user", "content": "hi"}])).conversation_id
+    asyncio.run(c.send([{"role": "user", "content": "o" * 400}], cid))
+
+    stored = c._conversations[cid].token_ids
+    assert stored[-1] == SENTINEL or SENTINEL in stored[-3:], (
+        "the stored conversation does not end with the boundary encode always emits, so "
+        "it was cut after rendering")

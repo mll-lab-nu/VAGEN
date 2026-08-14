@@ -220,6 +220,7 @@ def write_rollouts_summary_from_dump(
     dump_dir: str,
     filename: str = "summary.json",
     success_keys: Optional[List[str]] = None,
+    model: Optional[str] = None,
 ) -> str:
     """
     Aggregate summary by scanning dump_dir for metrics.json files.
@@ -237,6 +238,12 @@ def write_rollouts_summary_from_dump(
     error_rollouts: List[str] = []
     per_tag_data: Dict[int, Dict[str, Any]] = {}
 
+    # ★ Rollout directories are {timestamp}-{uuid8}, so a directory holds whatever was
+    # ever written there -- including another model's episodes. Filtering on the recorded
+    # model is what stops a summary blending two checkpoints: measured on a dump holding
+    # A and B, n_episodes came out 4 for a 2-episode config at a success rate averaged
+    # across both. `None` means "whatever is here", which is what the resume-time refresh
+    # wants, since it runs before this run has written anything.
     for run_dir in root.iterdir():
         if not run_dir.is_dir():
             continue
@@ -248,6 +255,9 @@ def write_rollouts_summary_from_dump(
             m = json.loads(metrics_path.read_text(encoding="utf-8"))
         except Exception:
             # Skip corrupted metrics
+            continue
+
+        if model is not None and str(m.get("model") or "") != str(model):
             continue
 
         rewards = m.get("rewards") or []

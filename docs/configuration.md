@@ -31,7 +31,7 @@ harness decides how the first maps onto the second.
 trainer:
   harness: concat
   compact_budget: 4000          # compact only: the conversation size that triggers a summary
-  compact_summary_budget: null  # null -> compact_budget / 4
+  compact_summary_budget: null  # null -> max(1, min(response_length_per_turn, compact_budget // 4))
 ```
 
 !!! danger "`harness` and `algorithm.adv_estimator` are one choice"
@@ -91,11 +91,15 @@ turn.
 | `trajectory_grpo` | group-relative, over trajectories | — |
 | verl's `gae`, `grpo`, … | one row — **`concat` only** | — |
 
-The two `+`-prefixed parameters appear in no config file and must be given on the command
-line:
+Neither `+`-prefixed parameter appears in a config file, so both go on the command line.
+warning.
 
 ```bash
 ```
+
+!!! danger "Two more startup refusals"
+    All but `trajectory_grpo` need a critic and refuse without `critic.enable=True`. And
+    `ValueError`s at startup, the same class of trap as the harness rule above.
 
 ---
 
@@ -127,20 +131,21 @@ envs:
 | `response_length_per_turn` | hard cap on one generation — it becomes `max_tokens` |
 | `max_env_response_per_turn` | ceiling on one observation; over it the text is cut. Default 2048 |
 | `thinking_token_budget` | tokens allowed *inside* a reasoning block — see **Budgets** |
+| `env_response_length` | deprecated spelling of `max_env_response_per_turn`; setting both raises |
 | `config` | environment-specific, passed straight through |
 
 ### Seeds
 
 ```yaml
-seed: [7]                # 1 element: a base seed; the actual seeds are sampled 32-bit
+seed: [7]                # 1 element: a base seed; actual seeds are sampled from [0, 2**31-1]
 seed: [0, 99]            # 2 elements: sampled from the INCLUSIVE range, with repeats
 seed: [0, 99, 1]         # 3 elements: as above, each value used at most `limit` times
 ```
 
 !!! warning "The third element is an occurrence limit, not a step, and the range is inclusive"
     With `limit: 1` the loader draws `n_envs` values from `range(min, max+1)` **without**
-    replacement. So `n_envs` must equal `max - min + 1`, or a different value is dropped at
-    random on every run — and where an environment indexes its dataset as
+    replacement. So `n_envs` must equal `max - min + 1`, or one value is dropped — the
+    *same* one on every run at a fixed `data.base_seed`, since the RNG is seeded from it — and where an environment indexes its dataset as
     `seed % len(dataset)`, the surplus wraps onto item 0 and scores it twice.
     `tests/test_eval_matches_val.py` checks this for the shipped eval configs.
 
@@ -198,10 +203,14 @@ FrozenLake's defaults are **not** the same — `prompt_format` defaults to `free
 
 | format | shape | available on |
 |---|---|---|
-| `wm` | `<observation><think><answer><prediction>` | sokoban, frozenlake, navigation, primitive_skill |
-| `free_think` | `<think>…</think>` then `<answer>` | all of the above |
+| `wm` | `<observation><think><answer><prediction>` | sokoban, frozenlake, primitive_skill |
+| `free_think` | `<think>…</think>` then `<answer>` | sokoban, frozenlake, primitive_skill |
 | `free_wm` | observation / answer / prediction, free prose between | **sokoban only** |
 | `answer` | `<answer>` only | **sokoban only** |
+| `wm`, `free_think`, `no_think`, `eval_mode` | navigation's own set, and it tags the action `<action>`, not `<answer>` | **navigation only** |
+
+`SpatialGym` has no `prompt_format`: the field is `init=False` and it parses `THINK:` /
+`FINAL ANSWER:` labels with a whole-text fallback.
 
 !!! danger "`<think>` is a reserved token on some model families"
     On Qwen2.5-VL and InternVL3 it is ordinary text. On **Qwen3-VL, Qwen3.5 and GLM** it is
@@ -223,8 +232,11 @@ needs a judge server — `scripts/launch_judge.sh` starts one.
 trainer:
   state_reward:
     placement: auto                        # auto | turn_end | per_span
-    state_estimation:      {enable: false, weight: 1.0}
-    transition_prediction: {enable: false, weight: 1.0}
+    state_estimation:      {enable: false, weight: 0.5}
+    transition_prediction: {enable: false, weight: 0.5}
+    budget: 0.1
+    score_base: 0.334
+    format_reward: 0.0
     judge_base_url: "http://127.0.0.1:8123/v1"
     judge_model: ...
 ```
@@ -240,9 +252,9 @@ mid-turn is credited twice.
 ```yaml
 trainer:
   val_before_train: true
-  log_val_generations: 10
+  log_val_generations: 32
   val_log_select: balanced        # balanced | first | failures | successes | worst | best
-  save_best_actor: false
+  save_best_actor: true
   save_freq: 100
   max_actor_ckpt_to_keep: 1
   max_critic_ckpt_to_keep: 1

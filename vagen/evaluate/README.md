@@ -87,7 +87,7 @@ backends:
 | `response_length_per_turn` | int | Hard cap on one generation; becomes the call's `max_tokens` |
 | `max_response_length` | int | The response region a conversation must fit. Optional — unset, there is no accounting |
 | `max_env_response_per_turn` | int | Ceiling on one observation; over it the text is cut. Default 2048 |
-| `compact_budget`, `compact_summary_budget` | int | `compact` only. Without one of these (or `max_response_length`) no trigger can fire and it runs as concat, so it is refused |
+| `compact_budget`, `compact_summary_budget` | int | `compact` only. `compact` needs `compact_budget` or `max_response_length`, or no trigger can fire and it runs as concat -- so that is refused. `compact_summary_budget` alone does not satisfy it |
 | `tokens_per_image` | int | What one image costs when sizes are estimated. It feeds the **compaction trigger**, so a value far from your environment's real frame cost makes `compact` misbehave |
 | `tokenizer` | str | A HuggingFace id or path. Given one, text sizes are exact instead of 4 characters a token |
 
