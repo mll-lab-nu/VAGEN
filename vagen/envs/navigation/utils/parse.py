@@ -80,7 +80,7 @@ def compute_reward(
     success_reward: float = 10.0,
     is_format_correct_so_far: bool = True,
 ) -> float:
-    """Compute step reward following ViewSuite pattern.
+    """Compute step reward.
 
     - per_turn_format_reward: given every step if format is correct this turn
     - format_reward: given at episode end only if ALL turns had correct format

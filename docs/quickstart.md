@@ -10,9 +10,6 @@
   intend to run. `default_gae` and `ppo` also train a critic the size of the actor, so a
   3B run holds two 3B models plus the rollout engine; A100-80G class cards are what these
   were developed on. Lower `n_gpus_per_node` and `data.train_batch_size` together.
-- `ninja` — vLLM builds kernels through it at engine startup, even under `--enforce-eager`,
-  and it is not pulled in by either engine extra. Without it the server dies with a bare
-  `FileNotFoundError: 'ninja'` several frames below anything that names vLLM.
 - Conda (recommended)
 
 ### Setup

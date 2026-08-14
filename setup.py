@@ -7,7 +7,7 @@ setup(
     long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     url="https://github.com/mll-lab-nu/VAGEN",
-    license="Apache-2.0",
+    license="MIT",
     packages=find_packages(exclude=["tests", "tests.*", "vagen.tests", "vagen.tests.*"]),
     # find_packages() alone ships no data files, and `vagen/configs/` is not a package --
     # it holds no .py, so nothing can reach it. envs/registry.py resolves

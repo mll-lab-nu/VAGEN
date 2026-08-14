@@ -101,7 +101,7 @@ backends:
 - `default_max_turns` — Fallback max_turns if env doesn't specify one
 
 **`run`**:
-- `backend` — Which backend to use: `openai` | `azure` | `sglang` | `vllm` | `together` | `claude` | `gemini` | `openai_responses` | `azure_responses`
+- `backend` — Which backend to use. The names with a block in `vagen/configs/eval_default.yaml`: `openai` | `azure` | `sglang` | `vllm` | `together` | `claude` | `gemini`. Any other name needs a `backends.<name>:` block of its own; without one the run stops and lists what is configured.
 - `max_concurrent_jobs` — Episode-level parallelism (how many episodes run at once)
 - `resume` — `skip_completed` (default) skips episodes already completed **by the same model**; `force_rerun` deletes the previous rollouts and runs everything again; `off` runs everything and keeps what is there. Note YAML reads a bare `off` as the boolean `False`; both are accepted
 - `live_summary` — Refresh `summary.json` after each episode
