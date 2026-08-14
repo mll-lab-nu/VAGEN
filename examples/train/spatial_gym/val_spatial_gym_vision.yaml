@@ -15,8 +15,7 @@ envs:
     # `run1000` exists, so every validation episode died on the load assertion.
     seed: [16, 19, 1]
     max_turns: 11
-    # Below data.max_response_length (2000). Above it, the loop clamps per_turn up
-    # to the region, and the derived observation ceiling collapses with it.
+    # Below data.max_response_length, which the scripts set to 18432.
     response_length_per_turn: 1024
     # What one observation may be. Declared rather than derived: the derivation is
     # deliberately generous and the static checks are only exact against a real number.

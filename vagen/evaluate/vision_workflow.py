@@ -421,11 +421,10 @@ class GenericVisionInferenceWorkflow:
             if metadata:
                 result.update(metadata)
             return result
-        finally:
-            try:
-                await env.close()
-            except Exception:
-                pass
+        # No env.close() here: `run_episode` closes it in its own `finally`, so doing it
+        # again closed every environment twice. Harmless for the shipped envs -- gym closes
+        # are idempotent and the remote client guards on its session id -- but it would
+        # bite the first env whose close is not.
 
 
 def _text_of(message: dict) -> str:

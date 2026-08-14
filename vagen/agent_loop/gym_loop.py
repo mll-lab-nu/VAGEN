@@ -11,7 +11,6 @@ contract, and turn the client's rows into ``AgentLoopOutput``.
 
 from __future__ import annotations
 
-import inspect
 import logging
 import os
 from typing import Any
@@ -22,7 +21,6 @@ from verl.experimental.agent_loop.agent_loop import AgentLoopOutput, cap_token_i
 from verl.utils.rollout_trace import rollout_trace_op
 
 from vagen.agent_loop.base import VagenGymAgentLoopBase
-from vagen.agent_loop.obs import _normalize_images, convert_obs_to_content, extract_success
 from vagen.rewards.judge import shared_judge
 from vagen.envs.registry import get_env_cls
 from vagen.envs.state_reward import state_reward_spec_of

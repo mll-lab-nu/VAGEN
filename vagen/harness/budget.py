@@ -36,14 +36,14 @@ What remains here is of two kinds.
     T*g <= n_r                  concat's episode, if every turn used its full allowance
     2k <= m                     the optional trigger set somewhere unhelpful
 
-★ ``E`` is deliberately absent from every relation above. It is a **runtime ceiling on one
-observation** -- the number an oversized observation is cut to -- and nothing else. It used
-to be an input to this arithmetic too, and that was a mistake in both directions: it made
-``max_response_length`` and ``max_model_len`` appear to depend on a quantity that only
-bounds a worst case, so a generous ceiling inflated the requirement and the warning fired
-on configurations that were fine. What an episode actually costs in observations is
-measured at runtime by the harness (``note_room`` reads ``client.measure`` of the real
-observation), not predicted from ``E`` here.
+★ ``E`` is the ceiling one observation is cut to, and it appears in exactly two places:
+that cut (``context_limits``) and compaction's "can a conversation buy a turn" refusal.
+It is deliberately absent from everything that sizes ``max_response_length`` or
+``max_model_len`` -- a quantity that only bounds a worst case has no business inflating a
+requirement, and when it did, a generous ceiling made the episode warning fire on
+configurations that were fine. What an episode actually costs in observations is measured
+at runtime by the harness (``note_room`` reads ``client.measure`` of the real observation),
+not predicted from ``E`` here.
 
 The distinction matters. Refusing on a worst case rules out any long episode on the
 strength of a case that does not happen, and that is what makes a long-tail rollout
@@ -226,22 +226,29 @@ def _check_compact(b: Budgets) -> None:
     # real condition at 800. That gap is the mechanism behind CompactionMakesNoProgress
     # firing on configurations this function accepted.
     #
-    # ★ The observation is NOT charged here, though a real turn pays for one. E is a
-    # ceiling on a worst case, not a description of a typical observation, so adding it
-    # would refuse configurations that run perfectly well -- and E is not what decides
-    # max_response_length. The floor stays: it is derived from the region itself and is
-    # what makes the difference between "a turn fits" and "a turn fits and the next one is
-    # worth attempting".
+    # ★ The observation IS charged here, and only here. E is kept out of the relations
+    # that decide max_response_length and max_model_len -- a worst-case ceiling has no
+    # business inflating those. But "can a conversation buy a turn?" is a compaction
+    # question, and a turn genuinely pays for an observation: under concat and compact the
+    # observation lands in the response region alongside the generation.
+    #
+    # Removing it here briefly reopened the hole this function documents. Measured by
+    # differential search over the old and new checkers: 27 configurations were refused
+    # before and accepted after, e.g. n_r=2000, g=512, k=256, E=2048 -- which then
+    # compacts after one turn on every episode, hits CompactionMakesNoProgress, and
+    # returns an EMPTY BATCH deterministically, with only a per-episode warning.
     floor = min(b.per_turn, max(1, b.response_len // 4))
-    needed = k + b.summary_request_len + b.per_turn + floor
+    needed = k + b.summary_request_len + b.per_turn + b.env_response + floor
     detail = (f"compact_summary_budget={k} + the summary request ({b.summary_request_len}) "
-              f"+ response_length_per_turn={b.per_turn} + a floor of {floor}")
+              f"+ response_length_per_turn={b.per_turn} + "
+              f"max_env_response_per_turn={b.env_response} + a floor of {floor}")
     if needed > b.response_len:
         raise BudgetError(
             f"a conversation has no room to buy a turn: {detail} = {needed}, against "
             f"data.max_response_length={b.response_len}. Every conversation would close "
             f"at or before its first turn. Lower compact_summary_budget, "
-            f"response_length_per_turn, or raise max_response_length."
+            f"response_length_per_turn or max_env_response_per_turn, or raise "
+            f"max_response_length."
         )
 
     m = b.compact_budget
