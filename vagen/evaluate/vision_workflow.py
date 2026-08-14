@@ -41,6 +41,7 @@ class GenericVisionInferenceWorkflow:
         compact_budget: Optional[int] = None,
         compact_summary_budget: Optional[int] = None,
         tokenizer: Any = None,
+        processor: Any = None,
         tokens_per_image: Optional[int] = None,
     ):
         self.adapter = adapter
@@ -61,6 +62,7 @@ class GenericVisionInferenceWorkflow:
         self.compact_budget = compact_budget
         self.compact_summary_budget = compact_summary_budget
         self.tokenizer = tokenizer
+        self.processor = processor
         # See chat_client.DEFAULT_TOKENS_PER_IMAGE: this feeds the compaction trigger, not
         # just an overflow guard, so a value far off the environment's real frame cost
         # makes `compact` close conversations before they have bought a turn.
@@ -244,6 +246,7 @@ class GenericVisionInferenceWorkflow:
         # then makes _purge_error_rollouts delete the dump on the next resumed run.
         harness, opening, continuation = self._build_harness(turn_limit)
         client = ChatClient(self.adapter, self.chat_config, tokenizer=self.tokenizer,
+                                processor=self.processor,
                             response_limit=self.response_length_per_turn,
                             **({} if self.tokens_per_image is None
                                else {"tokens_per_image": self.tokens_per_image}))
@@ -289,6 +292,14 @@ class GenericVisionInferenceWorkflow:
                 finish_reason, terminated = "env_error", False
             elif terminated:
                 finish_reason = "done"
+            elif n_turns == 0 and not adapted.rewards:
+                # ★ Zero turns is not an ending, it is a non-answer: the endpoint returned
+                # nothing (a refusal or a content filter) and run_episode stopped before
+                # the first env step. Calling it `no_room` filed it as a completed episode,
+                # so it counted as a zero in success_rate, stayed out of error_rollouts,
+                # survived the purge, and was marked done by resume -- which means rerunning
+                # could never repair it.
+                finish_reason = "empty_generation"
             elif n_turns >= turn_limit:
                 # run_episode marks running out of turns as `truncated` too, so the flag
                 # alone cannot tell "used its whole budget" from "stopped early for lack

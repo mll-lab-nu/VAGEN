@@ -33,6 +33,10 @@ envs:
     # policy was trained to write in a turn.
     response_length_per_turn: 512
     max_env_response_per_turn: 256
+    # The ceiling above is in real tokens, copied from val_sokoban_vision.yaml. Evaluation
+    # measures against it with the served model's own processor -- see `tokenizer:` in
+    # vagen/evaluate/README.md, which defaults to backends.<name>.model -- so the two are
+    # in the same unit and nothing here needs to name a per-image cost.
     config:
       dim_room: [6, 6]
       max_steps: 100

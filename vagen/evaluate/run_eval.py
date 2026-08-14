@@ -214,7 +214,8 @@ def _resume_mode(value) -> str:
     )
 
 
-def _purge_error_rollouts(dump_dir: Optional[str], resume_mode: str) -> None:
+def _purge_error_rollouts(dump_dir: Optional[str], resume_mode: str,
+                          tags: Optional[set] = None) -> None:
     """
     Remove previous error rollouts so reruns start clean.
     Only invoked when resume mode keeps completed runs.
@@ -227,6 +228,8 @@ def _purge_error_rollouts(dump_dir: Optional[str], resume_mode: str) -> None:
     success_reasons = set(NORMAL_FINISH_REASONS)
     for tag_entry in os.scandir(dump_dir):
         if not tag_entry.is_dir() or not tag_entry.name.startswith("tag_"):
+            continue
+        if tags is not None and tag_entry.name not in tags:
             continue
         for rollout_entry in os.scandir(tag_entry.path):
             if not rollout_entry.is_dir():
@@ -262,14 +265,22 @@ def _purge_error_rollouts(dump_dir: Optional[str], resume_mode: str) -> None:
                 logger.warning("Failed to remove error rollout folder: %s", rollout_entry.path)
 
 
-def _refresh_tag_summaries(dump_dir: Optional[str]) -> None:
+def _refresh_tag_summaries(dump_dir: Optional[str], model: Optional[str] = None,
+                           tags: Optional[set] = None) -> None:
     if not dump_dir or not os.path.isdir(dump_dir):
         return
     for tag_entry in os.scandir(dump_dir):
         if not tag_entry.is_dir() or not tag_entry.name.startswith("tag_"):
             continue
+        if tags is not None and tag_entry.name not in tags:
+            continue
         try:
-            outp = write_rollouts_summary_from_dump(dump_dir=tag_entry.path, filename="summary.json")
+            # model=... so a dump directory holding two checkpoints does not get a summary
+            # averaged across both. Without it, a resume that skips every job (because the
+            # run is already complete) republishes the blended number and the per-tag
+            # rewrite below never runs, since `results` is empty.
+            outp = write_rollouts_summary_from_dump(dump_dir=tag_entry.path,
+                                                    filename="summary.json", model=model)
             logger.info("Resume: refreshed summary %s", outp)
         except Exception as exc:
             logger.warning("Resume: failed to refresh summary for %s: %s", tag_entry.path, exc)
@@ -285,6 +296,8 @@ def _collect_completed_runs(dump_dir: Optional[str]) -> Dict[Tuple[str, int, Uni
 
     for tag_entry in os.scandir(dump_dir):
         if not tag_entry.is_dir() or not tag_entry.name.startswith("tag_"):
+            continue
+        if tags is not None and tag_entry.name not in tags:
             continue
         for rollout_entry in os.scandir(tag_entry.path):
             if not rollout_entry.is_dir():
@@ -546,8 +559,13 @@ def main() -> None:
                     logger.warning("could not clear %s: %s", path, exc)
     if resume_mode != "off":
         logger.info("Resume mode=%s; pruning error rollouts under %s", resume_mode, dump_dir)
-        _purge_error_rollouts(dump_dir, resume_mode)
-        _refresh_tag_summaries(dump_dir)
+        # Scoped to this run's tags, like the force_rerun clearing above: navigation puts
+        # three tags in one dump dir, and purging a tag this run does not touch discards
+        # results nobody asked to rerun.
+        _purge_error_rollouts(dump_dir, resume_mode,
+                              tags={f"tag_{j['data'].get('tag_id')}" for j in jobs})
+        _refresh_tag_summaries(dump_dir, model=model,
+                               tags={f"tag_{j['data'].get('tag_id')}" for j in jobs})
 
     completed_index: Dict[Tuple[str, int, int], str] = {}
     # ★ Resume compares the model too. See metrics.json's "model": a rollout produced by a
@@ -602,7 +620,11 @@ def main() -> None:
         if tag_id_val is not None:
             tag_info = f"(tag={tag_id_val})"
             tag_ids_seen.add(tag_id_val)
-        error_msg = r.get("error")
+        # `error_details` is what arun_episode's normal return path sets; `error` is what
+        # the runner's setup guard sets. Reading only the latter meant an episode that
+        # failed inside the loop was printed as an ordinary status line and never reached
+        # summary["error_details"].
+        error_msg = r.get("error") or (r.get("error_details") or {}).get("error")
         if error_msg:
             print(f"{rid} ERROR: {error_msg} {tag_info}")
             detail: Dict[str, Any] = {"rollout_id": rid, "error": error_msg}
@@ -618,13 +640,17 @@ def main() -> None:
     # a loud crash into a clean-looking run: exit 0, n_episodes 0, and if the dump dir has
     # prior rollouts the summary reprints THOSE numbers under this run's name. Say it, and
     # exit non-zero.
-    setup_failures = [r for r in results if r.get("finish_reason") == "setup_error"]
-    if setup_failures and len(setup_failures) == len(results):
-        first = setup_failures[0].get("error", "")
+    # ★ Any total failure, not just one before the episode. A bad api_key, a wrong model
+    # id or an unreachable base_url fails INSIDE each episode -- finish_reason "error" --
+    # and used to exit 0 reporting success_rate 0.0, which is indistinguishable from a
+    # model that simply solved nothing.
+    DEAD = {"setup_error", "error", "env_error", "empty_generation"}
+    dead = [r for r in results if r.get("finish_reason") in DEAD]
+    if dead and len(dead) == len(results):
+        first = dead[0].get("error") or dead[0].get("error_details") or dead[0].get("finish_reason")
         raise SystemExit(
-            f"every one of the {len(results)} jobs failed before its episode started, so "
-            f"nothing was evaluated. This is a configuration error, not a flaky run. "
-            f"First failure: {first}"
+            f"all {len(results)} episodes failed ({dead[0].get('finish_reason')}), so "
+            f"nothing was evaluated -- this is not a score of zero. First failure: {first}"
         )
 
     from vagen.evaluate.utils.summary_utils import write_rollouts_summary_from_dump
