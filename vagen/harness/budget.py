@@ -184,8 +184,7 @@ def check(mode: str, b: Budgets) -> None:
             warnings.warn(
                 f"concat keeps the whole episode in one conversation, so its response "
                 f"region holds every turn: max_turns={b.max_turns} x "
-                f"response_length_per_turn={b.per_turn} + {max(0, b.max_turns - 1)} x "
-                f"max_env_response_per_turn={b.env_response} = {episode} tokens, against "
+                f"response_length_per_turn={b.per_turn} = {episode} tokens, against "
                 f"data.max_response_length={b.response_len}. Turns will be generated "
                 f"against the room left rather than the full allowance, and anything over "
                 f"is truncated -- but if episodes really do run that long, use "
@@ -219,8 +218,7 @@ def _check_compact(b: Budgets) -> None:
         )
 
     # A conversation has to be able to buy a turn: room for the summary and its request,
-    # one generation, and -- when the environment's size is actually declared -- one
-    # observation and the floor below which the next generation is not worth making.
+    # one generation, and the floor below which the next generation is not worth making.
     #
     # Without the observation and the floor this admitted configurations that then died
     # at runtime after two environment steps, discarding rows that were already good:

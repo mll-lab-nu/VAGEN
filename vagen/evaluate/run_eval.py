@@ -10,6 +10,7 @@ import shutil
 from dataclasses import dataclass, field, fields
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import datetime
 import yaml
 from omegaconf import DictConfig, OmegaConf, open_dict
 
@@ -50,6 +51,12 @@ class EnvSpec:
     # same way training does -- it becomes the API call's max_tokens -- and the rest
     # follows from it.
     response_length_per_turn: Optional[int] = None
+    #: The response region a conversation must fit, as data.max_response_length is
+    #: in training. Optional: unset, there is no accounting, which is what a closed
+    #: API wants. Set it and compaction and the room checks work as they do in
+    #: training. Do NOT expect response_length_per_turn * max_turns to stand in for
+    #: it -- observations land in the same region.
+    max_response_length: Optional[int] = None
     max_env_response_per_turn: Optional[int] = None
     compact_budget: Optional[int] = None
     compact_summary_budget: Optional[int] = None
@@ -151,6 +158,7 @@ def _parse_env_specs(cfg: Dict[str, Any]) -> List[EnvSpec]:
             max_turns=item.get("max_turns"),
             harness=str(item.get("harness", "concat")),
             response_length_per_turn=item.get("response_length_per_turn"),
+            max_response_length=item.get("max_response_length"),
             max_env_response_per_turn=item.get("max_env_response_per_turn"),
             compact_budget=item.get("compact_budget"),
             compact_summary_budget=item.get("compact_summary_budget"),
@@ -184,6 +192,10 @@ def _resume_mode(value) -> str:
     to be touched. Both spellings are accepted now, and anything else is an error rather
     than a silent fallthrough to whichever branch happens to be last.
     """
+    if value is None:
+        # `resume:` with nothing after it, or `run.resume=` on the CLI. Previously this
+        # fell through to force_rerun behaviour rather than stopping the run.
+        return "skip_completed"
     if isinstance(value, bool):
         return "off" if value is False else "skip_completed"
     text = str(value).strip().lower()
@@ -361,6 +373,7 @@ def _expand_jobs(
                 "chat_config": chat_cfg,
                 "harness": spec.harness,
                 "response_length_per_turn": spec.response_length_per_turn,
+                "max_response_length": spec.max_response_length,
                 "max_env_response_per_turn": spec.max_env_response_per_turn,
                 "compact_budget": spec.compact_budget,
                 "compact_summary_budget": spec.compact_summary_budget,
@@ -456,9 +469,15 @@ def _load_config(cfg_path: str, overrides: List[str]) -> DictConfig:
             key, _, raw = item.partition("=")
             # Parsed as YAML so lists, ints and booleans arrive as themselves rather than
             # as strings: `envs.0.seed=[1,60,1]` has to be a list.
-            value = OmegaConf.create({"v": raw}).v if raw.startswith(("[", "{")) else raw
-            if isinstance(value, str):
+            try:
                 value = yaml.safe_load(raw)
+            except yaml.YAMLError as exc:
+                raise ValueError(f"override {item!r}: {raw!r} is not valid YAML") from exc
+            # ★ A YAML timestamp is not a config value. `2024-12-01` loads as a date, which
+            # OmegaConf refuses as an unsupported type -- and it is a real API version
+            # string (backends.azure.azure_api_version). Dates have no other use here.
+            if isinstance(value, (datetime.date, datetime.datetime)):
+                value = raw
             OmegaConf.update(cfg, key.strip(), value, merge=True)
     return cfg
 

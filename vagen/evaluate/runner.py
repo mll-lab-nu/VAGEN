@@ -28,7 +28,11 @@ def _safe_read_json(p: Path) -> Optional[Dict[str, Any]]:
         return None
 
 
-NORMAL_FINISH_REASONS = {"done", "max_turns"}
+#: Endings that are episodes rather than failures. Anything outside this set is treated as
+#: an error rollout and DELETED by _purge_error_rollouts on the next resumed run, so a
+#: legitimate ending missing from here silently destroys results -- "no_room" is a real
+#: episode whose conversation ran out of response region, and its turns are real data.
+NORMAL_FINISH_REASONS = {"done", "max_turns", "no_room"}
 
 
 async def run_eval_parallel(
@@ -109,6 +113,7 @@ async def run_eval_parallel(
             chat_config=data.get("chat_config") or {},
             harness=data.get("harness", "concat"),
             response_length_per_turn=data.get("response_length_per_turn"),
+            max_response_length=data.get("max_response_length"),
             max_env_response_per_turn=data.get("max_env_response_per_turn"),
             compact_budget=data.get("compact_budget"),
             compact_summary_budget=data.get("compact_summary_budget"),

@@ -82,7 +82,7 @@ backends:
 | `split` | str | Dataset split identifier (default: `"default"`) |
 | `config` | dict | Kwargs passed to the environment constructor |
 | `chat_config` | dict | Kwargs passed to the LLM completion call (temperature, max_tokens, etc.) |
-| `concat_multi_turn` | bool | `true`: send full message history; `false`: only system + last turn (default: `true`) |
+| `harness` | bool | `true`: send full message history; `false`: only system + last turn (default: `true`) |
 
 **`default_chat_config`** — Top-level fallback: applied to any env that doesn't define its own `chat_config`.
 

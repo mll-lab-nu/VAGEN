@@ -40,7 +40,10 @@ def test_concat_warns_about_an_episode_whose_turns_cannot_all_fit():
     what overflows anyway is truncated rather than refused. Refusing would rule out any
     long episode on the strength of a case a real rollout does not reach.
     """
-    with pytest.warns(UserWarning, match=r"10 x response_length_per_turn=1000 \+ 9 x max_env_response_per_turn=200"):
+    # ★ Matched through the `=` and the total. The previous regex stopped one token short
+    # of the sum, so it went on passing after the sum stopped following from the terms it
+    # printed -- a test asserting a false equation is worse than no test.
+    with pytest.warns(UserWarning, match=r"max_turns=10 x response_length_per_turn=1000 = 10000 tokens"):
         check("concat", _b(max_turns=10, per_turn=1000, response_len=8000, env_response=200))
 
 
@@ -339,23 +342,24 @@ def test_the_runner_forwards_a_calls_own_limits():
 
 
 # ------------------------------------------------------- the ceilings, enforced live
-def test_an_oversized_observation_is_cut_to_the_ceiling_and_says_so():
-    """Left to cap_token_ids it surfaces at the end of the episode as a truncated row,
-    which says nothing about the observation that caused it.
-
-    Cut rather than refused: ``max_env_response_per_turn`` exists so that T*g + (T-1)*E
-    bounds an episode, and a bound that kills the rollout when an environment exceeds it
-    only moves the failure. One oversized observation costs its own tail."""
+def test_an_oversized_observation_is_cut_to_the_ceiling():
+    """Cut rather than refused: max_env_response_per_turn exists so an episode is bounded,
+    and a bound that kills the rollout when an environment exceeds it only moves the
+    failure. One oversized observation costs its own tail."""
     from vagen.core.client import InferenceClient
 
     class _C(InferenceClient):
-        def encode(self, messages): return [0] * 900
+        # one token per character, so sizes are legible
+        def encode(self, messages): return [0] * sum(len(m["content"]) for m in messages)
         async def generate(self, prompt_ids, **kw): raise AssertionError("not reached")
 
     c = _C()
     c.opening_limit, c.continuation_limit = 1000, 400
-    assert c._fit_context([0] * 900, opening=True) == [0] * 900   # fits the prompt region
-    assert c._fit_context([0] * 900, opening=False) == [0] * 400  # cut to E
+    msgs = [{"role": "user", "content": "o" * 900}]
+    assert c._fit_messages(msgs, opening=True) == msgs            # fits the prompt region
+    cut = c._fit_messages(msgs, opening=False)
+    assert len(cut[0]["content"]) <= 400
+    assert cut[0]["content"] == "o" * len(cut[0]["content"])       # head kept, not tail
 
 
 def test_an_oversized_opening_still_refuses_because_a_cut_would_eat_the_system_prompt():
@@ -365,13 +369,35 @@ def test_an_oversized_opening_still_refuses_because_a_cut_would_eat_the_system_p
     from vagen.core.client import ContextTooLarge, InferenceClient
 
     class _C(InferenceClient):
-        def encode(self, messages): return [0] * 1200
+        def encode(self, messages): return [0] * sum(len(m["content"]) for m in messages)
         async def generate(self, prompt_ids, **kw): raise AssertionError("not reached")
 
     c = _C()
     c.opening_limit, c.continuation_limit = 1000, 400
     with pytest.raises(ContextTooLarge, match="opening a conversation"):
-        c._fit_context([0] * 1200, opening=True)
+        c._fit_messages([{"role": "user", "content": "o" * 1200}], opening=True)
+
+
+def test_a_cut_drops_whole_images_once_the_text_is_gone():
+    """A partial image is not an image: placeholders and frames have to stay 1:1, so a
+    frame that will not fit is dropped entire, along with its placeholder."""
+    from vagen.core.client import InferenceClient
+
+    class _C(InferenceClient):
+        def encode(self, messages):
+            n = 0
+            for m in messages:
+                n += len(m["content"]) + 500 * len(m.get("images") or [])
+            return [0] * n
+        async def generate(self, prompt_ids, **kw): raise AssertionError("not reached")
+
+    c = _C()
+    c.continuation_limit = 600
+    cut = c._fit_messages(
+        [{"role": "user", "content": "<image><image>xx", "images": ["a", "b"]}],
+        opening=False)
+    assert len(cut[0]["images"]) == 1
+    assert cut[0]["content"].count("<image>") == 1, "placeholders and frames diverged"
 
 
 def test_the_two_ceilings_come_from_the_mode():
@@ -423,9 +449,11 @@ def test_the_ceiling_does_not_depend_on_the_configuration_at_all(mode):
 
 
 @pytest.mark.parametrize("mode", ["concat", "compact"])
-def test_a_five_turn_episode_at_a_real_observation_size_passes_without_warning(mode):
-    """The configuration this parameter was added for: 5 x 2048 generations plus four
-    256-token observations inside an 11264 region."""
+def test_a_five_turn_episode_passes_without_warning(mode):
+    """5 x 2048 generations inside an 11264 region. The observations are deliberately NOT
+    part of this -- E feeds no static relation any more -- which is why the name no longer
+    claims they are: the old one promised an observation budget the assertion never
+    measured, and passed just as happily at env_response=100000."""
     import warnings
 
     b = _b(response_len=11264, per_turn=2048, max_turns=5, env_response=256, compact_budget=4000, summary_budget=1000)

@@ -1,3 +1,8 @@
+# ★ The eval seeds are disjoint from BOTH the train and val ranges in
+# examples/train/, because the same seed is the same instance. They used to start at 0:
+# frozenlake's eval overlapped training on 127 of 128 seeds and primitive_skill's on all
+# 16, so a fine-tuned checkpoint's "eval" number was its training-set accuracy. 20000+ is
+# above every range those configs use.
 # ★ The seed range is INCLUSIVE and the third element is an occurrence limit, not a step.
 # With limit 1 the loader does `rng.sample(range(min, max+1), n_envs)`, so n_envs must equal
 # max-min+1 or a task is dropped at random on every run -- and, where the env indexes its
@@ -18,8 +23,8 @@ envs:
   - name: RemoteEnv
     n_envs: 16
     tag_id: primitive_skill_align_two_cube
-    seed: [0, 15, 1]
-    max_turns: 5
+    seed: [20000, 20015, 1]
+    max_turns: 3  # matches train/val; 5 was a 67% larger turn budget than the val curve
     config:
       base_urls: "http://localhost:8000"
       timeout: 120
@@ -39,8 +44,8 @@ envs:
   - name: RemoteEnv
     n_envs: 16
     tag_id: primitive_skill_place_two_cube
-    seed: [0, 15, 1]
-    max_turns: 5
+    seed: [20000, 20015, 1]
+    max_turns: 3  # matches train/val; 5 was a 67% larger turn budget than the val curve
     config:
       base_urls: "http://localhost:8000"
       timeout: 120
@@ -60,8 +65,8 @@ envs:
   - name: RemoteEnv
     n_envs: 16
     tag_id: primitive_skill_stack_three_cube
-    seed: [0, 15, 1]
-    max_turns: 5
+    seed: [20000, 20015, 1]
+    max_turns: 3  # matches train/val; 5 was a 67% larger turn budget than the val curve
     config:
       base_urls: "http://localhost:8000"
       timeout: 120
@@ -81,8 +86,8 @@ envs:
   - name: RemoteEnv
     n_envs: 16
     tag_id: primitive_skill_put_apple_in_drawer
-    seed: [0, 15, 1]
-    max_turns: 5
+    seed: [20000, 20015, 1]
+    max_turns: 3  # matches train/val; 5 was a 67% larger turn budget than the val curve
     config:
       base_urls: "http://localhost:8000"
       timeout: 120
@@ -101,7 +106,7 @@ envs:
 
 experiment:
   dump_dir: ${fileroot}/rollouts/eval_primitive_skill
-  default_max_turns: 5
+  default_max_turns: 3  # matches train/val; 5 was a 67% larger turn budget than the val curve
 
 run:
   backend: "openai"
