@@ -327,6 +327,12 @@ class GenericVisionInferenceWorkflow:
                 "num_turns": n_turns,
                 "infos": final_infos,
                 "env_config": env_config_dump,
+                # ★ Recorded so resume can tell whose rollout this is. Without it the key
+                # is (env, seed, tag_id) alone, so evaluating a second model into the same
+                # dump directory skips every episode and reprints the first model's
+                # success_rate under the second model's name, exit 0, no warning.
+                "model": getattr(self.adapter, "model", None) or getattr(
+                    getattr(self.adapter, "inner", None), "model", None),
             }
             metrics.setdefault("max_turns", turn_limit)
             if error_info is not None:
@@ -378,6 +384,12 @@ class GenericVisionInferenceWorkflow:
                         "num_turns": 0,
                         "infos": (infos or []) + [{"error": repr(e)}],
                         "env_config": env_config_dump,
+                # ★ Recorded so resume can tell whose rollout this is. Without it the key
+                # is (env, seed, tag_id) alone, so evaluating a second model into the same
+                # dump directory skips every episode and reprints the first model's
+                # success_rate under the second model's name, exit 0, no warning.
+                "model": getattr(self.adapter, "model", None) or getattr(
+                    getattr(self.adapter, "inner", None), "model", None),
                         "error_details": {
                             "error": repr(e),
                             "error_type": type(e).__name__,
