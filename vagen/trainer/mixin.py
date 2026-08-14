@@ -33,7 +33,6 @@ import os
 import numpy as np
 import torch
 from verl import DataProto
-from verl.protocol import pad_dataproto_to_divisor
 from verl.utils.debug import marked_timer
 
 from vagen.custom_advantage import needs_value_mask
@@ -315,15 +314,28 @@ class VagenLogicMixin:
         if not extra:
             return batch
 
-        filler = batch.select_idxs([0] * extra)
-        for key in self._NEUTRALISED_ON_PAD:
-            if key in filler.batch.keys():
-                filler.batch[key] = torch.zeros_like(filler.batch[key])
-        padded = DataProto.concat([batch, filler])
+        padded = self._vagen_pad_to_multiple(batch, multiple)
         print(f"[vagen] split-pad: {n} -> {n + extra} rows for multiple {multiple} "
               f"(dp={self.actor_rollout_wg.world_size}, actor_mini={actor_mini}, critic_mini={critic_mini})")
         self.metrics["custom_metrics/train/split_pad_rows"] = float(extra)
         return padded
+
+    def _vagen_pad_to_multiple(self, batch, multiple: int):
+        """Pad the row count to a multiple of ``multiple`` with rows that carry no gradient.
+
+        The filler is a copy of row 0 with every loss-bearing tensor zeroed, so it occupies
+        a split slot and contributes nothing. verl's ``pad_dataproto_to_divisor`` repeats
+        real rows *unmasked* instead, which weights those episodes twice.
+        """
+        n = len(batch.batch["attention_mask"])
+        extra = (-n) % max(1, int(multiple))
+        if not extra:
+            return batch
+        filler = batch.select_idxs([0] * extra)
+        for key in self._NEUTRALISED_ON_PAD:
+            if key in filler.batch.keys():
+                filler.batch[key] = torch.zeros_like(filler.batch[key])
+        return DataProto.concat([batch, filler])
 
     def _vagen_write_value_mask(self, batch):
         """Tell the critic which positions carry return supervision.
@@ -400,8 +412,15 @@ class VagenLogicMixin:
         if self.config.trainer.balance_batch:
             before = len(batch.batch["attention_mask"])
             divisor = self.actor_rollout_wg.world_size
-            batch, pad_size = pad_dataproto_to_divisor(batch, divisor)
-            print(f"[vagen] filter: padded {before} -> {before + pad_size} for {divisor} dp workers")
+            # ★ Neutralised filler, not `pad_dataproto_to_divisor`. That repeats real rows
+            # verbatim, and this runs *after* advantage -- so up to world_size-1 real rows
+            # would carry their advantages and response_mask twice: double gradient weight
+            # and double weight in critic/score, for whichever episodes happen to sit at
+            # the front of the batch. `_vagen_pad_rows_for_split`'s own docstring says so
+            # thirty lines up; this call site was the one that had not caught up.
+            batch = self._vagen_pad_to_multiple(batch, divisor)
+            print(f"[vagen] filter: padded {before} -> {len(batch.batch['attention_mask'])} "
+                  f"for {divisor} dp workers")
             self._balance_batch(batch, metrics=self.metrics, logging_prefix="filtered_global_seqlen")
         return batch
 

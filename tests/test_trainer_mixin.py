@@ -855,3 +855,33 @@ def test_a_turn_level_loss_refuses_an_estimator_with_no_turn_id():
     for other in ("default_gae", "token_level_gae", "turn_level_gae",
                   "bi_level_gae", "bi_level_gae_varlam"):
         assert publishes_turn_id(other) is True, other
+
+
+def test_padding_rows_carry_no_gradient():
+    """★ Behavioural, not a grep. `_vagen_filter` padded with `pad_dataproto_to_divisor`,
+    which repeats real rows verbatim -- and it runs AFTER advantage, so up to world_size-1
+    real episodes carried their advantages and response_mask twice: double gradient weight,
+    and double weight in critic/score. The padder thirty lines above says exactly that in
+    its docstring; the filter's call site had not caught up. Both share the neutralised
+    filler now, so this asserts what the filler contains."""
+    import torch
+    from verl import DataProto
+
+    from vagen.trainer.mixin import VagenLogicMixin
+
+    n, width = 3, 4
+    batch = DataProto.from_dict({
+        "attention_mask": torch.ones(n, width, dtype=torch.long),
+        "response_mask": torch.ones(n, width, dtype=torch.long),
+        "advantages": torch.full((n, width), 2.0),
+        "token_level_scores": torch.full((n, width), 3.0),
+    })
+    padded = VagenLogicMixin._vagen_pad_to_multiple(VagenLogicMixin, batch, 4)
+
+    assert len(padded.batch["attention_mask"]) == 4, "did not pad to the multiple"
+    for key in ("response_mask", "advantages", "token_level_scores"):
+        real, filler = padded.batch[key][:n], padded.batch[key][n:]
+        assert real.abs().sum() > 0, f"{key} lost its real rows"
+        assert filler.abs().sum() == 0, (
+            f"{key} in the filler row is non-zero -- that row will contribute gradient "
+            f"and weight one episode twice")
