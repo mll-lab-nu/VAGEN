@@ -32,16 +32,35 @@ def format_prompt(max_actions_per_step, action_sep, add_example=True, prompt_for
         return wm_format_prompt(max_actions_per_step, action_sep, add_example)
     elif prompt_format == "free_wm":
         return free_wm_format_prompt(max_actions_per_step, action_sep, add_example)
+    elif prompt_format == "answer":
+        return answer_format_prompt(max_actions_per_step, action_sep, add_example)
     else:
         raise ValueError(f"Unknown prompt format: {prompt_format}")
 
 def free_think_format_prompt(max_actions_per_step, action_sep, add_example=True):
-    """Generate format prompt for free_think format"""
+    """Generate format prompt for free_think format.
+
+    Think, then answer -- the whole contract. Written to hold for both kinds of model:
+    one that types `<think>` as text, and one whose chat template has already opened the
+    block for it, so that the response begins inside the reasoning and its first tag is
+    `</think>`. Hence "close it with `</think>`" rather than "emit `<think>`": the latter
+    is unsatisfiable on the families that reserve the token (see the wm/free_wm split).
+
+    The requirement that the answer follow `</think>` is the load-bearing part for a
+    native-thinking model. It is the only thing in the format that says *stop reasoning*.
+    """
     base_prompt = f"""You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}.
 You should first give your reasoning, and then your answer.
 Your response should be in the format of:
-<think>...</think><answer>...</answer>"""
-    
+<think>...</think><answer>...</answer>
+
+Rules:
+- Close your reasoning with `</think>` before answering; the answer must come after it.
+- Output 1 to {max_actions_per_step} action(s) inside `<answer>`.
+- Valid actions are: Up, Down, Left, Right.
+- Separate multiple actions with `{action_sep}`.
+- Do not put anything other than actions inside `<answer>`."""
+
     if add_example:
         examples = f"""
 Example 1:
@@ -107,6 +126,38 @@ Example 3:
 """
         return base_prompt + "\n" + examples
 
+    return base_prompt
+
+
+def answer_format_prompt(max_actions_per_step, action_sep, add_example=True):
+    """Just the action, for models that reason in their own thinking channel.
+
+    Qwen3.5 and friends open a `<think>` block in the generation prompt and reason inside
+    it before the visible response begins. Asking such a model *also* to narrate its
+    reasoning into `<observation>`/`<think>`/`<prediction>` tags makes it do the work
+    twice: once natively and once for the parser. It also collides outright -- `<think>`
+    is a reserved control token on those families, so the tag can never be produced as
+    text (see the wm/free_wm split).
+
+    So this format marks up only what has to be machine-read: the action. Everything
+    before `<answer>` is the model's own reasoning and is left alone.
+    """
+    base_prompt = f"""You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}.
+End your response with your chosen action(s) in the format:
+<answer>...</answer>
+
+Rules for <answer>:
+- Output 1 to {max_actions_per_step} action(s).
+- Valid actions are: Up, Down, Left, Right.
+- Separate multiple actions with `{action_sep}`.
+- Do not put anything other than actions inside the tag."""
+
+    if add_example:
+        example = f"""
+
+Example:
+<answer>Right{action_sep}Up</answer>"""
+        return base_prompt + example
     return base_prompt
 
 

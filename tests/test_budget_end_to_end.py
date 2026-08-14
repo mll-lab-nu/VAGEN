@@ -148,9 +148,12 @@ def test_a_legal_episode_keeps_the_peak_inside_the_guarantee():
     c = episode("compact", b, system=600, obs=lambda i: 200, gen=lambda i: 1024)
     assert c.peak <= bound, f"peak {c.peak} > the guaranteed {bound}"
 
-    with pytest.raises(ContextTooLarge, match="an observation came to 3000"):
-        episode("compact", b, system=600, obs=lambda i: 3000 if i == 1 else 64,
-                gen=lambda i: 1024)
+    # ★ And it holds through an observation that overruns E, because the ceiling now cuts
+    # rather than refuses. That is the whole point of E being a ceiling: the guarantee is
+    # meant to survive a badly behaved environment, not to be voided by one.
+    over = episode("compact", b, system=600, obs=lambda i: 3000 if i == 1 else 64,
+                   gen=lambda i: 1024)
+    assert over.peak <= bound, f"peak {over.peak} > the guaranteed {bound} after a cut"
 
 
 def test_the_defaults_are_the_largest_values_that_pass():

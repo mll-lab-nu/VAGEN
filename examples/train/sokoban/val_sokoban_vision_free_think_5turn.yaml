@@ -1,0 +1,25 @@
+# Validation half of train_sokoban_vision_free_think_5turn.yaml. Read that file for the
+# budget arithmetic and why the per-turn cap is 2048.
+envs:
+  - name: Sokoban
+    n_envs: 256
+    data_source: sokoban
+    seed: [10001,10256,1]
+    max_turns: 5
+    response_length_per_turn: 2048
+    max_env_response_per_turn: 256
+    # Force the reasoning block closed at 512 tokens instead of letting the turn be cut
+    # mid-thought. `response_length_per_turn` above is still the hard ceiling on the whole
+    # turn; this bounds only the thinking inside it, and leaves room for the answer.
+    # Needs rollout.engine_kwargs.vllm.reasoning_config set -- see the training script.
+    thinking_token_budget: 512
+    config:
+      render_mode: vision
+      prompt_format: free_think
+      use_example_in_sys_prompt: True
+      # ★ Must match the train yaml. Absent, this falls back to SokobanEnvConfig's default
+      # of 0.1 a turn -- so validation was scoring 1.0 + 5*0.1 = 1.50 for a solved episode
+      # where training scored 1.0 + 5*0.02 = 1.10, and val reward stopped being comparable
+      # to train reward at all. tests/test_train_and_val_agree_on_rewards.py pins the two.
+      format_reward: 0.02
+      min_solution_steps: [1,5]
