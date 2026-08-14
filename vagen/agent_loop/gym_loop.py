@@ -26,7 +26,7 @@ from vagen.envs.registry import get_env_cls
 from vagen.envs.state_reward import state_reward_spec_of
 from vagen.rewards.state_reward import DEFAULT_SCORE_BASE, TAGS, StateRewardWrapper
 from vagen.agent_loop.verl_client import VerlClient
-from vagen.harness import HARNESSES, build_harness
+from vagen.harness import build_harness
 from vagen.harness.budget import (
     Budgets, check as check_budgets, context_limits, default_env_response,
     default_summary_budget,

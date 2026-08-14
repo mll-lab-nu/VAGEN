@@ -282,3 +282,65 @@ def test_a_job_that_cannot_even_be_set_up_does_not_take_the_batch_with_it():
     assert "async def _run_one" in src, "setup is not inside the guarded path"
     body = src[src.index("async def _runner"):src.index("async def _run_one")]
     assert "try:" in body and "except Exception" in body
+
+
+# --------------------------------------------- any BaseHarness, not just the built-in three
+#
+# Evaluation is usually where a new context policy is tried first, and an eval config is a
+# yaml -- there is nowhere to put a decorator that would have run by then. So a name from
+# the registry and an import path both work, and both are checked against BaseHarness.
+
+
+class _EveryOtherTurn(_Adapter):
+    pass
+
+
+def _custom_harness_cls():
+    from vagen.harness import ConcatHarness
+
+    class ShoutHarness(ConcatHarness):
+        """A real BaseHarness subclass that is not one of the three."""
+
+    return ShoutHarness
+
+
+def test_a_registered_custom_harness_is_selectable_by_name():
+    from vagen.harness import HARNESSES, register_harness
+
+    cls = _custom_harness_cls()
+    register_harness("shout")(cls)
+    try:
+        adapter, result = _run("shout", turns=3)
+        assert result["num_turns"] == 3
+        assert len(adapter.calls) == 3
+    finally:
+        HARNESSES.pop("shout", None)
+
+
+def test_a_custom_harness_works_as_an_import_path_with_nothing_registered():
+    """``module:Class``, for the case where there is no package to hang a decorator on."""
+    adapter, result = _run("vagen.harness.no_concat:NoConcatHarness", turns=3)
+    assert [m["role"] for m in adapter.calls[-1]] == ["system", "user"]
+    assert result["num_turns"] == 3
+
+
+def test_registering_something_that_is_not_a_harness_is_refused():
+    from vagen.harness import register_harness
+
+    with pytest.raises(TypeError, match="does not subclass BaseHarness"):
+        register_harness("nope")(dict)
+
+
+def test_an_import_path_naming_the_wrong_class_fails_at_construction():
+    """Not at the first next_call, where it would be an AttributeError deep in the loop."""
+    with pytest.raises(TypeError, match="does not subclass BaseHarness"):
+        GenericVisionInferenceWorkflow(adapter=_Adapter(), harness="collections:OrderedDict")
+
+
+def test_shadowing_a_registered_harness_is_refused():
+    """A silent rebinding means a run reports the policy it was configured with and
+    executes another one."""
+    from vagen.harness import register_harness
+
+    with pytest.raises(ValueError, match="already registered"):
+        register_harness("concat")(_custom_harness_cls())

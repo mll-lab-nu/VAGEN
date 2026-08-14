@@ -13,7 +13,8 @@ from vagen.evaluate.utils.json_utils import sanitize_for_json
 from vagen.core.env_adapter import GymEnvAdapter
 from vagen.core.runner import run_episode
 from vagen.evaluate.chat_client import ChatClient
-from vagen.harness import HARNESSES, build_harness
+from vagen.harness import build_harness, resolve_harness
+from vagen.harness.compact import CompactHarness
 from vagen.harness.budget import DEFAULT_MAX_ENV_RESPONSE, default_summary_budget
 
 logger = logging.getLogger(__name__)
@@ -49,8 +50,10 @@ class GenericVisionInferenceWorkflow:
         # no_concat and could not express compaction at all -- training deleted that bool
         # rather than deprecating it, precisely so a stale config would be rejected instead
         # of quietly outvoting `harness`.
-        if harness not in HARNESSES:
-            raise ValueError(f"unknown harness {harness!r}; choose from {sorted(HARNESSES)}")
+        # Resolved now rather than at the first episode, so a bad name fails once at
+        # construction instead of once per rollout -- and any BaseHarness subclass is
+        # accepted, whether registered by name or given as an import path.
+        resolve_harness(harness)
         self.harness_name = harness
         self.response_length_per_turn = response_length_per_turn
         self.max_response_length = max_response_length
@@ -172,7 +175,7 @@ class GenericVisionInferenceWorkflow:
             kw["floor"] = min(per_turn, max(1, response_len // 4))
         elif per_turn:
             kw["floor"] = per_turn
-        if self.harness_name == "compact":
+        if issubclass(resolve_harness(self.harness_name), CompactHarness):
             budget = self.compact_budget
             if not budget and not response_len:
                 # Neither trigger can fire, so the conversation would grow forever and this
