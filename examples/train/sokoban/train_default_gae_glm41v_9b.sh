@@ -9,6 +9,19 @@
 # For the same reason it uses free_wm rather than wm -- `<think>` belongs to the model's
 # own thinking channel here, so it cannot also serve as one of the format's four tags.
 # See train_sokoban_vision_free_wm.yaml.
+#
+# ★ DOES NOT RUN ON THIS STACK. Verified 2026-08-14, and it fails at the first attention
+# forward rather than at load, so a cluster job burns its allocation before saying so:
+#
+#   verl/verl/models/transformers/glm4v.py:313
+#     from transformers.models.glm4v.modeling_glm4v import apply_multimodal_rotary_pos_emb
+#   ImportError -- transformers 5.12.1 removed that symbol from the glm4v module.
+#
+# GLM-4V's mrope was refactored upstream to `apply_rotary_pos_emb` + `rotate_half_llm`.
+# Porting it is real work and is deliberately NOT done here: a rope that is subtly wrong
+# does not raise, it corrupts training silently, and there is no GLM baseline in this repo
+# to catch that against. `qwen2_5_vl` still has the old symbol, which is why Qwen works.
+# Kept as the starting point for whoever does the port. See docs/issues.md.
 set -eo pipefail
 
 V=$(cd "$(dirname "$0")/../../.." && pwd)

@@ -11,6 +11,13 @@
 # need it: InternVL3 tokenizes `<think>` as three ordinary text tokens, exactly like
 # Qwen2.5-VL, so `wm` is reachable here. Switch this pair back to train/val_sokoban_vision
 # .yaml if you would rather have it directly comparable with the Qwen2.5-VL runs.
+#
+# ★ DOES NOT RUN ON THIS STACK. vLLM 0.22 dies with a CUDA device-side assert
+# (`IndexKernel.cu:111 index out of bounds`). The architecture IS supported; the fault is a
+# mismatch between the image-placeholder count VAGEN puts in `prompt_token_ids` and what
+# the engine expects. Leading hypothesis, unverified: InternVL's dynamic tiling
+# (`max_dynamic_patch`) makes the tile count differ between VAGEN's processor call and
+# vLLM's. Kept because the diagnosis is worth more than the deletion. See docs/issues.md.
 set -eo pipefail
 
 V=$(cd "$(dirname "$0")/../../.." && pwd)
