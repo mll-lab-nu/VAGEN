@@ -95,8 +95,14 @@ class MultiOutputAgentLoopWorker(AgentLoopWorker):
         if not flat:
             # verl indexes inputs[0]; fail with the cause rather than an IndexError.
             raise RuntimeError(
-                f"all {len(groups)} rollouts returned zero outputs, so there is nothing to "
-                "train on -- check that the agent loop appends an AgentLoopOutput per turn"
+                f"all {len(groups)} rollouts returned zero outputs, so there is nothing "
+                f"to train on. Read the per-episode warnings above before suspecting the "
+                f"agent loop: the common cause is a trainer.compact_budget too small to "
+                f"hold a summary plus one generation, which closes every conversation "
+                f"after one turn and raises CompactionMakesNoProgress on every episode. "
+                f"The static checks cannot catch that -- the threshold depends on the "
+                f"system prompt, which they cannot see. Otherwise, check that the agent "
+                f"loop appends an AgentLoopOutput per turn."
             )
 
         # How many rows each rollout produced is the one number that says whether the

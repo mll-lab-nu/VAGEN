@@ -52,6 +52,16 @@ UNDISCOUNTED_ESTIMATORS: set[str] = set()
 # therefore require a turn's reward to sit on the turn's last token.
 TURN_LUMPED_REWARD_ESTIMATORS: set[str] = set()
 
+# Estimator names that publish a `turn_id` column alongside the advantage.
+#
+# ★ Not the same set as TRAJECTORY_ESTIMATORS, though it was assumed to be. Stitching an
+# episode's rows together and *locating its turns* are different jobs: `trajectory_grpo`
+# does the first and not the second -- it returns a bare AdvantageOutputs rather than
+# going through `_Packed.emit`. The turn-level losses need the column, so keyed off
+# `spans_rows` they accepted trajectory_grpo at startup and then raised inside the first
+# backward pass, which is the failure that guard exists to pre-empt.
+PUBLISHES_TURN_ID: set[str] = set()
+
 
 def register_trajectory_adv_est(
     name: str,
@@ -59,11 +69,19 @@ def register_trajectory_adv_est(
     needs_critic: bool = False,
     undiscounted: bool = False,
     turn_lumped_reward: bool = False,
+    publishes_turn_id: bool = True,
 ) -> Callable:
-    """Register an estimator that scores a whole episode, however its rows are laid out."""
+    """Register an estimator that scores a whole episode, however its rows are laid out.
+
+    ``publishes_turn_id`` defaults True because all but one do; set it False for an
+    estimator that returns a bare ``AdvantageOutputs`` instead of going through
+    ``_Packed.emit``.
+    """
 
     def decorator(fn):
         TRAJECTORY_ESTIMATORS.add(name)
+        if publishes_turn_id:
+            PUBLISHES_TURN_ID.add(name)
         if needs_critic:
             CRITIC_ESTIMATORS.add(name)
         if undiscounted:
@@ -81,6 +99,7 @@ def register_sentinel_adv_est(
     needs_critic: bool = False,
     undiscounted: bool = False,
     turn_lumped_reward: bool = False,
+    publishes_turn_id: bool = True,
 ) -> Callable:
     """Register a trajectory estimator that additionally writes sentinel returns.
 
@@ -162,6 +181,11 @@ def wants_turn_lumped_reward(adv_estimator) -> bool:
     from the estimator in use instead of both being set by hand and drifting apart.
     """
     return _name_of(adv_estimator) in TURN_LUMPED_REWARD_ESTIMATORS
+
+
+def publishes_turn_id(adv_estimator) -> bool:
+    """Whether this estimator emits the `turn_id` column the turn-level losses read."""
+    return _name_of(adv_estimator) in PUBLISHES_TURN_ID
 
 
 def spans_rows(adv_estimator) -> bool:

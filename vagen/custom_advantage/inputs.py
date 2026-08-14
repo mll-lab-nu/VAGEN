@@ -318,6 +318,7 @@ def advantage_estimator(
     sentinel_returns: bool = False,
     undiscounted: bool = False,
     turn_lumped_reward: bool = False,
+    publishes_turn_id: bool = True,
 ) -> Callable:
     """Register a function of :class:`AdvantageInputs` as an advantage estimator.
 
@@ -330,6 +331,11 @@ def advantage_estimator(
         sentinel_returns: set when the estimator leaves some positions of ``returns``
             unsupervised. Only affects the trainer's fallback ``value_mask``; prefer
             returning ``value_mask`` on :class:`AdvantageOutputs`, which is explicit.
+        publishes_turn_id: whether the estimator emits the ``turn_id`` column, which the
+            turn-level policy losses read. True for every estimator that goes through
+            ``_Packed.emit``; set False for one returning a bare ``AdvantageOutputs``.
+            Keyed off ``spans_rows`` instead, the turn-loss guard accepted an estimator
+            that has no turn_id and then raised inside the first backward pass.
         undiscounted: set when the estimator mixes a per-token recursion with a per-turn
             one, which is only defined at ``gamma == 1`` -- see
             ``registry.requires_undiscounted`` for why, and for the measured error at
@@ -367,6 +373,7 @@ def advantage_estimator(
             needs_critic=needs_critic,
             undiscounted=undiscounted,
             turn_lumped_reward=turn_lumped_reward,
+            publishes_turn_id=publishes_turn_id,
         )(adapter)
         return fn
 
