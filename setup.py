@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="vagen",
-    version="26.2.5",
+    version="26.8.14",
     description="Reinforcing world model reasoning for multi-turn VLM agents",
     long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
@@ -102,5 +102,8 @@ setup(
     # 3.12, not 3.10: the source parses under 3.10, but verl's installer fetches a
     # cp312-only flash-attn wheel, so an older interpreter fails partway through the
     # install rather than here.
-    python_requires=">=3.12",
+    # ★ Exactly 3.12, matching scripts/install.sh, which refuses anything else. They
+    # disagreed: setup.py said >=3.12 while the installer rejected 3.13, so following the
+    # documented prerequisite and then the documented install command failed.
+    python_requires=">=3.12,<3.13",
 )
