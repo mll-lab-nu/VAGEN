@@ -122,9 +122,9 @@ def test_the_response_region_holds_what_the_checks_let_through():
 
 
 
-def test_env_response_length_is_enforced_in_the_mode_whose_arithmetic_needs_it():
-    """compact's continuation ceiling was the budget, so E bounded nothing there -- in
-    the one mode where every relation is written in terms of it."""
+def test_the_env_response_ceiling_is_what_bounds_a_continuation():
+    """E's one job: the size an observation is cut to. compact's continuation ceiling
+    used to be the compaction budget instead, which bounded nothing worth bounding."""
     b = Budgets(prompt_len=2000, response_len=16000, per_turn=1024, max_turns=3,
                 env_response=200, compact_budget=4000, summary_budget=512,
                 summary_request_len=REQ)
@@ -156,8 +156,10 @@ def test_a_legal_episode_keeps_the_peak_inside_the_guarantee():
     assert over.peak <= bound, f"peak {over.peak} > the guaranteed {bound} after a cut"
 
 
-def test_the_defaults_are_the_largest_values_that_pass():
-    """A default its own checker rejects fails every run that did not configure it."""
+def test_the_defaults_pass_their_own_checks():
+    """A default its own checker rejects fails every run that did not configure it. E
+    is no longer among the values being solved for -- it is a flat ceiling -- but it
+    still has to be a number the rest of the arithmetic tolerates."""
     from dataclasses import replace
 
     from vagen.harness.budget import default_env_response, default_summary_budget
@@ -165,12 +167,10 @@ def test_the_defaults_are_the_largest_values_that_pass():
     b = Budgets(prompt_len=1024, response_len=8192, per_turn=1024, max_turns=5,
                 compact_budget=4096, summary_budget=default_summary_budget(4096, 1024),
                 summary_request_len=REQ)
-    check("compact", replace(b, env_response=default_env_response("compact", b),
-                             env_response_configured=False))
+    check("compact", replace(b, env_response=default_env_response("compact", b)))
 
     c = Budgets(prompt_len=512, response_len=2048, per_turn=256, max_turns=2)
-    check("concat", replace(c, env_response=default_env_response("concat", c),
-                            env_response_configured=False))
+    check("concat", replace(c, env_response=default_env_response("concat", c)))
 
 
 def test_a_region_that_cannot_hold_one_turn_says_so_once():
