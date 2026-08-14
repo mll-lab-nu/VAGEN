@@ -324,7 +324,14 @@ def context_limits(mode: str, b: Budgets) -> tuple[int, int]:
     # is an observation: the summary request goes out on the same path. It is a fixed
     # string this module already measures, so admit it rather than reporting a 70-token
     # observation the environment never returned.
-    continuation = b.env_response if mode in ("concat", "compact") else opening
+    # ★ The observation ceiling applies in every mode, no_concat included. It used to be
+    # `opening` there -- i.e. max_prompt_length -- so max_env_response_per_turn reached the
+    # client in two modes out of three and was inert in the third, while the docs describe
+    # it as "the ceiling one observation is cut to" without qualification.
+    #
+    # Under no_concat every call opens a conversation, so the observation lands in the
+    # prompt region: the binding limit is whichever of the two is smaller.
+    continuation = min(b.env_response, opening) if mode == "no_concat" else b.env_response
     if mode == "compact":
         continuation = max(continuation, b.summary_request_len)
     return opening, continuation

@@ -362,20 +362,36 @@ def test_an_oversized_observation_is_cut_to_the_ceiling():
     assert cut[0]["content"] == "o" * len(cut[0]["content"])       # head kept, not tail
 
 
-def test_an_oversized_opening_still_refuses_because_a_cut_would_eat_the_system_prompt():
-    """★ The asymmetry. An opening is the system prompt plus the first observation, and
-    trimming it would truncate the instructions identically on every episode of the run --
-    a config error laundered into silently degraded data, which is worse than a crash."""
-    from vagen.core.client import ContextTooLarge, InferenceClient
+def _char_client():
+    from vagen.core.client import InferenceClient
 
     class _C(InferenceClient):
         def encode(self, messages): return [0] * sum(len(m["content"]) for m in messages)
         async def generate(self, prompt_ids, **kw): raise AssertionError("not reached")
+    return _C()
 
-    c = _C()
+
+def test_an_oversized_opening_is_trimmed_but_the_system_prompt_is_never_cut():
+    """★ The line is the system prompt, not the opening. Instructions cut identically on
+    every episode are a config error laundered into silently degraded data; an oversized
+    *observation* is just an oversized observation, and under no_concat every call is an
+    opening -- so refusing them outright discarded every turn an episode had earned."""
+    c = _char_client()
+    c.opening_limit, c.continuation_limit = 1000, 400
+    out = c._fit_messages([{"role": "system", "content": "s" * 100},
+                           {"role": "user", "content": "o" * 1200}], opening=True)
+    assert out[0]["content"] == "s" * 100, "the system prompt was cut"
+    assert len(out[1]["content"]) < 1200 and out[1]["content"], "the observation was not trimmed"
+
+
+def test_an_opening_whose_system_prompt_alone_does_not_fit_still_refuses():
+    """No cut repairs a prompt region too small to hold the instructions."""
+    from vagen.core.client import ContextTooLarge
+
+    c = _char_client()
     c.opening_limit, c.continuation_limit = 1000, 400
     with pytest.raises(ContextTooLarge, match="opening a conversation"):
-        c._fit_messages([{"role": "user", "content": "o" * 1200}], opening=True)
+        c._fit_messages([{"role": "system", "content": "s" * 1200}], opening=True)
 
 
 def test_a_cut_drops_whole_images_once_the_text_is_gone():
@@ -406,7 +422,14 @@ def test_the_two_ceilings_come_from_the_mode():
     b = _b(prompt_len=9000, response_len=8000, per_turn=512, max_turns=5,
            env_response=1360, compact_budget=1300, summary_budget=325)
     assert context_limits("concat", b) == (9000, 1360)
-    assert context_limits("no_concat", b) == (9000, 9000)
+    # ★ no_concat gets the observation ceiling too. It used to be handed `opening`, so
+    # max_env_response_per_turn reached the client in two modes out of three and was inert
+    # in the third -- while the docs call it "the ceiling one observation is cut to" with
+    # no qualification. Every call there opens a conversation, so the observation lands in
+    # the prompt region and the binding limit is whichever is smaller.
+    assert context_limits("no_concat", b) == (9000, 1360)
+    assert context_limits("no_concat", _b(prompt_len=500, response_len=8000, per_turn=512,
+                                          max_turns=5, env_response=1360)) == (500, 500)
     # Compaction's openings are bounded by the prompt region like everyone else's. They
     # used to be bounded by compact_budget, from when that number was what a conversation
     # had to fit inside; it is an optional trigger now, and treating a trigger as a

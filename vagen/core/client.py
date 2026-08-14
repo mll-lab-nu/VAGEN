@@ -258,7 +258,10 @@ class InferenceClient(ABC):
         if size <= limit:
             return messages
         if opening:
-            self._check_context([0] * size, opening=True)
+            # The part that cannot be cut. If it alone is over, no trimming helps.
+            fixed = [m for m in messages if m.get("role") == "system"]
+            if fixed and self.measure(fixed) > limit:
+                self._check_context([0] * size, opening=True)
 
         trimmed, final = self._shrink(messages, limit)
         if not self._warned_truncating_context:
@@ -291,6 +294,9 @@ class InferenceClient(ABC):
         ceiling has to be loud; it is a config error, not something to silently absorb.
         """
         work = [dict(m) for m in messages]
+        # The system prompt is instructions, not an observation: cutting it degrades every
+        # episode of the run identically and invisibly.
+        cuttable = [i for i, m in enumerate(work) if m.get("role") != "system"]
         size = self.measure(work)
         for _ in range(self._SHRINK_PASSES):
             if size <= limit:
@@ -298,21 +304,24 @@ class InferenceClient(ABC):
             # Scale by how far over we are, with a margin, rather than nibbling: a token
             # is not a fixed number of characters and one pass per token would be O(n).
             keep = max(0.0, (limit / size) * 0.95)
-            shrunk = [_scale_text(m, keep) for m in work]
+            shrunk = [_scale_text(m, keep) if i in cuttable else m
+                      for i, m in enumerate(work)]
             if _text_len(shrunk) == _text_len(work):
                 break                      # text is exhausted; only images are left
             work = shrunk
             size = self.measure(work)
         # Text alone could not do it. Drop whole images from the end -- a partial image is
         # not an image, and the placeholder/frame counts have to stay 1:1.
-        while size > limit and any(m.get("images") for m in work):
-            for m in reversed(work):
+        while size > limit and any(work[i].get("images") for i in cuttable):
+            for i in reversed(cuttable):
+                m = work[i]
                 if m.get("images"):
                     m["images"] = list(m["images"])[:-1]
                     m["content"] = _drop_one_image_placeholder(m.get("content", ""))
                     break
             size = self.measure(work)
-        nothing_left = not _text_len(work) and not any(m.get("images") for m in work)
+        nothing_left = (not _text_len([work[i] for i in cuttable])
+                        and not any(work[i].get("images") for i in cuttable))
         if size > limit or nothing_left:
             raise ContextTooLarge(
                 f"an observation of {self.measure(messages)} tokens cannot be brought under "
