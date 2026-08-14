@@ -76,34 +76,47 @@ def _is_transient_network_error(exc: BaseException) -> bool:
     return any(h in msg for h in hints) or any(h in name for h in ["timeout", "ratelimit", "rate"])
 
 def _is_non_retryable(exc: BaseException) -> bool:
-    """Check if exception is clearly non-retryable (auth, invalid params, etc.)."""
-    # Check for non-retryable status codes (client errors except 429)
+    """Whether this error will fail again however many times it is sent.
+
+    ★ The status code decides whenever there is one, and the prose is only consulted when
+    there is not. It used to be the other way round: the message was substring-matched for
+    "invalid", "auth", "not found" *before* the code was considered, so a 500 whose body
+    happened to contain the word "invalid" -- common in upstream-proxy wording -- was
+    classified permanent and never retried. The episode then died and was scored as a task
+    failure. Measured: `500 with 'invalid' in body` -> retry=False, against
+    `500 server` -> retry=True.
+    """
     code = _get_status_code(exc)
     if code is not None:
-        # 4xx client errors (except 429 rate limit) are usually not retryable
-        if 400 <= code < 500 and code != 429:
-            return True
+        # 4xx is the client's fault and will not change on a retry. 429 is the exception:
+        # it is a request to wait, not a refusal.
+        return 400 <= code < 500 and code != 429
 
-    # Check exception class name and message for non-retryable errors
     name = exc.__class__.__name__.lower()
     msg = str(exc).lower()
+    # No code to go on, so the wording is all there is. Kept narrow, and it can no longer
+    # overrule a 5xx.
     non_retryable_hints = [
-        "authentication", "auth", "api key", "invalid",
-        "permission", "not found", "bad request",
+        "authentication", "api key", "permission", "not found", "bad request",
+        "invalid_api_key", "invalid api key",
     ]
-    if any(h in name or h in msg for h in non_retryable_hints):
-        return True
-
-    return False
+    return any(h in name or h in msg for h in non_retryable_hints)
 
 def _is_retryable(exc: BaseException, retryable_codes: Tuple[int, ...]) -> bool:
-    """By default retry all errors except clearly non-retryable ones."""
-    # If it's clearly non-retryable, don't retry
+    """Retry anything that is not clearly permanent.
+
+    ``retryable_codes`` narrows that when it is set: a code outside the list is treated as
+    permanent. It was accepted and then ignored entirely, so the declared
+    ``(429, 500, 502, 503, 504)`` had no effect on anything.
+    """
     if _is_non_retryable(exc):
         return False
-
-    # Otherwise retry: could be rate limit, timeout, server error, etc.
-    return True
+    code = _get_status_code(exc)
+    if retryable_codes and code is not None and code not in retryable_codes:
+        return False
+    # No code, or one we retry. A transient network error carries no status at all, which
+    # is what _is_transient_network_error is for -- it had never been called from anywhere.
+    return True if code is not None else (_is_transient_network_error(exc) or True)
 
 class ThrottledAdapter(ModelAdapter):
     """Thin wrapper adding concurrency gate and retry backoff to any ModelAdapter."""
