@@ -1,0 +1,41 @@
+# The sokoban dataset for native-thinking models, asking for think *and* answer.
+#
+# Same setting as `train_sokoban_vision_think.yaml` -- a model whose chat template opens a
+# `<think>` block in the generation prompt (Qwen3.5 today), run with
+# `data.apply_chat_template_kwargs.enable_thinking=True` so the reasoning lands in the
+# response and carries response_mask=1. The one difference is `prompt_format`.
+#
+# ★ Why not `answer`. Under `answer` the only requirement is that an `<answer>` tag exists
+# somewhere, and `format_correct` is satisfied by one written *inside* an unclosed think
+# block. Measured over 5 steps of the Qwen3.5-4B run in logs/qwen35_think_answer: 20 of 40
+# rollouts hit the 16384-token cap without ever emitting `</think>`, and 6 of those still
+# scored `format_correct=1.0` off a draft answer buried in the ramble. The format reward
+# was therefore paying out for traces that never terminated. Response length averaged
+# 13.0k-13.9k tokens a turn and was still climbing at step 5.
+#
+# `free_think` asks for `</think>` and then `<answer>` after it. That is the only clause in
+# any of these formats that says *stop reasoning*, and it is the lever this arm needs: an
+# unterminated trace now scores format 0, gets its actions discarded by `strict_format`,
+# and is pushed against by the advantage. The four-tag `wm` form remains unreachable here
+# (`<think>` is a reserved control token on these families).
+envs:
+  - name: Sokoban # registered env name
+    n_envs: 10000
+    data_source: sokoban # nickname for logging
+    seed: [1,10000,1] # sample n_env seeds from seed[0] to seed[1] with each seed repeat at most seed[2] times
+    max_turns: 20 # max number of interaction turns per episode
+    response_length_per_turn: 16384 # held at the `answer` arm's value so the A/B differs only in format
+    config: # env-specific config
+      render_mode: vision
+      prompt_format: free_think
+      # ★ On, unlike the `answer` arm. There the example taught imitation of a shape the
+      # model no longer had to produce; here the shape is required, and each worked
+      # example carries a one-sentence `<think>` -- the only brevity anchor in the prompt
+      # that does not require adding an explicit length instruction (which would confound
+      # the format A/B this file exists to run).
+      use_example_in_sys_prompt: True
+      # 0.02 a turn, not the 0.1 default: at max_turns=5 the default pays 0.5 for
+      # formatting alone, half of what solving the level is worth. 0.02 pays 0.10 over
+      # the episode, matching what the two state rewards pay together.
+      format_reward: 0.02
+      min_solution_steps: [1,5]

@@ -40,7 +40,7 @@ def test_concat_warns_about_an_episode_whose_turns_cannot_all_fit():
     what overflows anyway is truncated rather than refused. Refusing would rule out any
     long episode on the strength of a case a real rollout does not reach.
     """
-    with pytest.warns(UserWarning, match=r"10 x response_length_per_turn=1000 \+ 9 x env_response_length=200"):
+    with pytest.warns(UserWarning, match=r"10 x response_length_per_turn=1000 \+ 9 x max_env_response_per_turn=200"):
         check("concat", _b(max_turns=10, per_turn=1000, response_len=8000, env_response=200))
 
 
@@ -339,10 +339,14 @@ def test_the_runner_forwards_a_calls_own_limits():
 
 
 # ------------------------------------------------------- the ceilings, enforced live
-def test_an_oversized_observation_is_named_where_it_happens():
+def test_an_oversized_observation_is_cut_to_the_ceiling_and_says_so():
     """Left to cap_token_ids it surfaces at the end of the episode as a truncated row,
-    which says nothing about the observation that caused it."""
-    from vagen.core.client import ContextTooLarge, InferenceClient
+    which says nothing about the observation that caused it.
+
+    Cut rather than refused: ``max_env_response_per_turn`` exists so that T*g + (T-1)*E
+    bounds an episode, and a bound that kills the rollout when an environment exceeds it
+    only moves the failure. One oversized observation costs its own tail."""
+    from vagen.core.client import InferenceClient
 
     class _C(InferenceClient):
         def encode(self, messages): return [0] * 900
@@ -350,9 +354,24 @@ def test_an_oversized_observation_is_named_where_it_happens():
 
     c = _C()
     c.opening_limit, c.continuation_limit = 1000, 400
-    c._check_context([0] * 900, opening=True)                     # fits the prompt region
-    with pytest.raises(ContextTooLarge, match="an observation came to 900"):
-        c._check_context([0] * 900, opening=False)
+    assert c._fit_context([0] * 900, opening=True) == [0] * 900   # fits the prompt region
+    assert c._fit_context([0] * 900, opening=False) == [0] * 400  # cut to E
+
+
+def test_an_oversized_opening_still_refuses_because_a_cut_would_eat_the_system_prompt():
+    """★ The asymmetry. An opening is the system prompt plus the first observation, and
+    trimming it would truncate the instructions identically on every episode of the run --
+    a config error laundered into silently degraded data, which is worse than a crash."""
+    from vagen.core.client import ContextTooLarge, InferenceClient
+
+    class _C(InferenceClient):
+        def encode(self, messages): return [0] * 1200
+        async def generate(self, prompt_ids, **kw): raise AssertionError("not reached")
+
+    c = _C()
+    c.opening_limit, c.continuation_limit = 1000, 400
+    with pytest.raises(ContextTooLarge, match="opening a conversation"):
+        c._fit_context([0] * 1200, opening=True)
 
 
 def test_the_two_ceilings_come_from_the_mode():
@@ -368,3 +387,117 @@ def test_the_two_ceilings_come_from_the_mode():
     # ceiling killed the episode on its first call -- the opening is the system prompt
     # plus the first observation, with no summary in it yet to compact away.
     assert context_limits("compact", b) == (9000, 1360)
+
+
+# ------------------------------------------------- max_env_response_per_turn (E)
+#
+# The environment-side twin of response_length_per_turn. Before it existed, E was
+# "the largest value that still passes the checks", derived from the response region --
+# which made every relation written in terms of E self-consistent and bounded nothing the
+# environment actually did.
+
+
+def test_the_default_env_response_is_a_flat_ceiling_not_a_share_of_the_region():
+    """★ The derived value grew with the response region, so a bigger answer budget
+    implied a bigger observation. At max_response_length=12288 it came to 10240 against a
+    measured sokoban observation of 96 tokens, and the T*g + (T-1)*E warning then reported
+    a 5-turn episode as needing 51k where a real one needs 11k -- firing on every rollout
+    of every correctly sized config, which is how a warning stops being read."""
+    from vagen.harness.budget import DEFAULT_MAX_ENV_RESPONSE, default_env_response
+
+    big = default_env_response("concat", _b(response_len=12288, per_turn=2048))
+    assert big == DEFAULT_MAX_ENV_RESPONSE == 2048
+
+
+def test_the_flat_ceiling_never_raises_a_tight_configuration_past_what_fits():
+    """It is a cap, not a floor: where the region-derived room is smaller, that still
+    wins, or the static checks would start admitting observations that do not fit."""
+    from vagen.harness.budget import default_env_response
+
+    tight = default_env_response("concat", _b(response_len=2000, per_turn=1000))
+    assert tight == 1000 < 2048
+
+
+@pytest.mark.parametrize("mode", ["concat", "compact"])
+def test_a_five_turn_episode_at_a_real_observation_size_passes_without_warning(mode):
+    """The configuration this parameter was added for: 5 x 2048 generations plus four
+    256-token observations inside an 11264 region."""
+    import warnings
+
+    b = _b(response_len=11264, per_turn=2048, max_turns=5, env_response=256,
+           env_response_configured=True, compact_budget=4000, summary_budget=1000)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")   # any budget warning becomes a failure
+        check(mode, b)
+
+
+def test_the_spec_accepts_the_new_name_and_the_old_one():
+    from vagen.gym_agent_dataset import EnvSpec
+
+    assert EnvSpec(name="Sokoban", n_envs=1, max_env_response_per_turn=256).max_env_response_per_turn == 256
+    # the deprecated spelling is what the oversized-observation error told people to set
+    assert EnvSpec(name="Sokoban", n_envs=1, env_response_length=256).max_env_response_per_turn == 256
+    assert EnvSpec(name="Sokoban", n_envs=1).max_env_response_per_turn is None
+
+
+def test_the_spec_refuses_two_different_values_for_one_quantity():
+    from vagen.gym_agent_dataset import EnvSpec
+
+    with pytest.raises(ValueError, match="They are one quantity"):
+        EnvSpec(name="Sokoban", n_envs=1, max_env_response_per_turn=256, env_response_length=512)
+
+
+# ------------------------------------------------------- thinking_token_budget
+#
+# The lever `response_length_per_turn` is not. `max_tokens` cuts the turn wherever it
+# happens to be; this makes the engine close the reasoning block and let the model answer.
+# Measured on Qwen3.5 at a 2048 max_tokens cap, 92% of turns were cut before `</think>`
+# and so had no answer to score.
+
+
+def test_the_budget_is_carried_as_a_sampling_key_and_nothing_else():
+    """★ Model-agnostic on purpose. VAGEN passes a token count; what a reasoning block
+    looks like lives in engine config (a registered reasoning_parser, or an explicit
+    start/end pair), because that is per-family knowledge. Nothing here may learn that
+    `<think>` is the delimiter -- the next family spells it differently."""
+    import inspect
+
+    from vagen.agent_loop import gym_loop
+
+    src = inspect.getsource(gym_loop)
+    assert "thinking_token_budget" in src
+    assert "<think>" not in src and "</think>" not in src, \
+        "a reasoning delimiter leaked into the agent loop; it belongs in engine config"
+
+
+def test_the_spec_carries_the_budget_and_defaults_to_off():
+    """Off unless asked for: set, it makes vLLM refuse the request unless the engine also
+    has reasoning_config, so a default would break every run that does not want it."""
+    from vagen.gym_agent_dataset import EnvSpec
+
+    assert EnvSpec(name="Sokoban", n_envs=1).thinking_token_budget is None
+    assert EnvSpec(name="Sokoban", n_envs=1, thinking_token_budget=512).thinking_token_budget == 512
+
+
+def test_the_budget_reaches_the_client_sampling_params():
+    """It has to survive as a plain extra key: verl builds its sampling dict from a fixed
+    field list with no pass-through, but the engine call is
+    `SamplingParams(max_tokens=..., **sampling_params)`, so an extra key arrives intact."""
+    sampling = {"temperature": 1.0}
+    kwargs = {"thinking_token_budget": 512}
+    if kwargs.get("thinking_token_budget"):                     # the gym_loop line
+        sampling = {**sampling, "thinking_token_budget": int(kwargs["thinking_token_budget"])}
+    from vllm import SamplingParams
+    p = SamplingParams(max_tokens=2048, **sampling)
+    assert p.thinking_token_budget == 512
+
+
+def test_an_unset_budget_adds_no_key_at_all():
+    """A None must not become `thinking_token_budget=None` in the dict: vLLM checks for
+    `is not None`, so passing it explicitly would demand reasoning_config from every run."""
+    for value in (None, 0):
+        sampling = {"temperature": 1.0}
+        kwargs = {"thinking_token_budget": value}
+        if kwargs.get("thinking_token_budget"):
+            sampling = {**sampling, "thinking_token_budget": int(kwargs["thinking_token_budget"])}
+        assert "thinking_token_budget" not in sampling

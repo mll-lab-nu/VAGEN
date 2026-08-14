@@ -5,7 +5,7 @@
     n_r   data.max_response_length       a row's response region -- the real bound
     g     response_length_per_turn       one generation, and the floor below which one
                                          is not worth making
-    E     env_response_length            one observation, after the processor has
+    E     max_env_response_per_turn      one observation, after the processor has
                                          expanded its images
     T     max_turns                      environment steps in an episode
     k     trainer.compact_summary_budget the largest a summary may be
@@ -45,6 +45,12 @@ by ``max_new_tokens`` and only observations can overflow.
 Measured on Sokoban vision, for scale: S=589, E=44..58 with a 96x96 frame, a real turn
 about 164 tokens. A 20-turn episode is ~3200 tokens against a 6144 region -- which is why
 the region trigger alone never fires there, and why ``m`` survives as a second one.
+
+Re-measured 2026-08-13 against Qwen3.5's processor, since E is now a configurable ceiling
+and the number it should be set near matters: S=370 for sokoban vision with the free_think
+prompt, and one observation with its image expanded is **80 tokens opening, 96
+mid-episode**. Two orders of magnitude below the 2048 default and three below the value
+the region-derived default used to produce.
 """
 
 from __future__ import annotations
@@ -113,6 +119,15 @@ def default_summary_budget(compact_budget: int, per_turn: int) -> int:
     return max(1, min(per_turn, compact_budget // 4))
 
 
+#: ``E`` when a spec does not set ``max_env_response_per_turn``. A flat ceiling rather
+#: than a share of the region: an environment's observation size is a property of the
+#: environment, not of how much room the model was given to answer it. 2048 is far above
+#: what any environment here returns (sokoban vision: 80 tokens opening, 96 mid-episode,
+#: measured on a 96x96 frame with Qwen3.5's processor) and far below the derived value it
+#: replaces, so it bounds the arithmetic without binding on a real rollout.
+DEFAULT_MAX_ENV_RESPONSE = 2048
+
+
 def default_env_response(mode: str, b: Budgets) -> int:  # noqa: D401
     """``E`` when it is not configured: the room the mode has left for observations.
 
@@ -134,14 +149,21 @@ def default_env_response(mode: str, b: Budgets) -> int:  # noqa: D401
     # from an aggregate a real rollout never reaches.
     if mode == "no_concat":
         # Every call opens a conversation, so the observation lands in the prompt region.
-        return max(1, b.prompt_len)
+        return min(DEFAULT_MAX_ENV_RESPONSE, max(1, b.prompt_len))
     # Room for one observation and the generation that answers it -- but never less than
     # a quarter of the region. `per_turn` is clamped up to `response_len` when a config
     # asks for more than the region holds, and `response_len - per_turn` is then 0: a
     # ceiling of one token, which refuses every observation on the second turn of every
     # episode. Measured: all four spatial_gym scripts, whose per-turn budget (2048)
     # exceeds their region (2000).
-    return max(b.response_len // 4, b.response_len - b.per_turn, 1)
+    room = max(b.response_len // 4, b.response_len - b.per_turn, 1)
+    # ★ Capped at a flat ceiling, because the room-based value is not a bound on anything
+    # the environment does -- it is "the largest number that still passes the checks", and
+    # it grows with the response region. At max_response_length=12288 it comes to 10240, so
+    # the T*g + (T-1)*E warning reports a 5-turn episode as needing 51k tokens when a real
+    # one needs 11k: a measured sokoban vision observation is 96 tokens. The warning then
+    # fires on every rollout of every well-sized config and stops being read.
+    return min(DEFAULT_MAX_ENV_RESPONSE, room)
 
 
 
@@ -165,7 +187,7 @@ def check(mode: str, b: Budgets) -> None:
 
     if mode == "no_concat":
         _need(b, b.env_response + b.per_turn, "one turn",
-              f"env_response_length={b.env_response} + response_length_per_turn={b.per_turn}")
+              f"max_env_response_per_turn={b.env_response} + response_length_per_turn={b.per_turn}")
 
     if mode == "concat" and b.per_turn_configured:
         episode = b.max_turns * b.per_turn + max(0, b.max_turns - 1) * b.env_response
@@ -180,7 +202,7 @@ def check(mode: str, b: Budgets) -> None:
                 f"concat keeps the whole episode in one conversation, so its response "
                 f"region holds every turn: max_turns={b.max_turns} x "
                 f"response_length_per_turn={b.per_turn} + {max(0, b.max_turns - 1)} x "
-                f"env_response_length={b.env_response} = {episode} tokens, against "
+                f"max_env_response_per_turn={b.env_response} = {episode} tokens, against "
                 f"data.max_response_length={b.response_len}. Turns will be generated "
                 f"against the room left rather than the full allowance, and anything over "
                 f"is truncated -- but if episodes really do run that long, use "
@@ -224,7 +246,7 @@ def _check_compact(b: Budgets) -> None:
     # real condition at 800. That gap is the mechanism behind CompactionMakesNoProgress
     # firing on configurations this function accepted.
     #
-    # The exact form needs a declared `env_response_length`. Derived, that number is
+    # The exact form needs a declared `max_env_response_per_turn`. Derived, that number is
     # deliberately generous -- it exists to catch one pathological observation, not to
     # describe a typical one -- and checking against it would refuse every unconfigured
     # run.
@@ -234,13 +256,13 @@ def _check_compact(b: Budgets) -> None:
               f"+ response_length_per_turn={b.per_turn}")
     if b.env_response_configured:
         needed += b.env_response + floor
-        detail += f" + env_response_length={b.env_response} + a floor of {floor}"
+        detail += f" + max_env_response_per_turn={b.env_response} + a floor of {floor}"
     if needed > b.response_len:
         raise BudgetError(
             f"a conversation has no room to buy a turn: {detail} = {needed}, against "
             f"data.max_response_length={b.response_len}. Every conversation would close "
             f"at or before its first turn. Lower compact_summary_budget, "
-            f"response_length_per_turn or env_response_length, or raise "
+            f"response_length_per_turn or max_env_response_per_turn, or raise "
             f"max_response_length."
         )
 
@@ -293,7 +315,7 @@ def context_limits(mode: str, b: Budgets) -> tuple[int, int]:
     a turn is a runtime question, and ``CompactionMakesNoProgress`` is where it is asked.
     """
     opening = b.prompt_len
-    # An observation is bounded by env_response_length wherever a conversation can be
+    # An observation is bounded by max_env_response_per_turn wherever a conversation can be
     # continued. Compaction used the budget here, which bounded nothing worth bounding:
     # every relation compaction has to satisfy is written in terms of E, and E was the
     # one quantity with no runtime enforcement in the one mode that depends on it.
