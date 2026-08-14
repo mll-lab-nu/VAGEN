@@ -15,7 +15,7 @@ set -eo pipefail
 V=$(cd "$(dirname "$0")/../../.." && pwd)
 SCRIPTDIR=$(cd "$(dirname "$0")" && pwd)
 PROJECT_NAME=${PROJECT_NAME:-vagen_experiments}
-EXPERIMENT_NAME=${EXPERIMENT_NAME:-frozenlake_ppo_qwen25vl3b}
+EXPERIMENT_NAME=${EXPERIMENT_NAME:-frozenlake_default_gae_qwen25vl3b}
 EXPERIMENT_DIR=${EXPERIMENT_DIR:-$V/exps/$PROJECT_NAME/$EXPERIMENT_NAME}
 MODEL=${MODEL:-Qwen/Qwen2.5-VL-3B-Instruct}
 mkdir -p "$EXPERIMENT_DIR"
