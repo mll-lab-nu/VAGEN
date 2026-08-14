@@ -1,8 +1,13 @@
+# The whole `base` set, once each. It was [30,60,1] over n_envs=30, which is wrong twice:
+# `range(30,61)` holds 31 values and 30 are sampled, so one task was dropped at random on
+# every run, and seed 30 was also in the train yaml's range -- the same task on both sides.
 envs:
   - name: RemoteEnv
-    n_envs: 30
+    n_envs: 60
     data_source: navigation
-    seed: [30, 60, 1]
+    # 60 values for 60 envs, so every task is drawn exactly once. Indices come out as
+    # `seed % 60`, so 1..59 map to themselves and 60 maps to 0.
+    seed: [1, 60, 1]
     max_turns: 10
     response_length_per_turn: 512
     config:
