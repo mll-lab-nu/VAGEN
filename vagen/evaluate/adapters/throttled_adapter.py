@@ -103,20 +103,21 @@ def _is_non_retryable(exc: BaseException) -> bool:
     return any(h in name or h in msg for h in non_retryable_hints)
 
 def _is_retryable(exc: BaseException, retryable_codes: Tuple[int, ...]) -> bool:
-    """Retry anything that is not clearly permanent.
+    """Retry anything not clearly permanent. The default is to retry.
 
-    ``retryable_codes`` narrows that when it is set: a code outside the list is treated as
-    permanent. It was accepted and then ignored entirely, so the declared
-    ``(429, 500, 502, 503, 504)`` had no effect on anything.
+    ★ ``retryable_codes`` is deliberately NOT used as a whitelist. It was accepted and
+    ignored, and switching it on looked like the fix -- but the declared
+    ``(429, 500, 502, 503, 504)`` is not the set of codes that mean "try again". It omits
+    520/522/524 (Cloudflare in front of an endpoint), **529** (Anthropic's routine
+    `overloaded_error`), 501 and 507. Treating those as permanent makes one HTTP call and
+    then scores the episode as a task failure, which on a loaded endpoint eats episodes.
+
+    So the parameter narrows nothing and the decision is entirely
+    ``not _is_non_retryable``: a 4xx other than 429 is the client's fault, everything else
+    gets another go.
     """
-    if _is_non_retryable(exc):
-        return False
-    code = _get_status_code(exc)
-    if retryable_codes and code is not None and code not in retryable_codes:
-        return False
-    # No code, or one we retry. A transient network error carries no status at all, which
-    # is what _is_transient_network_error is for -- it had never been called from anywhere.
-    return True if code is not None else (_is_transient_network_error(exc) or True)
+    del retryable_codes
+    return not _is_non_retryable(exc)
 
 class ThrottledAdapter(ModelAdapter):
     """Thin wrapper adding concurrency gate and retry backoff to any ModelAdapter."""

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+         <loc>https://vagen.readthedocs.io/</loc>
+         <lastmod>2026-08-14</lastmod>
+    </url>
+    <url>
+         <loc>https://vagen.readthedocs.io/configuration/</loc>
+         <lastmod>2026-08-14</lastmod>
+    </url>
+    <url>
+         <loc>https://vagen.readthedocs.io/custom-environment/</loc>
+         <lastmod>2026-08-14</lastmod>
+    </url>
+    <url>
+         <loc>https://vagen.readthedocs.io/custom-filter/</loc>
+         <lastmod>2026-08-14</lastmod>
+    </url>
+    <url>
+         <loc>https://vagen.readthedocs.io/custom-metric/</loc>
+         <lastmod>2026-08-14</lastmod>
+    </url>
+    <url>
+         <loc>https://vagen.readthedocs.io/issues/</loc>
+         <lastmod>2026-08-14</lastmod>
+    </url>
+    <url>
+         <loc>https://vagen.readthedocs.io/quickstart/</loc>
+         <lastmod>2026-08-14</lastmod>
+    </url>
+</urlset>
