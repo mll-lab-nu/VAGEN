@@ -1,6 +1,4 @@
-"""The dependency rule VAGEN_ARCH.md states, as a gate rather than a claim.
-
-Nothing on the evaluation path may import verl, torch or ray. That is what lets a user
+"""Nothing on the evaluation path may import verl, torch or ray. That is what lets a user
 score a checkpoint against a hosted API without a training install, and it is the reason
 `vagen/core/env_adapter.py` exists at all -- `GymEnvAdapter` was moved out of
 `agent_loop/gym_loop.py`, which does import verl, purely so evaluation could reach it.
