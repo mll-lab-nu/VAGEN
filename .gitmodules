@@ -1,4 +1,8 @@
 [submodule "verl"]
 	path = verl
 	url = https://github.com/JamesKrW/verl.git
-	branch = verl260812-vagen
+	# A tag, not the branch. A submodule pins a SHA either way, but the SHA is only
+	# fetchable while something references it -- delete or rewrite the branch and every
+	# `git clone --recursive` of this repo breaks, with no warning here. vagen-260812
+	# points at 27c51e9, the commit this release was built and tested against.
+	branch = vagen-260812
