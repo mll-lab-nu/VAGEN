@@ -28,6 +28,11 @@ harness decides how the first maps onto the second.
 | `no_concat` | **one row per turn**, each a fresh conversation | history is not needed, or will not fit |
 | `compact` | a row per conversation, summarised and reopened when full | long episodes that must keep context |
 
+`compact` is closely related to **CompactionRL** ([arXiv:2607.05378](https://arxiv.org/abs/2607.05378),
+Li et al., 2026), which trains task execution and summary generation jointly under context
+compaction. Here the summary is produced by the policy and trained with everything else, so
+the same comparison applies.
+
 ```yaml
 trainer:
   harness: compact
@@ -71,14 +76,27 @@ class MyHarness(BaseHarness): ...
 ```
 
 ```yaml
+# training
 trainer:
-  harness: mine                        # registered
-  harness: mypkg.harnesses:MyHarness   # or an import path
+  harness: mine    # a registered name; needs the module imported in every worker, below
 ```
+
+```yaml
+# evaluation -- examples/evaluate/<env>/config.yaml
+envs:
+  - name: Sokoban
+    harness: mypkg.harnesses:MyHarness   # an import path
+```
+
+(One key per block: `harness` twice under one `trainer:` is a duplicate mapping key and
+OmegaConf raises on it.)
 
 For training, the module has to be imported inside the workers, which is what
 `actor_rollout_ref.model.external_lib` is for: verl builds a registry per worker process.
-Evaluation accepts the same two forms.
+
+★ Evaluation accepts both spellings but imports nothing, so in practice use the import path
+there: `run_eval` has no `external_lib` hook, and a bare registered name fails with
+`unknown harness 'mine'; choose from ['compact', 'concat', 'no_concat']`.
 
 ---
 
@@ -149,7 +167,9 @@ envs:
 
 ### Seeds
 
-```yaml
+One of these three forms (not a block to paste — each line is a whole alternative):
+
+```text
 seed: [7]                # 1 element: a base seed; actual seeds are sampled from [0, 2**31-1]
 seed: [0, 99]            # 2 elements: sampled from the INCLUSIVE range, with repeats
 seed: [0, 99, 1]         # 3 elements: as above, each value used at most `limit` times
@@ -313,7 +333,9 @@ filter:
 `filter_kwargs` is splatted into the registered function, so the accepted keys are that
 function's. The two built in take **different** ones:
 
-```yaml
+One of these two (each line is a whole alternative):
+
+```text
 filter: {name: reward_variance,       filter_kwargs: {topk: 0.2,  ddof: 0}, enable: true}
 filter: {name: reward_variance_top_p, filter_kwargs: {top_p: 0.9, ddof: 0}, enable: true}
 ```
