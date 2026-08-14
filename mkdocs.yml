@@ -3,6 +3,11 @@ site_description: Training VLM Agents with Multi-Turn Reinforcement Learning
 site_url: https://vagen.readthedocs.io/
 docs_dir: docs
 
+# ★ A broken link or a page missing from the nav fails the build instead of shipping.
+# docs/issues.md was orphaned from the nav for months, unreachable on the site, while
+# holding the two fixes most likely to be needed.
+strict: true
+
 repo_name: mll-lab-nu/VAGEN
 repo_url: https://github.com/mll-lab-nu/VAGEN
 

@@ -3,11 +3,12 @@
 Read this first; it is meant to take five minutes. `VAGEN_ARCH.md` has the design
 rationale, and it is long. Anything here that disagrees with it, believe this.
 
-Training backend: `verl@release/v0.8.0`, a **sibling checkout** at `../verl` — verl is
-**not pip-installed**, so it has to be on `PYTHONPATH`.
+Training backend: verl **main**, as the git submodule at `VAGEN/verl`, pip-installed from
+that checkout by `scripts/install.sh` (`pip install --no-deps -e ./verl`). It reports
+`0.9.0.dev`. There is no sibling checkout and nothing to put on `PYTHONPATH`.
 
 ```bash
-PYTHONPATH=$(pwd)/../verl:$(pwd) python -m pytest -q     # 534 passed, 6 skipped
+pytest -q      # pytest.ini supplies testpaths and `pythonpath = . verl`
 ```
 
 ---
@@ -74,7 +75,7 @@ These have all been broken at least once, and none of them raised when they were
 
 ## 4. Token budgets
 
-Full treatment in `../logs/三个mode-token限制与结束逻辑.md`. The short version:
+Full treatment in `vagen/harness/budget.py`'s module docstring. The short version:
 
 Every turn, in every mode, asks the same question:
 
@@ -169,7 +170,7 @@ bash examples/train/... --cfg job --resolve                  # dry-run the confi
 ```
 
 A judge endpoint is needed only when `trainer.state_reward.*.enable=True`:
-`bash scripts/launch_judge.sh` (~23 GB/card, shares every GPU).
+`bash scripts/launch_judge.sh` (shares a GPU with training; size it against your card).
 
 **Reaping matters.** Orphaned vLLM workers holding 60–90 GB/card have bitten this project
 repeatedly. Kill everything on the GPUs *except* the judge's process tree.
@@ -183,18 +184,11 @@ vagen/agent_loop/    gym_loop.py (the verl AgentLoop), verl_client.py, multi_out
 vagen/utils/         image_token_utils.py, concat_val_multi_turn.py, episode_log.py
 vagen/trainer/       VagenPPOTrainer + the mixins over verl's SeparateRayPPOTrainer
 vagen/custom_advantage/   the algorithm layer (TrajectoryView + the estimators)
-logs/                design notes and findings -- see below
 ```
 
-`../logs/` (outside git) is where the reasoning lives:
-
-| file | what |
-|---|---|
-| `三个mode-token限制与结束逻辑.md` | the budgets and every termination path |
-| `四个token上限-与compact观察.md` | the design discussion the budgets came from |
-| `CHANGELOG-overnight.md` | what changed and why, including the mistakes |
-| `template-seam.md` | a known defect, pinned as xfail, and why it is not a one-liner |
-| `dropped-row-renumbering.md` | conversation numbering + what adopting fully-async needs |
+Design notes that used to live in an out-of-tree `logs/` directory have been folded into
+the module docstrings they describe -- `vagen/harness/budget.py` for the budgets and every
+termination path, `vagen/core/harness.py` for the context policies.
 
 ## 7. Where it stands
 
@@ -204,23 +198,13 @@ logs/                design notes and findings -- see below
 ```
 concat     1 conversation per episode
 no_concat  one per turn
-compact    4-5 per 20-turn episode        (max_turns=20, compact_budget=1300)
+compact    ~0.4 per 5-turn episode         (max_turns=5, compact_budget=1200; 128 episodes -> 178 rows)
 ```
 
 Also working: image-aware truncation, budget-aware generation in all three modes, the
 identity chain (group > episode > conversation > turn), per-token rewards reaching the
 loss, `value_mask` reaching the critic, all 20 training scripts config-verified with
 sokoban and frozenlake actually run.
-
-### Open, ranked
-
-| | severity | where |
-|---|---|---|
-| The summary is a turn in the GAE recursion | by design | compaction's summary is a policy action -- generated, trained (mask 1), and its zero immediate reward is correct credit assignment. So it is a step, and the turn before it bootstraps through it. Listed because it surprises people, not because it is wrong |
-| Compact loss reweighting | deferred | by the project owner; algorithm layer |
-| 10 of 15 verl patches could move to the VAGEN layer | cleanliness | audited, hooks identified. The critic mask is explicitly blessed to stay, and the actor mask added 2026-08-08 alongside it for the same reason: a loss-side mask has no hook |
-| An empty first generation shrinks the batch | low | the episode contributes no rows and `multi_output._postprocess` only raises when *every* rollout is empty. Under GRPO that quietly shrinks a group |
-| `_summary_request_len` over-counts | low | it renders the request as an *opening* turn, so Qwen injects a system block: 39 tokens where the client sends 23. Over-reserving is the safe direction |
 
 ## 8. How to work here
 
@@ -229,6 +213,5 @@ sokoban and frozenlake actually run.
   trusting a new check, mutate the thing it guards and watch it go red.
 - **Do not trust a green run over a measurement.** The three-mode runs passed for weeks
   while compact was silently behaving as no_concat.
-- **Long output goes to `../logs/`,** not the terminal.
 - **Never edit `vagen/` or `verl/` while a training run is in flight** — a later mode in
   the same sweep will pick up the change and the comparison stops being one.
