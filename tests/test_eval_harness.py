@@ -431,3 +431,47 @@ def test_a_crashed_environment_is_not_reported_as_a_solved_episode():
     result = asyncio.run(wf.arun_episode(_Broken, {"name": "Stub"}, seed=0, max_turns=3))
     assert result["finish_reason"] == "env_error", result["finish_reason"]
     assert result["success"] is False
+
+
+def test_an_unusable_observation_ceiling_is_refused_not_silently_emptied():
+    """★ The shipped sokoban eval played blind from turn 2 and reported a success rate.
+
+    `max_env_response_per_turn: 256` was copied from the training yaml, where a frame is
+    ~96 real tokens -- but evaluation without a processor prices one at 800, so every
+    continuation measured 814, and `_shrink` scaled the text to zero and dropped the frame.
+    The model saw the empty string. One warning, exit 0, a number written to summary.json.
+
+    A ceiling that cannot hold one observation is a config error, and has to say so.
+    """
+    from vagen.core.client import ContextTooLarge
+
+    adapter = _Adapter()
+    wf = GenericVisionInferenceWorkflow(
+        adapter=adapter, dump_dir=None, harness="concat",
+        max_env_response_per_turn=256, tokens_per_image=800)
+    env_cls = type("_VisionEnv", (_Env,), {"vision": True})
+    result = asyncio.run(wf.arun_episode(env_cls, {"name": "Stub"}, seed=0, max_turns=3))
+    assert result["finish_reason"] == "error", (
+        f"expected a refusal, got {result['finish_reason']!r} -- the observation was cut "
+        f"to nothing and the episode reported normally")
+    assert "cannot be brought under" in str(result.get("error_details", {}))
+
+
+def test_a_processor_prices_a_frame_instead_of_guessing_at_it():
+    """The estimate exists only for a closed API. Given the served model, evaluation
+    measures what training measures -- 40x apart on a 96x96 frame, which is the difference
+    between a ceiling that fits and one that erases the observation."""
+    from PIL import Image
+    from transformers import AutoProcessor
+
+    from model_path import local_snapshot
+    from vagen.evaluate.chat_client import ChatClient
+
+    msg = {"role": "user", "content": "<image>\nDecide your next action(s).",
+           "images": [Image.new("RGB", (96, 96))]}
+    proc = AutoProcessor.from_pretrained(local_snapshot("Qwen/Qwen2.5-VL-3B-Instruct"))
+
+    measured = ChatClient(_Adapter(), processor=proc).measure([msg])
+    estimated = ChatClient(_Adapter()).measure([msg])
+    assert measured < 256, f"a 96x96 frame measured {measured}; the shipped ceiling is 256"
+    assert estimated > measured * 5, "the estimate is supposed to be the pessimistic one"

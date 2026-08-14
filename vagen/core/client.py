@@ -280,7 +280,16 @@ class InferenceClient(ABC):
     _SHRINK_PASSES = 12
 
     def _shrink(self, messages: list, limit: int) -> tuple[list, int]:
-        """Trim text, then whole images, until ``measure`` fits under ``limit``."""
+        """Trim text, then whole images, until ``measure`` fits under ``limit``.
+
+        ★ Refuses rather than reducing an observation to nothing. Without a floor this
+        happily returned the empty string: measured on the shipped sokoban eval, where the
+        ceiling (256, copied from the training yaml, where a frame really is ~96 tokens)
+        sat below what evaluation charges for one frame (800 by estimate), every
+        continuation observation became `""` with no image -- the model played blind from
+        turn 2 and the run reported a success rate, exit 0, one warning. An unusable
+        ceiling has to be loud; it is a config error, not something to silently absorb.
+        """
         work = [dict(m) for m in messages]
         size = self.measure(work)
         for _ in range(self._SHRINK_PASSES):
@@ -303,6 +312,17 @@ class InferenceClient(ABC):
                     m["content"] = _drop_one_image_placeholder(m.get("content", ""))
                     break
             size = self.measure(work)
+        nothing_left = not _text_len(work) and not any(m.get("images") for m in work)
+        if size > limit or nothing_left:
+            raise ContextTooLarge(
+                f"an observation of {self.measure(messages)} tokens cannot be brought under "
+                f"the {limit}-token ceiling without deleting it: cutting reached "
+                f"{size} tokens with {sum(len(m.get('images') or []) for m in work)} "
+                f"image(s) and no text left. Raise max_env_response_per_turn, or -- if this "
+                f"is an evaluation -- check `tokens_per_image` against what your "
+                f"environment's frames actually cost; the default estimate is deliberately "
+                f"high and a ceiling copied from a training config is priced differently."
+            )
         return work, size
 
     def _check_context(self, context: list[int], *, opening: bool) -> None:
