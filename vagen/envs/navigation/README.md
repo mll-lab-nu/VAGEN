@@ -39,6 +39,7 @@ Key parameters:
 
 ```bash
 # Terminal 1: start server
+python -m vagen.envs.navigation.serve
 
 # Terminal 2: run eval
 bash examples/evaluate/navigation/run_eval.sh
@@ -50,6 +51,7 @@ Config: `examples/evaluate/navigation/config.yaml`
 
 ```bash
 # Terminal 1: start server
+python -m vagen.envs.navigation.serve
 
 # Terminal 2: run training
 cd VAGEN

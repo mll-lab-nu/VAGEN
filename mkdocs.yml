@@ -33,6 +33,7 @@ nav:
   - Home: index.md
   - Quick Start: quickstart.md
   - Configuration: configuration.md
+  - Evaluation: evaluation.md
   - Known Issues: issues.md
   - Customization:
     - Environment: custom-environment.md

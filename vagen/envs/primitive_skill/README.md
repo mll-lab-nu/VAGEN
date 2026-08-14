@@ -44,6 +44,7 @@ Key parameters:
 
 ```bash
 # Terminal 1: start server
+python -m vagen.envs.primitive_skill.serve
 
 # Terminal 2: run eval
 bash examples/evaluate/primitive_skill/run_eval.sh
@@ -55,6 +56,7 @@ Config: `examples/evaluate/primitive_skill/config.yaml`
 
 ```bash
 # Terminal 1: start server
+python -m vagen.envs.primitive_skill.serve
 
 # Terminal 2: run training
 cd VAGEN

@@ -143,6 +143,14 @@ registry drops the environment and you get `KeyError: Unknown env name: SpatialG
 
 ## Quick Start
 
+`trainer.logger` defaults to `["console", "wandb"]` and no example script overrides it, so
+log in first — or turn it off:
+
+```bash
+wandb login                       # or: export WANDB_MODE=offline
+                                  # or append: trainer.logger=[console]
+```
+
 ### Training
 VAGEN currently supports PPO / GRPO with three multi-turn training paradigms:
 
@@ -315,7 +323,8 @@ trainer:
 # export HF_TOKEN=xxx
 huggingface_hub:
   hf_save_freq: null   # upload every N steps (must be a multiple of trainer.save_freq); null = disabled
-  repo_id: null        
+  repo_id: vagen-training   # the shipped default; enabling upload with it unchanged
+                          # pushes to a repo of that name under your account        
   private: false        
 ```
 

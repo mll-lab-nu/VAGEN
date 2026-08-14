@@ -5,7 +5,9 @@ set -euo pipefail
 #   python -m vagen.envs.navigation.serve --port 8000
 
 # ---------- Defaults / Paths ----------
-fileroot="${fileroot:-"$HOME/projects/vagen"}"
+# VAGEN_EVAL_ROOT first, matching the vllm launcher and the eval configs; a
+# developer's home directory is not a default.
+fileroot="${VAGEN_EVAL_ROOT:-${fileroot:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)/eval_runs}}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG="${CONFIG:-"$SCRIPT_DIR/../config.yaml"}"
 PORT="${PORT:-30000}"

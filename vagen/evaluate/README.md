@@ -13,19 +13,22 @@ CLI overrides (OmegaConf dotlist):
 python -m vagen.evaluate.run_eval --config config.yaml run.backend=claude backends.claude.model=claude-opus-4-6
 ```
 
-Below is a complete example (`examples/evaluate/frozenlake/config.yaml`):
+Below is a complete example, abridged from `examples/evaluate/frozenlake/config.yaml` —
+read that file for the authoritative version:
 
 ```yaml
 defaults:
   - ../../../vagen/configs/eval_default   # inherit shared backend definitions
 
-fileroot: ${oc.env:HOME}/projects/vagen
+fileroot: ${oc.env:VAGEN_EVAL_ROOT,./eval_runs}   # relative to THIS file's directory
 
 envs:
   - name: FrozenLake                      # registered env class name
     n_envs: 128                           # how many episodes to run
     tag_id: frozenlake_test               # groups rollout outputs under tag_{tag_id}/
-    seed: [0,128,1]                       # [start, end, step] → generates seeds 0..127
+    seed: [20000,20127,1]                 # [min, max, occurrence-limit]; INCLUSIVE, so this
+                                          # is 128 values for n_envs=128. Above the training
+                                          # ranges on purpose -- same seed, same instance.
     max_turns: 5                          # max agent–env interaction turns per episode
     config:                               # passed to the env constructor
       render_mode: vision

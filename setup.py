@@ -23,6 +23,10 @@ setup(
         "envs/*/requirements.txt",
     ]},
     install_requires=[
+        # vLLM compiles kernels through ninja at engine startup even with --enforce-eager,
+        # and neither engine extra pulls it in. Missing, the server dies with a bare
+        # FileNotFoundError several frames below anything that mentions vLLM.
+        "ninja",
         "gym-sokoban",
         "gymnasium",
         "gymnasium[toy-text]",
