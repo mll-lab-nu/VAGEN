@@ -42,12 +42,17 @@ mapfile -t BASE < <(grep -vE '^\s*(#|$)' "$V/vagen/configs/baseline_vllm.flags" 
 # and lets the first conversation -- no summary to carry -- run 7 turns against 5 for
 # every one after it. At k=300, m in [1999, 2221] and the first gets 6.
 #
-# Measured, not predicted: 32 episodes produced 57 rows, 7 of them one row and 25 of them
-# two, so ~0.8 compactions per episode. The turn arithmetic above is per conversation and
-# holds; what it does not tell you is episode length. max_turns=20 is a cap and these
-# episodes end well before it, so most fit in one conversation plus a bit. Sizing m from
-# max_turns would have been sizing for an episode that does not occur.
-COMPACT_BUDGET=${COMPACT_BUDGET:-2100}
+# ★ 1200, not 2100, and it is tied to max_turns=5 in the dataset yaml. The arithmetic
+# above is per conversation, so a budget only compacts if a whole episode does NOT fit
+# inside one: at m=2100 a 5-turn episode fits, compaction never fires, and this arm
+# silently measures concat -- the same numbers as the default_gae script, under a name
+# that says otherwise. 1200 buys about three turns and then two, so a 5-turn episode
+# compacts once.
+#
+# Measured on the cluster at this setting: 128 episodes produced 178 rows, i.e. ~0.4
+# compactions per episode -- below one because sokoban episodes often end before turn 5.
+# Raise max_turns and this has to come down with it, or the arm degenerates again.
+COMPACT_BUDGET=${COMPACT_BUDGET:-1200}
 COMPACT_SUMMARY_BUDGET=${COMPACT_SUMMARY_BUDGET:-300}
 
 PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
