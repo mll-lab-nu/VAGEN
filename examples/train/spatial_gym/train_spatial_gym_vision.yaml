@@ -19,7 +19,12 @@ envs:
     response_length_per_turn: 1024
     # What one observation may be. Declared rather than derived: the derivation is
     # deliberately generous and the static checks are only exact against a real number.
-    env_response_length: 600
+    #
+    # 700 from measurement, not taste (Qwen2.5-VL processor, run00): the opening
+    # observation is 677 tokens across 2 images and the largest mid-episode one is 349.
+    # The opening is charged against max_prompt_length (4000 here), not against this, so
+    # this only has to cover a rendered view.
+    max_env_response_per_turn: 700
     config:
       exp_type: active
       render_mode: vision

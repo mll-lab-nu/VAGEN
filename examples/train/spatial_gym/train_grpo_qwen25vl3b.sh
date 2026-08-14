@@ -10,12 +10,24 @@
 #
 # Anything after "${BASE[@]}" overrides it, and anything on the command line overrides
 # that, so a one-off sweep needs no edit here.
+# ★ The response region has to hold the WHOLE episode, because this reward is
+# terminal-only. concat keeps all 11 turns in one conversation, and SpatialGym pays out
+# only on the final cogmap turn (spatial_gym_env.py: `awaiting_cogmap_output`), which is
+# reachable only after max_exp_steps=10 exploration turns. Worst case:
+#
+#     11 x response_length_per_turn(1024) + 10 x max_env_response_per_turn(700) = 18264
+#
+# At the old 2000, `exhausted()` (floor = min(g, n_r/4) = 500) ended every episode around
+# turn 3 of 11 -- so the only scored turn was never reached and these runs could not score
+# at all, while every other metric looked ordinary. Sized for the worst case deliberately:
+# exploration turns really use ~150 tokens, but a budget that merely usually fits would
+# cut the one turn that matters on the episodes that reason longest.
 set -eo pipefail
 
 V=$(cd "$(dirname "$0")/../../.." && pwd)
 SCRIPTDIR=$(cd "$(dirname "$0")" && pwd)
 PROJECT_NAME=${PROJECT_NAME:-vagen_spatial_gym}
-EXPERIMENT_NAME=${EXPERIMENT_NAME:-grpo_qwen25vl3b}
+EXPERIMENT_NAME=${EXPERIMENT_NAME:-spatial_gym_grpo_qwen25vl3b}
 EXPERIMENT_DIR=${EXPERIMENT_DIR:-$V/exps/$PROJECT_NAME/$EXPERIMENT_NAME}
 MODEL=${MODEL:-Qwen/Qwen2.5-VL-3B-Instruct}
 mkdir -p "$EXPERIMENT_DIR"
@@ -51,7 +63,8 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     trainer.harness=concat \
     data.train_batch_size=32 \
     data.max_prompt_length=4000 \
-    data.max_response_length=2000 \
+    data.max_response_length=18432 \
+    actor_rollout_ref.rollout.max_model_len=22528 \
     actor_rollout_ref.actor.ppo_mini_batch_size=32 \
     actor_rollout_ref.rollout.n=8 \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
@@ -63,9 +76,9 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     trainer.n_gpus_per_node=8 \
     trainer.nnodes=1 \
     trainer.critic_warmup=0 \
-    trainer.save_freq=5 \
-    trainer.test_freq=2 \
-    trainer.total_training_steps=10 \
+    trainer.save_freq=100 \
+    trainer.test_freq=20 \
+    trainer.total_training_steps=401 \
     trainer.project_name="$PROJECT_NAME" \
     trainer.experiment_name="$EXPERIMENT_NAME" \
     trainer.default_local_dir="$EXPERIMENT_DIR/verl_checkpoints" \
