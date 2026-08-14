@@ -20,10 +20,15 @@ from vagen.envs.registry import get_env_cls
 from vagen.evaluate.runner import run_eval_parallel, NORMAL_FINISH_REASONS
 from vagen.evaluate.utils.seeding_utils import generate_seeds_for_spec
 from vagen.evaluate.utils.summary_utils import write_rollouts_summary_from_dump
-DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "conf", "evaluate.yaml")
+#: There is no default config, and there never was one: this pointed at
+#: `vagen/evaluate/conf/evaluate.yaml`, a directory that has never existed in the repo, so
+#: `python -m vagen.evaluate.run_eval` with no --config raised FileNotFoundError on a path
+#: the user had no way to recognise as fictional. A config names the environments to run;
+#: there is nothing sensible to guess.
+_EXAMPLE_CONFIGS_DIR = "examples/evaluate"
 
 
-logger = logging.getLogger("view_suite.run_eval")
+logger = logging.getLogger("vagen.evaluate.run_eval")
 if not logger.handlers:
     logging.basicConfig(level=logging.INFO)
 
@@ -612,8 +617,14 @@ def _did_you_mean(cfg: DictConfig, key: str) -> str:
 
 def main() -> None:
     args = _parse_args()
-    cfg_path = args.config or DEFAULT_CONFIG_PATH
-    cfg_path = os.path.abspath(cfg_path)
+    if not args.config:
+        raise SystemExit(
+            "--config is required: an eval config names the environments to run, and there "
+            f"is nothing to guess. The shipped ones are under {_EXAMPLE_CONFIGS_DIR}/<env>/, "
+            "e.g.\n"
+            "  python -m vagen.evaluate.run_eval --config examples/evaluate/sokoban/config.yaml"
+        )
+    cfg_path = os.path.abspath(args.config)
     if not os.path.exists(cfg_path):
         raise FileNotFoundError(f"Config file not found: {cfg_path}")
 

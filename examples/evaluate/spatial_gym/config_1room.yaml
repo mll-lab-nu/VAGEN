@@ -7,7 +7,7 @@ envs:
   - name: SpatialGym
     n_envs: 4
     tag_id: spatial_gym_1room
-  # ★ Held-out rooms only. The seed here is an INDEX into a fixed dataset (`run{seed:02d}`),
+    # ★ Held-out rooms only. The seed here is an INDEX into a fixed dataset (`run{seed:02d}`),
     # not a generator seed, and the dataset has exactly 20 rooms: train takes 0-15 and
     # validation 16-19 (examples/train/spatial_gym/{train,val}_spatial_gym_vision.yaml). So
     # the `seed: [0, 19, 1]` this file used to carry scored a trained checkpoint on the

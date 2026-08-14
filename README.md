@@ -159,7 +159,7 @@ VAGEN currently supports PPO / GRPO with three multi-turn training paradigms:
 ```bash
 # Qwen/Qwen2.5-VL-3B-Instruct
 cd VAGEN
-bash examples/train/sokoban/train_ppo_qwen25vl3b.sh
+bash examples/train/sokoban/train_default_gae_qwen25vl3b.sh
 ```
 
 ```bash
@@ -218,6 +218,20 @@ override:
 bash examples/evaluate/sokoban/vllm/eval_qwen25_vl_3b.sh 'envs.0.harness=no_concat'
 ```
 
+Every environment ships a vLLM launcher:
+
+| environment | launcher |
+|---|---|
+| Sokoban | `examples/evaluate/sokoban/vllm/eval_qwen25_vl_3b.sh` |
+| FrozenLake | `examples/evaluate/frozenlake/vllm/eval_qwen25_vl_3b.sh` |
+| Navigation | `examples/evaluate/navigation/vllm/eval_qwen25_vl_7b.sh` |
+| PrimitiveSkill | `examples/evaluate/primitive_skill/vllm/eval_qwen25_vl_3b.sh` |
+| SpatialGym | `examples/evaluate/spatial_gym/vllm/eval_qwen25_vl_3b.sh` |
+
+Navigation and PrimitiveSkill also need their own environment server running
+(`python -m vagen.envs.<env>.serve --port 8000`); the launcher checks and says so.
+SpatialGym needs its room dataset — same, see `vagen/envs/spatial_gym/README.md`.
+
 ```bash
 cd VAGEN
 # Against any OpenAI-compatible endpoint already running (set OPENAI_API_KEY first --
@@ -274,7 +288,7 @@ You can follow the Sokoban examples as templates:
 
 Write your training script based on:
 
-* [`examples/train/sokoban/train_ppo_qwen25vl3b.sh`](examples/train/sokoban/train_ppo_qwen25vl3b.sh)
+* [`examples/train/sokoban/train_default_gae_qwen25vl3b.sh`](examples/train/sokoban/train_default_gae_qwen25vl3b.sh)
 
 
 ## More Customization

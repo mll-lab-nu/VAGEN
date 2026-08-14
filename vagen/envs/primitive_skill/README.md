@@ -60,7 +60,7 @@ python -m vagen.envs.primitive_skill.serve
 
 # Terminal 2: run training
 cd VAGEN
-bash examples/train/primitive_skill/train_ppo_qwen25vl3b.sh
+bash examples/train/primitive_skill/train_default_gae_qwen25vl3b.sh
 ```
 
 ## Prompt Formats

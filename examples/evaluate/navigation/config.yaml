@@ -27,12 +27,16 @@ envs:
     tag_id: navigation_base
     seed: [0, 59, 1]
     max_turns: 10
-    # ★ Both from val_navigation.yaml. Without response_length_per_turn the client falls
-    # through to chat_config.max_tokens (1024), i.e. twice what the policy was trained to
-    # write in a turn -- a checkpoint gets room here that it never had while learning, so
-    # the number this reports is not the number the training curve was tracking.
+    # ★ From val_navigation.yaml:13. Without it the client falls through to
+    # chat_config.max_tokens (1024), i.e. twice what the policy was trained to write in a
+    # turn -- a checkpoint gets room here that it never had while learning, so the number
+    # this reports is not the number the training curve was tracking.
+    #
+    # max_env_response_per_turn is deliberately NOT set, matching val_navigation.yaml:1-4:
+    # navigation renders on a remote AI2-THOR server and a frame's token cost is a property
+    # of that server's settings, so there is no number this repo can honestly state. Unset,
+    # both sides take DEFAULT_MAX_ENV_RESPONSE, which is the agreement that matters.
     response_length_per_turn: 512
-    max_env_response_per_turn: 2048
     config:
       base_urls: "http://localhost:8000"
       timeout: 120
@@ -50,12 +54,16 @@ envs:
     tag_id: navigation_common_sense
     seed: [0, 59, 1]
     max_turns: 10
-    # ★ Both from val_navigation.yaml. Without response_length_per_turn the client falls
-    # through to chat_config.max_tokens (1024), i.e. twice what the policy was trained to
-    # write in a turn -- a checkpoint gets room here that it never had while learning, so
-    # the number this reports is not the number the training curve was tracking.
+    # ★ From val_navigation.yaml:13. Without it the client falls through to
+    # chat_config.max_tokens (1024), i.e. twice what the policy was trained to write in a
+    # turn -- a checkpoint gets room here that it never had while learning, so the number
+    # this reports is not the number the training curve was tracking.
+    #
+    # max_env_response_per_turn is deliberately NOT set, matching val_navigation.yaml:1-4:
+    # navigation renders on a remote AI2-THOR server and a frame's token cost is a property
+    # of that server's settings, so there is no number this repo can honestly state. Unset,
+    # both sides take DEFAULT_MAX_ENV_RESPONSE, which is the agreement that matters.
     response_length_per_turn: 512
-    max_env_response_per_turn: 2048
     config:
       base_urls: "http://localhost:8000"
       timeout: 120
@@ -73,12 +81,16 @@ envs:
     tag_id: navigation_long_horizon
     seed: [0, 59, 1]
     max_turns: 10
-    # ★ Both from val_navigation.yaml. Without response_length_per_turn the client falls
-    # through to chat_config.max_tokens (1024), i.e. twice what the policy was trained to
-    # write in a turn -- a checkpoint gets room here that it never had while learning, so
-    # the number this reports is not the number the training curve was tracking.
+    # ★ From val_navigation.yaml:13. Without it the client falls through to
+    # chat_config.max_tokens (1024), i.e. twice what the policy was trained to write in a
+    # turn -- a checkpoint gets room here that it never had while learning, so the number
+    # this reports is not the number the training curve was tracking.
+    #
+    # max_env_response_per_turn is deliberately NOT set, matching val_navigation.yaml:1-4:
+    # navigation renders on a remote AI2-THOR server and a frame's token cost is a property
+    # of that server's settings, so there is no number this repo can honestly state. Unset,
+    # both sides take DEFAULT_MAX_ENV_RESPONSE, which is the agreement that matters.
     response_length_per_turn: 512
-    max_env_response_per_turn: 2048
     config:
       base_urls: "http://localhost:8000"
       timeout: 120

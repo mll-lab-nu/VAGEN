@@ -17,7 +17,7 @@ try:
 except Exception:
     write_rollouts_summary_from_dump = None  # type: ignore
 
-logger = logging.getLogger("view_suite.runner")
+logger = logging.getLogger("vagen.evaluate.runner")
 
 
 def _safe_read_json(p: Path) -> Optional[Dict[str, Any]]:
