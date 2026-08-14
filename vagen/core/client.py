@@ -131,7 +131,8 @@ class InferenceClient(ABC):
         # conversation -- so measuring separately would both cost twice and ship every
         # frame twice.
         opening = conversation.prompt_len is None
-        context = self._fit_context(self.encode(messages), opening=opening)
+        messages = self._fit_messages(messages, opening=opening)
+        context = self.encode(messages)
         conversation.add_context(context)
 
         output = await self._generate_nonempty(conversation, **kwargs)
@@ -225,51 +226,84 @@ class InferenceClient(ABC):
         return new_id
 
     # ------------------------------------------------------------------ reading
-    def _fit_context(self, context: list[int], *, opening: bool) -> list[int]:
-        """Cut an over-large context down to what this mode has room for.
+    def _fit_messages(self, messages: list, *, opening: bool) -> list:
+        """Shrink an over-large observation to what this mode has room for.
 
-        ``max_env_response_per_turn`` is a ceiling on what the environment may hand back
-        in one turn, and this is where it becomes true rather than merely declared. An
-        observation over it used to raise; it is cut now. The ceiling exists so that
-        ``T*g + (T-1)*E`` bounds an episode, and a bound that kills the rollout when an
-        environment exceeds it does not bound anything -- it moves the failure. One
-        oversized observation should cost its own tail, not the whole episode.
+        ``max_env_response_per_turn`` is a ceiling on what the environment may hand back in
+        one turn, and this is where it becomes true rather than merely declared. An
+        observation over it is cut; the ceiling exists so that an episode is bounded, and a
+        bound that kills the rollout when an environment exceeds it does not bound
+        anything, it moves the failure.
 
-        ★ Only observations. An **opening** still raises, because it is the system prompt
-        plus the first observation (plus a summary, under compaction) and the system
-        prompt is not something the environment returned. Cutting it would truncate the
-        instructions identically on every episode of the run and train on the remainder --
-        a config error laundered into silently degraded data. An opening that does not fit
-        means the prompt region is too small, which no cut repairs.
+        ★ The cut is on the message TEXT, before rendering -- not on the rendered token
+        span. Cutting the span is the obvious implementation and it is wrong: ``render``
+        tokenizes with ``add_generation_prompt=True``, so the span ends
+        ``<|im_end|>\n<|im_start|>assistant\n``, and a head-keeping cut throws that away
+        first. The engine is then handed a prompt that stops mid-observation with no role
+        boundary, the model continues the user's sentence, and ``add_response`` records
+        those tokens at mask 1 and hands them to ``env.step`` as an action. Trimming the
+        text and re-rendering cannot produce a malformed turn, because the template builds
+        the boundary either way.
 
-        Loud either way. A cut observation is a real loss of information and identical on
-        every episode, so it is exactly the kind of thing that goes unnoticed for a week;
-        the warning names the knob and fires once per client rather than once per turn.
+        ★ Only observations. An **opening** still raises: it is the system prompt plus the
+        first observation, and cutting it would truncate the instructions identically on
+        every episode of the run and train on the remainder -- a config error laundered
+        into silently degraded data. An opening that does not fit means the prompt region
+        is too small, which no cut repairs.
         """
         limit = self.opening_limit if opening else self.continuation_limit
-        if limit is None or len(context) <= limit:
-            return context
+        if limit is None:
+            return messages
+        size = self.measure(messages)
+        if size <= limit:
+            return messages
         if opening:
-            self._check_context(context, opening=True)
+            self._check_context([0] * size, opening=True)
 
-        kept = self.fit_context(context, limit)
+        trimmed, final = self._shrink(messages, limit)
         if not self._warned_truncating_context:
             self._warned_truncating_context = True
             logger.warning(
                 "an observation came to %d tokens, over the %d this mode has room for; "
-                "cut to %d, keeping any image whole. Image placeholders are counted "
+                "its text was cut to bring it to %d. Image placeholders are counted "
                 "expanded, as the model sees them. Set max_env_response_per_turn to what "
                 "the environment actually returns, shrink the observation (fewer or "
                 "smaller frames, shorter text), or raise the budget it has to fit inside "
-                "-- see vagen/harness/budget.py for which one. Warned once per client.",
-                len(context), limit, len(kept),
+                "-- see vagen/harness/budget.py. Warned once per client.",
+                size, limit, final,
             )
-        return kept
+        return trimmed
 
-    #: Backends that carry images override this; the base cut is a plain slice.
-    def fit_context(self, context: list[int], limit: int) -> list[int]:
-        """Cut ``context`` to ``limit``, keeping the head."""
-        return context[:limit]
+    #: How many times ``_shrink`` may re-measure. Each pass scales the text by the ratio it
+    #: is over by, so it converges fast; the cap is only there to stop a pathological
+    #: tokenizer looping forever.
+    _SHRINK_PASSES = 12
+
+    def _shrink(self, messages: list, limit: int) -> tuple[list, int]:
+        """Trim text, then whole images, until ``measure`` fits under ``limit``."""
+        work = [dict(m) for m in messages]
+        size = self.measure(work)
+        for _ in range(self._SHRINK_PASSES):
+            if size <= limit:
+                return work, size
+            # Scale by how far over we are, with a margin, rather than nibbling: a token
+            # is not a fixed number of characters and one pass per token would be O(n).
+            keep = max(0.0, (limit / size) * 0.95)
+            shrunk = [_scale_text(m, keep) for m in work]
+            if _text_len(shrunk) == _text_len(work):
+                break                      # text is exhausted; only images are left
+            work = shrunk
+            size = self.measure(work)
+        # Text alone could not do it. Drop whole images from the end -- a partial image is
+        # not an image, and the placeholder/frame counts have to stay 1:1.
+        while size > limit and any(m.get("images") for m in work):
+            for m in reversed(work):
+                if m.get("images"):
+                    m["images"] = list(m["images"])[:-1]
+                    m["content"] = _drop_one_image_placeholder(m.get("content", ""))
+                    break
+            size = self.measure(work)
+        return work, size
 
     def _check_context(self, context: list[int], *, opening: bool) -> None:
         """Raise if ``context`` is over the ceiling. For the cases a cut cannot repair.
@@ -335,3 +369,63 @@ class InferenceClient(ABC):
 
     def conversations(self) -> list[Conversation]:
         return list(self._conversations.values())
+
+
+#: The marker an environment puts where a frame goes. Kept in step with the frames list.
+IMAGE_PLACEHOLDER = "<image>"
+
+
+def _text_parts(content):
+    """The mutable text-bearing parts of a message's content, whatever shape it is in."""
+    if isinstance(content, str):
+        return None
+    return [p for p in content if isinstance(p, dict) and p.get("type") == "text"]
+
+
+def _text_len(messages) -> int:
+    total = 0
+    for m in messages:
+        c = m.get("content", "")
+        if isinstance(c, str):
+            total += len(c.replace(IMAGE_PLACEHOLDER, ""))
+        else:
+            total += sum(len(p.get("text", "")) for p in _text_parts(c) or ())
+    return total
+
+
+def _scale_text(message: dict, keep: float) -> dict:
+    """A copy of ``message`` with its text cut to ``keep`` of its length, head kept.
+
+    The head, because an observation leads with what changed and trails with boilerplate
+    the model has already seen T-1 times.
+    """
+    out = dict(message)
+    content = out.get("content", "")
+    if isinstance(content, str):
+        # ★ Scale the prose *between* the image placeholders, never the placeholders. A
+        # plain slice of the string deletes `<image>` markers, and then the placeholders
+        # no longer match the frames list -- the 1:1 invariant this whole path exists to
+        # preserve. Caught by test_a_cut_drops_whole_images_once_the_text_is_gone.
+        chunks = content.split(IMAGE_PLACEHOLDER)
+        out["content"] = IMAGE_PLACEHOLDER.join(c[: int(len(c) * keep)] for c in chunks)
+        return out
+    parts = []
+    for p in content:
+        if isinstance(p, dict) and p.get("type") == "text":
+            p = {**p, "text": p.get("text", "")[: int(len(p.get("text", "")) * keep)]}
+        parts.append(p)
+    out["content"] = parts
+    return out
+
+
+def _drop_one_image_placeholder(content):
+    """Remove the last image placeholder, so placeholders and frames stay 1:1."""
+    if isinstance(content, str):
+        head, sep, tail = content.rpartition(IMAGE_PLACEHOLDER)
+        return head + tail if sep else content
+    parts = list(content)
+    for i in range(len(parts) - 1, -1, -1):
+        if isinstance(parts[i], dict) and parts[i].get("type") == "image":
+            del parts[i]
+            break
+    return parts

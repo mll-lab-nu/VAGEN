@@ -9,7 +9,7 @@ defaults:
 # Before running eval, start the navigation server:
 #   python -m vagen.envs.navigation.serve --port 8000
 #
-# Each eval_set has 60 tasks. seed=[0,60,1] covers all tasks once.
+# Each eval_set has 60 tasks; seed=[0,59,1] over n_envs=60 covers each exactly once.
 
 # Where rollouts and summaries are written. Override with VAGEN_EVAL_ROOT,
 # or set fileroot here. Repo-relative by default: the old default was one

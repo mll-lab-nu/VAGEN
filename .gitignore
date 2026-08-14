@@ -61,3 +61,4 @@ nohup.out
 
 # Cluster launchers: site-specific, kept local rather than published.
 examples/slurm/
+eval_runs/

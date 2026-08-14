@@ -106,7 +106,7 @@ class GymEnvAdapter:
         unsupported = [k for k in mm if k not in ("<image>",) and mm.get(k)]
         if unsupported:
             raise NotImplementedError(
-                f"environment {self.name!r} returned {unsupported} in multi_modal_input; "
+                f"environment {self.env_name!r} returned {unsupported} in multi_modal_input; "
                 f"only '<image>' is carried into training. Supporting another modality "
                 f"means lifting it here and adding it to multi_modal_data in _outputs."
             )

@@ -1,3 +1,8 @@
+# ★ The eval seeds are disjoint from BOTH the train and val ranges in
+# examples/train/, because the same seed is the same instance. They used to start at 0:
+# frozenlake's eval overlapped training on 127 of 128 seeds and primitive_skill's on all
+# 16, so a fine-tuned checkpoint's "eval" number was its training-set accuracy. 20000+ is
+# above every range those configs use.
 # ★ The seed range is INCLUSIVE and the third element is an occurrence limit, not a step.
 # With limit 1 the loader does `rng.sample(range(min, max+1), n_envs)`, so n_envs must equal
 # max-min+1 or a task is dropped at random on every run -- and, where the env indexes its
@@ -15,9 +20,14 @@ envs:
   - name: Sokoban
     n_envs: 128
     tag_id: sokoban_test
-    seed: [10000, 10127, 1]
+    seed: [20000, 20127, 1]
     split: test
     max_turns: 5
+    # ★ Both from val_sokoban_vision.yaml. Without response_length_per_turn the
+    # client falls through to chat_config.max_tokens (1024), i.e. twice what the
+    # policy was trained to write in a turn.
+    response_length_per_turn: 512
+    max_env_response_per_turn: 256
     config:
       dim_room: [6, 6]
       max_steps: 100
