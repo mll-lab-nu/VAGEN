@@ -77,12 +77,19 @@ backends:
 | `name` | str | Registered environment class (e.g. `FrozenLake`, `Sokoban`, `RemoteEnv`, `SpatialGym`) |
 | `n_envs` | int | Number of episodes to run |
 | `tag_id` | int/str | Output subdirectory name: `tag_{tag_id}/` |
-| `seed` | list | `[start, end, step]` to generate a range, or explicit list of seeds |
+| `seed` | list | `[base]`, `[min, max]`, or `[min, max, occurrence-limit]`. **Inclusive**, and the third element is a per-value cap, *not* a step. Explicit seeds go in `seed_list` |
+| `seed_list` | list | Explicit seeds, at least `n_envs` of them; overrides `seed` |
 | `max_turns` | int | Max agent–env turns per episode |
 | `split` | str | Dataset split identifier (default: `"default"`) |
 | `config` | dict | Kwargs passed to the environment constructor |
-| `chat_config` | dict | Kwargs passed to the LLM completion call (temperature, max_tokens, etc.) |
-| `harness` | bool | `true`: send full message history; `false`: only system + last turn (default: `true`) |
+| `chat_config` | dict | Kwargs passed to the LLM completion call (temperature, etc.). `max_tokens` is clamped to `response_length_per_turn` when that is set |
+| `harness` | str | Context policy: `concat` (default) \| `no_concat` \| `compact`, a registered name, or an import path `module:Class`. Any `BaseHarness` subclass works |
+| `response_length_per_turn` | int | Hard cap on one generation; becomes the call's `max_tokens` |
+| `max_response_length` | int | The response region a conversation must fit. Optional — unset, there is no accounting |
+| `max_env_response_per_turn` | int | Ceiling on one observation; over it the text is cut. Default 2048 |
+| `compact_budget`, `compact_summary_budget` | int | `compact` only. Without one of these (or `max_response_length`) no trigger can fire and it runs as concat, so it is refused |
+| `tokens_per_image` | int | What one image costs when sizes are estimated. It feeds the **compaction trigger**, so a value far from your environment's real frame cost makes `compact` misbehave |
+| `tokenizer` | str | A HuggingFace id or path. Given one, text sizes are exact instead of 4 characters a token |
 
 **`default_chat_config`** — Top-level fallback: applied to any env that doesn't define its own `chat_config`.
 
@@ -93,7 +100,7 @@ backends:
 **`run`**:
 - `backend` — Which backend to use: `openai` | `azure` | `sglang` | `vllm` | `together` | `claude` | `gemini` | `openai_responses` | `azure_responses`
 - `max_concurrent_jobs` — Episode-level parallelism (how many episodes run at once)
-- `resume` — `skip_completed` skips episodes with existing successful metrics; `off` reruns everything; `force_rerun` forces rerunning all episodes regardless of existing successful metrics (overrides `skip_completed` behavior)
+- `resume` — `skip_completed` (default) skips episodes already completed **by the same model**; `force_rerun` deletes the previous rollouts and runs everything again; `off` runs everything and keeps what is there. Note YAML reads a bare `off` as the boolean `False`; both are accepted
 - `live_summary` — Refresh `summary.json` after each episode
 
 **`backends.{name}`** — Config for each backend:
@@ -108,13 +115,13 @@ backends:
 dump_dir/
 └── tag_{tag_id}/
     ├── summary.json                    # aggregated metrics
-    └── {env_name}_seed_{seed}/
+    └── {YYYYmmdd-HHMMSS}-{uuid8}/
         ├── metrics.json                # per-episode results (success, reward, finish_reason)
         ├── messages.json               # full conversation history
         ├── assistant_texts.json        # model replies only
         ├── transcript.txt              # human-readable conversation
         └── images/
-            └── turn_00_00.png          # observation images per turn
+            └── turn_01_01.png          # 1-indexed; turn 01 is the reset observation
 ```
 
 ## 2. Scripts

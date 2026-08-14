@@ -129,8 +129,15 @@ it at `VAGEN/verl` (the submodule) or `../verl` (a sibling checkout), in that or
 `VERL=/path/to/verl` to override.
 </details>
 
-Some environments need their own setup: [spatial_gym](vagen/envs/spatial_gym/README.md)
-(dataset download), [navigation](vagen/envs/navigation/README.md) (AI2-THOR),
+**Environments in this repository** — `vagen/configs/env_registry.yaml` is the list that
+matters: `Sokoban`, `FrozenLake`, `SpatialGym`, `PrimitiveSkill` (ManiSkill), and
+`RemoteEnv`, which is how `Navigation` runs. The five benchmarks pictured above are the
+paper's; SVG is not part of this release.
+
+Some need their own setup: [spatial_gym](vagen/envs/spatial_gym/README.md) (dataset
+download, plus `matplotlib` and `scipy` from its requirements.txt — without them the
+registry drops the environment and you get `KeyError: Unknown env name: SpatialGym`),
+[navigation](vagen/envs/navigation/README.md) (AI2-THOR),
 [primitive_skill](vagen/envs/primitive_skill/README.md) (ManiSkill).
 
 
@@ -149,7 +156,7 @@ bash examples/train/sokoban/train_ppo_qwen25vl3b.sh
 
 ```bash
 # Qwen/Qwen3-VL-4B-Instruct
-# needs transformers>=4.57 (pinned in setup.py) for the qwen3_vl model type
+# needs transformers>=5.2.0 (pinned in setup.py; the engine extras pin ==5.12.1)
 cd VAGEN
 bash examples/train/sokoban/train_grpo_qwen3vl4b.sh
 ```
@@ -333,7 +340,7 @@ If you find our framework and paper useful, we appreciate it if you could cite o
 ```bibtex
 @inproceedings{wang2025vagen,
   title={VAGEN: Reinforcing World Model Reasoning for Multi-Turn VLM Agents},
-  author={Kangrui Wang and Pingyue Zhang and Zihan Wang and Yaning Gao and Linjie Li and Qineng Wang and Hanyang Chen and Yiping Lu and   Zhengyuan Yang and Lijuan Wang and Ranjay Krishna and Jiajun Wu and Li Fei-Fei and Yejin Choi and Manling Li},
+  author={Kangrui Wang and Pingyue Zhang and Zihan Wang and Yaning Gao and Linjie Li and Qineng Wang and Hanyang Chen and Chi Wan and Yiping Lu and Zhengyuan Yang and Lijuan Wang and Ranjay Krishna and Jiajun Wu and Li Fei-Fei and Yejin Choi and Manling Li},
   booktitle={The Thirty-ninth Annual Conference on Neural Information Processing Systems},
   year={2025},
   url={https://arxiv.org/abs/2510.16907}
