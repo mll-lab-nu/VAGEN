@@ -1,16 +1,24 @@
+# ★ The seed range is INCLUSIVE and the third element is an occurrence limit, not a step.
+# With limit 1 the loader does `rng.sample(range(min, max+1), n_envs)`, so n_envs must equal
+# max-min+1 or a task is dropped at random on every run -- and, where the env indexes its
+# dataset as `seed % len(dataset)`, the extra value wraps onto task 0 and scores it twice.
+# Measured on navigation before this fix: 59 of 60 tasks evaluated, task 0 counted twice.
 defaults:
   - ../../../vagen/configs/eval_default
 
 # Before running eval, start the primitive_skill server:
 #   python -m vagen.envs.primitive_skill.serve --port 8000
 
-fileroot: ${oc.env:HOME}/projects/vagen
+# Where rollouts and summaries are written. Override with VAGEN_EVAL_ROOT,
+# or set fileroot here. Repo-relative by default: the old default was one
+# developer's home directory, which every shipped eval config inherited.
+fileroot: ${oc.env:VAGEN_EVAL_ROOT,./eval_runs}
 
 envs:
   - name: RemoteEnv
     n_envs: 16
     tag_id: primitive_skill_align_two_cube
-    seed: [0, 16, 1]
+    seed: [0, 15, 1]
     max_turns: 5
     config:
       base_urls: "http://localhost:8000"
@@ -22,7 +30,7 @@ envs:
       action_sep: "|"
       render_mode: vision
       format_reward: 0.1
-      success_reward: 10.0
+      success_reward: 1  # matches train/val; 10.0 here made the eval scale 10x the val curve's
     chat_config:
       temperature: 0
       max_tokens: 1024
@@ -31,7 +39,7 @@ envs:
   - name: RemoteEnv
     n_envs: 16
     tag_id: primitive_skill_place_two_cube
-    seed: [0, 16, 1]
+    seed: [0, 15, 1]
     max_turns: 5
     config:
       base_urls: "http://localhost:8000"
@@ -43,7 +51,7 @@ envs:
       action_sep: "|"
       render_mode: vision
       format_reward: 0.1
-      success_reward: 10.0
+      success_reward: 1  # matches train/val; 10.0 here made the eval scale 10x the val curve's
     chat_config:
       temperature: 0
       max_tokens: 1024
@@ -52,7 +60,7 @@ envs:
   - name: RemoteEnv
     n_envs: 16
     tag_id: primitive_skill_stack_three_cube
-    seed: [0, 16, 1]
+    seed: [0, 15, 1]
     max_turns: 5
     config:
       base_urls: "http://localhost:8000"
@@ -64,7 +72,7 @@ envs:
       action_sep: "|"
       render_mode: vision
       format_reward: 0.1
-      success_reward: 10.0
+      success_reward: 1  # matches train/val; 10.0 here made the eval scale 10x the val curve's
     chat_config:
       temperature: 0
       max_tokens: 1024
@@ -73,7 +81,7 @@ envs:
   - name: RemoteEnv
     n_envs: 16
     tag_id: primitive_skill_put_apple_in_drawer
-    seed: [0, 16, 1]
+    seed: [0, 15, 1]
     max_turns: 5
     config:
       base_urls: "http://localhost:8000"
@@ -85,7 +93,7 @@ envs:
       action_sep: "|"
       render_mode: vision
       format_reward: 0.1
-      success_reward: 10.0
+      success_reward: 1  # matches train/val; 10.0 here made the eval scale 10x the val curve's
     chat_config:
       temperature: 0
       max_tokens: 1024

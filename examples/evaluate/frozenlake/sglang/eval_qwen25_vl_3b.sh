@@ -11,10 +11,10 @@ mkdir -p "$LOG_DIR"
 
 # ---------- Model / Server Config ----------
 MODEL_NAME="${MODEL_NAME:-"qwen_25_vl_3b"}"
-MODEL_PATH="${QWEN25_VL_7B_PATH:-"Qwen/Qwen2.5-VL-3B-Instruct"}"
-DP_SIZE="${QWEN25_VL_7B_DP:-1}"
-TP_SIZE="${QWEN25_VL_7B_TP:-1}"
-MEM_FRACTION="${QWEN25_VL_7B_MEM:-0.80}"
+MODEL_PATH="${QWEN25_VL_3B_PATH:-"Qwen/Qwen2.5-VL-3B-Instruct"}"
+DP_SIZE="${QWEN25_VL_3B_DP:-1}"
+TP_SIZE="${QWEN25_VL_3B_TP:-1}"
+MEM_FRACTION="${QWEN25_VL_3B_MEM:-0.80}"
 
 DUMP_DIR="${DUMP_DIR:-"$fileroot/rollouts/${MODEL_NAME}"}"
 mkdir -p "$DUMP_DIR"
@@ -51,6 +51,7 @@ wait_for_server
 python -m vagen.evaluate.run_eval --config "${CONFIG}" \
   run.backend=sglang \
   backends.sglang.base_url="http://127.0.0.1:${PORT}/v1" \
+  backends.sglang.model="${MODEL_PATH}" \
   experiment.dump_dir="${DUMP_DIR}" \
   fileroot="${fileroot}" \
   "$@" \

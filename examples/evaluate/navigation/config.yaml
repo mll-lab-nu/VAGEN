@@ -1,3 +1,8 @@
+# ★ The seed range is INCLUSIVE and the third element is an occurrence limit, not a step.
+# With limit 1 the loader does `rng.sample(range(min, max+1), n_envs)`, so n_envs must equal
+# max-min+1 or a task is dropped at random on every run -- and, where the env indexes its
+# dataset as `seed % len(dataset)`, the extra value wraps onto task 0 and scores it twice.
+# Measured on navigation before this fix: 59 of 60 tasks evaluated, task 0 counted twice.
 defaults:
   - ../../../vagen/configs/eval_default
 
@@ -6,13 +11,16 @@ defaults:
 #
 # Each eval_set has 60 tasks. seed=[0,60,1] covers all tasks once.
 
-fileroot: ${oc.env:HOME}/projects/vagen
+# Where rollouts and summaries are written. Override with VAGEN_EVAL_ROOT,
+# or set fileroot here. Repo-relative by default: the old default was one
+# developer's home directory, which every shipped eval config inherited.
+fileroot: ${oc.env:VAGEN_EVAL_ROOT,./eval_runs}
 
 envs:
   - name: RemoteEnv
     n_envs: 60
     tag_id: navigation_base
-    seed: [0, 60, 1]
+    seed: [0, 59, 1]
     max_turns: 10
     config:
       base_urls: "http://localhost:8000"
@@ -29,7 +37,7 @@ envs:
   - name: RemoteEnv
     n_envs: 60
     tag_id: navigation_common_sense
-    seed: [0, 60, 1]
+    seed: [0, 59, 1]
     max_turns: 10
     config:
       base_urls: "http://localhost:8000"
@@ -46,7 +54,7 @@ envs:
   - name: RemoteEnv
     n_envs: 60
     tag_id: navigation_long_horizon
-    seed: [0, 60, 1]
+    seed: [0, 59, 1]
     max_turns: 10
     config:
       base_urls: "http://localhost:8000"
