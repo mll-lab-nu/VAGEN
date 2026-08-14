@@ -326,14 +326,18 @@ def _collect_completed_runs(dump_dir: Optional[str]) -> Dict[Tuple[str, int, Uni
                 # Keep tag_id as original type (int or str)
                 if not isinstance(tag_id, (int, str)):
                     tag_id = str(tag_id)
-                key = (str(env_name), int(seed), tag_id)
+                key = (str(env_name), int(seed), tag_id, str(metrics.get("model") or ""))
             except (TypeError, ValueError):
                 continue
             completed[key] = "done"
     return completed
 
 
-def _job_resume_key(data: Dict[str, Any]) -> Optional[Tuple[str, int, Union[int, str]]]:
+def _job_resume_key(data: Dict[str, Any]) -> Optional[Tuple]:
+    """★ The model is part of the key. Without it, evaluating a second checkpoint into a
+    dump directory the first one used skipped every episode and reprinted the first
+    model's success_rate under the second model's name -- exit 0, nothing in the output
+    saying so. A rollout produced by a different model answers a different question."""
     env_name = data.get("env_name")
     seed = data.get("seed")
     tag_id = data.get("tag_id")
@@ -343,7 +347,7 @@ def _job_resume_key(data: Dict[str, Any]) -> Optional[Tuple[str, int, Union[int,
         # Keep tag_id as original type (int or str)
         if not isinstance(tag_id, (int, str)):
             tag_id = str(tag_id)
-        return (str(env_name), int(seed), tag_id)
+        return (str(env_name), int(seed), tag_id, str(data.get("resume_model") or ""))
     except (TypeError, ValueError):
         return None
 
@@ -522,12 +526,26 @@ def main() -> None:
     print(f"Prepared {len(jobs)} jobs from {len(env_specs)} environment specs.")
 
     dump_dir = _resolve_dump_dir(cfg, base_dir)
+    if resume_mode == "force_rerun" and dump_dir and os.path.isdir(dump_dir):
+        # ★ Clear the old rollouts, or they are summarised alongside the new ones. Nothing
+        # keys a rollout directory to a seed -- they are {timestamp}-{uuid8} -- and
+        # write_rollouts_summary_from_dump scans every directory holding a metrics.json.
+        # Measured: a 2-episode force_rerun reported n_episodes=4 with seeds [1,1,2,2] and
+        # a success_rate averaged over both runs, indistinguishable from a clean one.
+        import shutil
+        for tag in sorted(os.listdir(dump_dir)):
+            path = os.path.join(dump_dir, tag)
+            if os.path.isdir(path) and tag.startswith("tag_"):
+                logger.info("force_rerun: clearing previous rollouts under %s", path)
+                shutil.rmtree(path)
     if resume_mode != "off":
         logger.info("Resume mode=%s; pruning error rollouts under %s", resume_mode, dump_dir)
         _purge_error_rollouts(dump_dir, resume_mode)
         _refresh_tag_summaries(dump_dir)
 
     completed_index: Dict[Tuple[str, int, int], str] = {}
+    # ★ Resume compares the model too. See metrics.json's "model": a rollout produced by a
+    # different checkpoint answers a different question, and reusing it is silent.
     if resume_mode == "skip_completed":
         completed_index = _collect_completed_runs(dump_dir)
         logger.info("Resume: detected %d completed rollouts to skip", len(completed_index))
@@ -536,6 +554,7 @@ def main() -> None:
         pending_jobs = []
         skipped = 0
         for job in jobs:
+            job["data"]["resume_model"] = str(model or "")
             key = _job_resume_key(job["data"])
             if key and completed_index.get(key) == "done":
                 skipped += 1
