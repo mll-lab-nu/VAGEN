@@ -1,3 +1,9 @@
+# ★ max_env_response_per_turn is deliberately NOT declared here. Navigation runs against a
+# remote AI2-THOR server, so one observation's token cost depends on that server's render
+# settings rather than on anything in this repo -- and an undeclared ceiling that is merely
+# plausible is worse than none, because an observation over it is now truncated rather than
+# refused. Measure it against your own server and declare it; that collapses the
+# episode-size warning this config otherwise raises at startup.
 envs:
   - name: RemoteEnv
     n_envs: 1200

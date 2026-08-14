@@ -1,3 +1,9 @@
+# ★ max_env_response_per_turn is deliberately NOT declared here. Navigation runs against a
+# remote AI2-THOR server, so one observation's token cost depends on that server's render
+# settings rather than on anything in this repo -- and an undeclared ceiling that is merely
+# plausible is worse than none, because an observation over it is now truncated rather than
+# refused. Measure it against your own server and declare it; that collapses the
+# episode-size warning this config otherwise raises at startup.
 # The whole `base` set, once each. It was [30,60,1] over n_envs=30, which is wrong twice:
 # `range(30,61)` holds 31 values and 30 are sampled, so one task was dropped at random on
 # every run, and seed 30 was also in the train yaml's range -- the same task on both sides.
