@@ -92,7 +92,7 @@ def resolve_reward_placement(config, configured: str = "auto") -> str:
     visible in a curve, so the estimator decides and ``placement`` exists to be overridden
     rather than to be set.
 
-    ``auto`` is the default for the same reason ``lam_low`` has none on ``bi_level_gae_varlam``:
+    ``auto`` is the default for the same reason a two-lambda estimator gives ``lam_low`` none:
     a value that must be kept in step with another setting by hand is one that eventually
     disagrees with it, silently.
     """

@@ -6,7 +6,7 @@ this repo's own history (commit 4076507), and the vectorised implementation has 
 with it token for token. Everything else here pins a property that would otherwise only
 be visible by reading that loop.
 
-Why a reproduction at all: ``bi_level_gae_varlam`` is this algorithm with three corrections
+Why a reproduction at all: this is the algorithm as released, three corrections behind
 (anchor at the turn's first token, add rather than overwrite, no intra-turn reset). Those
 corrections are worth what they measure, and they can only be measured against the thing
 they were made to.
@@ -200,7 +200,7 @@ def test_high_level_gamma_follows_gamma_when_unset():
 def test_a_turns_last_token_gets_the_turn_advantage_and_not_its_own_delta():
     """★ The overwrite. At a turn end the released code zeroes both the bootstrap and the
     accumulator, so ``delta = (A_turn + V) - V = A_turn`` exactly -- that token's own
-    delta is discarded rather than added. ``bi_level_gae_varlam`` adds instead, which is the
+    delta is discarded rather than added. A corrected variant would add it, which is the
     single line the two differ by at ``lam_low=1``.
 
     Checked on `returns`, which is unwhitened: ``return = A_turn + V(eos)`` is the turn's
@@ -240,12 +240,10 @@ def test_each_turns_inner_chain_is_independent():
     assert before[-1] != pytest.approx(after[-1]), "the perturbed turn did not move at all"
 
 
-def test_it_is_not_the_corrected_estimator():
-    """The two must actually differ on the same input, or the comparison the sweep is
-    running has nothing to measure."""
-    paper, _, mask = _call("bi_level_gae", _concat(), gamma=1.0, lam=0.95, high_level_gamma=1.0)
-    fixed, _, _ = _call("bi_level_gae_varlam", _concat(), gamma=1.0, lam=0.95, lam_low=1.0)
-    assert _at(paper, mask) != pytest.approx(_at(fixed, mask))
+# `test_it_is_not_the_corrected_estimator` stood here, asserting that this estimator and
+# `bi_level_gae_varlam` differ on the same input. The variable-lambda estimator has been
+# removed, so there is nothing left to differ from; what this algorithm IS is pinned by the
+# hand-computed recursions above, which is the stronger statement anyway.
 
 
 def test_the_two_layouts_agree():
@@ -266,8 +264,8 @@ def test_registry_declarations():
     assert "bi_level_gae" in TRAJECTORY_ESTIMATORS
     assert needs_critic("bi_level_gae") is True
     assert needs_value_mask("bi_level_gae") is False
-    # ★ Two explicit gammas, so unlike bi_level_gae_varlam it is well-defined away from 1.0 and
-    # must NOT be caught by the single-clock startup assertion.
+    # ★ Two explicit gammas, so it is well-defined away from 1.0 and must NOT be caught by
+    # the single-clock startup assertion.
     assert "bi_level_gae" not in UNDISCOUNTED_ESTIMATORS
 
 

@@ -128,7 +128,7 @@ async def test_everything_a_turn_earned_lands_on_its_last_token():
     that earned it.
 
     This was per-span, and per-span is the better placement for ``token_level_gae`` and
-    the variable-lambda ``bi_level_gae_varlam``. It is the wrong one for the paper's nested
+    a variable-lambda estimator. It is the wrong one for the paper's nested
     Bi-Level GAE, whose outer chain has a single reward slot per turn: a score sitting
     mid-turn is credited by the inner token chain and then again by the outer one
     (measured bias 0.177 against an exact policy gradient). The estimator and the

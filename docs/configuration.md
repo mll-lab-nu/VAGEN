@@ -90,27 +90,28 @@ turn.
 
 | estimator | scores | extra parameter |
 |---|---|---|
-| `default_gae` | the trajectory, rows stitched back together | — |
-| `token_level_gae` | per token, across the trajectory | — |
+| `default_gae` | the trajectory, rows stitched back together — **the default** | — |
+| `bi_level_gae` | turn-level outer chain, token-level inner — the published VAGEN algorithm | `+algorithm.high_level_gamma` (optional; defaults to `algorithm.gamma`) |
 | `turn_level_gae` | per turn | — |
-| `bi_level_gae` | turn-level outer chain, token-level inner | `+algorithm.high_level_gamma` (optional; defaults to `algorithm.gamma`) |
-| `bi_level_gae_varlam` | as above with a separate inner λ | `+algorithm.lam_low` (**required**) |
+| `token_level_gae` | per token, across the trajectory | — |
 | `trajectory_grpo` | group-relative, over trajectories | — |
 | verl's `gae`, `grpo`, … | one row — **`concat` only** | — |
 
-Neither `+`-prefixed parameter appears in a config file, so both go on the command line.
-Only `lam_low` is required — `high_level_gamma` falls back to `algorithm.gamma` with a
-warning.
+`high_level_gamma` does not appear in a config file, so it goes on the command line, and it
+falls back to `algorithm.gamma` with a warning if omitted.
 
 ```bash
-algorithm.adv_estimator=bi_level_gae        +algorithm.high_level_gamma=0.9
-algorithm.adv_estimator=bi_level_gae_varlam +algorithm.lam_low=0.5
+algorithm.adv_estimator=bi_level_gae +algorithm.high_level_gamma=0.9
 ```
 
-!!! danger "Two more startup refusals"
-    All but `trajectory_grpo` need a critic and refuse without `critic.enable=True`. And
-    `bi_level_gae_varlam` additionally refuses unless `algorithm.gamma=1.0`. Both are
-    `ValueError`s at startup, the same class of trap as the harness rule above.
+!!! danger "One more startup refusal"
+    All but `trajectory_grpo` need a critic and refuse without `critic.enable=True` — a
+    `ValueError` at startup, the same class of trap as the harness rule above.
+
+    An estimator may also declare `undiscounted=True` at registration, which refuses the
+    run unless `algorithm.gamma=1.0`. None of the shipped estimators does; it is there for
+    a custom one that mixes a per-token and a per-turn clock, where the two only agree at
+    1.0 and the disagreement otherwise looks like noise rather than a bug.
 
 ---
 

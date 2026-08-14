@@ -10,7 +10,7 @@ Two rewards, independently switchable:
 ★ Both scores are paid on the turn's **last** token, together with the outcome and the
 format bonus. This was per-span -- each score on the last token of the section that earned
 it, a signal *within* a turn -- which is the better placement for ``token_level_gae`` and
-the variable-lambda ``bi_level_gae_varlam``, and the wrong one for the paper's nested Bi-Level
+a variable-lambda estimator, and the wrong one for the paper's nested Bi-Level
 GAE, whose outer chain has a single reward slot per turn. Placement and advantage
 estimator are one choice, not two; ``_place`` has the measurements. The per-section
 breakdown moves to ``info`` rather than disappearing.
@@ -231,7 +231,7 @@ class StateRewardWrapper:
             Each section's score on the last token of the section that earned it -- on the
             last, because a span's score is a property of the whole span, so it is
             determined at the step that completes it. Better for ``token_level_gae`` and
-            the variable-lambda ``bi_level_gae_varlam``: measured -28% variance at lam 0.9 and
+            a variable-lambda estimator: measured -28% variance at lam 0.9 and
             -45% at 0.8, and exactly invariant once the critic is self-consistent, because
             a lumped score otherwise has to be *remembered* by ``V`` for the rest of the
             turn.

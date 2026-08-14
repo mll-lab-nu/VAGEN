@@ -236,7 +236,7 @@ def test_declares_what_the_trainer_needs_to_know():
 
 
 def test_is_not_a_two_clock_estimator():
-    """★ Unlike ``bi_level_gae_varlam`` this runs one recursion on one clock, so ``gamma < 1``
+    """★ This runs one recursion on one clock, so ``gamma < 1``
     is merely a choice rather than undefined -- and the startup assertion must not fire.
     (It is a bad choice: at gamma 0.99 a 4000-token episode delivers 2e-18 of its reward
     to the first token. That is a documented caveat, not something to refuse.)"""
