@@ -242,10 +242,19 @@ class GymLoop(VagenGymAgentLoopBase):
         per_turn = min(int(kwargs.get("response_length_per_turn") or self.response_length), self.response_length)
         harness, budgets = self._build_harness(
             per_turn, max_turns,
-            env_response=kwargs.get("env_response_length"),
+            env_response=kwargs.get("max_env_response_per_turn") or kwargs.get("env_response_length"),
             per_turn_configured=bool(kwargs.get("response_length_per_turn")),
         )
         opening_limit, continuation_limit = context_limits(self._harness_mode(), budgets)
+        # An extra sampling key rather than anything this layer interprets. verl builds its
+        # sampling dict from a fixed list of fields and has no pass-through for the rest,
+        # but the engine call is `SamplingParams(max_tokens=..., **sampling_params)` -- so
+        # a key added here reaches vLLM untouched, and nothing in VAGEN has to know what a
+        # reasoning block is. See EnvSpec.thinking_token_budget for why it is not the same
+        # lever as response_length_per_turn.
+        if kwargs.get("thinking_token_budget"):
+            sampling_params = {**sampling_params,
+                               "thinking_token_budget": int(kwargs["thinking_token_budget"])}
         client = VerlClient(
             self.server_manager,
             self.tokenizer,

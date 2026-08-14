@@ -98,6 +98,9 @@ class InferenceClient(ABC):
     def __init__(self):
         self._conversations: dict[str, Conversation] = {}
         self._counter = 0
+        #: One warning per client, not per turn -- an environment that overruns the
+        #: ceiling overruns it on every episode.
+        self._warned_truncating_context = False
 
     @property
     def returns_token_ids(self) -> bool:
@@ -128,8 +131,7 @@ class InferenceClient(ABC):
         # conversation -- so measuring separately would both cost twice and ship every
         # frame twice.
         opening = conversation.prompt_len is None
-        context = self.encode(messages)
-        self._check_context(context, opening=opening)
+        context = self._fit_context(self.encode(messages), opening=opening)
         conversation.add_context(context)
 
         output = await self._generate_nonempty(conversation, **kwargs)
@@ -223,7 +225,60 @@ class InferenceClient(ABC):
         return new_id
 
     # ------------------------------------------------------------------ reading
+    def _fit_context(self, context: list[int], *, opening: bool) -> list[int]:
+        """Cut an over-large context down to what this mode has room for.
+
+        ``max_env_response_per_turn`` is a ceiling on what the environment may hand back
+        in one turn, and this is where it becomes true rather than merely declared. An
+        observation over it used to raise; it is cut now. The ceiling exists so that
+        ``T*g + (T-1)*E`` bounds an episode, and a bound that kills the rollout when an
+        environment exceeds it does not bound anything -- it moves the failure. One
+        oversized observation should cost its own tail, not the whole episode.
+
+        ★ Only observations. An **opening** still raises, because it is the system prompt
+        plus the first observation (plus a summary, under compaction) and the system
+        prompt is not something the environment returned. Cutting it would truncate the
+        instructions identically on every episode of the run and train on the remainder --
+        a config error laundered into silently degraded data. An opening that does not fit
+        means the prompt region is too small, which no cut repairs.
+
+        Loud either way. A cut observation is a real loss of information and identical on
+        every episode, so it is exactly the kind of thing that goes unnoticed for a week;
+        the warning names the knob and fires once per client rather than once per turn.
+        """
+        limit = self.opening_limit if opening else self.continuation_limit
+        if limit is None or len(context) <= limit:
+            return context
+        if opening:
+            self._check_context(context, opening=True)
+
+        kept = self.fit_context(context, limit)
+        if not self._warned_truncating_context:
+            self._warned_truncating_context = True
+            logger.warning(
+                "an observation came to %d tokens, over the %d this mode has room for; "
+                "cut to %d, keeping any image whole. Image placeholders are counted "
+                "expanded, as the model sees them. Set max_env_response_per_turn to what "
+                "the environment actually returns, shrink the observation (fewer or "
+                "smaller frames, shorter text), or raise the budget it has to fit inside "
+                "-- see vagen/harness/budget.py for which one. Warned once per client.",
+                len(context), limit, len(kept),
+            )
+        return kept
+
+    #: Backends that carry images override this; the base cut is a plain slice.
+    def fit_context(self, context: list[int], limit: int) -> list[int]:
+        """Cut ``context`` to ``limit``, keeping the head."""
+        return context[:limit]
+
     def _check_context(self, context: list[int], *, opening: bool) -> None:
+        """Raise if ``context`` is over the ceiling. For the cases a cut cannot repair.
+
+        Two callers. An **opening** (see ``_fit_context``), and the **post-adoption**
+        re-check, which runs after the engine has already produced tokens against this
+        prompt -- cutting there would train on a sequence that was never sampled from,
+        the exact divergence ``adopt_prompt`` exists to prevent.
+        """
         limit = self.opening_limit if opening else self.continuation_limit
         if limit is None or len(context) <= limit:
             return
@@ -233,7 +288,7 @@ class InferenceClient(ABC):
         raise ContextTooLarge(
             f"{what} came to {len(context)} tokens, over the {limit} this mode has room "
             f"for. Image placeholders are counted expanded, as the model sees them. "
-            f"Set env_response_length to what the environment actually returns, shrink "
+            f"Set max_env_response_per_turn to what the environment actually returns, shrink "
             f"the observation (fewer or smaller frames, shorter text), or raise the "
             f"budget it has to fit inside -- see vagen/harness/budget.py for which one."
         )

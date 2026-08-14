@@ -336,3 +336,67 @@ def test_a_vision_token_the_policy_invented_is_refused():
     with pytest.raises(SampledVisionToken, match="generated vision token"):
         GymLoop._outputs(loop, _Client(), _Env(), _Result(),
                          {"group_idx": "g", "traj_idx": 0}, "ep", _NoCompaction())
+
+
+# ------------------------------------- the env-response ceiling cutting an observation
+#
+# `max_env_response_per_turn` cuts an oversized observation instead of refusing it, and
+# `encode` has already recorded that span's frames against the conversation by then. So
+# the cut has to un-record the frames whose placeholders it dropped. Nothing downstream
+# catches a frames list that outlives its placeholders: multi_modal_inputs is rebuilt from
+# the frames *alone*, because the token sequence is decoded with skip_special_tokens=True
+# first and every placeholder is erased. The model is simply handed a picture it was never
+# shown, and every position after it shifts.
+
+
+def _client_with(placeholders, sentinels, images):
+    from vagen.agent_loop.verl_client import VerlClient
+
+    c = VerlClient(server_manager=None, tokenizer=None, processor=None)
+    c._ph_cache = (set(placeholders), set(sentinels))
+    c._active = "c1"
+    c._conversations["c1"] = None          # only the id is read on this path
+    c._images["c1"] = list(images)
+    return c
+
+
+#: <vision_start> P P <vision_end> laid out the way a real span is.
+def _span(n_text, n_blocks, block=2, start=900, pad=901, end=902):
+    ids = [1] * n_text
+    for _ in range(n_blocks):
+        ids += [start] + [pad] * block + [end]
+    return ids
+
+
+def test_cutting_an_observation_drops_the_frames_whose_placeholders_went_with_it():
+    ids = _span(n_text=10, n_blocks=2)          # 10 text + 2 x 4 = 18 tokens
+    c = _client_with({901}, {900, 902}, ["frameA", "frameB"])
+
+    kept = c.fit_context(ids, 15)               # the cut lands inside the second picture
+
+    assert 901 not in kept[14:], "a picture was cut in half"
+    assert c._images["c1"] == ["frameA"], "the dropped picture kept its frame"
+    from vagen.utils.image_token_utils import count_placeholder_runs
+    assert count_placeholder_runs(kept, {901}) == len(c._images["c1"])
+
+
+def test_a_cut_that_takes_no_picture_leaves_every_frame_recorded():
+    ids = _span(n_text=10, n_blocks=1)          # pictures live at 10..13
+    c = _client_with({901}, {900, 902}, ["frameA"])
+
+    kept = c.fit_context(ids, 14)
+
+    assert len(kept) == 14
+    assert c._images["c1"] == ["frameA"]
+
+
+def test_frames_from_earlier_turns_are_not_touched_by_this_turns_cut():
+    """`_images` accumulates over the conversation; only the span being encoded now is at
+    risk. Trimming from the wrong end would drop the first turn's picture and leave the
+    oversized one in place."""
+    ids = _span(n_text=4, n_blocks=1)           # this turn carries one picture
+    c = _client_with({901}, {900, 902}, ["turn1", "turn2", "thisTurn"])
+
+    c.fit_context(ids, 5)                       # cuts inside this turn's picture
+
+    assert c._images["c1"] == ["turn1", "turn2"], "an earlier turn's frame was dropped"

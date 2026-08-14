@@ -32,11 +32,48 @@ class EnvSpec:
     max_turns: int = 1
     response_length_per_turn: Optional[int] = None
     # The largest a single observation from this environment may be, in tokens, after the
-    # processor has expanded any images. Left unset it is derived from the response
-    # region -- see vagen/harness/budget.py:default_env_response -- but the derivation
-    # cannot know what this environment actually returns, and the runtime error for an
-    # oversized observation says to set this. It has to be settable for that to be advice.
+    # processor has expanded any images. Left unset it falls back to
+    # vagen/harness/budget.py:DEFAULT_MAX_ENV_RESPONSE, and below that to a value derived
+    # from the response region -- but the derivation cannot know what this environment
+    # actually returns, and the runtime error for an oversized observation says to set
+    # this. It has to be settable for that to be advice.
+    #
+    # This is the environment-side twin of ``response_length_per_turn``: one bounds what
+    # the model may write in a turn, this bounds what the environment may hand back. With
+    # both set, a concat episode costs at most T*g + (T-1)*E and the compaction arithmetic
+    # is exact rather than self-consistent.
+    max_env_response_per_turn: Optional[int] = None
+    #: Deprecated spelling of ``max_env_response_per_turn``. Kept because it is what the
+    #: oversized-observation error told people to set.
     env_response_length: Optional[int] = None
+    # How many tokens the model may spend *inside* its reasoning block before the engine
+    # closes it for it. Unset, nothing is passed and behaviour is unchanged.
+    #
+    # ★ Not the same lever as ``response_length_per_turn``, and this is the whole point.
+    # ``response_length_per_turn`` is ``max_tokens`` -- a guillotine. The model is not told
+    # how much room it has, so it plans as if unbounded and is cut mid-sentence; measured
+    # on Qwen3.5, that lands the cut before ``</think>`` on 92% of turns at a 2048 cap, and
+    # a turn that never closed its reasoning has no answer to score. This instead makes the
+    # engine *force* the closing token when the budget runs out, so the model stops
+    # reasoning and answers. A bounded turn rather than a truncated one.
+    #
+    # Model-agnostic here: this is a token count, and nothing in VAGEN knows what a
+    # reasoning block looks like. The delimiters live in engine config
+    # (``rollout.engine_kwargs.vllm.reasoning_config``: either a registered
+    # ``reasoning_parser`` name or an explicit start/end string pair), which is where
+    # per-family knowledge belongs. vLLM refuses the request if this is set and that is
+    # not configured.
+    thinking_token_budget: Optional[int] = None
+
+    def __post_init__(self):
+        if self.max_env_response_per_turn is None:
+            self.max_env_response_per_turn = self.env_response_length
+        elif self.env_response_length not in (None, self.max_env_response_per_turn):
+            raise ValueError(
+                f"env spec {self.name!r} sets both max_env_response_per_turn="
+                f"{self.max_env_response_per_turn} and its old name env_response_length="
+                f"{self.env_response_length}. They are one quantity; drop the old one."
+            )
 
 @dataclass
 class EnvSpecs:
@@ -207,7 +244,8 @@ class AgenticDataset(Dataset):
                         "config": spec.config,
                         "max_turns": spec.max_turns,
                         "response_length_per_turn": spec.response_length_per_turn,
-                        "env_response_length": spec.env_response_length,
+                        "max_env_response_per_turn": spec.max_env_response_per_turn,
+                        "thinking_token_budget": spec.thinking_token_budget,
                         "data_source": data_source,
                         "agent_name":"gym_agent",
                         # verl's agent loop stores raw_prompt on every output and reads

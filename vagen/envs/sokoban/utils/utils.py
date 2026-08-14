@@ -3,47 +3,78 @@ from typing import Dict, List
 from PIL import Image
 import numpy as np
 
+# <think>...</think> then, after any amount of visible prose, <answer>...</answer>.
+#
+# ★ The opening `<think>` is optional, because on a native-thinking family the chat
+# template writes it into the *generation prompt* -- the response begins already inside
+# the block and its first tag is the closing one (see the vagen-think-token notes:
+# Qwen3.5 emits `</think>` only, Qwen2.5-VL emits both as ordinary text). Demanding the
+# opening tag makes the format unsatisfiable on exactly the models it is meant for.
+#
+# ★ The answer must come *after* `</think>`. Thinking models draft candidate answers
+# mid-reasoning -- measured on Qwen3.5, 8 of 40 truncated rambles contained an `<answer>`
+# tag inside the unclosed block. A parser that takes the first one anywhere rewards a
+# trace that never terminated, which is the opposite of the pressure this arm needs.
+#
+# ★ Split with `str.find` rather than one regex spanning both tags. The obvious pattern,
+# `(?:<think>)?(.*?)</think>(.*?)<answer>(.*?)</answer>`, backtracks quadratically on the
+# input that matters most: a response with no `</think>` at all makes the engine rescan to
+# the end from every start position. These responses run to 90k characters, so that is
+# ~8e9 steps -- it does not return. `find` is linear and the tags are unambiguous.
+_ANSWER_TAG = re.compile(r"<answer>(.*?)</answer>", re.DOTALL)
+
+
 def parse_free_think(response: str, action_sep: str = ",", max_actions: int = 3) -> Dict:
     """
     Parse free_think format response: <think>...</think><answer>...</answer>
-    
+
+    Two-tier like ``parse_wm``: the shape above decides ``format_correct``, extraction
+    falls back to a loose search so a malformed turn still yields its action instead of
+    discarding the episode over punctuation.
+
     Args:
         response: Raw LLM response string
         action_sep: Separator between actions
         max_actions: Maximum number of actions to extract
-    
+
     Returns:
         Dict containing parsed components and validation info
     """
-    # Pattern to match <think>...</think><answer>...</answer>
-    pattern = r'<think>(.*?)</think>\s*<answer>(.*?)</answer>'
-    match = re.search(pattern, response, re.DOTALL)
-    
-    format_correct = match is not None
-    
-    if not match:
-        think_content = ""
-        action_content = ""
-        actions = []
+    closed = response.find("</think>")
+    opened = response.find("<think>")
+    # Content before the close is the reasoning. If the model typed an opening tag of its
+    # own before that point, start after it; on a native-thinking family there is none,
+    # because the chat template already emitted it into the prompt.
+    start = opened + len("<think>") if 0 <= opened < closed else 0
+
+    after_close = _ANSWER_TAG.search(response, closed + len("</think>")) if closed >= 0 else None
+    format_correct = after_close is not None
+
+    if not format_correct:
+        # Salvage what is there. format_correct stays False either way.
+        think_content = (response[start:closed] if closed >= 0 else response[start:]).strip()
+        action_content = _loose_section(response, "answer")
     else:
-        think_content = match.group(1).strip()
-        action_content = match.group(2).strip()
-        
-        # Split actions by separator and clean them
-        actions = [action.strip().lower() for action in action_content.split(action_sep) if action.strip()]
-        
-        # Limit to max_actions
-        if len(actions) > max_actions:
-            actions = actions[:max_actions]
-            action_content = action_sep.join(actions)
-    
+        think_content = response[start:closed].strip()
+        action_content = after_close.group(1).strip()
+
+    actions = [a.strip().lower() for a in action_content.split(action_sep) if a.strip()]
+    if len(actions) > max_actions:
+        actions = actions[:max_actions]
+        action_content = action_sep.join(actions)
+
     # Reconstruct formatted response
     llm_response = f"<think>{think_content}</think><answer>{action_content}</answer>"
-    
+
     return {
         "llm_raw_response": response,
         "llm_response": llm_response,
         "think_content": think_content,
+        # The other formats expose the model's reasoning under this name; keep the alias so
+        # anything reading `reasoning_content` works across formats.
+        "reasoning_content": think_content,
+        "observation_content": "",
+        "prediction_content": "",
         "action_content": action_content,
         "actions": actions,
         "format_correct": format_correct,
@@ -152,6 +183,37 @@ def parse_wm(response: str, action_sep: str = ",", max_actions: int = 3) -> Dict
         "format_correct": format_correct,
     }
 
+def parse_answer_only(response: str, action_sep: str = ",", max_actions: int = 3) -> Dict:
+    """Read the action out of `<answer>...</answer>` and treat the rest as reasoning.
+
+    For models whose thinking is native: everything before the tag is their own reasoning,
+    recorded as reasoning_content but not required to follow any shape. ``format_correct``
+    therefore asks only that a well-formed `<answer>` exists -- there is nothing else the
+    format demands, so anything stricter would penalise a model that answered correctly.
+    """
+    match = re.search(r"<answer>(.*?)</answer>", response, re.DOTALL)
+    format_correct = match is not None
+
+    action_content = match.group(1).strip() if match else _loose_section(response, "answer")
+    reasoning_content = response[: match.start()].strip() if match else response.strip()
+
+    actions = [a.strip().lower() for a in action_content.split(action_sep) if a.strip()]
+    if len(actions) > max_actions:
+        actions = actions[:max_actions]
+        action_content = action_sep.join(actions)
+
+    return {
+        "llm_raw_response": response,
+        "llm_response": response,
+        "observation_content": "",
+        "reasoning_content": reasoning_content,
+        "prediction_content": "",
+        "action_content": action_content,
+        "actions": actions,
+        "format_correct": format_correct,
+    }
+
+
 def parse_free_wm(response: str, action_sep: str = ",", max_actions: int = 3) -> Dict:
     """
     Parse free_wm format response:
@@ -227,6 +289,8 @@ def parse_response(response: str, prompt_format: str = "free_think", action_sep:
         return parse_wm(response, action_sep, max_actions)
     elif prompt_format == "free_wm":
         return parse_free_wm(response, action_sep, max_actions)
+    elif prompt_format == "answer":
+        return parse_answer_only(response, action_sep, max_actions)
     else:
         raise ValueError(f"Unknown prompt format: {prompt_format}")
     
