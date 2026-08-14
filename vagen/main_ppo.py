@@ -38,7 +38,8 @@ from verl.utils.import_utils import deprecated
 #
 # Upstream marks this entrypoint deprecated in favour of main_ppo_sync.py, which builds a
 # standalone PPOTrainer with no _fit_* hooks. VagenPPOTrainer needs those hooks, and they
-# live on SeparateRayPPOTrainer, whose launcher this is. Known debt, tracked in VAGEN_ARCH.
+# live on SeparateRayPPOTrainer, whose launcher this is. Known debt: moving to the sync
+# entrypoint means porting the hooks, so it waits until upstream removes this one.
 @deprecated(
     "main_ppo.py is deprecated, and wil be replaced by main_ppo_sync.py in v0.8.0, please use main_ppo_sync.py instead."
 )
