@@ -19,7 +19,9 @@ from omegaconf import OmegaConf
 #: Anchored to the repo. A relative glob at module scope silently matched nothing from any
 #: other working directory, so the whole file passed while checking zero configs.
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-EVAL = sorted(glob.glob(os.path.join(_ROOT, "examples/evaluate/*/config.yaml")))
+#: EVERY eval yaml, not just `config.yaml`. Globbing the one name is how spatial_gym's
+#: config_1room.yaml -- the contaminated one -- was never looked at.
+EVAL = sorted(glob.glob(os.path.join(_ROOT, "examples/evaluate/*/*.yaml")))
 assert EVAL, "no eval configs found; the glob is wrong, not the repo empty"
 #: eval directory -> the val yaml its numbers are read against.
 PAIRS = {
@@ -36,22 +38,44 @@ UNPAIRED = {
     # index different datasets, so a range comparison is meaningless.
     "navigation": "train and val use different eval_set datasets",
     # config.yaml is the 2-room task and val is the 1-room one, so max_turns differs for a
-    # real reason (16 vs 11) and a turn-budget comparison is meaningless. The seeds ARE
-    # comparable, and are checked below via SEED_COMPARABLE.
+    # real reason (16 vs 11) and a turn-budget comparison is meaningless. config_1room.yaml
+    # IS comparable and is checked below via SEED_COMPARABLE.
     "spatial_gym": "eval config.yaml is a different task (2-room) from val (1-room)",
 }
 
-#: Eval directories whose seeds index the same space as their training config, so an
-#: overlap is a real contamination. Wider than PAIRS: spatial_gym's turn budget is not
-#: comparable to val's but its room indices are, and that is the check that matters.
-#: Every eval yaml in the directory is examined, not just config.yaml -- spatial_gym's
-#: contaminated range lived in config_1room.yaml, which nothing looked at.
+#: Eval CONFIGS whose seeds index the same space as their training config, so an overlap is
+#: a real contamination. Keyed on the file rather than the directory, because that is the
+#: granularity at which the question has an answer: spatial_gym ships two, and only one of
+#: them reads the dataset training reads. Checking the directory instead is how
+#: config_1room.yaml -- which asked for all twenty of the rooms training took sixteen of --
+#: went unexamined while config.yaml was the only file anything looked at.
+#:
+#: A seed range is only comparable when both sides index the SAME set. Adding an entry here
+#: for two files that happen to use integer seeds over different datasets invents a
+#: constraint: spatial_gym's config.yaml is the 2-room task and nothing under
+#: examples/train/ reads 2-room, so it correctly evaluates all twenty.
 SEED_COMPARABLE = {
-    "sokoban": "examples/train/sokoban/train_sokoban_vision.yaml",
-    "frozenlake": "examples/train/frozenlake/train_frozenlake_vision.yaml",
-    "primitive_skill": "examples/train/primitive_skill/train_primitive_skill.yaml",
-    "spatial_gym": "examples/train/spatial_gym/train_spatial_gym_vision.yaml",
+    "sokoban/config.yaml": "examples/train/sokoban/train_sokoban_vision.yaml",
+    "frozenlake/config.yaml": "examples/train/frozenlake/train_frozenlake_vision.yaml",
+    "primitive_skill/config.yaml": "examples/train/primitive_skill/train_primitive_skill.yaml",
+    "spatial_gym/config_1room.yaml": "examples/train/spatial_gym/train_spatial_gym_vision.yaml",
 }
+
+#: Eval configs deliberately outside SEED_COMPARABLE, with the reason. Without this the
+#: dict above is an allowlist with no completeness check -- exactly what let two
+#: contaminated configs sit unexamined.
+SEED_NOT_COMPARABLE = {
+    "navigation/config.yaml": "train uses base_train (1200 tasks), eval uses base (60)",
+    "spatial_gym/config.yaml": "2-room task; nothing under examples/train/ reads 2-room",
+}
+
+
+def test_every_eval_config_is_seed_checked_or_says_why_not():
+    for path in EVAL:
+        key = "/".join(path.replace("\\", "/").split("/")[-2:])
+        assert key in SEED_COMPARABLE or key in SEED_NOT_COMPARABLE, (
+            f"{key} is neither seed-checked nor listed as incomparable; add it to one. "
+            f"An eval config nobody compares against training is how contamination hides.")
 
 
 def test_every_eval_config_is_either_paired_or_deliberately_not():
@@ -87,23 +111,22 @@ def test_eval_turn_budget_matches_the_val_config(name, val_path):
             f"{val.get('max_turns')}")
 
 
-@pytest.mark.parametrize("name,train_path", sorted(SEED_COMPARABLE.items()))
-def test_eval_seeds_do_not_overlap_the_training_seeds(name, train_path):
+@pytest.mark.parametrize("rel,train_path", sorted(SEED_COMPARABLE.items()))
+def test_eval_seeds_do_not_overlap_the_training_seeds(rel, train_path):
     """★ Same seed, same instance. An eval range that reaches into the train range reports
     training-set accuracy under an evaluation heading, and nothing about the run says so.
 
-    spatial_gym did exactly that: the seed is an index into a 20-room download, training
-    took 0-15, and both eval configs asked for 0-19."""
+    spatial_gym's 1-room config did exactly that: the seed is an index into a 20-room
+    download, training took 0-15, and it asked for 0-19."""
     assert os.path.exists(os.path.join(_ROOT, train_path)), train_path
+    cfg = os.path.join(_ROOT, "examples/evaluate", rel)
+    assert os.path.exists(cfg), rel
     train = set().union(*(_seed_values(s) for s in _envs(train_path)))
-    configs = sorted(glob.glob(os.path.join(_ROOT, f"examples/evaluate/{name}/*.yaml")))
-    assert configs, f"no eval yaml found for {name}"
-    for cfg in configs:
-        for spec in _envs(cfg):
-            overlap = _seed_values(spec) & train
-            assert not overlap, (
-                f"{os.path.relpath(cfg, _ROOT)} draws {len(overlap)} seed(s) the training "
-                f"config also uses, e.g. {sorted(overlap)[:5]}")
+    for spec in _envs(cfg):
+        overlap = _seed_values(spec) & train
+        assert not overlap, (
+            f"{rel} draws {len(overlap)} seed(s) the training config also uses, "
+            f"e.g. {sorted(overlap)[:5]}")
 
 
 def test_every_eval_seed_range_covers_itself_exactly():

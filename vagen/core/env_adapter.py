@@ -12,7 +12,7 @@ from __future__ import annotations
 import inspect
 import logging
 
-from vagen.agent_loop.obs import _normalize_images, convert_obs_to_content, extract_success
+from vagen.core.obs import _normalize_images, convert_obs_to_content, extract_success
 
 logger = logging.getLogger(__name__)
 

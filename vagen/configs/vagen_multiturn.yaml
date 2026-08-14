@@ -59,6 +59,13 @@ trainer:
   # stopped at 270. Set high enough that the step count is always what stops a run;
   # there is no separate meaning to an epoch here, since the "dataset" is a seed list.
   total_epochs: 100000
+  # ★ And therefore this must never be null. verl derives
+  #     total_training_steps = len(dataloader) * total_epochs
+  # when it is (ray_trainer.py:448), and feeds the result to the LR scheduler as its
+  # horizon -- so with the 100000 above, a launch that forgot the flag would compute
+  # millions of steps, never finish its warmup ramp, and never stop. Every shipped script
+  # sets it; this is the default for one that does not.
+  total_training_steps: 401
   replace_image_tokens_for_logging: True    # By default, we want to convert a sequence of image tokens with readable placeholders in logs
   max_actor_ckpt_to_keep: 1                # Max number of actor checkpoints to keep (saves disk space)
   max_critic_ckpt_to_keep: 1               # Max number of critic checkpoints to keep

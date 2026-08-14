@@ -170,7 +170,7 @@ written into the batch — each backed by a patch in `verl/workers/utils/losses.
 # and the job looks healthy while none of this repo's rollout code executes.
 vagen/configs/baseline_vllm.flags
 
-bash examples/train/sokoban/train_ppo_qwen25vl3b.sh          # reads those flags
+bash examples/train/sokoban/train_default_gae_qwen25vl3b.sh          # reads those flags
 MODEL=/path/to/local/snapshot bash examples/train/...        # avoids a flaky hub lookup
 bash examples/train/... --cfg job --resolve                  # dry-run the config, no GPU
 ```
@@ -198,16 +198,22 @@ termination path, `vagen/core/harness.py` for the context policies.
 
 ### verl patches
 
-The submodule is `JamesKrW/verl` at tag `vagen-260812` (`27c51e9`), which is verl main plus
-three commits. Nothing else in verl is modified, and none of it is upstream:
+The submodule is `JamesKrW/verl`, pinned by SHA to `27c51e9`. The tag `vagen-260812` is what
+keeps that SHA fetchable -- a submodule records a SHA either way, and `.gitmodules` names the
+tag so nothing can garbage-collect it out from under a `clone --recursive`. The tag is not
+fetched into the clone, so `git -C verl tag` is empty; that is normal.
 
-| commit | what | why |
-|---|---|---|
-| `5083fc5` | adds `verl/workers/utils/{losses,padding}.py` | the turn-level policy losses and the padding helpers VAGEN's estimators call |
-| `12f79ab` | `attention_utils.py`, `qwen2_vl.py`, `torch_functional.py` | fall back to the Hub kernel when `flash-attn` is not installed, so the install does not have to build it |
-| `27c51e9` | `models/transformers/glm4v.py` | unpack the vision tower output as `qwen2_vl` already does, so GLM-4.1V trains on transformers 5.x |
+Its history is three commits (`git -C verl log --oneline`):
 
-To see them: `git -C verl log --oneline -3`.
+| commit | what |
+|---|---|
+| `5083fc5` | a **squashed snapshot** of verl main -- a root commit carrying the whole tree, so upstream's own history is not in this repo |
+| `12f79ab` | `attention_utils.py`, `qwen2_vl.py`, `glm4v.py`, `torch_functional.py` (+4 tests): fall back to the Hub flash-attention kernel when `flash-attn` is not installed, so the install does not have to build it |
+| `27c51e9` | `models/transformers/glm4v.py`: unpack the vision tower output as `qwen2_vl` already does, so GLM-4.1V trains on transformers 5.x |
+
+Because the base is squashed, `git diff` against today's `volcengine/verl` main mixes those
+two patches with however far upstream has moved since the snapshot -- it is not a list of
+what VAGEN changed. The two commits above are.
 
 ## 7. Where it stands
 

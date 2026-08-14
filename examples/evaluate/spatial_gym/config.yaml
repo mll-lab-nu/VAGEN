@@ -13,20 +13,18 @@ fileroot: ${oc.env:VAGEN_EVAL_ROOT,./eval_runs}
 
 envs:
   - name: SpatialGym
-    n_envs: 4
+    n_envs: 20
     tag_id: spatial_gym_2room
-  # ★ Held-out rooms only. The seed here is an INDEX into a fixed dataset (`run{seed:02d}`),
-    # not a generator seed, and the dataset has exactly 20 rooms: train takes 0-15 and
-    # validation 16-19 (examples/train/spatial_gym/{train,val}_spatial_gym_vision.yaml). So
-    # the `seed: [0, 19, 1]` this file used to carry scored a trained checkpoint on the
-    # sixteen rooms it was trained on, and reported the result as a benchmark.
+    # ★ All twenty rooms, deliberately. The seed is an INDEX into a fixed dataset
+    # (`run{seed:02d}`) rather than a generator seed, so an overlap with training would be
+    # the same room twice -- but this is the 2-ROOM set, and both training configs read
+    # `room_data/1-room` (examples/train/spatial_gym/{train,val}_spatial_gym_vision.yaml).
+    # Nothing under examples/train/ reads 2-room, so there is no held-out subset to carve
+    # out here and no contamination to avoid.
     #
-    # Four rooms is a small benchmark, and that is the honest size of what is held out --
-    # this dataset cannot support a larger disjoint one. Evaluating an OFF-THE-SHELF model
-    # that VAGEN never trained is the case where all twenty are fair game: set
-    # `n_envs: 20` and `seed: [0, 19, 1]`, and do not compare those numbers against a
-    # checkpoint trained here.
-    seed: [16, 19, 1]
+    # config_1room.yaml is the file where this mattered: it indexes the same rooms training
+    # does, and it used to ask for all twenty of them.
+    seed: [0, 19, 1]
     max_turns: 16
     # ★ Both from val_spatial_gym_vision.yaml. Without response_length_per_turn the client
     # falls through to chat_config.max_tokens (32768) -- thirty-two times the turn the
