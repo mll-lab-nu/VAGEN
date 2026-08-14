@@ -26,7 +26,8 @@ from vagen.envs.registry import get_env_cls
 from vagen.envs.state_reward import state_reward_spec_of
 from vagen.rewards.state_reward import DEFAULT_SCORE_BASE, TAGS, StateRewardWrapper
 from vagen.agent_loop.verl_client import VerlClient
-from vagen.harness import build_harness
+from vagen.harness import budget_mode, build_harness, resolve_harness
+from vagen.harness.compact import CompactHarness
 from vagen.harness.budget import (
     Budgets, check as check_budgets, context_limits, default_env_response,
     default_summary_budget,
@@ -147,7 +148,7 @@ class GymLoop(VagenGymAgentLoopBase):
             env_response=kwargs.get("max_env_response_per_turn") or kwargs.get("env_response_length"),
             per_turn_configured=bool(kwargs.get("response_length_per_turn")),
         )
-        opening_limit, continuation_limit = context_limits(self._harness_mode(), budgets)
+        opening_limit, continuation_limit = context_limits(budget_mode(self._harness_mode()), budgets)
         # An extra sampling key rather than anything this layer interprets. verl builds its
         # sampling dict from a fixed list of fields and has no pass-through for the rest,
         # but the engine call is `SamplingParams(max_tokens=..., **sampling_params)` -- so
@@ -409,9 +410,9 @@ class GymLoop(VagenGymAgentLoopBase):
         expensive version of another one and reports nothing at all.
         """
         mode = self._harness_mode()
-        m = int(self.config.trainer.compact_budget) if mode == "compact" else None
+        m = int(self.config.trainer.compact_budget) if budget_mode(mode) == "compact" else None
         summary_budget = None
-        if mode == "compact":
+        if issubclass(resolve_harness(mode), CompactHarness):
             configured = self.config.trainer.get("compact_summary_budget", None)
             summary_budget = int(configured) if configured else default_summary_budget(m, per_turn)
 
@@ -430,8 +431,8 @@ class GymLoop(VagenGymAgentLoopBase):
         # env config that does not declare it is still bounded -- by the largest value
         # that would have passed the checks below.
         b = replace(b, env_response=int(env_response) if env_response
-                    else default_env_response(mode, b))
-        check_budgets(mode, b)
+                    else default_env_response(budget_mode(mode), b))
+        check_budgets(budget_mode(mode), b)
 
         # Every mode gets the region and the floor. Passing them to compaction alone
         # left `_left()` as None for the other two, so nothing bounded their generation
@@ -449,7 +450,7 @@ class GymLoop(VagenGymAgentLoopBase):
         # which the truncation handles; too large silently deletes the episode.
         room = dict(response_len=self.response_length,
                     floor=min(per_turn, max(1, self.response_length // 4)))
-        if mode == "compact":
+        if issubclass(resolve_harness(mode), CompactHarness):
             # compact_budget is an optional second trigger on top of the region.
             return build_harness(
                 mode, budget=m, summary_budget=summary_budget,

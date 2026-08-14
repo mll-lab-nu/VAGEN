@@ -88,10 +88,28 @@ def _require_harness(cls, name: str) -> None:
         )
 
 
+def budget_mode(name: str) -> str:
+    """Which built-in's token accounting applies to ``name``.
+
+    ``vagen/harness/budget.py`` reasons about three shapes, and it takes a string. A
+    custom policy has a name it has never heard of, so without this a subclass of
+    ``CompactHarness`` gets no compaction budget wired and a concat-like one loses its
+    observation ceiling -- both silently, both only visible as a run that behaves like a
+    different mode than its name.
+    """
+    cls = resolve_harness(name)
+    if issubclass(cls, CompactHarness):
+        return "compact"
+    if issubclass(cls, NoConcatHarness):
+        return "no_concat"
+    return "concat"
+
+
 def build_harness(name: str, **kwargs) -> BaseHarness:
     """Instantiate by name or import path, failing with the available options."""
     return resolve_harness(name)(**kwargs)
 
 
 __all__ = ["BaseHarness", "Call", "ConcatHarness", "NoConcatHarness", "CompactHarness",
-           "HARNESSES", "build_harness", "register_harness", "resolve_harness"]
+           "HARNESSES", "build_harness", "budget_mode", "register_harness",
+           "resolve_harness"]

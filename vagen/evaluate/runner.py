@@ -106,6 +106,10 @@ async def run_eval_parallel(
                     "env_name": data.get("env_name"), "success": False,
                     "num_turns": 0, "cumulative_reward": 0.0, "rewards": [],
                     "terminated": False, "finish_reason": "setup_error",
+                    # ★ Both keys. `main()` reports errors off "error"; the in-episode
+                    # failure path sets it and this one did not, so a setup failure was
+                    # printed as an ordinary status line and never reached the summary.
+                    "error": repr(exc),
                     "error_details": {"error": repr(exc), "error_type": type(exc).__name__}}
 
     async def _run_one(data: Dict[str, Any], per_job_adapter_kwargs: Dict[str, Any]) -> Dict[str, Any]:

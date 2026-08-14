@@ -532,12 +532,18 @@ def main() -> None:
         # write_rollouts_summary_from_dump scans every directory holding a metrics.json.
         # Measured: a 2-episode force_rerun reported n_episodes=4 with seeds [1,1,2,2] and
         # a success_rate averaged over both runs, indistinguishable from a clean one.
-        import shutil
-        for tag in sorted(os.listdir(dump_dir)):
+        # ★ Only the tags this run will write. Clearing every `tag_*` destroys the
+        # completed rollouts of tags that are merely configured elsewhere -- navigation
+        # puts three in one dump dir, so re-running a trimmed config wiped the other two.
+        wanted = {f"tag_{j['data'].get('tag_id')}" for j in jobs}
+        for tag in sorted(wanted):
             path = os.path.join(dump_dir, tag)
-            if os.path.isdir(path) and tag.startswith("tag_"):
+            if os.path.isdir(path):
                 logger.info("force_rerun: clearing previous rollouts under %s", path)
-                shutil.rmtree(path)
+                try:
+                    shutil.rmtree(path)
+                except OSError as exc:      # a concurrent run holding the same dir
+                    logger.warning("could not clear %s: %s", path, exc)
     if resume_mode != "off":
         logger.info("Resume mode=%s; pruning error rollouts under %s", resume_mode, dump_dir)
         _purge_error_rollouts(dump_dir, resume_mode)
@@ -608,6 +614,19 @@ def main() -> None:
         else:
             print(rid, finish_reason, tag_info)
 
+    # ★ A config error hits every job identically, and per-job error handling then turns
+    # a loud crash into a clean-looking run: exit 0, n_episodes 0, and if the dump dir has
+    # prior rollouts the summary reprints THOSE numbers under this run's name. Say it, and
+    # exit non-zero.
+    setup_failures = [r for r in results if r.get("finish_reason") == "setup_error"]
+    if setup_failures and len(setup_failures) == len(results):
+        first = setup_failures[0].get("error", "")
+        raise SystemExit(
+            f"every one of the {len(results)} jobs failed before its episode started, so "
+            f"nothing was evaluated. This is a configuration error, not a flaky run. "
+            f"First failure: {first}"
+        )
+
     from vagen.evaluate.utils.summary_utils import write_rollouts_summary_from_dump
 
     # Sort tag_ids with str(x) as key to handle both int and str
@@ -615,7 +634,8 @@ def main() -> None:
         tag_dir = os.path.join(dump_dir, f"tag_{tag_id}") if dump_dir else None
         if not tag_dir:
             continue
-        outp = write_rollouts_summary_from_dump(dump_dir=tag_dir, filename="summary.json")
+        outp = write_rollouts_summary_from_dump(dump_dir=tag_dir, filename="summary.json",
+                                                model=model)
         tag_errors = error_records_by_tag.get(tag_id)
         if tag_errors:
             try:

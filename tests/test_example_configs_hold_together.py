@@ -13,14 +13,22 @@ import re
 import pytest
 from omegaconf import OmegaConf
 
-SCRIPTS = sorted(glob.glob("examples/train/*/*.sh"))
-BASE_FLAGS = open("vagen/configs/baseline_vllm.flags").read()
+#: Anchored to the repo, not the working directory. Read at module scope from a relative
+#: path, a pytest run from anywhere but the root failed at COLLECTION and took the whole
+#: suite with it -- not just this file.
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCRIPTS = sorted(glob.glob(os.path.join(_ROOT, "examples/train/*/*.sh")))
+assert SCRIPTS, "no training scripts found; the glob is wrong, not the repo empty"
+BASE_FLAGS = open(os.path.join(_ROOT, "vagen/configs/baseline_vllm.flags")).read()
 
 #: Kept out of the "every yaml is reachable" check, with the reason.
 UNREFERENCED_BY_DESIGN = {
-    # A frozen copy of the pre-2026-08-10 environment, for reproducing the `*_old` wandb
-    # runs. Its header says to use train_sokoban_vision.yaml for anything new, and it has
-    # no val counterpart on purpose.
+    # A frozen copy of the pre-2026-08-10 environment for reproducing the `*_old` wandb
+    # runs: it differs from the live yaml by exactly `strict_format: false` and
+    # `format_reward: 0.1`, and the rationale for both is in
+    # vagen/envs/sokoban/sokoban_env.py's `strict_format` comment. Unrunnable without
+    # hand-editing a script, which is the hazard this test exists to catch -- exempted
+    # deliberately, because reproducing an old run is what it is for.
     "examples/train/sokoban/train_sokoban_vision_oldenv.yaml",
 }
 
@@ -47,7 +55,10 @@ def test_a_concat_episode_fits_the_response_region(script):
     harness = (re.search(r"trainer\.harness=(\w+)", text) or [None, "concat"])[1]
     if harness != "concat":
         pytest.skip("only concat holds the whole episode in one row")
-    n_r = _flag(text, "data.max_response_length") or _flag(BASE_FLAGS, "data.max_response_length", 8000)
+    n_r = _flag(text, "data.max_response_length") or _flag(BASE_FLAGS, "data.max_response_length")
+    if n_r is None:
+        pytest.fail(f"{script} sets no data.max_response_length and neither does "
+                    f"baseline_vllm.flags; verl's default is 512, which none of these fit")
     for path in _script_yamls(text, script):
         for spec in OmegaConf.to_container(OmegaConf.load(path)).get("envs", []):
             g = spec.get("response_length_per_turn")
@@ -66,7 +77,8 @@ def test_the_context_window_covers_both_regions(script):
     if ctx is None:
         pytest.skip("inherits the engine default")
     n_p = _flag(text, "data.max_prompt_length") or _flag(BASE_FLAGS, "data.max_prompt_length", 1000)
-    n_r = _flag(text, "data.max_response_length") or _flag(BASE_FLAGS, "data.max_response_length", 8000)
+    n_r = _flag(text, "data.max_response_length") or _flag(BASE_FLAGS, "data.max_response_length")
+    assert n_r is not None, f"{script}: no data.max_response_length anywhere"
     assert n_p + n_r <= ctx, f"{script}: prompt {n_p} + response {n_r} > max_model_len {ctx}"
 
 
@@ -77,9 +89,10 @@ def test_every_example_yaml_is_reachable_from_a_script():
     referenced = set()
     for script in SCRIPTS:
         referenced.update(os.path.normpath(p) for p in _script_yamls(open(script).read(), script))
+    exempt = {os.path.normpath(os.path.join(_ROOT, p)) for p in UNREFERENCED_BY_DESIGN}
     orphans = sorted(
-        p for p in glob.glob("examples/train/*/*.yaml")
-        if os.path.normpath(p) not in referenced and p not in UNREFERENCED_BY_DESIGN
+        p for p in glob.glob(os.path.join(_ROOT, "examples/train/*/*.yaml"))
+        if os.path.normpath(p) not in referenced and os.path.normpath(p) not in exempt
     )
     assert not orphans, f"no .sh loads these: {orphans}"
 
