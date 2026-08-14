@@ -1,34 +1,19 @@
-# `max_turns: 20` is a CAP, not an expectation -- real sokoban episodes end well before
-# it (measured: 32 episodes gave 57 rows under compaction, ~0.8 compactions each). So the
-# startup warning that 20 x response_length_per_turn does not fit max_response_length is
-# EXPECTED and correct: it reports a worst case that does not occur. Generation is bounded
-# by the room actually left, which is why budget.py warns here instead of refusing.
+# max_turns is 5, the published setting and the one every run in this repo uses. The repo
+# used to ship 20 here and rely on the cluster wrapper to normalise it, which left a
+# standalone run with an episode that could not fit its response region:
+#   20 x 512 + 19 x 256 = 15104   against  data.max_response_length=4000
+# At 5 it is 5 x 512 + 4 x 256 = 3584 and the startup warning goes away for a real reason.
 #
-# ★ Do not "fix" it by lowering max_turns to 5. compact_budget is sized against this cap;
-# at 5 a whole episode fits inside one conversation, compaction never fires, and the
-# compact arm silently measures concat instead.
-# train_sokoban_vision.yaml, with the one difference that `<think>` is not required.
-#
-# Qwen3-VL, Qwen3.5 and GLM-4.1V reserve `<think>`/`</think>` as single control tokens
-# tied to their thinking mechanism (Qwen3-VL 151667/151668, Qwen3.5 248068/248069), and
-# the non-thinking Instruct variants are trained not to emit them. Under `wm` those models
-# write <observation>, <answer> and <prediction> -- all ordinary text -- and silently skip
-# <think>, so `format_correct` is False for every turn, and sokoban_env.py then discards
-# the action outright (strict_format). Measured on Qwen3-VL-4B-Instruct: format_correct_rate
-# 0.0 and reward 0.0 for the whole run, while the parser had in fact recovered the action.
-# `free_wm` asks for the same three tags and drops the fourth.
-#
-# Qwen2.5-VL keeps `wm` (train_sokoban_vision.yaml): there `<think>` is three ordinary text
-# tokens, so nothing is reserved and the strict format is reachable.
-#
-# Everything else is copied from train_sokoban_vision.yaml deliberately -- seeds, turn
-# budget and format_reward all have to match for the two families to be comparable.
+# ★ If you change this, change trainer.compact_budget with it. The compact arm is sized so
+# that a conversation buys about three turns before it has to summarise; a cap that lets a
+# whole episode fit inside one conversation means compaction never fires and that arm
+# silently measures concat instead. See train_default_gae_compact_qwen25vl3b.sh.
 envs:
   - name: Sokoban # registered env name
     n_envs: 10000
     data_source: sokoban # nickname for logging
     seed: [1,10000,1] # sample n_env seeds from seed[0] to seed[1] with each seed repeat at most seed[2] times
-    max_turns: 20 # max number of interaction turns per episode
+    max_turns: 5 # max number of interaction turns per episode
     response_length_per_turn: 512 # max response length per turn
     # The largest one observation may be. Measured with the Qwen2.5-VL processor:
     # sokoban vision is 80 tokens opening, 96 mid-episode. 256 leaves room for a larger frame without letting a

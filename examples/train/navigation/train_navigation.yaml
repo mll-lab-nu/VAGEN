@@ -1,15 +1,9 @@
-# ★ max_env_response_per_turn is deliberately NOT declared here. Navigation runs against a
-# remote AI2-THOR server, so one observation's token cost depends on that server's render
-# settings rather than on anything in this repo -- and an undeclared ceiling that is merely
-# plausible is worse than none, because an observation over it is now truncated rather than
-# refused. Measure it against your own server and declare it; that collapses the
-# episode-size warning this config otherwise raises at startup.
-# ★ base_train, not base. `base` is the 60-task HELD-OUT set that val_navigation.yaml
-# scores on -- this file used it, so the runs trained on their own evaluation set and the
-# val curve measured memorisation. The seed indexes the dataset directly
-# (`self._dataset[seed % len(self._dataset)]`, navigation_env.py:156), so there was no
-# shuffling to hide it. base_train ships 1200 tasks against base's 60; the sibling
-# train_navigation_base_common.yaml had this right all along.
+# ★ max_env_response_per_turn is written out as `null` on purpose: no ceiling, never cut
+# an observation. Navigation runs against a remote AI2-THOR server, so a frame's token cost
+# is a property of that server's render settings rather than of anything in this repo, and
+# an over-ceiling observation is now truncated rather than refused -- a plausible but
+# unmeasured number would silently discard real context. Measure it against your own server
+# if you want the static budget checks to be exact.
 envs:
   - name: RemoteEnv
     # 1200, matching base_train.json exactly, with each task drawn once.
@@ -18,6 +12,7 @@ envs:
     seed: [1, 1200, 1]
     max_turns: 10
     response_length_per_turn: 512
+    max_env_response_per_turn: null
     config:
       base_urls: "http://localhost:8000"
       timeout: 120
