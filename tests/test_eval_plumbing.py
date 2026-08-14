@@ -232,3 +232,43 @@ def test_the_summary_counts_one_run_not_two(tmp_path):
         dump_dir=str(tag), filename="s.json", model="m-B"))
     assert filtered["n_episodes"] == 1, (
         f"summary counted {filtered['n_episodes']} episodes for a one-episode run")
+
+
+# --------------------------------------------------------- config overrides
+@pytest.mark.parametrize("override,ok", [
+    ("run.backend=vllm", True),
+    ("backends.openai.model=foo", True),
+    ("envs.0.seed=[1,60,1]", True),
+    # EnvSpec defines it, the yaml leaves it at the default, and it is the documented way
+    # to evaluate under another context policy -- the case this check must not refuse.
+    ("envs.0.harness=no_concat", True),
+    ("envs.0.config.dim_room=[8,8]", True),          # passed through to the environment
+    ("envs.0.chat_config.temperature=0.7", True),    # passed through to the client
+    ("+something.genuinely.new=1", True),            # hydra's convention, honoured here
+    ("run.backendd=vllm", False),
+    ("experiment.dumpdir=/tmp/x", False),
+    ("envs.0.harnes=no_concat", False),
+])
+def test_a_mistyped_override_is_refused_rather_than_invented(tmp_path, override, ok):
+    """★ OmegaConf.update creates whatever key it is given. `run.backendd=vllm` and
+    `experiment.dumpdir=/tmp/x` were both accepted in silence -- the run went ahead on the
+    real setting and exited 0, so the only evidence was results in the wrong place, or a
+    backend you did not choose."""
+    from vagen.evaluate.run_eval import _load_config
+
+    cfg = "examples/evaluate/sokoban/config.yaml"
+    if ok:
+        _load_config(cfg, [override])
+        return
+    with pytest.raises(ValueError, match="not in the config"):
+        _load_config(cfg, [override])
+
+
+def test_the_refusal_names_the_key_it_meant(tmp_path):
+    from vagen.evaluate.run_eval import _load_config
+
+    with pytest.raises(ValueError, match=r"Did you mean run\.backend\?"):
+        _load_config("examples/evaluate/sokoban/config.yaml", ["run.backendd=vllm"])
+    # From EnvSpec's fields, not from the keys this yaml happens to spell out.
+    with pytest.raises(ValueError, match=r"Did you mean envs\.0\.harness\?"):
+        _load_config("examples/evaluate/sokoban/config.yaml", ["envs.0.harnes=x"])

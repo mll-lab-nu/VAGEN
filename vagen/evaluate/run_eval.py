@@ -6,6 +6,7 @@ import copy
 import json
 import logging
 import os
+import re
 import shutil
 from dataclasses import dataclass, field, fields
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -543,8 +544,70 @@ def _load_config(cfg_path: str, overrides: List[str]) -> DictConfig:
             # string (backends.azure.azure_api_version). Dates have no other use here.
             if isinstance(value, (datetime.date, datetime.datetime)):
                 value = raw
-            OmegaConf.update(cfg, key.strip(), value, merge=True)
+            key = key.strip()
+            # ★ A key that does not already exist is almost always a typo, and OmegaConf
+            # would create it: `run.backendd=vllm` and `experiment.dumpdir=/tmp/x` were
+            # both accepted in silence, the run went ahead with the real setting, and it
+            # exited 0. Only `envs[]` entries were validated. Hydra's own convention for
+            # deliberately adding a key is a `+` prefix, so use that here too.
+            if key.startswith("+"):
+                key = key[1:]
+            elif _may_be_absent(key):
+                pass
+            elif OmegaConf.select(cfg, key, default=_ABSENT) is _ABSENT:
+                raise ValueError(
+                    f"override {item!r} names {key!r}, which is not in the config. "
+                    f"{_did_you_mean(cfg, key)}To add a key that is genuinely new, prefix "
+                    f"it: +{item}"
+                )
+            OmegaConf.update(cfg, key, value, merge=True)
     return cfg
+
+
+#: Distinct from None, which is a legitimate value for several keys (backends.*.base_url).
+_ABSENT = object()
+
+#: `envs.<i>.<field>` for a field EnvSpec defines but the yaml leaves at its default. Most
+#: env entries do not spell out `harness`, and `envs.0.harness=no_concat` is the documented
+#: way to evaluate a checkpoint under another context policy -- rejecting it for being
+#: absent would refuse the override this validation is least entitled to refuse. A wrong
+#: field name here is still caught, by _parse_env_specs, with a better message.
+_ENV_OVERRIDE = re.compile(r"^envs\.\d+\.(?P<field>[A-Za-z_][A-Za-z0-9_]*)(?P<rest>\..*)?$")
+
+
+def _may_be_absent(key: str) -> bool:
+    m = _ENV_OVERRIDE.match(key)
+    if not m:
+        return False
+    field = m.group("field")
+    # Anything below `config` or `chat_config` is passed through to the environment or the
+    # client, so this module has no list to check it against.
+    if m.group("rest"):
+        return field in ("config", "chat_config")
+    return field in _ENV_SPEC_KEYS
+
+
+def _did_you_mean(cfg: DictConfig, key: str) -> str:
+    """The siblings of the deepest path segment that does resolve, if that narrows it."""
+    import difflib
+
+    parent, _, leaf = key.rpartition(".")
+    m = _ENV_OVERRIDE.match(key)
+    if m and not m.group("rest"):
+        # The yaml only spells out the env fields it changes, so its own keys are a worse
+        # suggestion list than the dataclass's: `envs.0.harnes` should point at `harness`
+        # whether or not this config happens to set it.
+        candidates = sorted(_ENV_SPEC_KEYS)
+    else:
+        node = OmegaConf.select(cfg, parent, default=None) if parent else cfg
+        if not isinstance(node, DictConfig):
+            return ""
+        candidates = [str(k) for k in node.keys()]
+    close = difflib.get_close_matches(leaf, candidates, n=3, cutoff=0.6)
+    if not close:
+        return ""
+    where = f"{parent}." if parent else ""
+    return "Did you mean " + " or ".join(f"{where}{c}" for c in close) + "? "
 
 
 def main() -> None:
