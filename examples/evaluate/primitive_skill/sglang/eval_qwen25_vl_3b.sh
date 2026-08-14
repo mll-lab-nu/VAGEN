@@ -19,6 +19,23 @@ MODEL_NAME="${MODEL_NAME:-"qwen_25_vl_3b"}"
 MODEL_PATH="${QWEN25_VL_3B_PATH:-"Qwen/Qwen2.5-VL-3B-Instruct"}"
 DP_SIZE="${QWEN25_VL_3B_DP:-4}"
 TP_SIZE="${QWEN25_VL_3B_TP:-1}"
+
+# ★ Clamp to what is actually visible. These defaulted to a full node's worth of data
+# parallelism, and on a smaller machine sglang failed at engine init with a message that
+# never mentions dp-size -- the node size is the one setting here that is not a property
+# of the model.
+if [ -n "${CUDA_VISIBLE_DEVICES:-}" ]; then
+  _gpus=$(printf '%s' "$CUDA_VISIBLE_DEVICES" | tr ',' '\n' | grep -c .)
+else
+  _gpus=$(nvidia-smi -L 2>/dev/null | grep -c '^GPU ' || true)
+fi
+[ "${_gpus:-0}" -ge 1 ] 2>/dev/null || _gpus=1
+if [ $((DP_SIZE * TP_SIZE)) -gt "$_gpus" ]; then
+  echo "dp-size=$DP_SIZE x tp=$TP_SIZE needs $((DP_SIZE * TP_SIZE)) GPUs, but $_gpus are visible." >&2
+  echo "Lower it, e.g. DP=1:  QWEN25_VL_3B_DP=1 bash $0" >&2
+  exit 1
+fi
+
 MEM_FRACTION="${QWEN25_VL_3B_MEM:-0.80}"
 
 DUMP_DIR="${DUMP_DIR:-"$fileroot/rollouts/eval_primitive_skill_${MODEL_NAME}"}"

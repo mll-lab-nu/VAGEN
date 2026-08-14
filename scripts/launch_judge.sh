@@ -15,7 +15,23 @@ set -eo pipefail
 ENV=${ENV:-$(python3 -c 'import sys, os; print(os.path.dirname(os.path.dirname(sys.executable)))' 2>/dev/null || echo "$CONDA_PREFIX")}
 MODEL=${MODEL:-Qwen/Qwen3-4B-Instruct-2507}
 PORT=${PORT:-8123}
-TP=${TP:-8}
+# ★ Defaults to the number of visible GPUs, not to 8. Hardcoded, this script died on any
+# smaller node with an engine-init error that never mentions tensor parallelism -- and the
+# node size is the one thing here that is not a property of the model.
+# nvidia-smi rather than torch: this runs before `export PATH="$ENV/bin:$PATH"` below, so
+# `python3` here is whatever the login shell has, and on a real node that is usually a
+# python without torch -- which would report one GPU and silently size TP to 1.
+if [ -n "${CUDA_VISIBLE_DEVICES:-}" ]; then
+  _gpus=$(printf '%s' "$CUDA_VISIBLE_DEVICES" | tr ',' '\n' | grep -c .)
+else
+  _gpus=$(nvidia-smi -L 2>/dev/null | grep -c '^GPU ' || true)
+fi
+[ "${_gpus:-0}" -ge 1 ] 2>/dev/null || _gpus=1
+TP=${TP:-$_gpus}
+if [ "$TP" -gt "$_gpus" ]; then
+  echo "TP=$TP but only $_gpus GPU(s) are visible; vLLM would fail at engine init." >&2
+  exit 1
+fi
 MEM=${MEM:-0.10}
 
 export PATH="$ENV/bin:$PATH"
