@@ -18,6 +18,9 @@ setup(
         "configs/*.yaml",
         "configs/*.flags",
         "envs/navigation/assets/*.json",
+        # The per-environment extras the docs tell you to install. Absent from a
+        # non-editable install, the README points at a file that is not there.
+        "envs/*/requirements.txt",
     ]},
     install_requires=[
         "gym-sokoban",
