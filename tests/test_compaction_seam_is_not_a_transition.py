@@ -55,19 +55,17 @@ class _Cfg(dict):
 
 class _Inputs:
     def __init__(self, mask, ends_with_summary, rewards=None, values=None,
-                 gamma=1.0, lam=0.95, lam_low=1.0):
+                 gamma=1.0, lam=0.95):
         self.view = _View(mask)
         zeros = torch.zeros(mask.shape, dtype=torch.float32)
         self.rewards = zeros if rewards is None else rewards
         self.values = zeros.clone() if values is None else values
         self.ends_with_summary = ends_with_summary
         self.config = _Cfg(gamma=gamma, lam=lam)
-        self._lam_low = lam_low
 
-    def required_param(self, name, why=""):
-        assert name == "lam_low"
-        return self._lam_low
 
+#: The one string the writer and the reader have to agree on.
+COLUMN_THE_LOOP_WRITES = "ends_with_summary"
 
 WIDTH = 8
 
@@ -192,31 +190,47 @@ def test_more_compactions_do_not_mean_less_credit():
 
 # ------------------------------------------ the column reaches the estimator
 
-def test_the_flag_reaches_the_estimator_inputs_under_its_documented_name():
-    """★ Everything above tests that the seam is *computed*, from a hand-built view. This
-    tests that a real batch carries it: `ends_with_summary` is the column the agent loop
-    writes and `AdvantageInputs` is where an estimator reads it, and a rename on either
-    side would leave every other test in this file green while no estimator could ever
-    see a seam.
+def test_the_property_reads_the_column_the_agent_loop_writes():
+    """★ Everything above builds the view by hand. This is the join: the agent loop writes
+    a `ends_with_summary` column, `AdvantageInputs.ends_with_summary` reads one, and if the
+    two strings ever stop matching then `seam()` returns all-zeros and every compaction seam
+    is charged as a real environment transition -- silently, on every episode.
 
-    This replaces a test that asserted `compute_bi_level_gae_varlam` changed its output
-    when the flag was set. That estimator is gone and none of the remaining ones consult
-    the seam, so the reachable contract stops here.
+    The first version of this test asserted `hasattr(AdvantageInputs, "ends_with_summary")`
+    and grepped the writer's source for the literal. That is one-sided: renaming the string
+    on the READER side (`inputs.py`) left the whole suite green while no estimator could see
+    a seam again. So assert on the value that comes back.
     """
+    import numpy as np
+
     from vagen.custom_advantage.inputs import AdvantageInputs
 
-    assert hasattr(AdvantageInputs, "ends_with_summary"), (
-        "AdvantageInputs no longer exposes ends_with_summary, so a custom estimator has "
-        "no way to reach the seam the harness records"
+    written = COLUMN_THE_LOOP_WRITES
+    inputs = AdvantageInputs(
+        batch={},
+        non_tensor_batch={written: np.asarray([True, False])},
+        config=_Cfg(gamma=1.0, lam=1.0),
+        estimator="token_level_gae",
     )
+    got = inputs.ends_with_summary
+    assert got is not None, (
+        f"AdvantageInputs.ends_with_summary does not read {written!r}, the column the "
+        f"agent loop writes -- so seam() is all-zeros and every compaction seam is "
+        f"discounted as an environment step")
+    assert list(got) == [True, False]
+
+
+def test_the_agent_loop_still_writes_that_column():
+    """The other end of the same join. Cheap, and it is what makes the test above a join
+    rather than a test of AdvantageInputs against itself."""
     import inspect
 
-    from vagen.agent_loop import gym_loop
-    from vagen.agent_loop import multi_output
+    from vagen.agent_loop import gym_loop, multi_output
 
-    assert '"ends_with_summary"' in inspect.getsource(gym_loop), (
+    lit = f'"{COLUMN_THE_LOOP_WRITES}"'
+    assert lit in inspect.getsource(gym_loop), (
         "the agent loop stopped writing the column the seam is derived from")
-    assert '"ends_with_summary"' in inspect.getsource(multi_output), (
+    assert lit in inspect.getsource(multi_output), (
         "the column is not carried through multi_output, so it never reaches the batch")
 
 

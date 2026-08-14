@@ -423,3 +423,72 @@ def test_turn_gae_still_needs_a_value_mask():
     from vagen.custom_advantage import needs_value_mask
 
     assert needs_value_mask("turn_level_gae") is True
+
+
+# ------------------------------------------------- _backward_gae's variable-lambda branch
+
+def _bwd(rewards, values, valid, gamma, lam):
+    from vagen.custom_advantage.trajectory_algos import _backward_gae
+
+    import torch
+    t = lambda x, d=torch.float32: torch.tensor(x, dtype=d)
+    return _backward_gae(t(rewards), t(values), t(valid, torch.bool), gamma,
+                         t(lam) if isinstance(lam, list) else lam)
+
+
+def test_a_constant_lambda_tensor_is_the_scalar_it_equals():
+    """★ The branch `lam_t = lam if torch.is_tensor(lam) else None` had exactly one caller
+    -- `bi_level_gae_varlam` -- and lost its only coverage when that estimator was removed.
+    Nothing in the tree passes a tensor now, but the docstring advertises it as what a
+    per-turn lambda would use, so it is an extension point, and an unexercised one is one
+    that breaks for whoever reaches for it first.
+
+    A tensor of a single repeated value must reproduce the scalar path exactly: that pins
+    the indexing (`lam_t[:, t]`) against an off-by-one or a transposed read, which is the
+    way this goes wrong.
+    """
+    import pytest
+
+    rewards = [[0.0, 0.0, 0.0, 1.0]]
+    values = [[0.1, 0.2, 0.3, 0.4]]
+    valid = [[True, True, True, True]]
+
+    scalar = _bwd(rewards, values, valid, 1.0, 0.7)
+    tensor = _bwd(rewards, values, valid, 1.0, [[0.7, 0.7, 0.7, 0.7]])
+    assert tensor[0].tolist() == pytest.approx(scalar[0].tolist(), rel=1e-6)
+
+
+def test_a_per_position_lambda_is_applied_at_that_position():
+    """The point of the branch: lambda varies along the sequence. A zero at one position
+    cuts the chain there and nowhere else, so credit stops propagating past it while every
+    later position keeps the value it had."""
+    import pytest
+
+    rewards = [[0.0, 0.0, 0.0, 1.0]]
+    values = [[0.0, 0.0, 0.0, 0.0]]
+    valid = [[True, True, True, True]]
+
+    full = _bwd(rewards, values, valid, 1.0, [[1.0, 1.0, 1.0, 1.0]])
+    cut = _bwd(rewards, values, valid, 1.0, [[1.0, 0.0, 1.0, 1.0]])
+
+    # With no values, every delta is the reward at that position: full credit reaches t=0.
+    assert full[0].tolist() == pytest.approx([1.0, 1.0, 1.0, 1.0], rel=1e-6)
+    # lam_t is consulted AT position t (`lam_t[:, t]`), so a zero at t=1 zeroes the carry
+    # into position 1 itself and everything before it -- not just everything before it.
+    assert cut[0].tolist() == pytest.approx([0.0, 0.0, 1.0, 1.0], rel=1e-6)
+
+
+def test_padding_is_not_folded_into_the_recursion():
+    """Padding sits on the right, so the loop starts inside it. An invalid position must
+    leave `lastgaelam` alone rather than multiplying it by a padded lambda."""
+    import pytest
+
+    rewards = [[0.0, 1.0, 0.0]]
+    values = [[0.0, 0.0, 0.0]]
+    lam = [[1.0, 1.0, 0.0]]          # the 0.0 sits under padding; it must never be read
+
+    padded = _bwd(rewards, values, [[True, True, False]], 1.0, lam)
+    exact = _bwd(rewards[0][:2] and [[0.0, 1.0]], [[0.0, 0.0]], [[True, True]], 1.0,
+                 [[1.0, 1.0]])
+    assert padded[0, :2].tolist() == pytest.approx(exact[0].tolist(), rel=1e-6)
+    assert float(padded[0, 2]) == 0.0, "a padded position was given an advantage"

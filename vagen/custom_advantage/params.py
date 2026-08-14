@@ -4,9 +4,10 @@ verl's ``AlgoConfig`` is a dataclass with a fixed field list -- ``gamma``, ``lam
 ``adv_estimator`` and a handful of others. A new algorithm almost always wants a knob
 that is not on that list, and there are two ways to get one wrong:
 
-* **Forgetting hydra's ``+``.** ``algorithm.lam_low=0.9`` fails loudly ("could not
-  override"), so that one is fine. ``+algorithm.lam_low=0.9`` appends it and works.
-* **Reading it with a default.** ``config.get("lam_low", 1.0)`` turns a typo, a missing
+* **Forgetting hydra's ``+``.** ``algorithm.high_level_gamma=0.9`` fails loudly ("could
+  not override"), so that one is fine. ``+algorithm.high_level_gamma=0.9`` appends it and
+  works.
+* **Reading it with a default.** ``config.get("high_level_gamma", 1.0)`` turns a typo, a missing
   ``+``, or a config path that never reached the trainer into a silently different
   algorithm. That is the dangerous one: the run completes, the curves look ordinary, and
   the numbers are of some other estimator.
@@ -35,7 +36,7 @@ def required(config, name: str, estimator: str, why: str):
     """An estimator hyperparameter with no sensible default.
 
     Args:
-        name: the key under ``algorithm``, e.g. ``"lam_low"``.
+        name: the key under ``algorithm``, e.g. ``"high_level_gamma"``.
         estimator: the registered estimator name, for the error message.
         why: what silently happens if it is missing -- the part a reader needs in order
             to understand why this is not just defaulted.

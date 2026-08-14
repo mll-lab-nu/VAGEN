@@ -200,8 +200,8 @@ def test_high_level_gamma_follows_gamma_when_unset():
 def test_a_turns_last_token_gets_the_turn_advantage_and_not_its_own_delta():
     """★ The overwrite. At a turn end the released code zeroes both the bootstrap and the
     accumulator, so ``delta = (A_turn + V) - V = A_turn`` exactly -- that token's own
-    delta is discarded rather than added. A corrected variant would add it, which is the
-    single line the two differ by at ``lam_low=1``.
+    delta is discarded rather than added. Adding it instead is a one-line change, and the
+    behaviour pinned here is what makes this the released algorithm rather than that one.
 
     Checked on `returns`, which is unwhitened: ``return = A_turn + V(eos)`` is the turn's
     own return, so the last turn's must be its reward plus nothing, 1.0, because it

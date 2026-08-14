@@ -9,30 +9,7 @@ When running on NVIDIA B200 or RTX 6000 Pro GPUs with sglang, the default attent
 +actor_rollout_ref.rollout.engine_kwargs.sglang.mm_attention_backend=triton_attn
 ```
 
-## 2. SGLang worker dies unexpectedly
-
-If SGLang workers die with no clear error message, this is likely caused by a `uvicorn` compatibility issue. Pin `uvicorn` to a version below 0.41:
-
-```bash
-pip install "uvicorn<0.41"
-```
-
-## 3. Model families that do not train on this stack
-
-Two of the shipped sokoban scripts cannot run as of transformers 5.12.1 / vLLM 0.22. Both
-fail *after* the allocation is up rather than at model load, so they cost a cluster job
-before saying anything. They are kept, with the diagnosis in their headers, because the
-diagnosis is the useful part.
-
-| script | fails with | where it stands |
-|---|---|---|
-| `train_default_gae_glm41v_9b.sh` | `ImportError: apply_multimodal_rotary_pos_emb` at the first attention forward | transformers removed the symbol from `models.glm4v`; GLM-4V's mrope was refactored to `apply_rotary_pos_emb` + `rotate_half_llm`. `verl/verl/models/transformers/glm4v.py:313` still imports the old name. Porting it is real work and a subtly wrong rope corrupts training **silently** — there is no GLM baseline here to catch that against. **Note** the verl submodule *does* carry a `glm4v.py` patch (`27c51e9`, unpacking the vision tower output), so the file is not untouched — that patch fixes a different fault, and this one is what remains. |
-| `train_default_gae_internvl3_2b.sh` | CUDA device-side assert, `IndexKernel.cu:111 index out of bounds` | The architecture is supported. The image-placeholder count VAGEN writes into `prompt_token_ids` disagrees with what the engine expects; the leading hypothesis is InternVL's dynamic tiling (`max_dynamic_patch`) giving different tile counts on either side. Unverified. |
-
-`qwen2_5_vl` still carries the old rope symbol, which is why the Qwen scripts are
-unaffected.
-
-## 4. `<think>` is a reserved token on some families — do not use `prompt_format: wm` there
+## 2. `<think>` is a reserved token on some families — do not use `prompt_format: wm` there
 
 On Qwen2.5-VL and InternVL3, `<think>` is three ordinary text tokens. On **Qwen3-VL,
 Qwen3.5 and GLM** it is a single reserved control token tied to the model's own thinking
@@ -60,7 +37,7 @@ default to `free_think` and are unaffected. What each environment offers:
 
 `free_wm` and `answer` exist only for sokoban.
 
-## 5. `thinking_token_budget` bounds the think block, not the response — and not the cost
+## 3. `thinking_token_budget` bounds the think block, not the response — and not the cost
 
 For a model with a native reasoning channel (Qwen3-VL, Qwen3.5, GLM), `thinking_token_budget`
 is passed to vLLM, which forces the closing `</think>` once the budget is spent. Measured
@@ -86,7 +63,7 @@ vLLM refuses the request if the budget is set and `reasoning_config` is not; see
 `examples/train/sokoban/train_default_gae_qwen35_4b_think.sh` for the delimiters, which are
 per-model-family knowledge and so live in the script rather than in VAGEN.
 
-## 6. A `compact_budget` too small fails at runtime, not at startup
+## 4. A `compact_budget` too small fails at runtime, not at startup
 
 Under `trainer.harness=compact`, a budget that cannot hold the system prompt plus a summary
 plus one generation closes every conversation after a single turn, raises
