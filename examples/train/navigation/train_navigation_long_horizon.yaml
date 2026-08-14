@@ -1,9 +1,7 @@
-# ★ max_env_response_per_turn is written out as `null` on purpose: no ceiling, never cut
-# an observation. Navigation runs against a remote AI2-THOR server, so a frame's token cost
-# is a property of that server's render settings rather than of anything in this repo, and
-# an over-ceiling observation is now truncated rather than refused -- a plausible but
-# unmeasured number would silently discard real context. Measure it against your own server
-# if you want the static budget checks to be exact.
+# max_env_response_per_turn is left unset here, so it takes the 2048 default. Navigation
+# runs against a remote AI2-THOR server and a frame's token cost is a property of that
+# server's render settings, so there is no number this repo can honestly measure. Declare
+# it once you have measured yours; it is the ceiling an observation is truncated to.
 envs:
   - name: RemoteEnv
     n_envs: 1200
@@ -11,7 +9,6 @@ envs:
     seed: [1, 1200, 1]
     max_turns: 10
     response_length_per_turn: 512
-    max_env_response_per_turn: null
     config:
       base_urls: "http://localhost:8000"
       timeout: 120

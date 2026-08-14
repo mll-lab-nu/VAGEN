@@ -527,8 +527,8 @@ class GymLoop(VagenGymAgentLoopBase):
         # Derived from what the mode has left rather than defaulted to a constant, so an
         # env config that does not declare it is still bounded -- by the largest value
         # that would have passed the checks below.
-        b = replace(b, env_response=int(env_response) if env_response else default_env_response(mode, b),
-                    env_response_configured=bool(env_response))
+        b = replace(b, env_response=int(env_response) if env_response
+                    else default_env_response(mode, b))
         check_budgets(mode, b)
 
         # Every mode gets the region and the floor. Passing them to compaction alone
