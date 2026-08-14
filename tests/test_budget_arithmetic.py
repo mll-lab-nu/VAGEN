@@ -116,8 +116,7 @@ def test_the_derived_defaults_satisfy_the_rules_they_are_checked_against():
             b = replace(b, summary_budget=k)
             # Derived, so it must say so: the exact "can a conversation buy a turn"
             # check is meaningless against a number chosen to be generous.
-            b = replace(b, env_response=default_env_response("compact", b),
-                        env_response_configured=False)
+            b = replace(b, env_response=default_env_response("compact", b))
             assert k >= 1
             check("compact", b)
 
@@ -126,13 +125,14 @@ def test_the_room_check_turns_over_exactly_where_it_says():
     """A bound the error tells you to use, that then fails, costs a second submission."""
     from dataclasses import replace
 
-    # E declared, so the exact form applies: summary + request + generation + one
-    # observation + the floor below which the next generation is not worth making.
+    # summary + request + generation + the floor below which the next generation is not
+    # worth making. The observation is deliberately NOT charged: E is a ceiling on a worst
+    # case, not a description of a typical observation.
     b = _b(compact_budget=None, summary_budget=500, per_turn=1000, env_response=300,
-           prompt_len=4000, summary_request_len=13, env_response_configured=True)
+           prompt_len=4000, summary_request_len=13)
     for n_r in range(1800, 4000):
         floor = min(1000, max(1, n_r // 4))
-        if 500 + 13 + 1000 + 300 + floor <= n_r:
+        if 500 + 13 + 1000 + floor <= n_r:
             needed = n_r
             break
     check("compact", replace(b, response_len=needed))
@@ -409,13 +409,17 @@ def test_the_default_env_response_is_a_flat_ceiling_not_a_share_of_the_region():
     assert big == DEFAULT_MAX_ENV_RESPONSE == 2048
 
 
-def test_the_flat_ceiling_never_raises_a_tight_configuration_past_what_fits():
-    """It is a cap, not a floor: where the region-derived room is smaller, that still
-    wins, or the static checks would start admitting observations that do not fit."""
-    from vagen.harness.budget import default_env_response
+@pytest.mark.parametrize("mode", ["concat", "no_concat", "compact"])
+def test_the_ceiling_does_not_depend_on_the_configuration_at_all(mode):
+    """★ E is a truncation ceiling and nothing else, so there is nothing to derive it
+    from. Both earlier derivations were wrong in the same way -- they made the size of an
+    observation a function of how much room the model was given to answer it. From the
+    worst-case sum it went negative and refused every observation; from the room left it
+    grew with the response region, reaching 10240 against a measured 96."""
+    from vagen.harness.budget import DEFAULT_MAX_ENV_RESPONSE, default_env_response
 
-    tight = default_env_response("concat", _b(response_len=2000, per_turn=1000))
-    assert tight == 1000 < 2048
+    for b in (_b(response_len=2000, per_turn=1000), _b(response_len=64000, per_turn=1000)):
+        assert default_env_response(mode, b) == DEFAULT_MAX_ENV_RESPONSE
 
 
 @pytest.mark.parametrize("mode", ["concat", "compact"])
@@ -424,8 +428,7 @@ def test_a_five_turn_episode_at_a_real_observation_size_passes_without_warning(m
     256-token observations inside an 11264 region."""
     import warnings
 
-    b = _b(response_len=11264, per_turn=2048, max_turns=5, env_response=256,
-           env_response_configured=True, compact_budget=4000, summary_budget=1000)
+    b = _b(response_len=11264, per_turn=2048, max_turns=5, env_response=256, compact_budget=4000, summary_budget=1000)
     with warnings.catch_warnings():
         warnings.simplefilter("error")   # any budget warning becomes a failure
         check(mode, b)
@@ -501,64 +504,3 @@ def test_an_unset_budget_adds_no_key_at_all():
         if kwargs.get("thinking_token_budget"):
             sampling = {**sampling, "thinking_token_budget": int(kwargs["thinking_token_budget"])}
         assert "thinking_token_budget" not in sampling
-
-
-# ------------------------------------------- an explicitly unbounded observation ceiling
-#
-# Three states, not two: absent asks for a derived default, a number is a measurement, and
-# an explicit `null` says this environment has no ceiling at all. The third exists because
-# an over-ceiling observation is now CUT rather than refused, so a ceiling that was guessed
-# rather than measured silently discards real context. A remote environment's frame size is
-# a property of the server it talks to, not of this repo.
-
-
-def test_writing_the_key_as_null_is_not_the_same_as_leaving_it_out(tmp_path):
-    from vagen.gym_agent_dataset import UNBOUNDED_ENV_RESPONSE, load_envspecs
-
-    absent = tmp_path / "absent.yaml"
-    absent.write_text("envs:\n  - name: Sokoban\n    n_envs: 1\n")
-    assert load_envspecs(str(absent)).specs[0].max_env_response_per_turn is None
-
-    explicit = tmp_path / "null.yaml"
-    explicit.write_text("envs:\n  - name: Sokoban\n    n_envs: 1\n"
-                        "    max_env_response_per_turn: null\n")
-    assert load_envspecs(str(explicit)).specs[0].max_env_response_per_turn == UNBOUNDED_ENV_RESPONSE
-
-    number = tmp_path / "num.yaml"
-    number.write_text("envs:\n  - name: Sokoban\n    n_envs: 1\n"
-                      "    max_env_response_per_turn: 256\n")
-    assert load_envspecs(str(number)).specs[0].max_env_response_per_turn == 256
-
-
-def test_the_deprecated_spelling_can_also_be_nulled(tmp_path):
-    from vagen.gym_agent_dataset import UNBOUNDED_ENV_RESPONSE, load_envspecs
-
-    p = tmp_path / "old.yaml"
-    p.write_text("envs:\n  - name: Sokoban\n    n_envs: 1\n    env_response_length: null\n")
-    assert load_envspecs(str(p)).specs[0].max_env_response_per_turn == UNBOUNDED_ENV_RESPONSE
-
-
-@pytest.mark.parametrize("mode", ["concat", "no_concat", "compact"])
-def test_unbounded_disables_the_observation_ceiling_rather_than_setting_a_big_one(mode):
-    """``None`` is what turns the client's check off, and the client is where an
-    observation would otherwise be cut. A large number would still cut, just later."""
-    from vagen.harness.budget import context_limits
-
-    b = _b(env_response=-1, compact_budget=4000, summary_budget=1000, summary_request_len=13)
-    opening, continuation = context_limits(mode, b)
-    assert continuation is None
-    # the opening ceiling stays: the prompt region is a real limit whatever the env returns
-    assert opening == b.prompt_len
-
-
-@pytest.mark.parametrize("mode", ["concat", "no_concat", "compact"])
-def test_unbounded_skips_the_checks_written_in_terms_of_E_instead_of_failing_them(mode):
-    """Every relation here is written in terms of E. With no E they cannot be evaluated,
-    and evaluating them against the sentinel would produce nonsense arithmetic."""
-    import warnings
-
-    b = _b(env_response=-1, max_turns=20, per_turn=1000, response_len=4000,
-           compact_budget=4000, summary_budget=1000, summary_request_len=13)
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        check(mode, b)

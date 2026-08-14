@@ -10,8 +10,6 @@ from torch.utils.data import Dataset
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 from omegaconf import OmegaConf
-
-from vagen.harness.budget import UNBOUNDED_ENV_RESPONSE
 import torch
 
 @dataclass
@@ -44,12 +42,6 @@ class EnvSpec:
     # the model may write in a turn, this bounds what the environment may hand back. With
     # both set, a concat episode costs at most T*g + (T-1)*E and the compaction arithmetic
     # is exact rather than self-consistent.
-    #
-    # ★ Writing it out as `null` is a third option, and not the same as leaving it out:
-    # it means this environment has NO ceiling, so an observation is never bounded and
-    # never cut. Use it when the size is not a property of this repo -- a remote env whose
-    # frames depend on the server it talks to -- because a guessed ceiling now discards
-    # real context instead of raising. See budget.UNBOUNDED_ENV_RESPONSE.
     max_env_response_per_turn: Optional[int] = None
     #: Deprecated spelling of ``max_env_response_per_turn``. Kept because it is what the
     #: oversized-observation error told people to set.
@@ -90,20 +82,7 @@ class EnvSpecs:
 
 def load_envspecs(yaml_path: str) -> EnvSpecs:
     cfg = OmegaConf.load(yaml_path)
-    specs = []
-    for entry in cfg.get("envs", []):
-        raw = OmegaConf.to_container(entry, resolve=True)
-        # ★ Writing the key with no value is not the same as leaving it out. Absent means
-        # "derive a ceiling for me"; an explicit `null` means "this environment has no
-        # ceiling -- never truncate an observation". The dataclass cannot tell the two
-        # apart, since both arrive as None, so it is decided here where the yaml is still
-        # visible. See EnvSpec.max_env_response_per_turn.
-        unbounded = any(k in raw and raw[k] is None
-                        for k in ("max_env_response_per_turn", "env_response_length"))
-        spec = EnvSpec(**raw)
-        if unbounded:
-            spec.max_env_response_per_turn = UNBOUNDED_ENV_RESPONSE
-        specs.append(spec)
+    specs = [EnvSpec(**OmegaConf.to_container(s, resolve=True)) for s in cfg.get("envs", [])]
     return EnvSpecs(specs=specs)
 
 # Upper bound used for RNG sampling when only a base seed is provided
