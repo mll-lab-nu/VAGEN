@@ -69,7 +69,12 @@ backends:
     max_backoff: 8.0
 
   vllm:
-    base_url: "http://127.0.0.1:8000/v1"
+    # ★ Not 8000, which is vLLM's own default: navigation's and primitive_skill's
+    # ENVIRONMENT servers (vagen/envs/*/serve.py) default to 8000 too, so a policy server
+    # left on it collides with the environment the policy is meant to be acting in -- and
+    # the symptom is the environment answering chat completions, or the reverse. Start the
+    # policy server with `--port 8311` to match, as examples/evaluate/*/vllm/ do.
+    base_url: "http://127.0.0.1:8311/v1"
     api_key: "EMPTY"
     model: ""
     max_concurrency: 2
