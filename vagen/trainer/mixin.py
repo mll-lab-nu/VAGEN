@@ -75,10 +75,17 @@ class VagenLogicMixin:
         the same argument the docstring below makes for estimators. An unregistered name
         is treated as splitting, matching the base class default.
         """
-        from vagen.harness import HARNESSES
+        from vagen.harness import resolve_harness
 
-        cls = HARNESSES.get(self._vagen_harness_mode())
-        return True if cls is None else cls.splits_episode_across_rows
+        try:
+            cls = resolve_harness(self._vagen_harness_mode())
+        except (ValueError, TypeError):
+            # Unresolvable here is not fatal -- build_harness will say so properly when the
+            # rollout starts. Assume it splits, which is the conservative answer: it makes
+            # the estimator check demand a trajectory estimator rather than waving through
+            # a per-row one that would score a fraction of an episode.
+            return True
+        return cls.splits_episode_across_rows
 
     def _vagen_harness_mode(self) -> str:
         """Which context policy the agent loop will actually run.

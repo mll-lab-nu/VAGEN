@@ -203,3 +203,21 @@ def test_the_contract_holds_no_implementations():
         if inspect.isclass(obj) and issubclass(obj, contract.BaseHarness) and obj is not contract.BaseHarness
     ]
     assert classes == [], f"{classes} belong in vagen/harness/"
+
+
+# --------------------------------------- a custom harness reaches the training path too
+def test_the_estimator_check_asks_a_custom_harness_whether_it_splits():
+    """★ The check keys off `splits_episode_across_rows`, and it used to look the harness
+    up by name only -- so an import-path harness came back None and was assumed to split,
+    which makes the estimator guard reject default_gae on a concat-like policy. Now it
+    resolves the class, and only a genuinely unresolvable name falls back to `True`."""
+    from vagen.harness import ConcatHarness, resolve_harness
+
+    class Mine(ConcatHarness):
+        pass
+
+    import sys
+    sys.modules[__name__].Mine = Mine
+    resolved = resolve_harness(f"{__name__}:Mine")
+    assert resolved is Mine
+    assert resolved.splits_episode_across_rows is ConcatHarness.splits_episode_across_rows
