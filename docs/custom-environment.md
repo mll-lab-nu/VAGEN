@@ -41,4 +41,4 @@ You can follow the Sokoban examples as templates:
 
 ## Step 4: Create a Training Script
 
-Write your training script based on [`examples/train/sokoban/train_ppo_qwen25vl3b.sh`](https://github.com/mll-lab-nu/VAGEN/blob/main/examples/train/sokoban/train_ppo_qwen25vl3b.sh)
+Write your training script based on [`examples/train/sokoban/train_default_gae_qwen25vl3b.sh`](https://github.com/mll-lab-nu/VAGEN/blob/main/examples/train/sokoban/train_default_gae_qwen25vl3b.sh)

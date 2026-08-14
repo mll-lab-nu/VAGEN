@@ -57,7 +57,7 @@ sys + obs_0 + response_0 + obs_1 + response_1 + ...
 ```bash
 cd VAGEN
 wandb login
-bash examples/train/sokoban/train_ppo_qwen25vl3b.sh
+bash examples/train/sokoban/train_default_gae_qwen25vl3b.sh
 ```
 
 #### 2. Non-Concatenated Training

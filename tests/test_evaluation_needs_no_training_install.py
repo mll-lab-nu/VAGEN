@@ -25,6 +25,15 @@ CLEAN_PACKAGES = ["vagen/core", "vagen/harness", "vagen/evaluate", "vagen/envs_r
 
 FORBIDDEN = {"verl", "torch", "ray"}
 
+#: ★ Also forbidden: reaching into VAGEN's own training packages. `vagen/core/env_adapter.py`
+#: imported `vagen.agent_loop.obs` -- which happens to be pure PIL and typing today, so the
+#: verl/torch/ray check above passed while the layering the file exists to maintain was
+#: already broken. One `import torch` added to anything under agent_loop/ would have taken
+#: evaluation with it, silently. (obs.py now lives in core/, which is the real fix; this is
+#: what stops the next one.)
+FORBIDDEN_PACKAGES = {"vagen.agent_loop", "vagen.trainer", "vagen.custom_advantage",
+                      "vagen.custom_loss", "vagen.custom_filter", "vagen.custom_metric"}
+
 #: ManiSkill's own simulation code, vendored under primitive_skill. It is torch-native --
 #: the simulator returns tensors -- and it is reached only by the primitive_skill
 #: environment, which already needs its own requirements file. The rule is about VAGEN's
@@ -32,8 +41,8 @@ FORBIDDEN = {"verl", "torch", "ray"}
 EXEMPT_PREFIXES = ("vagen/envs/primitive_skill/maniskill/",)
 
 
-def _module_roots(path: str):
-    """Every module imported by `path`, at any nesting depth, as its top-level name.
+def _imports(path: str):
+    """Every module imported by `path`, at any nesting depth, with its full dotted name.
 
     ast rather than a grep: a `from torch import ...` inside a function body is exactly the
     kind of import that gets added to "avoid the dependency" and then makes the dependency
@@ -44,11 +53,21 @@ def _module_roots(path: str):
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
-                yield alias.name.split(".")[0]
+                yield alias.name
         elif isinstance(node, ast.ImportFrom):
             # level > 0 is a relative import, which cannot reach outside the package.
             if node.module and node.level == 0:
-                yield node.module.split(".")[0]
+                yield node.module
+
+
+def _offenders(path: str):
+    bad = []
+    for mod in _imports(path):
+        if mod.split(".")[0] in FORBIDDEN:
+            bad.append(mod.split(".")[0])
+        elif any(mod == pkg or mod.startswith(pkg + ".") for pkg in FORBIDDEN_PACKAGES):
+            bad.append(mod)
+    return sorted(set(bad))
 
 
 def _python_files():
@@ -72,10 +91,10 @@ assert FILES, "no files collected; CLEAN_PACKAGES is wrong, not the repo empty"
 
 @pytest.mark.parametrize("rel", FILES)
 def test_the_evaluation_path_imports_no_training_dependency(rel):
-    found = sorted(set(_module_roots(os.path.join(_ROOT, rel))) & FORBIDDEN)
+    found = _offenders(os.path.join(_ROOT, rel))
     assert not found, (
-        f"{rel} imports {found}. Evaluation is meant to run without a training install, "
-        f"so this makes `pip install` for an eval-only user pull in {found[0]}. If the "
-        f"code genuinely belongs on the training side, it belongs under vagen/agent_loop "
-        f"or vagen/trainer."
+        f"{rel} imports {found}. Evaluation is meant to run without a training install, so "
+        f"this makes `pip install` for an eval-only user pull in a training dependency -- "
+        f"directly, or transitively through a VAGEN training package that is free of one "
+        f"only until someone adds it. Shared helpers belong in vagen/core."
     )

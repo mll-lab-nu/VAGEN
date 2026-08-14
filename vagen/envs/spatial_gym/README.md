@@ -42,6 +42,6 @@ bash examples/train/spatial_gym/train_grpo_qwen25vl7b.sh
 PPO training
 
 ```bash
-bash examples/train/spatial_gym/train_ppo_qwen25vl3b.sh
-bash examples/train/spatial_gym/train_ppo_qwen25vl7b.sh
+bash examples/train/spatial_gym/train_default_gae_qwen25vl3b.sh
+bash examples/train/spatial_gym/train_default_gae_qwen25vl7b.sh
 ```

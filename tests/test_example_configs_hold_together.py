@@ -153,11 +153,22 @@ def test_the_run_is_stopped_by_its_step_count_and_not_by_an_epoch_count(script):
     that looked configured for 401 steps produced 30 and no checkpoint. navigation
     stopped at 270. Nothing said so: the run simply ended and reported success.
     """
+    shared = OmegaConf.load(os.path.join(_ROOT, "vagen/configs/vagen_multiturn.yaml")).trainer
     text = open(script).read()
+    # ★ Fall back to the shared default rather than skipping. Skipping here is what let the
+    # inverse bug through: with total_epochs raised to 100000 to stop epochs binding, a
+    # script that omitted the step count would have verl derive
+    # `len(dataloader) * total_epochs` -- millions of steps, an LR warmup that never
+    # completes, and no stop condition. The default has to be exercised, not stepped over.
     steps = _flag(text, "trainer.total_training_steps")
+    if steps is None:
+        steps = shared.total_training_steps
+        assert steps is not None, (
+            "neither the script nor vagen_multiturn.yaml pins trainer.total_training_steps, "
+            "so verl derives it as len(dataloader) * total_epochs -- an unbounded run")
     batch = _flag(text, "data.train_batch_size")
-    if steps is None or batch is None:
-        pytest.skip("script does not pin both a step count and a batch size")
+    if batch is None:
+        pytest.skip("script does not pin a batch size")
 
     yamls = _script_yamls(text, script)
     train_yaml = next((y for y in yamls if "/train_" in y), None)
@@ -166,9 +177,11 @@ def test_the_run_is_stopped_by_its_step_count_and_not_by_an_epoch_count(script):
     cfg = OmegaConf.load(train_yaml)
     n_envs = sum(int(e["n_envs"]) for e in cfg["envs"])
 
-    epochs = _flag(text, "trainer.total_epochs") or int(
-        OmegaConf.load(os.path.join(_ROOT, "vagen/configs/vagen_multiturn.yaml"))
-        .trainer.total_epochs)
+    # `is None`, not `or`: a script setting total_epochs=0 would otherwise fall through to
+    # the shared default and pass while doing zero steps.
+    epochs = _flag(text, "trainer.total_epochs")
+    if epochs is None:
+        epochs = int(shared.total_epochs)
 
     per_epoch = n_envs // batch          # drop_last=True
     assert per_epoch >= 1, (
@@ -178,3 +191,29 @@ def test_the_run_is_stopped_by_its_step_count_and_not_by_an_epoch_count(script):
         f"{os.path.basename(script)} asks for {steps} steps but can only reach "
         f"{epochs * per_epoch} ({per_epoch} steps/epoch x {epochs} epochs): "
         f"n_envs={n_envs}, train_batch_size={batch}")
+
+
+def test_the_shared_config_bounds_a_run_that_names_no_step_count():
+    """★ The two keys are a pair, and raising one without pinning the other is a trap.
+
+    total_epochs is 100000 so that an epoch count can never stop a run before its steps do
+    (see the test above). But verl computes
+
+        total_training_steps = len(train_dataloader) * total_epochs        [ray_trainer.py]
+
+    whenever total_training_steps is null, and hands the result to the LR scheduler as its
+    horizon. Left null, a launch that did not pass the flag would compute millions of steps:
+    the warmup ramp never completes, the cosine decay is flat, and nothing ever stops it.
+
+    Every shipped script passes the flag, so the parametrized test above never reaches the
+    default -- which is exactly why this one has to check it directly.
+    """
+    trainer = OmegaConf.load(
+        os.path.join(_ROOT, "vagen/configs/vagen_multiturn.yaml")).trainer
+    epochs = trainer.get("total_epochs")
+    steps = trainer.get("total_training_steps")
+    assert epochs is not None and int(epochs) > 0, "total_epochs must be set"
+    assert steps is not None and int(steps) > 0, (
+        f"vagen_multiturn.yaml sets total_epochs={epochs} but leaves total_training_steps "
+        f"null, so verl derives it as len(dataloader) * {epochs} -- an unbounded run with "
+        f"a broken LR schedule for anyone who does not pass the flag")

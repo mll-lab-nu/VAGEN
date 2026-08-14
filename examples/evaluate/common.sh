@@ -18,7 +18,11 @@
 # this readable: sokoban_default_gae_qwen25vl3b-global_step_400.
 vagen_model_name() {
   local path="${1%/}" step exp
-  step="$(printf '%s' "$path" | grep -oE 'global_step_[0-9]+' | tail -1 || true)"
+  # `best_actor` as well as `global_step_N`: trainer.val_log keeps the best-validating actor
+  # under <exp>/verl_checkpoints/best_actor/actor/huggingface, and docs/evaluation.md tells
+  # the reader that is where the checkpoint to score lives. Matching only global_step_ sent
+  # every run's best actor to the same `huggingface` directory.
+  step="$(printf '%s' "$path" | grep -oE 'global_step_[0-9]+|best_actor' | tail -1 || true)"
   if [ -z "$step" ]; then
     # A local directory outside verl's layout: its own name is the informative part.
     # Otherwise a HuggingFace hub id (Qwen/Qwen2.5-VL-3B-Instruct), where `/` would open a
@@ -26,7 +30,19 @@ vagen_model_name() {
     if [ -d "$path" ]; then basename "$path"; else printf '%s' "${path//\//_}"; fi
     return
   fi
-  exp="$(printf '%s' "$path" | sed -E "s#/(verl_)?checkpoints?/${step}.*##; s#.*/##")"
+  # The run's own name: the directory holding the step, skipping a `checkpoints` level if
+  # that is what it turns out to be. Covers both layouts -- <exp>/verl_checkpoints/<step>/…
+  # (what the scripts here configure) and verl's own default
+  # checkpoints/<project>/<exp>/<step>/…, where the run name is one level nearer.
+  local head
+  head="$(printf '%s' "$path" | sed -E "s#/${step}(/.*)?\$##")"
+  exp="${head##*/}"
+  case "$exp" in
+    checkpoints|checkpoint|verl_checkpoints|verl_checkpoint) exp="${head%/*}"; exp="${exp##*/}" ;;
+  esac
+  # A run directory called `checkpoints` at the filesystem root leaves this empty; the step
+  # alone is still unique per step, which is the property that matters.
+  [ "$exp" = "$path" ] && exp=""
   printf '%s' "${exp:+${exp}-}${step}"
 }
 
@@ -61,12 +77,24 @@ vagen_serve_vllm() {
   # takes seconds to release device memory. Returning the instant SIGTERM is delivered
   # means a second invocation profiles its memory fraction while the first still holds it
   # and OOMs at engine init -- which is what a loop over checkpoints does.
+  #
+  # ★ This REPLACES any EXIT trap the caller already installed -- bash has one per signal.
+  # None of the shipped launchers set one before calling this, but a script that does would
+  # lose it silently, so refuse rather than discard.
+  local existing
+  existing="$(trap -p EXIT)"
+  if [ -n "$existing" ]; then
+    echo "vagen_serve_vllm installs an EXIT trap to reap the server, but one is already " >&2
+    echo "set and bash keeps only the last: ${existing}" >&2
+    echo "Call this before installing your own, and chain to _vagen_reap_server." >&2
+    return 1
+  fi
   # shellcheck disable=SC2317
-  cleanup() {
+  _vagen_reap_server() {
     kill "${SERVER_PID}" 2>/dev/null || true
     wait "${SERVER_PID}" 2>/dev/null || true
   }
-  trap cleanup EXIT
+  trap _vagen_reap_server EXIT
 
   local i
   for i in $(seq 1 90); do

@@ -10,13 +10,18 @@ set -euo pipefail
 fileroot="${VAGEN_EVAL_ROOT:-${fileroot:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)/eval_runs}}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG="${CONFIG:-"$SCRIPT_DIR/../config.yaml"}"
+# shellcheck source=../../common.sh
+source "${SCRIPT_DIR}/../../common.sh"
 PORT="${PORT:-30000}"
 LOG_DIR="${LOG_DIR:-"$SCRIPT_DIR/logs"}"
 mkdir -p "$LOG_DIR"
 
 # ---------- Model / Server Config ----------
-MODEL_NAME="${MODEL_NAME:-"qwen_25_vl_7b"}"
 MODEL_PATH="${QWEN25_VL_7B_PATH:-"Qwen/Qwen2.5-VL-7B-Instruct"}"
+# ★ Derived from the checkpoint path, not a constant. Hardcoded, every
+# checkpoint of a run landed in one dump directory and overwrote the last
+# summary.json -- see vagen_model_name in examples/evaluate/common.sh.
+MODEL_NAME="${MODEL_NAME:-$(vagen_model_name "${MODEL_PATH}")}"
 DP_SIZE="${QWEN25_VL_7B_DP:-8}"
 TP_SIZE="${QWEN25_VL_7B_TP:-1}"
 
@@ -38,7 +43,7 @@ fi
 
 MEM_FRACTION="${QWEN25_VL_7B_MEM:-0.80}"
 
-DUMP_DIR="${DUMP_DIR:-"$fileroot/rollouts/eval_navigation_${MODEL_NAME}"}"
+DUMP_DIR="${DUMP_DIR:-"$fileroot/rollouts/eval_navigation/${MODEL_NAME}"}"
 mkdir -p "$DUMP_DIR"
 
 SERVER_LOG="${LOG_DIR}/${MODEL_NAME}_server.log"
@@ -65,7 +70,7 @@ cleanup() {
 trap cleanup EXIT
 
 # ---------- Wait for server to be ready ----------
-source "${SCRIPT_DIR}/wait_for_server.sh"
+source "${SCRIPT_DIR}/../../wait_for_server.sh"
 wait_for_server
 
 # ---------- Run Eval ----------

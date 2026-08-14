@@ -13,7 +13,12 @@ MODEL_PATH=Qwen/Qwen2.5-VL-3B-Instruct \
 ```
 
 That starts a vLLM server, runs the config next to it, writes rollouts and a
-`summary.json`, and shuts the server down. Any extra argument is a hydra override:
+`summary.json`, and shuts the server down. There is one per environment —
+`examples/evaluate/<env>/vllm/` for sokoban, frozenlake, navigation, primitive_skill and
+spatial_gym; the last three also need an environment server or a dataset, and each
+launcher checks for its own and says what to run.
+
+Any extra argument is a hydra override:
 
 ```bash
 bash examples/evaluate/sokoban/vllm/eval_qwen25_vl_3b.sh 'envs.0.harness=no_concat'
@@ -44,8 +49,11 @@ is kept separately under `best_actor/`, selected on the mean of
 !!! warning "Put the model in the dump directory"
     Rollouts are keyed on `(env, seed, tag_id, model)` and `resume: skip_completed` skips
     on a match. Two checkpoints evaluated into one dump directory are kept apart by the
-    model field, but the *summary* is clearer if the paths differ too — the shipped vLLM
-    launcher puts `$MODEL_NAME` in the path for that reason.
+    model field, but the *summary* is per-directory, so two checkpoints sharing one would
+    have the second overwrite the first's `summary.json`. Every launcher puts
+    `$MODEL_NAME` in the path for that reason, and derives it with `vagen_model_name`
+    (`examples/evaluate/common.sh`) rather than `basename` — every verl checkpoint's
+    basename is the literal string `huggingface`, `best_actor/` included.
 
 ## Comparing context policies
 
