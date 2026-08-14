@@ -13,9 +13,11 @@ A lightweight reimplementation built on [VERL](https://github.com/volcengine/ver
 
 - [Quick Start](quickstart.md) - Installation and basic usage
 - [Configuration](configuration.md) - Training configuration reference
+- [Evaluation](evaluation.md) - Evaluate a checkpoint, and compare context policies
 - [Custom Environment](custom-environment.md) - Build your own environment
 - [Custom Filter](custom-filter.md) - Preprocess training data
 - [Custom Metric](custom-metric.md) - Add W&B logging metrics
+- [Known Issues](issues.md) - Model families and engine flags that need a workaround
 
 ## Links
 

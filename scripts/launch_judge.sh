@@ -34,4 +34,7 @@ exec "$ENV/bin/python" -m vllm.entrypoints.openai.api_server \
   --tensor-parallel-size "$TP" \
   --gpu-memory-utilization "$MEM" \
   --max-model-len 4096 \
-  --disable-log-requests
+  # vLLM 0.22 removed --disable-log-requests; quiet is the default and the flag
+  # that exists now is its opposite. Left in as a comment because the failure it
+  # caused -- `error: unrecognized arguments` -- names the flag, not the version.
+  # --enable-log-requests

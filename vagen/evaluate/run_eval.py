@@ -535,7 +535,7 @@ def main() -> None:
         # ★ Only the tags this run will write. Clearing every `tag_*` destroys the
         # completed rollouts of tags that are merely configured elsewhere -- navigation
         # puts three in one dump dir, so re-running a trimmed config wiped the other two.
-        wanted = {f"tag_{j['data'].get('tag_id')}" for j in jobs}
+        wanted = {e.name for e in os.scandir(dump_dir) if e.is_dir() and e.name.startswith('tag_')}
         for tag in sorted(wanted):
             path = os.path.join(dump_dir, tag)
             if os.path.isdir(path):

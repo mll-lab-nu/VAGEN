@@ -33,9 +33,18 @@ mkdir -p "$EXPERIMENT_DIR"
 # submodule leaves VAGEN/verl there but empty. Left unresolved this used to go on with
 # VERL empty, which made hydra.searchpath "file:///verl/trainer/config" and failed later
 # on something that does not mention verl.
-VERL=${VERL:-$(for d in "$V/verl" "$V/../verl"; do
-    [ -f "$d/verl/trainer/config/ppo_trainer.yaml" ] && (cd "$d" && pwd) && break
-done)}
+# ★ A plain loop, not `VERL=${VERL:-$(...)}`. Under `set -e` a command substitution that
+# exits non-zero kills the shell AT THE ASSIGNMENT, so the diagnostic below never ran: a
+# clone without --recursive got exit 1 and no output at all, which is precisely the case
+# the diagnostic exists for.
+if [ -z "${VERL:-}" ]; then
+    for d in "$V/verl" "$V/../verl"; do
+        if [ -f "$d/verl/trainer/config/ppo_trainer.yaml" ]; then
+            VERL=$(cd "$d" && pwd)
+            break
+        fi
+    done
+fi
 if [ -z "$VERL" ]; then
     echo "verl not found at $V/verl or $V/../verl." >&2
     echo "Run: git submodule update --init --recursive   (or set VERL=/path/to/verl)" >&2
