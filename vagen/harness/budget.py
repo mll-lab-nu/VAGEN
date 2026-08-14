@@ -127,6 +127,23 @@ def default_summary_budget(compact_budget: int, per_turn: int) -> int:
 #: replaces, so it bounds the arithmetic without binding on a real rollout.
 DEFAULT_MAX_ENV_RESPONSE = 2048
 
+#: ``max_env_response_per_turn: null``, written out in the yaml, means *no ceiling* -- do
+#: not bound an observation and never truncate one. Distinct from leaving the key out,
+#: which asks for a derived default; ``load_envspecs`` is what tells the two apart, since
+#: both reach the dataclass as ``None``.
+#:
+#: It exists because a ceiling is only worth having when it is a measurement. A remote
+#: environment's observation size is a property of the server it runs against, not of this
+#: repo -- and now that an over-ceiling observation is *cut* rather than refused, a
+#: plausible-but-unmeasured number silently discards real context. Saying "unbounded" is
+#: honest; guessing is not.
+UNBOUNDED_ENV_RESPONSE = -1
+
+
+def env_response_is_bounded(env_response: int | None) -> bool:
+    """False when the config asked for no observation ceiling at all."""
+    return env_response is not None and env_response >= 0
+
 
 def default_env_response(mode: str, b: Budgets) -> int:  # noqa: D401
     """``E`` when it is not configured: the room the mode has left for observations.
@@ -184,6 +201,12 @@ def check(mode: str, b: Budgets) -> None:
         raise BudgetError(
             f"response_length_per_turn={b.per_turn} exceeds rollout.max_model_len={b.context}."
         )
+
+    if not env_response_is_bounded(b.env_response):
+        # Nothing below can be computed: every relation is written in terms of E, and the
+        # config has said there is no E. The runtime is unaffected -- generation is still
+        # bounded by the room left, and the batch boundary still truncates what overflows.
+        return
 
     if mode == "no_concat":
         _need(b, b.env_response + b.per_turn, "one turn",
@@ -324,6 +347,11 @@ def context_limits(mode: str, b: Budgets) -> tuple[int, int]:
     # is an observation: the summary request goes out on the same path. It is a fixed
     # string this module already measures, so admit it rather than reporting a 70-token
     # observation the environment never returned.
+    if not env_response_is_bounded(b.env_response):
+        # ``None`` disables the check in the client, which is exactly "do not bound an
+        # observation, and never cut one". The opening ceiling stays: it is the prompt
+        # region, which is a real limit whatever the environment returns.
+        return opening, None
     continuation = b.env_response if mode in ("concat", "compact") else opening
     if mode == "compact":
         continuation = max(continuation, b.summary_request_len)
