@@ -21,10 +21,11 @@ from vagen.custom_advantage import TRAJECTORY_ESTIMATORS
 
 ESTIMATORS = sorted(TRAJECTORY_ESTIMATORS)
 
-#: Hyperparameters an estimator requires before it will run at all.
-PARAMS: dict[str, dict] = {
-    "removed_estimator_gae_varlam": {"lam_low": 0.8},
-}
+#: Hyperparameters an estimator requires before it will run at all. Empty today -- every
+#: registered estimator runs on the shared defaults -- but the contract below is written
+#: against this rather than against "no estimator needs anything", so adding one that does
+#: means adding a line here rather than special-casing it.
+PARAMS: dict[str, dict] = {}
 
 
 class _Cfg(dict):

@@ -275,13 +275,10 @@ def test_token_gae_runs_without_a_turn_column():
     assert ret[0].tolist() == pytest.approx([1.0, 1.0])
 
 
-
-removed_estimator = get_adv_estimator_fn("removed_estimator_gae_varlam")
-
-
-class _BiCfg(_Cfg):
-    def __init__(self, gamma=1.0, lam=1.0, lam_low=1.0):
-        self.gamma, self.lam, self.lam_low = gamma, lam, lam_low
+# (lam_low == lam is token-level GAE; lam_low == 1 is turn-level) and its refusal to run
+# without lam_low. That estimator is gone. Its layout-independence and value-mask
+# properties were never specific to it -- test_estimator_contract.py asserts both for
+# every registered estimator.
 
 
 def test_turn_boundaries_are_found_under_both_layouts():

@@ -90,21 +90,25 @@ turn.
 
 | estimator | scores | extra parameter |
 |---|---|---|
-| `default_gae` | the trajectory, rows stitched back together | — |
-| `token_level_gae` | per token, across the trajectory | — |
+| `default_gae` | the trajectory, rows stitched back together — **the default** | — |
 | `turn_level_gae` | per turn | — |
+| `token_level_gae` | per token, across the trajectory | — |
 | `trajectory_grpo` | group-relative, over trajectories | — |
 | verl's `gae`, `grpo`, … | one row — **`concat` only** | — |
 
-Neither `+`-prefixed parameter appears in a config file, so both go on the command line.
-warning.
+falls back to `algorithm.gamma` with a warning if omitted.
 
 ```bash
 ```
 
-!!! danger "Two more startup refusals"
-    All but `trajectory_grpo` need a critic and refuse without `critic.enable=True`. And
-    `ValueError`s at startup, the same class of trap as the harness rule above.
+!!! danger "One more startup refusal"
+    All but `trajectory_grpo` need a critic and refuse without `critic.enable=True` — a
+    `ValueError` at startup, the same class of trap as the harness rule above.
+
+    An estimator may also declare `undiscounted=True` at registration, which refuses the
+    run unless `algorithm.gamma=1.0`. None of the shipped estimators does; it is there for
+    a custom one that mixes a per-token and a per-turn clock, where the two only agree at
+    1.0 and the disagreement otherwise looks like noise rather than a bug.
 
 ---
 

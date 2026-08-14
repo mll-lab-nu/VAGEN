@@ -5,11 +5,19 @@ to summarise, writes one, and the next conversation opens on the *same* world st
 model emissions are separated by that seam -- the summary and the next action -- so the
 token stream shows two turn endings where one environment transition happened.
 
-``removed_estimator_gae_varlam`` spends ``algorithm.lam`` crossing a turn. Spending it at the seam too
-attenuates credit by ``lam ** 2`` where an ordinary turn costs ``lam``, and how often
-that happens is set by how often the policy compacts, which is set by how much it writes.
-The effective horizon then moves as the policy's verbosity moves, which is not a
-hyperparameter anybody chose.
+An estimator that spends ``algorithm.lam`` crossing a turn, and spends it at the seam too,
+attenuates credit by ``lam ** 2`` where an ordinary turn costs ``lam`` -- and how often that
+happens is set by how often the policy compacts, which is set by how much it writes. The
+effective horizon then moves as the policy's verbosity moves, which is not a hyperparameter
+anybody chose.
+
+★ No estimator in the tree consults the seam today: the one that did,
+``removed_estimator_gae_varlam``, has been removed, and the remaining ones either run at ``lam = 1``
+where the question is moot or deliberately treat every boundary alike. What is tested here
+is that the flag is *computed correctly and reaches the estimator inputs* -- the harness
+knows which conversation it summarised, that reaches ``AdvantageInputs.ends_with_summary``,
+and ``TrajectoryView.seam`` turns it into a per-position mask. That is the contract a custom
+estimator picks up, and it is the half that cannot be re-derived downstream.
 
 The seam also joins two critic evaluations of the same world state rendered as two
 different pieces of text -- the conversation being closed, and the summary standing in
@@ -114,7 +122,7 @@ def test_an_absent_column_means_no_seams_rather_than_an_error():
 # ------------------------------------------------------------------ what it buys
 
 def _lambdas(ends_with_summary, lam_low, lam_high):
-    """The per-position lambda `removed_estimator_gae_varlam` builds, as the estimator builds it."""
+    """The per-position lambda an estimator would build from the seam mask."""
     packed = _pack(_Inputs(_compact_layout(), ends_with_summary))
     seq_lam = torch.where(packed.boundary(), lam_high, lam_low)
     return torch.where(packed.seam(ends_with_summary), 1.0, seq_lam)[0]
@@ -182,7 +190,37 @@ def test_more_compactions_do_not_mean_less_credit():
     assert survives_unfixed[2] / survives_fixed[2] == pytest.approx(lam_high**6, rel=1e-6)
 
 
-# ------------------------------------------ the estimator, not just the helper
+# ------------------------------------------ the column reaches the estimator
+
+def test_the_flag_reaches_the_estimator_inputs_under_its_documented_name():
+    """★ Everything above tests that the seam is *computed*, from a hand-built view. This
+    tests that a real batch carries it: `ends_with_summary` is the column the agent loop
+    writes and `AdvantageInputs` is where an estimator reads it, and a rename on either
+    side would leave every other test in this file green while no estimator could ever
+    see a seam.
+
+    This replaces a test that asserted `compute_removed_estimator_gae_varlam` changed its output
+    when the flag was set. That estimator is gone and none of the remaining ones consult
+    the seam, so the reachable contract stops here.
+    """
+    from vagen.custom_advantage.inputs import AdvantageInputs
+
+    assert hasattr(AdvantageInputs, "ends_with_summary"), (
+        "AdvantageInputs no longer exposes ends_with_summary, so a custom estimator has "
+        "no way to reach the seam the harness records"
+    )
+    import inspect
+
+    from vagen.agent_loop import gym_loop
+    from vagen.agent_loop import multi_output
+
+    assert '"ends_with_summary"' in inspect.getsource(gym_loop), (
+        "the agent loop stopped writing the column the seam is derived from")
+    assert '"ends_with_summary"' in inspect.getsource(multi_output), (
+        "the column is not carried through multi_output, so it never reaches the batch")
+
+
+# --------------------------------------------------------- the signal at its source
 
 def test_the_harness_records_which_conversation_it_summarised():
     """The estimator can only be right if the flag is. Only the harness knows the
