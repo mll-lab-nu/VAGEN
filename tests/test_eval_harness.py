@@ -237,3 +237,48 @@ def test_compact_without_a_trigger_is_refused_rather_than_run_as_concat():
         wf = GenericVisionInferenceWorkflow(adapter=_Adapter(), dump_dir=None,
                                             harness="compact")
         asyncio.run(wf.arun_episode(_Env, {"name": "Stub"}, seed=0, max_turns=3))
+
+
+# ------------------------------------------ resume and aggregation, pinned
+#
+# The eval path had no tests at all, and these are the failures that produce a wrong
+# NUMBER rather than an error: a rerun that double-counts, a resume that reprints another
+# model's score, and one bad job that discards the whole batch.
+
+
+def test_resume_will_not_reuse_a_rollout_from_a_different_model():
+    """★ The key is (env, seed, tag, model). Without the model, evaluating checkpoint B
+    into the directory checkpoint A used skipped all of A's episodes and reprinted A's
+    success_rate under B's name -- exit 0, nothing in the output saying so."""
+    from vagen.evaluate.run_eval import _job_resume_key
+
+    base = {"env_name": "Sokoban", "seed": 1, "tag_id": "t"}
+    a = _job_resume_key({**base, "resume_model": "/ckpt/A"})
+    b = _job_resume_key({**base, "resume_model": "/ckpt/B"})
+    assert a != b, "two models share a resume key"
+    assert a == _job_resume_key({**base, "resume_model": "/ckpt/A"})
+
+
+def test_one_normal_finish_reason_set_governs_deletion_and_reporting():
+    """There were two, and they disagreed: `no_room` was kept on disk and treated as
+    completed by resume while being reported as an error rollout."""
+    from vagen.evaluate.runner import NORMAL_FINISH_REASONS as a
+    from vagen.evaluate.utils.summary_utils import NORMAL_FINISH_REASONS as b
+
+    assert a is b
+    _, result = _run("concat", turns=3)
+    assert result["finish_reason"] in a
+
+
+def test_a_job_that_cannot_even_be_set_up_does_not_take_the_batch_with_it():
+    """The tag_id check, the max_turns validation, the adapter build and the workflow
+    construction all sat above the try, and `await fut` re-raises -- so one malformed job
+    aborted the run and discarded every episode that had already finished."""
+    import inspect
+
+    from vagen.evaluate import runner
+
+    src = inspect.getsource(runner)
+    assert "async def _run_one" in src, "setup is not inside the guarded path"
+    body = src[src.index("async def _runner"):src.index("async def _run_one")]
+    assert "try:" in body and "except Exception" in body

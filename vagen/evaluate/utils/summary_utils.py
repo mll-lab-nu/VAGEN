@@ -5,6 +5,15 @@ import datetime as dt
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+#: Endings that are episodes rather than failures, in one place.
+#:
+#: ★ There were two lists and they disagreed. runner's governed deletion and resume;
+#: summary_utils hardcoded ("done", "max_turns", "skipped_resume") in four places. So
+#: `no_room` was kept on disk and treated as completed by resume while being reported as an
+#: error rollout, and `skipped_resume` was treated as normal by the summary although
+#: nothing produces it -- and if anything did, _purge_error_rollouts would have deleted it.
+NORMAL_FINISH_REASONS = {"done", "max_turns", "no_room"}
+
 # ------------------------
 # Helpers
 # ------------------------
@@ -142,7 +151,7 @@ def write_rollouts_summary(
         sum_turns += ep["num_turns"]
 
         # Count errors (exclude normal endings like done/max_turns/skipped resumes)
-        if ep["finish_reason"] not in ("done", "max_turns", "skipped_resume"):
+        if ep["finish_reason"] not in NORMAL_FINISH_REASONS:
             rid = ep.get("rollout_id")
             if rid:
                 error_rollouts.append(rid)
@@ -164,7 +173,7 @@ def write_rollouts_summary(
                 tag_state["succ_cnt"] += 1
             tag_state["reward_sum"] += ep["cumulative_reward"]
             tag_state["turn_sum"] += ep["num_turns"]
-            if ep["finish_reason"] not in ("done", "max_turns", "skipped_resume"):
+            if ep["finish_reason"] not in NORMAL_FINISH_REASONS:
                 rid = ep.get("rollout_id")
                 if rid:
                     tag_state["error_rollouts"].add(rid)
@@ -282,7 +291,7 @@ def write_rollouts_summary_from_dump(
         sum_cum_reward += ep["cumulative_reward"]
         sum_turns += ep["num_turns"]
 
-        if ep["finish_reason"] not in ("done", "max_turns", "skipped_resume"):
+        if ep["finish_reason"] not in NORMAL_FINISH_REASONS:
             error_rollouts.append(rollout_id)
 
         if tag_val is not None:
@@ -302,7 +311,7 @@ def write_rollouts_summary_from_dump(
                 tag_state["succ_cnt"] += 1
             tag_state["reward_sum"] += ep["cumulative_reward"]
             tag_state["turn_sum"] += ep["num_turns"]
-            if ep["finish_reason"] not in ("done", "max_turns", "skipped_resume"):
+            if ep["finish_reason"] not in NORMAL_FINISH_REASONS:
                 tag_state["error_rollouts"].add(rollout_id)
 
     n = len(episodes)

@@ -28,13 +28,14 @@ def _safe_read_json(p: Path) -> Optional[Dict[str, Any]]:
         return None
 
 
-#: Endings that are episodes rather than failures. Anything outside this set is treated as
-#: an error rollout and DELETED by _purge_error_rollouts on the next resumed run, so a
-#: legitimate ending missing from here silently destroys results -- "no_room" is a real
-#: episode whose conversation ran out of response region, and its turns are real data.
+# One definition, in summary_utils, because both this module and the summary writer key
+# deletion, resume and reporting off it -- and they used to disagree.
+from vagen.evaluate.utils.summary_utils import NORMAL_FINISH_REASONS  # noqa: E402
+
+
 def _load_tokenizer(name):
-    """A tokenizer by id or path, or None. Failure is a warning, not a stop: exact sizing
-    is an improvement over the character estimate, never a requirement."""
+    """A tokenizer by id or path, or None. Failure is a warning, not a stop: exact text
+    sizing is an improvement over the character estimate, never a requirement."""
     if not name:
         return None
     try:
@@ -44,9 +45,6 @@ def _load_tokenizer(name):
         logger.warning("could not load tokenizer %r (%s); sizes will be estimated from "
                        "characters instead", name, exc)
         return None
-
-
-NORMAL_FINISH_REASONS = {"done", "max_turns", "no_room"}
 
 
 async def run_eval_parallel(
@@ -90,7 +88,27 @@ async def run_eval_parallel(
     )
 
     async def _runner(data: Dict[str, Any], per_job_adapter_kwargs: Dict[str, Any]) -> Dict[str, Any]:
-        """Run one episode safely, never raising exceptions out of this function."""
+        """Run one episode safely, never raising exceptions out of this function.
+
+        ★ The whole body is inside the guard, including the setup. It was not: the tag_id
+        check, the max_turns assert, the adapter build and the workflow construction all
+        sat above the try, and `await fut` re-raises -- so ONE malformed job aborted the
+        batch and discarded every episode that had already finished. A bad `harness:` value
+        reached here the same way.
+        """
+        try:
+            return await _run_one(data, per_job_adapter_kwargs)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Job setup failed for env=%s seed=%s",
+                             data.get("env_name"), data.get("seed"))
+            return {"rollout_id": f"ERR-{uuid.uuid4().hex[:8]}", "seed": data.get("seed"),
+                    "tag_id": data.get("tag_id"), "split": data.get("split"),
+                    "env_name": data.get("env_name"), "success": False,
+                    "num_turns": 0, "cumulative_reward": 0.0, "rewards": [],
+                    "terminated": False, "finish_reason": "setup_error",
+                    "error_details": {"error": repr(exc), "error_type": type(exc).__name__}}
+
+    async def _run_one(data: Dict[str, Any], per_job_adapter_kwargs: Dict[str, Any]) -> Dict[str, Any]:
         adapter = ThrottledAdapter(base_adapter_factory(**per_job_adapter_kwargs), policy)
         env_config: Dict[str, Any] = data["env_config"]
 
@@ -104,7 +122,10 @@ async def run_eval_parallel(
         data["tag_id"] = tag_id
 
         turn_limit_int = int(data.get("max_turns", default_max_turns))
-        assert turn_limit_int > 0, f"Invalid max_turns={turn_limit_int} for env '{data.get('env_name')}'"
+        # Not an assert: under `python -O` that vanishes, and max_turns=0 then runs
+        # range(0) and reports a full set of 0-turn "normal" episodes.
+        if turn_limit_int <= 0:
+            raise ValueError(f"max_turns={turn_limit_int} for env '{data.get('env_name')}'")
 
 
         episode_metadata = {
