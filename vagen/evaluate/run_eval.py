@@ -10,6 +10,7 @@ import shutil
 from dataclasses import dataclass, field, fields
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import yaml
 from omegaconf import DictConfig, OmegaConf, open_dict
 
 from vagen.evaluate.register_builtins import *  # populate registry
@@ -168,6 +169,31 @@ def _resolve_dump_dir(cfg: Dict[str, Any], base_dir: str) -> str:
     if not os.path.isabs(dump_dir):
         dump_dir = os.path.abspath(os.path.join(base_dir, dump_dir))
     return dump_dir
+
+
+#: What `resume:` may say. "off" keeps everything, including previous error rollouts.
+_RESUME_MODES = {"off", "skip_completed", "force_rerun"}
+
+
+def _resume_mode(value) -> str:
+    """Normalise `resume:`, and refuse a value nothing understands.
+
+    ★ YAML parses a bare ``off`` as the boolean False, so ``resume: off`` used to
+    stringify to ``"False"``, match none of the ``== "off"`` guards, and quietly do the
+    opposite of what it said -- error rollouts were purged on a run that asked for nothing
+    to be touched. Both spellings are accepted now, and anything else is an error rather
+    than a silent fallthrough to whichever branch happens to be last.
+    """
+    if isinstance(value, bool):
+        return "off" if value is False else "skip_completed"
+    text = str(value).strip().lower()
+    if text in _RESUME_MODES:
+        return text
+    raise ValueError(
+        f"run.resume={value!r} is not a resume mode; choose from {sorted(_RESUME_MODES)}. "
+        f"Note YAML reads a bare `off` as the boolean False -- quote it as \"off\" if you "
+        f"want the literal string."
+    )
 
 
 def _purge_error_rollouts(dump_dir: Optional[str], resume_mode: str) -> None:
@@ -419,8 +445,21 @@ def _load_config(cfg_path: str, overrides: List[str]) -> DictConfig:
     cfg: DictConfig = OmegaConf.load(cfg_path)  # type: ignore
     cfg = _resolve_defaults(cfg_path, cfg)
     if overrides:
-        override_cfg = OmegaConf.from_dotlist(overrides)
-        cfg = OmegaConf.merge(cfg, override_cfg)
+        # ★ Applied one at a time with OmegaConf.update, not merged from a dotlist.
+        # `from_dotlist` turns `envs.0.n_envs=1` into a DICT keyed "0", and merging that
+        # onto a list raises `Cannot merge DictConfig with ListConfig` -- so no override
+        # could reach an element of `envs`, which is where every per-environment setting
+        # lives. `update` understands the index.
+        for item in overrides:
+            if "=" not in item:
+                raise ValueError(f"override {item!r} is not key=value")
+            key, _, raw = item.partition("=")
+            # Parsed as YAML so lists, ints and booleans arrive as themselves rather than
+            # as strings: `envs.0.seed=[1,60,1]` has to be a list.
+            value = OmegaConf.create({"v": raw}).v if raw.startswith(("[", "{")) else raw
+            if isinstance(value, str):
+                value = yaml.safe_load(raw)
+            OmegaConf.update(cfg, key.strip(), value, merge=True)
     return cfg
 
 
@@ -441,7 +480,7 @@ def main() -> None:
 
     run_cfg = cfg.get("run") or {}
     backend = str(run_cfg.get("backend", "openai")).lower()
-    resume_mode = str(run_cfg.get("resume", "skip_completed"))
+    resume_mode = _resume_mode(run_cfg.get("resume", "skip_completed"))
     live_summary = bool(run_cfg.get("live_summary", False))
     max_concurrent = int(run_cfg.get("max_concurrent_jobs", 4))
     base_seed = int(run_cfg.get("base_seed", run_cfg.get("start_seed", 0)))

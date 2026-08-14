@@ -17,7 +17,10 @@
 # Only override the fields you need to change.
 # ─────────────────────────────────────────────────────────────────────
 
-fileroot: ${oc.env:HOME}/projects/vagen
+# Where rollouts and summaries are written. Override with VAGEN_EVAL_ROOT,
+# or set fileroot here. Repo-relative by default: the old default was one
+# developer's home directory, which every shipped eval config inherited.
+fileroot: ${oc.env:VAGEN_EVAL_ROOT,./eval_runs}
 
 experiment:
   dump_dir: ${fileroot}/rollouts/default
