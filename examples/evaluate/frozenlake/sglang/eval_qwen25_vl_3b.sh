@@ -2,7 +2,9 @@
 set -euo pipefail
 
 # ---------- Defaults / Paths ----------
-fileroot="${fileroot:-"$HOME/projects/vagen"}"
+# VAGEN_EVAL_ROOT first, matching the vllm launcher and the eval configs; a
+# developer's home directory is not a default.
+fileroot="${VAGEN_EVAL_ROOT:-${fileroot:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)/eval_runs}}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG="${CONFIG:-"$SCRIPT_DIR/../config.yaml"}"
 PORT="${PORT:-30000}"
@@ -16,7 +18,9 @@ DP_SIZE="${QWEN25_VL_3B_DP:-1}"
 TP_SIZE="${QWEN25_VL_3B_TP:-1}"
 MEM_FRACTION="${QWEN25_VL_3B_MEM:-0.80}"
 
-DUMP_DIR="${DUMP_DIR:-"$fileroot/rollouts/${MODEL_NAME}"}"
+# The env name belongs in the path: rollouts are keyed on (env, seed, tag, model)
+# and resume skips on a match, so two envs sharing a directory skip each other.
+DUMP_DIR="${DUMP_DIR:-"$fileroot/rollouts/eval_frozenlake/${MODEL_NAME}"}"
 mkdir -p "$DUMP_DIR"
 
 SERVER_LOG="${LOG_DIR}/${MODEL_NAME}_server.log"

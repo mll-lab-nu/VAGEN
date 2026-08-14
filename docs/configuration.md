@@ -11,8 +11,9 @@ confusion:
 
 !!! warning "`baseline_vllm.flags` overrides the base config"
     Every shipped script sources `vagen/configs/baseline_vllm.flags`, and it wins over
-    `vagen_multiturn.yaml`. Most visibly `data.max_prompt_length`, which is **1000** in the
-    flags file and 9000 in the yaml. Read the flags file, not only the yaml.
+    `vagen_multiturn.yaml`. Two that matter: `data.max_prompt_length` is **1000** in the
+    flags file and 9000 in the yaml, and `actor_rollout_ref.rollout.name` is **vllm** in
+    the flags file and `sglang` in the yaml. Read the flags file, not only the yaml.
 
 ---
 
@@ -156,7 +157,15 @@ seed: [0, 99, 1]         # 3 elements: as above, each value used at most `limit`
     `tests/test_eval_matches_val.py` checks this for the shipped eval configs.
 
 Training and evaluation derive seeds identically, so one directive gives the same seeds on
-both sides.
+both sides. The global offset is `data.base_seed`, which is **not** in verl's data schema
+and so needs the `+` prefix on the command line:
+
+```bash
++data.base_seed=1234
+```
+
+Without it hydra rejects the key; written as `data.base_seed=` it is silently ignored and
+stays 0.
 
 ### Budgets
 
@@ -261,13 +270,17 @@ trainer:
   log_val_generations: 32
   val_log_select: balanced        # balanced | first | failures | successes | worst | best
   save_best_actor: true
-  save_freq: 100
+  save_freq: 100                  # ★ NOT the default. verl's is -1, i.e. never save
   max_actor_ckpt_to_keep: 1
   max_critic_ckpt_to_keep: 1
   rollout_data_dir: ...           # per-step rollout dumps, as jsonl
   replace_image_tokens_for_logging: true
   log_image: {enable: false, max_pending: 2, png_compress_level: 0}
 ```
+
+!!! danger "`save_freq` has no useful default"
+    verl's default is `-1` — never checkpoint. Every shipped script sets it by hand; a
+    script written from this block without it trains for days and saves nothing.
 
 !!! tip "Set `save_freq` against your wall clock"
     A requeued job resumes from the last checkpoint (`resume_mode: auto`), so `save_freq` is
