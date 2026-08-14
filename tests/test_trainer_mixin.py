@@ -839,3 +839,19 @@ def test_the_rescope_runs_after_verl_computes_its_data_metrics():
     assert t.metrics["critic/score/by_row/mean"] == 0.027
     assert t.metrics["critic/score/by_row/max"] == 0.9
     assert "critic/score/max" not in t.metrics
+
+
+def test_a_turn_level_loss_refuses_an_estimator_with_no_turn_id():
+    """★ The guard asked `spans_rows`, which is a different question. `trajectory_grpo`
+    stitches an episode's rows together (so spans_rows is True) but returns a bare
+    AdvantageOutputs rather than going through `_Packed.emit`, so it publishes no
+    `turn_id` -- and the turn-level losses read that column. Keyed off the wrong predicate
+    the pairing passed every startup check and raised inside the first backward pass,
+    which is exactly what this guard exists to pre-empt."""
+    from vagen.custom_advantage import publishes_turn_id, spans_rows
+
+    assert spans_rows("trajectory_grpo") is True
+    assert publishes_turn_id("trajectory_grpo") is False
+    for other in ("default_gae", "token_level_gae", "turn_level_gae",
+                  "removed_estimator_gae", "removed_estimator_gae_varlam"):
+        assert publishes_turn_id(other) is True, other

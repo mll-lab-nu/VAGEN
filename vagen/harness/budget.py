@@ -251,6 +251,21 @@ def _check_compact(b: Budgets) -> None:
             f"max_response_length."
         )
 
+    # ★ NOT checked here: whether `m` can hold a conversation at all. A budget below
+    # roughly `k + |req| + g` makes every conversation close after one turn, which raises
+    # CompactionMakesNoProgress and empties the batch on every episode -- measured at
+    # m=400, k=100, g=512, where every static check passes and no warning fires, and
+    # multi_output then reports "all N rollouts returned zero outputs ... check that the
+    # agent loop appends an AgentLoopOutput per turn", naming the agent loop for a
+    # one-line budget typo.
+    #
+    # A static check for it was written and reverted: `k + |req| + g <= m` refuses
+    # configurations that demonstrably run (tests/test_budget_end_to_end.py's
+    # compact-lever case among them), because a generation is charged against the
+    # response region rather than against `m`, and the true threshold depends on the
+    # system prompt, which this module cannot see. Getting the relation right needs the
+    # runtime numbers, so the runtime guard remains the one that catches it -- the gap is
+    # that its message names the wrong cause.
     m = b.compact_budget
     if m and 2 * k > m:
         # Advisory now, not fatal: the region trigger is the one that has to hold, and

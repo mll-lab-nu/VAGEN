@@ -328,7 +328,9 @@ def compute_default_gae(inputs: AdvantageInputs):
         )
 
 
-@advantage_estimator("trajectory_grpo")
+# publishes_turn_id=False: this one returns a bare AdvantageOutputs rather than
+# going through _Packed.emit, so there is no turn_id column for a turn-level loss.
+@advantage_estimator("trajectory_grpo", publishes_turn_id=False)
 def compute_trajectory_grpo(inputs: AdvantageInputs):
     """One advantage per trajectory, normalised within its prompt group.
 
