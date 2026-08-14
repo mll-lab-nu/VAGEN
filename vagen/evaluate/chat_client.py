@@ -14,12 +14,15 @@ token ids, which a chat endpoint has no use for. So ``encode`` records the rende
 messages against the active conversation and ``generate`` reads them back -- the same
 pattern ``VerlClient`` uses for image frames.
 
-**Tokens may be estimated.** A closed API exposes no tokenizer. Set ``tokenizer:`` in the
-eval config when the endpoint serves a known model (``vllm serve`` does) and text sizing is
-exact; without one it is 4 characters to the token. Either way an image is priced by
-``tokens_per_image`` -- a tokenizer cannot measure a frame, only a processor can, and the
-number that matters is what the *server's* processor will charge. Neither is ever used to
-build a training row; evaluation produces no rows.
+**Sizes are measured when they can be.** Set ``model:`` in the eval config -- normally the
+same id you are serving -- and this loads that model's *processor* and prices text and
+frames exactly as training does. Only a closed API, where there is no processor to load,
+falls back to estimating: 4 characters to the token, and ``tokens_per_image`` for a frame.
+
+That fallback is a last resort, not a knob to tune. Getting it wrong is not cosmetic: the
+same number drives the compaction trigger and the observation ceiling, so an estimate far
+from the truth makes `compact` fire on conversations that are not full, or makes a ceiling
+copied from a training config cut every observation to nothing.
 """
 
 from __future__ import annotations
@@ -30,6 +33,9 @@ from typing import Any
 from vagen.core.client import BackendOutput, InferenceClient
 
 logger = logging.getLogger(__name__)
+
+#: The marker an environment puts where a frame goes.
+IMAGE_PLACEHOLDER = "<image>"
 
 #: Characters per token when no tokenizer is available. Only the *ratio* matters, and only
 #: for deciding when a conversation is full: 4 is the usual English rule of thumb, and an
@@ -69,7 +75,8 @@ class ChatClient(InferenceClient):
 
     def __init__(self, adapter, chat_config: dict | None = None, tokenizer=None,
                  response_limit: int | None = None,
-                 tokens_per_image: int = DEFAULT_TOKENS_PER_IMAGE):
+                 tokens_per_image: int = DEFAULT_TOKENS_PER_IMAGE,
+                 processor=None):
         super().__init__()
         self.adapter = adapter
         self.chat_config = dict(chat_config or {})
@@ -79,6 +86,8 @@ class ChatClient(InferenceClient):
         self.response_limit = response_limit
         #: Optional. Present, sizes are exact; absent, they are estimated from characters.
         self.tokenizer = tokenizer
+        #: Optional, and better: a processor prices frames too, which a tokenizer cannot.
+        self.processor = processor
         self.tokens_per_image = tokens_per_image
         self._active: str | None = None
         #: conversation id -> the API messages sent so far. The harness decides *which*
@@ -130,6 +139,17 @@ class ChatClient(InferenceClient):
         return rendered, size
 
     def _size(self, text: str, images: list) -> int:
+        if self.processor is not None:
+            # Exactly what training measures: the processor expands each placeholder into
+            # however many tokens that frame really costs at this resolution.
+            try:
+                expanded = text.replace(
+                    IMAGE_PLACEHOLDER, "<|vision_start|><|image_pad|><|vision_end|>")
+                out = self.processor(text=[expanded], images=list(images) or None,
+                                     return_tensors="pt")
+                return int(out["input_ids"].shape[-1])
+            except Exception:   # noqa: BLE001 - a processor that cannot render this
+                pass            # falls through to the estimate rather than killing the run
         if self.tokenizer is not None:
             n = len(self.tokenizer.encode(text))
         else:

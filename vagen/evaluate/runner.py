@@ -33,18 +33,29 @@ def _safe_read_json(p: Path) -> Optional[Dict[str, Any]]:
 from vagen.evaluate.utils.summary_utils import NORMAL_FINISH_REASONS  # noqa: E402
 
 
-def _load_tokenizer(name):
-    """A tokenizer by id or path, or None. Failure is a warning, not a stop: exact text
-    sizing is an improvement over the character estimate, never a requirement."""
+def _load_sizers(name):
+    """``(processor, tokenizer)`` for a model id or path; either may be None.
+
+    A processor is what makes sizing exact, because it is the only thing that can price a
+    frame -- and the frame is the part an estimate gets badly wrong. A tokenizer alone
+    still fixes the text. Neither is required: failure is a warning, and the client falls
+    back to characters-and-a-constant.
+    """
     if not name:
-        return None
+        return None, None
+    processor = tokenizer = None
+    try:
+        from transformers import AutoProcessor
+        processor = AutoProcessor.from_pretrained(name)
+    except Exception as exc:  # noqa: BLE001 - text-only models have no processor
+        logger.info("no processor for %r (%s); frames will be estimated", name, exc)
     try:
         from transformers import AutoTokenizer
-        return AutoTokenizer.from_pretrained(name)
+        tokenizer = AutoTokenizer.from_pretrained(name)
     except Exception as exc:  # noqa: BLE001
-        logger.warning("could not load tokenizer %r (%s); sizes will be estimated from "
-                       "characters instead", name, exc)
-        return None
+        logger.warning("could not load a tokenizer for %r (%s); sizes will be estimated "
+                       "from characters", name, exc)
+    return processor, tokenizer
 
 
 async def run_eval_parallel(
@@ -157,7 +168,8 @@ async def run_eval_parallel(
             compact_budget=data.get("compact_budget"),
             compact_summary_budget=data.get("compact_summary_budget"),
             tokens_per_image=data.get("tokens_per_image"),
-            tokenizer=_load_tokenizer(data.get("tokenizer")),
+            **dict(zip(("processor", "tokenizer"),
+                       _load_sizers(data.get("tokenizer") or model))),
         )
         async with episode_gate:
             logger.info(
@@ -228,7 +240,11 @@ async def run_eval_parallel(
             if tag_val is not None:
                 try:
                     tag_dir = os.path.join(dump_dir, f"tag_{tag_val}")
-                    write_rollouts_summary_from_dump(dump_dir=tag_dir, filename="summary.json")
+                    # model=... for the same reason main() passes it: a dump directory can hold
+                    # more than one checkpoint, and an unfiltered summary averages them.
+                    write_rollouts_summary_from_dump(dump_dir=tag_dir,
+                                                     filename="summary.json",
+                                                     model=model)
                 except Exception:
                     # Best effort: never fail the run due to summary writing
                     pass
