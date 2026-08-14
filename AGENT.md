@@ -3,6 +3,10 @@
 Read this first; it is meant to take five minutes. `VAGEN_ARCH.md` has the design
 rationale, and it is long. Anything here that disagrees with it, believe this.
 
+A ★ in a comment, here or in the code, marks something that was got wrong once: the note
+says what the failure looked like, so the next person recognises it rather than rediscovers
+it. They are worth reading before changing the line they sit on.
+
 Training backend: a **patched fork** of verl main -- `JamesKrW/verl`, pinned to the tag
 `vagen-260812` (`27c51e9`) as the git submodule at `VAGEN/verl`, pip-installed from that
 checkout by `scripts/install.sh` (`pip install --no-deps -e ./verl`). It reports

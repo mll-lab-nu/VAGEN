@@ -29,7 +29,18 @@ python -m vagen.evaluate.run_eval --config examples/evaluate/spatial_gym/config.
 ```
 
 Available eval configs:
-- `config.yaml` - 2-room active exploration 
+
+| config | task | rooms scored |
+|---|---|---|
+| `config.yaml` | 2-room active exploration | all 20 of `room_data/2-room`. Nothing under `examples/train/` reads 2-room, so none of them were trained on |
+| `config_1room.yaml` | 1-room, matching the training task | the four held out: training takes rooms 0-15 of `room_data/1-room` and validation 16-19 |
+
+`config_1room.yaml` is what the shipped launcher runs by default:
+
+```bash
+MODEL_PATH=/path/to/checkpoint \
+  bash examples/evaluate/spatial_gym/vllm/eval_qwen25_vl_3b.sh
+```
 
 ## Training
 
@@ -39,9 +50,13 @@ bash examples/train/spatial_gym/train_grpo_qwen25vl3b.sh
 bash examples/train/spatial_gym/train_grpo_qwen25vl7b.sh
 ```
 
-PPO training
+PPO training -- `default_gae` with a critic, which is what PPO is here
 
 ```bash
 bash examples/train/spatial_gym/train_default_gae_qwen25vl3b.sh
 bash examples/train/spatial_gym/train_default_gae_qwen25vl7b.sh
+```
+
+
+```bash
 ```
