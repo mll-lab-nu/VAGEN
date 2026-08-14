@@ -212,7 +212,7 @@ class VagenLogicMixin:
         failure arrives several minutes into a run as ``Unsupported loss mode``, and its
         version of the second is a ``ValueError`` from inside the first backward pass.
         """
-        from vagen.custom_advantage import TRAJECTORY_ESTIMATORS, spans_rows
+        from vagen.custom_advantage import PUBLISHES_TURN_ID, publishes_turn_id
         from vagen.custom_loss import TURN_LEVEL_LOSSES
 
         actor = self.config.get("actor_rollout_ref", {}).get("actor", {})
@@ -221,11 +221,11 @@ class VagenLogicMixin:
             return
 
         estimator = self.config.algorithm.adv_estimator
-        if not spans_rows(estimator):
+        if not publishes_turn_id(estimator):
             raise ValueError(
                 f"actor.policy_loss.loss_mode={loss_mode!r} needs a `turn_id` column, and "
                 f"algorithm.adv_estimator={str(getattr(estimator, 'value', estimator))!r} "
-                f"does not publish one. Use one of {sorted(TRAJECTORY_ESTIMATORS)}, which "
+                f"does not publish one. Use one of {sorted(PUBLISHES_TURN_ID)}, which "
                 f"locate the turns while computing the advantage. Nothing else in the "
                 f"batch says where a turn starts, and the only fallback would be to treat "
                 f"a row as a turn -- which is verl's own `gspo`, and is an entire episode "
