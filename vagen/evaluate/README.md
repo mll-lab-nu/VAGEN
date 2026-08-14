@@ -30,9 +30,17 @@ envs:
                                           # is 128 values for n_envs=128. Above the training
                                           # ranges on purpose -- same seed, same instance.
     max_turns: 5                          # max agent–env interaction turns per episode
+    response_length_per_turn: 512         # ★ becomes the API call's max_tokens. Copy it
+                                          # from the val config: without it the client
+                                          # falls back to chat_config.max_tokens below,
+                                          # and the policy gets room it never trained with
     config:                               # passed to the env constructor
       render_mode: vision
       size: 4
+    chat_config:                          # ★ per-env sampling. Pin the temperature:
+      temperature: 0                      # unset, the provider's default applies (1.0),
+      max_tokens: 1024                    # so two checkpoints are not compared on equal
+      top_p: 1.0                          # terms and a rerun does not reproduce
       p: 0.8
       is_slippery: false
       slip_prob: 0.0

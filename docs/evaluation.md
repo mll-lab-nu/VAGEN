@@ -84,9 +84,13 @@ subclass works here too, by registered name or as an import path — see
 ```
 
 `finish_reason` is one of `done`, `max_turns`, `no_room` (the conversation ran out of
-response region), `env_error`, `setup_error`, or `error`. Only the first three count as
-episodes; the rest are listed under `error_rollouts` and are deleted by the next resumed
-run.
+response region), `env_error`, `setup_error`, `empty_generation` (the backend returned no
+text), or `error`. Only the first three count as episodes; the rest are listed under
+`error_rollouts` and are deleted by the next resumed run.
+
+If *every* episode ends in one of the failure reasons, the run stops with a non-zero exit
+rather than writing `success_rate: 0.0` — an evaluation where nothing ran is not a score of
+zero, and it used to be reported as one.
 
 See [`vagen/evaluate/README.md`](https://github.com/mll-lab-nu/VAGEN/blob/main/vagen/evaluate/README.md)
 for the full config reference.
