@@ -1,4 +1,11 @@
-"""Concat until a budget is hit, then summarise and start again."""
+"""Concat until a budget is hit, then summarise and start again.
+
+Closely related to CompactionRL (arXiv:2607.05378, Li et al. 2026), which trains task
+execution and summary generation jointly under context compaction. Here too the summary is
+written by the policy and carries gradient like any other turn -- it is not a free
+preprocessing step -- so the compaction seam is a place the credit assignment has to be
+right about. See ``TrajectoryView.seam``.
+"""
 
 from __future__ import annotations
 
