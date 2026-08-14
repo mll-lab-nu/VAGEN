@@ -410,11 +410,25 @@ class GymLoop(VagenGymAgentLoopBase):
         expensive version of another one and reports nothing at all.
         """
         mode = self._harness_mode()
-        m = int(self.config.trainer.compact_budget) if budget_mode(mode) == "compact" else None
+        # ★ compact_budget is optional, and the budget checker says so in the text it
+        # prints ("leave it unset and let the response region decide"). `int(None)` is a
+        # TypeError, which is not EpisodeUnusable, so it escaped GymLoop.run into
+        # asyncio.gather and took the whole batch -- on every episode of every step,
+        # naming nothing. The unset case is the one the code recommends.
+        m = None
         summary_budget = None
         if issubclass(resolve_harness(mode), CompactHarness):
+            configured_m = self.config.trainer.get("compact_budget", None)
+            m = int(configured_m) if configured_m else None
             configured = self.config.trainer.get("compact_summary_budget", None)
-            summary_budget = int(configured) if configured else default_summary_budget(m, per_turn)
+            if configured:
+                summary_budget = int(configured)
+            elif m:
+                summary_budget = default_summary_budget(m, per_turn)
+            else:
+                # No trigger of its own: the response region is the bound, so reserve
+                # against that rather than against a budget that does not exist.
+                summary_budget = default_summary_budget(self.response_length, per_turn)
 
         b = Budgets(
             prompt_len=self.prompt_length,
@@ -563,15 +577,14 @@ class GymLoop(VagenGymAgentLoopBase):
                             # agent never described anything.
                             **{f"{k}_reward": v for k, v in env.state_scores.items()},
                             # Fraction of the episode's turns the environment judged
-                            # well-formed. Absent when the environment does not report it,
-                            # rather than a zero that would read as "never well-formed".
+                            # well-formed. NaN, not absent, when the environment does not
+                            # report one -- see the note on a stable key set below.
                             # getattr, not attribute access: `env` here is whatever the
                             # runner was handed, and the tests' fakes are not the adapter.
-                            **(
-                                {"format_correct_rate": getattr(env, "turns_well_formed", 0)
-                                                        / getattr(env, "turns_seen", 0)}
+                            "format_correct_rate": (
+                                getattr(env, "turns_well_formed", 0) / getattr(env, "turns_seen", 0)
                                 if getattr(env, "reports_format", False) and getattr(env, "turns_seen", 0)
-                                else {}
+                                else float("nan")
                             ),
                             # ★ How much the model itself wrote, per turn. `response_spans`
                             # is exactly the model-emitted region -- the same thing the
@@ -587,12 +600,28 @@ class GymLoop(VagenGymAgentLoopBase):
                             # verbose. Every collapse in the 0809 sweep showed up first as
                             # a length jump, and this is the number that would have said
                             # whether the jump was the model or the scenery.
-                            **(
-                                {"model_tokens_per_turn": sum(int(e) - int(b) for b, e in spans)
-                                                          / max(1, len(spans))}
-                                if spans else {}
+                            "model_tokens_per_turn": (
+                                sum(int(e) - int(b) for b, e in spans) / max(1, len(spans))
+                                if spans else float("nan")
                             ),
                         },
+                        # ★ Every row publishes the same reward_extra_info keys, always.
+                        # verl reads the key set off ROW 0 and then indexes every other row
+                        # with it (agent_loop.py: `reward_extra_keys =
+                        # list(reward_extra_infos[0].keys())`), so a row that omits a key
+                        # either loses the metric for the whole batch or raises KeyError and
+                        # takes the training step -- depending on which episode happens to
+                        # land at index 0, i.e. nondeterministically.
+                        #
+                        # Two reachable producers of a mixed key set: an environment that
+                        # crashed (GymEnvAdapter.step returns {"env_error": True} with no
+                        # format_correct), and spatial_gym, which never reports
+                        # format_correct at all while the other four environments do. Any
+                        # batch mixing them hit this every step.
+                        #
+                        # NaN rather than 0: "this environment does not measure it" is not
+                        # "it was never well-formed", and a mean over NaN is visibly NaN
+                        # rather than quietly depressed.
                         "image_data": images,
                         "last_turn": row is rows[-1],
                         # `row is rows[-1]`, not `conversation_id == len(rows) - 1`:
