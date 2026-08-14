@@ -4,7 +4,7 @@ Multipart encoding/decoding utilities for gym environment communication.
 Protocol:
 - Request/Response use multipart/form-data or multipart/mixed
 - JSON metadata + optional PIL images
-- Reuses ViewSuite's proven multipart implementation
+- Multipart framing, so a frame does not have to be base64-inlined into JSON
 """
 
 from __future__ import annotations

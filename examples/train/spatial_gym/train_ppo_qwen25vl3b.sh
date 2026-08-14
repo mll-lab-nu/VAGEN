@@ -4,9 +4,8 @@
 # Per-experiment settings only. Everything that makes a VAGEN run work at all lives in
 # vagen/configs/baseline_vllm.flags and is read below -- in particular the two flags that
 # select VAGEN's agent loop. Without them verl runs its own, and the job comes up looking
-# healthy while none of this repo's rollout code executes. All twenty of these scripts
-# were in that state, and the duplication is why: each carried its own copy of the stack
-# settings, and the copies stopped including the loop.
+# healthy while none of this repo's rollout code executes -- so the shared flags file is
+# the single place those live, and this script holds only what makes it this experiment.
 #
 # Anything after "${BASE[@]}" overrides it, and anything on the command line overrides
 # that, so a one-off sweep needs no edit here.
@@ -37,6 +36,20 @@ EXPERIMENT_NAME=${EXPERIMENT_NAME:-spatial_gym_ppo_qwen25vl3b}
 EXPERIMENT_DIR=${EXPERIMENT_DIR:-$V/exps/$PROJECT_NAME/$EXPERIMENT_NAME}
 MODEL=${MODEL:-Qwen/Qwen2.5-VL-3B-Instruct}
 mkdir -p "$EXPERIMENT_DIR"
+
+# ★ The room dataset is NOT in the repo: vagen/envs/spatial_gym/room_data is gitignored, so
+# a fresh clone has nothing here and the run dies inside the first env reset with a bare
+# file-not-found. And the path in the yaml below is relative to the working directory, not
+# to the yaml -- so even with the data present, launching from anywhere but the repo root
+# failed the same way. Check it, say what to run, and pin the working directory.
+ROOM_DATA="$V/vagen/envs/spatial_gym/room_data"
+if [ ! -d "$ROOM_DATA/1-room" ]; then
+  echo "spatial_gym needs its room dataset, which is not tracked in git:" >&2
+  echo "  hf download yw12356/spatial_gym_dataset --repo-type dataset \\" >&2
+  echo "     --local-dir $ROOM_DATA" >&2
+  exit 1
+fi
+cd "$V"
 
 # verl is not imported as an installed package; it is a checkout, and it has to come
 # first on PYTHONPATH so this fork wins over any other copy.

@@ -13,10 +13,27 @@ fileroot: ${oc.env:VAGEN_EVAL_ROOT,./eval_runs}
 
 envs:
   - name: SpatialGym
-    n_envs: 20
+    n_envs: 4
     tag_id: spatial_gym_2room
-    seed: [0, 19, 1]
+  # ★ Held-out rooms only. The seed here is an INDEX into a fixed dataset (`run{seed:02d}`),
+    # not a generator seed, and the dataset has exactly 20 rooms: train takes 0-15 and
+    # validation 16-19 (examples/train/spatial_gym/{train,val}_spatial_gym_vision.yaml). So
+    # the `seed: [0, 19, 1]` this file used to carry scored a trained checkpoint on the
+    # sixteen rooms it was trained on, and reported the result as a benchmark.
+    #
+    # Four rooms is a small benchmark, and that is the honest size of what is held out --
+    # this dataset cannot support a larger disjoint one. Evaluating an OFF-THE-SHELF model
+    # that VAGEN never trained is the case where all twenty are fair game: set
+    # `n_envs: 20` and `seed: [0, 19, 1]`, and do not compare those numbers against a
+    # checkpoint trained here.
+    seed: [16, 19, 1]
     max_turns: 16
+    # ★ Both from val_spatial_gym_vision.yaml. Without response_length_per_turn the client
+    # falls through to chat_config.max_tokens (32768) -- thirty-two times the turn the
+    # policy was trained to write. And an unset ceiling here takes DEFAULT_MAX_ENV_RESPONSE
+    # (2048) rather than the 700 training bounded observations to.
+    response_length_per_turn: 1024
+    max_env_response_per_turn: 700
     config:
       exp_type: active
       render_mode: vision

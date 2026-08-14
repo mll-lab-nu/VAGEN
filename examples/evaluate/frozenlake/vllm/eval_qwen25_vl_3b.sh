@@ -1,16 +1,13 @@
 #!/bin/bash
-# Evaluate on sokoban against a local vLLM server.
+# Evaluate on FrozenLake against a local vLLM server.
 #
-# The repo calls vLLM "the verified default" and makes the two engines mutually exclusive
-# extras (setup.py), but every eval launcher shipped was an sglang one -- so following the
-# install instructions and then the evaluation instructions left you with an engine no
-# example could drive. vLLM's OpenAI-compatible server is what `run.backend=openai` already
-# talks to; only the base_url changes.
+# setup.py calls vLLM "the verified default" and the two engines are mutually exclusive
+# extras, but frozenlake shipped only an sglang launcher -- so following the install instructions and then the
+# evaluation instructions left you with an engine no example here could drive.
 #
-#   MODEL_PATH=/path/to/model bash examples/evaluate/sokoban/vllm/eval_qwen25_vl_3b.sh
+#   MODEL_PATH=/path/to/model bash examples/evaluate/frozenlake/vllm/eval_qwen25_vl_3b.sh
 #
-# Any extra argument is forwarded to run_eval as a hydra override, so a different context
-# policy is one flag:
+# Any extra argument is forwarded to run_eval as a hydra override:
 #
 #   ... eval_qwen25_vl_3b.sh 'envs.0.harness=no_concat'
 set -eo pipefail
@@ -22,6 +19,7 @@ V="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 source "${SCRIPT_DIR}/../../common.sh"
 
 MODEL_PATH="${MODEL_PATH:-Qwen/Qwen2.5-VL-3B-Instruct}"
+# Not 8000: keeps the policy server clear of the environment servers other envs use.
 PORT="${PORT:-8311}"
 TP_SIZE="${TP_SIZE:-1}"
 MEM_FRACTION="${MEM_FRACTION:-0.55}"
@@ -29,13 +27,10 @@ MAX_MODEL_LEN="${MAX_MODEL_LEN:-8192}"
 MAX_IMAGES="${MAX_IMAGES:-8}"
 
 fileroot="${VAGEN_EVAL_ROOT:-${V}/eval_runs}"
-# ★ The model name is in the dump directory, and it has to be. Rollouts are keyed on
-# (env, seed, tag_id, model) and resume skips on a match, so evaluating checkpoint B into
-# the directory checkpoint A used would skip jobs and blend summaries. See
-# vagen_model_name for why `basename` is not enough: every verl checkpoint's basename is
-# the literal string `huggingface`.
+# The env name belongs in the path: rollouts are keyed on (env, seed, tag, model) and
+# resume skips on a match, so two envs sharing a directory skip each other.
 MODEL_NAME="${MODEL_NAME:-$(vagen_model_name "${MODEL_PATH}")}"
-DUMP_DIR="${DUMP_DIR:-${fileroot}/rollouts/eval_sokoban/${MODEL_NAME}}"
+DUMP_DIR="${DUMP_DIR:-${fileroot}/rollouts/eval_frozenlake/${MODEL_NAME}}"
 LOG_DIR="${fileroot}/logs"; mkdir -p "$LOG_DIR" "$DUMP_DIR"
 
 vagen_serve_vllm "$MODEL_PATH" "$PORT" "$TP_SIZE" "$MEM_FRACTION" \

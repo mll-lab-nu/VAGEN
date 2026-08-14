@@ -33,7 +33,7 @@ class NavigationEnvConfig:
     max_actions_per_step: int = 5
     action_sep: str = "|"
     max_steps: int = 30
-    # Reward config (ViewSuite-style)
+    # Reward config
     format_reward: float = 0.0          # end-of-episode bonus if ALL turns had correct format
     per_turn_format_reward: float = 0.01  # per-step bonus if this turn's format is correct
     success_reward: float = 1.0         # reaching the goal

@@ -3,9 +3,15 @@
 Read this first; it is meant to take five minutes. `VAGEN_ARCH.md` has the design
 rationale, and it is long. Anything here that disagrees with it, believe this.
 
-Training backend: verl **main**, as the git submodule at `VAGEN/verl`, pip-installed from
-that checkout by `scripts/install.sh` (`pip install --no-deps -e ./verl`). It reports
-`0.9.0.dev`. There is no sibling checkout and nothing to put on `PYTHONPATH`.
+Training backend: a **patched fork** of verl main -- `JamesKrW/verl`, pinned to the tag
+`vagen-260812` (`27c51e9`) as the git submodule at `VAGEN/verl`, pip-installed from that
+checkout by `scripts/install.sh` (`pip install --no-deps -e ./verl`). It reports
+`0.9.0.dev`. The patches are small and listed under "verl patches" below; they are not
+upstream, so a stock `pip install verl` will not run this.
+
+The training scripts find verl at `VAGEN/verl` (the submodule) or `../verl` (a sibling
+checkout), in that order, and put it first on `PYTHONPATH` so this fork wins over any
+other copy. Set `VERL=/path/to/verl` to override.
 
 ```bash
 pytest -q      # pytest.ini supplies testpaths and `pythonpath = . verl`
@@ -188,6 +194,19 @@ Design notes that used to live in an out-of-tree `logs/` directory have been fol
 the module docstrings they describe -- `vagen/harness/budget.py` for the budgets and every
 termination path, `vagen/core/harness.py` for the context policies.
 
+### verl patches
+
+The submodule is `JamesKrW/verl` at tag `vagen-260812` (`27c51e9`), which is verl main plus
+three commits. Nothing else in verl is modified, and none of it is upstream:
+
+| commit | what | why |
+|---|---|---|
+| `5083fc5` | adds `verl/workers/utils/{losses,padding}.py` | the turn-level policy losses and the padding helpers VAGEN's estimators call |
+| `12f79ab` | `attention_utils.py`, `qwen2_vl.py`, `torch_functional.py` | fall back to the Hub kernel when `flash-attn` is not installed, so the install does not have to build it |
+| `27c51e9` | `models/transformers/glm4v.py` | unpack the vision tower output as `qwen2_vl` already does, so GLM-4.1V trains on transformers 5.x |
+
+To see them: `git -C verl log --oneline -3`.
+
 ## 7. Where it stands
 
 **Working and verified end to end** — three modes on Sokoban, 6 steps each, validation at
@@ -201,8 +220,9 @@ compact    ~0.4 per 5-turn episode         (max_turns=5, compact_budget=1200; 12
 
 Also working: image-aware truncation, budget-aware generation in all three modes, the
 identity chain (group > episode > conversation > turn), per-token rewards reaching the
-loss, `value_mask` reaching the critic, all 20 training scripts config-verified with
-sokoban and frozenlake actually run.
+loss, `value_mask` reaching the critic, and every training script under `examples/train/`
+config-verified by `tests/test_example_configs_hold_together.py`, with sokoban and
+frozenlake actually run.
 
 ## 8. How to work here
 
