@@ -5,7 +5,7 @@ import logging
 import os
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Literal
+from typing import Any, Dict, List, Optional
 
 from vagen.evaluate.vision_workflow import GenericVisionInferenceWorkflow
 from vagen.evaluate.adapters.throttled_adapter import ThrottledAdapter, ThrottleRetryPolicy
@@ -67,7 +67,6 @@ async def run_eval_parallel(
     default_max_turns: int,
     dump_dir: Optional[str] = "./rollouts",
     max_concurrent_jobs: int = 4,
-    resume_mode: Literal["off", "skip_completed", "force_rerun"] = "skip_completed",
     live_summary: bool = False,
 ) -> List[Dict[str, Any]]:
     """
