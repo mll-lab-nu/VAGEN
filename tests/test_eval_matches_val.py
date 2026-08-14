@@ -35,9 +35,22 @@ UNPAIRED = {
     # Trains on `base_train` (1200 tasks) and scores on `base` (60): the seed numbers
     # index different datasets, so a range comparison is meaningless.
     "navigation": "train and val use different eval_set datasets",
-    # The seed is a room index into a fixed download, and eval deliberately covers all 20
-    # rooms rather than only the held-out four.
-    "spatial_gym": "seed indexes a fixed room set, not a generator",
+    # config.yaml is the 2-room task and val is the 1-room one, so max_turns differs for a
+    # real reason (16 vs 11) and a turn-budget comparison is meaningless. The seeds ARE
+    # comparable, and are checked below via SEED_COMPARABLE.
+    "spatial_gym": "eval config.yaml is a different task (2-room) from val (1-room)",
+}
+
+#: Eval directories whose seeds index the same space as their training config, so an
+#: overlap is a real contamination. Wider than PAIRS: spatial_gym's turn budget is not
+#: comparable to val's but its room indices are, and that is the check that matters.
+#: Every eval yaml in the directory is examined, not just config.yaml -- spatial_gym's
+#: contaminated range lived in config_1room.yaml, which nothing looked at.
+SEED_COMPARABLE = {
+    "sokoban": "examples/train/sokoban/train_sokoban_vision.yaml",
+    "frozenlake": "examples/train/frozenlake/train_frozenlake_vision.yaml",
+    "primitive_skill": "examples/train/primitive_skill/train_primitive_skill.yaml",
+    "spatial_gym": "examples/train/spatial_gym/train_spatial_gym_vision.yaml",
 }
 
 
@@ -74,19 +87,23 @@ def test_eval_turn_budget_matches_the_val_config(name, val_path):
             f"{val.get('max_turns')}")
 
 
-@pytest.mark.parametrize("name,val_path", sorted(PAIRS.items()))
-def test_eval_seeds_do_not_overlap_the_training_seeds(name, val_path):
+@pytest.mark.parametrize("name,train_path", sorted(SEED_COMPARABLE.items()))
+def test_eval_seeds_do_not_overlap_the_training_seeds(name, train_path):
     """★ Same seed, same instance. An eval range that reaches into the train range reports
-    training-set accuracy under an evaluation heading, and nothing about the run says so."""
-    train_path = os.path.join(_ROOT, val_path.replace("/val_", "/train_"))
-    if not os.path.exists(train_path):
-        pytest.skip(f"no train counterpart for {name}")
+    training-set accuracy under an evaluation heading, and nothing about the run says so.
+
+    spatial_gym did exactly that: the seed is an index into a 20-room download, training
+    took 0-15, and both eval configs asked for 0-19."""
+    assert os.path.exists(os.path.join(_ROOT, train_path)), train_path
     train = set().union(*(_seed_values(s) for s in _envs(train_path)))
-    for spec in _envs(f"examples/evaluate/{name}/config.yaml"):
-        overlap = _seed_values(spec) & train
-        assert not overlap, (
-            f"{name} eval draws {len(overlap)} seed(s) the training config also uses, "
-            f"e.g. {sorted(overlap)[:5]}")
+    configs = sorted(glob.glob(os.path.join(_ROOT, f"examples/evaluate/{name}/*.yaml")))
+    assert configs, f"no eval yaml found for {name}"
+    for cfg in configs:
+        for spec in _envs(cfg):
+            overlap = _seed_values(spec) & train
+            assert not overlap, (
+                f"{os.path.relpath(cfg, _ROOT)} draws {len(overlap)} seed(s) the training "
+                f"config also uses, e.g. {sorted(overlap)[:5]}")
 
 
 def test_every_eval_seed_range_covers_itself_exactly():

@@ -16,10 +16,6 @@ Two of them return `dict[str, float]` rather than a single float; `collect_regis
 (`vagen/trainer/logic.py`) supports both. The registry calls `fn(data)` with no extra
 arguments — there is no `**kwargs` mechanism.
 
-| Metric | Description |
-|--------|-------------|
-| `reward_variance` | Mean within-group reward variance |
-
 ## Creating a Custom Metric
 
 ### Step 1: Create Your Metric
@@ -31,13 +27,12 @@ from vagen.custom_metric.metric import register_metric
 from verl import DataProto
 
 @register_metric("my_metric")
-def my_metric(data: DataProto, **kwargs) -> float:
+def my_metric(data: DataProto) -> float:
     """
     Custom metric implementation.
 
     Args:
         data: DataProto containing training data
-        **kwargs: Additional arguments
 
     Returns:
         float: Metric value for logging

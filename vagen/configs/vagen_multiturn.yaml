@@ -48,7 +48,17 @@ actor_rollout_ref:
 # Trainer Configuration
 # ============================================================================
 trainer:
-  val_before_train: True                    
+  val_before_train: True
+  # ★ A VAGEN run is bounded by trainer.total_training_steps, which every example script
+  # sets. But verl's fit loop is `for epoch in range(total_epochs)` -- steps only stop it
+  # early -- and verl's default total_epochs is 30. So the real limit is
+  #     min(total_training_steps, total_epochs * floor(n_envs / train_batch_size))
+  # and the second term binds whenever the seed list is small: spatial_gym (n_envs 50,
+  # batch 32) ran 1 step an epoch and stopped at 30 of its 401, never once reaching
+  # save_freq=100 -- 30 steps of training and no checkpoint to show for it. navigation
+  # stopped at 270. Set high enough that the step count is always what stops a run;
+  # there is no separate meaning to an epoch here, since the "dataset" is a seed list.
+  total_epochs: 100000
   replace_image_tokens_for_logging: True    # By default, we want to convert a sequence of image tokens with readable placeholders in logs
   max_actor_ckpt_to_keep: 1                # Max number of actor checkpoints to keep (saves disk space)
   max_critic_ckpt_to_keep: 1               # Max number of critic checkpoints to keep
@@ -133,8 +143,8 @@ trainer:
     format_reward: 0.0
     judge_base_url: "http://127.0.0.1:8123/v1"
     # Qwen3 generation, instruct-only: the 2507 line has no thinking mode, which for a
-    # parser on the rollout's critical path is what you want. Qwen3.5 needs a newer
-    # transformers than verl is pinned to here.
+    # parser on the rollout's critical path is what you want. A judge that stops to reason
+    # costs every turn of every rollout, and nothing here reads the reasoning.
     judge_model: "Qwen/Qwen3-4B-Instruct-2507"
 
   # Context policy, and the only thing that selects one. Named rather than left null so
@@ -147,7 +157,12 @@ trainer:
   # It has to hold the system prompt, which is re-sent every time a conversation opens,
   # plus a summary and more than one turn -- on Sokoban the system prompt alone is 589
   # tokens, so 400 (which this ran with) could not fit an opening call, let alone a turn.
-  # See vagen/harness/budget.py; the checks there refuse the ones that cannot work.
+  #
+  # ★ Nothing checks this statically -- vagen/harness/budget.py says so in its own words,
+  # and explains why (the true threshold depends on the system prompt, which that module
+  # cannot see). A budget too small to hold one turn is caught at RUNTIME, as
+  # CompactionMakesNoProgress on every episode. If a compact run empties its batch
+  # immediately, suspect this number first.
   compact_budget: 4000
   # How long the summary itself may be. null derives it as compact_budget/4, which is
   # what keeps compaction worth doing: the summary has to fit inside the budget it is

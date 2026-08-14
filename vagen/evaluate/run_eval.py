@@ -470,7 +470,7 @@ def _resolve_defaults(cfg_path: str, cfg: DictConfig, _visited: Optional[set] = 
     Example usage inside a YAML config::
 
         defaults:
-          - base_viewsuite        # loads base_viewsuite.yaml next to this file
+          - base_sokoban          # loads base_sokoban.yaml next to this file
           - ../shared/backends    # relative path also works
 
         # only the fields you want to override
@@ -569,7 +569,16 @@ def main() -> None:
     max_concurrent = int(run_cfg.get("max_concurrent_jobs", 4))
     base_seed = int(run_cfg.get("base_seed", run_cfg.get("start_seed", 0)))
 
-    backend_cfg: Dict[str, Any] = cfg.get("backends", {})[backend]
+    backends_cfg: Dict[str, Any] = cfg.get("backends", {}) or {}
+    if backend not in backends_cfg:
+        # A bare KeyError here names the string and nothing else, and the two most likely
+        # causes -- a typo, and a backend the README lists but eval_default.yaml does not
+        # define -- both look identical from the traceback.
+        raise ValueError(
+            f"run.backend={backend!r} has no entry under `backends:`. Configured: "
+            f"{sorted(backends_cfg)}. Add a `backends.{backend}:` block, or pick one of those."
+        )
+    backend_cfg: Dict[str, Any] = backends_cfg[backend]
     model = backend_cfg.get("model") or backend_cfg.get("deployment")
     if not model:
         raise ValueError(f"[{backend}] requires 'model' (or 'deployment' for Azure) in backends.{backend}.*")

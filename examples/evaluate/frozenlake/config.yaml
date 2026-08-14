@@ -35,6 +35,14 @@ envs:
       is_slippery: false
       slip_prob: 0.0
       max_actions_per_step: 5
+    # ★ Without this the provider's own default applies -- 1.0 for an OpenAI-compatible
+    # server, i.e. 128 sampled episodes where every other env's eval decodes greedily.
+    # Two checkpoints scored here were not being compared on equal terms, and rerunning
+    # the same checkpoint did not reproduce. Every other eval config pins temperature 0.
+    chat_config:
+      temperature: 0
+      max_tokens: 1024
+      top_p: 1.0
 
 experiment:
   dump_dir: ${fileroot}/rollouts/eval_frozenlake

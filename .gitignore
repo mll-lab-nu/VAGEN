@@ -62,3 +62,20 @@ nohup.out
 # Cluster launchers: site-specific, kept local rather than published.
 examples/slurm/
 eval_runs/
+
+# Built mkdocs output. .readthedocs.yaml rebuilds from source on every push, so a tracked
+# copy only ever serves a stale one to whoever browses the repo on GitHub.
+site/
+
+# Never commit credentials. These are here so a stray key cannot be added by accident,
+# not because one ever was.
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+credentials.json
+.aws/
+*.env
+.env.*

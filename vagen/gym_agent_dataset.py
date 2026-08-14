@@ -267,21 +267,3 @@ class AgenticDataset(Dataset):
 
     def __getitem__(self, idx):
         return self.items[idx]
-
-
-if __name__ == "__main__":
-    # Simple test
-    dataset = AgenticDataset(
-        data_files="verl/recipe/viewsuite/configs/val_config.yaml",
-        config={"base_seed": 42},
-    )
-    print(f"Total envs: {len(dataset)}")
-    #shuffle and sample
-    import random
-    random.seed(42)
-    indices = list(range(len(dataset)))
-    random.shuffle(indices)
-    sample_indices = indices[:10]
-    for i in sample_indices:
-        item = dataset[i]
-        print(item)

@@ -1,9 +1,10 @@
 # VAGEN Architecture
 
-Training backend: verl **main**, carried as the git submodule at `VAGEN/verl` and
-pip-installed from that checkout (`pip install --no-deps -e ./verl`). It reports
-`0.9.0.dev`. This document was written against `release/v0.8.0` as a sibling checkout;
-where the two disagree, the submodule is what runs.
+Training backend: a patched fork of verl main -- `JamesKrW/verl` at tag `vagen-260812`
+(`27c51e9`) -- carried as the git submodule at `VAGEN/verl` and pip-installed from that
+checkout (`pip install --no-deps -e ./verl`). It reports `0.9.0.dev`. The three patches are
+listed in `AGENT.md`. This document was written against `release/v0.8.0` as a sibling
+checkout; where the two disagree, the submodule is what runs.
 
 > **Start with `AGENT.md`.** It is the five-minute orientation: the layering, the
 > invariants that break silently, how to run things, and where the project stands. This
@@ -71,25 +72,33 @@ sections, substitute:
 
 ### Packages and dependency direction
 
+The **rule** below is real and enforced by review: nothing under `vagen/core`, the
+environments, or the evaluation path may import verl, torch or ray, so evaluation runs
+without a training install. The *names* in the original sketch (`clients/`, `eval/`,
+`train/`, `ports.py`, `msg.py`) were never built. What exists:
+
 ```
 vagen/
-├── core/       ★ no verl / no torch / no ray
-│   ports.py  tape.py  harness/  runner.py  envspec.py  envs/  envs_remote/  metrics.py
-├── clients/    ★ no verl
-│   chat_api.py  adapters/            (local_engine.py / managed_server.py: later)
-├── eval/       depends on core + clients — **no verl / torch / ray**
-└── train/      depends on core + clients + verl
-    verl_client.py  gym_loop.py  multi_output.py   (see AGENT.md section 6)
+├── core/            ★ no verl / no torch / no ray
+│   harness.py  client.py  runner.py  tape.py  env.py  env_adapter.py
+├── harness/         concat / no_concat / compact, and budget.py   ★ no verl
+├── envs/  envs_remote/                                            ★ no verl
+├── evaluate/        depends on core + harness + envs   ★ no verl / torch / ray
+│   run_eval.py  runner.py  chat_client.py  vision_workflow.py  registry.py
+└── agent_loop/  trainer/  custom_advantage/  custom_loss/  custom_filter/
+                  depends on all of the above + verl
 ```
 
 ```
-vagen.core    → PIL, numpy, omegaconf
-vagen.clients → vagen.core, openai/anthropic…
-vagen.eval    → vagen.core, vagen.clients        ❌ never verl/torch/ray
-vagen.train   → + verl, torch, ray
+vagen.core, vagen.harness, vagen.envs → PIL, numpy, omegaconf
+vagen.evaluate                        → the above + openai/anthropic…  ❌ never verl/torch/ray
+vagen.agent_loop, vagen.trainer       → + verl, torch, ray
 ```
 
-CI gate: in a clean env, `pip install vagen[eval] && python -c "import vagen.eval"` must pass.
+There is no `[eval]` extra -- `setup.py` ships `test`, `vllm` and `sglang`. The rule itself
+is gated by `tests/test_evaluation_needs_no_training_install.py`, which walks the AST of
+every module in those packages and fails on an import of verl, torch or ray at any nesting
+depth. ManiSkill's vendored simulator is exempt, with the reason in the test.
 
 ---
 
@@ -512,7 +521,7 @@ class VagenV0Mixin(VagenLogicMixin):              # binds to v0.8.0's _fit_*
 class VagenPPOTrainer(VagenV0Mixin, SeparateRayPPOTrainer): pass
 # later, free:  VagenOneStepOffTrainer(VagenV0Mixin, OneStepOffRayTrainer)
 ```
-`vagen/ray_trainer.py`: **1660 lines → a few hundred**. The two-layer split exists so we can migrate to main's V1 trainer later by swapping only the binding layer.
+`vagen/trainer/ppo_trainer.py` + `vagen/trainer/mixin.py`, replacing a 1660-line vendored trainer with a few hundred. The two-layer split exists so we can migrate to main's V1 trainer later by swapping only the binding layer.
 
 ### 8.3 ⭐ Algorithm layer — token-level / turn-level / bi-level
 

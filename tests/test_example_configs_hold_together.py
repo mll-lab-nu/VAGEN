@@ -138,3 +138,43 @@ def test_a_seed_list_of_exactly_n_envs_is_accepted_on_both_sides():
     b = SimpleNamespace(name="S", n_envs=3, seed=[0], seed_list=[1, 2, 3])
     assert ev(a, 0, 0) == [1, 2, 3]
     assert tr(b, 0, 0) == [1, 2, 3]
+
+
+@pytest.mark.parametrize("script", SCRIPTS)
+def test_the_run_is_stopped_by_its_step_count_and_not_by_an_epoch_count(script):
+    """★ verl's fit loop is `for epoch in range(trainer.total_epochs)`, and
+    total_training_steps only ends it early. So the real bound is
+
+        min(total_training_steps, total_epochs * floor(n_envs / train_batch_size))
+
+    and with verl's default total_epochs=30 the right-hand term binds whenever the seed
+    list is small. spatial_gym (n_envs 50, train_batch_size 32, drop_last=True) got one
+    step an epoch and stopped at 30 of its 401 -- never reaching save_freq=100, so a run
+    that looked configured for 401 steps produced 30 and no checkpoint. navigation
+    stopped at 270. Nothing said so: the run simply ended and reported success.
+    """
+    text = open(script).read()
+    steps = _flag(text, "trainer.total_training_steps")
+    batch = _flag(text, "data.train_batch_size")
+    if steps is None or batch is None:
+        pytest.skip("script does not pin both a step count and a batch size")
+
+    yamls = _script_yamls(text, script)
+    train_yaml = next((y for y in yamls if "/train_" in y), None)
+    if train_yaml is None:
+        pytest.skip("script names no train yaml")
+    cfg = OmegaConf.load(train_yaml)
+    n_envs = sum(int(e["n_envs"]) for e in cfg["envs"])
+
+    epochs = _flag(text, "trainer.total_epochs") or int(
+        OmegaConf.load(os.path.join(_ROOT, "vagen/configs/vagen_multiturn.yaml"))
+        .trainer.total_epochs)
+
+    per_epoch = n_envs // batch          # drop_last=True
+    assert per_epoch >= 1, (
+        f"train_batch_size={batch} exceeds n_envs={n_envs}, so drop_last discards every "
+        f"batch and the run does zero steps")
+    assert epochs * per_epoch >= steps, (
+        f"{os.path.basename(script)} asks for {steps} steps but can only reach "
+        f"{epochs * per_epoch} ({per_epoch} steps/epoch x {epochs} epochs): "
+        f"n_envs={n_envs}, train_batch_size={batch}")

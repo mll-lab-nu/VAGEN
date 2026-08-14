@@ -130,6 +130,7 @@ envs:
 | key | meaning |
 |---|---|
 | `name` | registered environment name |
+| `tag_id` | **required in an eval config.** Names the results directory (`tag_<id>`) and is part of the resume key, so two env entries in one run must not share one |
 | `n_envs` | number of instances |
 | `data_source` | label only |
 | `seed` | see **Seeds** |

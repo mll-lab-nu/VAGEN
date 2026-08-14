@@ -4,9 +4,8 @@
 # Per-experiment settings only. Everything that makes a VAGEN run work at all lives in
 # vagen/configs/baseline_vllm.flags and is read below -- in particular the two flags that
 # select VAGEN's agent loop. Without them verl runs its own, and the job comes up looking
-# healthy while none of this repo's rollout code executes. All twenty of these scripts
-# were in that state, and the duplication is why: each carried its own copy of the stack
-# settings, and the copies stopped including the loop.
+# healthy while none of this repo's rollout code executes -- so the shared flags file is
+# the single place those live, and this script holds only what makes it this experiment.
 #
 # Anything after "${BASE[@]}" overrides it, and anything on the command line overrides
 # that, so a one-off sweep needs no edit here.
