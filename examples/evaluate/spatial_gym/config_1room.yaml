@@ -1,7 +1,7 @@
 defaults:
   - ../../../vagen/configs/eval_default
 
-fileroot: ${oc.env:HOME}/projects/vagen
+fileroot: ${oc.env:VAGEN_EVAL_ROOT,./eval_runs}
 
 envs:
   - name: SpatialGym
@@ -25,7 +25,7 @@ envs:
       top_p: 1.0
 
 experiment:
-  dump_dir: ./rollouts/spatial_gym_1room
+  dump_dir: ${fileroot}/rollouts/eval_spatial_gym_1room
   default_max_turns: 11
 
 run:
