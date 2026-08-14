@@ -1,14 +1,21 @@
+# ★ base_train, not base. `base` is the 60-task HELD-OUT set that val_navigation.yaml
+# scores on -- this file used it, so the runs trained on their own evaluation set and the
+# val curve measured memorisation. The seed indexes the dataset directly
+# (`self._dataset[seed % len(self._dataset)]`, navigation_env.py:156), so there was no
+# shuffling to hide it. base_train ships 1200 tasks against base's 60; the sibling
+# train_navigation_base_common.yaml had this right all along.
 envs:
   - name: RemoteEnv
-    n_envs: 10000
+    # 1200, matching base_train.json exactly, with each task drawn once.
+    n_envs: 1200
     data_source: navigation
-    seed: [0, 30]
+    seed: [1, 1200, 1]
     max_turns: 10
     response_length_per_turn: 512
     config:
       base_urls: "http://localhost:8000"
       timeout: 120
       retries: 3
-      eval_set: base
+      eval_set: base_train
       prompt_format: eval_mode
       max_actions_per_step: 5
