@@ -182,9 +182,13 @@ def _generate_seeds_for_spec(
     """Generate `n_envs` seeds using either seed_list or seed directive rules."""
     explicit_list = _coerce_to_int_list(spec.seed_list)
     if explicit_list is not None:
-        if len(explicit_list) <= spec.n_envs:
+        # `<`, not `<=`: a list of exactly n_envs values is used in full, so demanding
+        # "more than" rejected the obvious way to name every seed you want. The eval side
+        # has always required only `>= n_envs`; this was the one that disagreed.
+        if len(explicit_list) < spec.n_envs:
             raise ValueError(
-                f"seed_list for env '{spec.name}' must contain more than n_envs values"
+                f"seed_list for env '{spec.name}' has {len(explicit_list)} values for "
+                f"n_envs={spec.n_envs}; it must contain at least n_envs values"
             )
         return explicit_list[: spec.n_envs]
 

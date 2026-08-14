@@ -29,10 +29,21 @@ def _normalize_seed_directive(seed_field) -> List[int]:
 
 
 def _make_rng_seed(base_seed: int, spec: Any, spec_idx: int, hint: str) -> int:
-    """Expand the global seed into a deterministic per-spec RNG seed."""
+    """Expand the global seed into a deterministic per-spec RNG seed.
+
+    ★ The payload must match ``vagen/gym_agent_dataset.py:_make_rng_seed`` exactly, or the
+    same seed directive produces different seeds under evaluation than under training --
+    which makes "evaluate on the val seeds" unreachable through the directive, and quietly
+    weakens any test that compares the declared ranges rather than the realised sets.
+    Measured before this: `seed: [100,200]`, n_envs=8 gave train [127,184,156,...] against
+    eval [149,125,100,...].
+
+    ``split`` used to be hashed in here and is not on the training side. Dropped rather
+    than added there: the training EnvSpec has no split, and adding a field to the payload
+    would renumber every existing training run's seeds.
+    """
     name = getattr(spec, "name", "unknown")
-    split = getattr(spec, "split", "default")
-    payload = f"{base_seed}|{spec_idx}|{name}|{split}|{hint}"
+    payload = f"{base_seed}|{spec_idx}|{name}|{hint}"
     digest = hashlib.blake2b(payload.encode("utf-8"), digest_size=8).digest()
     return int.from_bytes(digest, "little")
 
