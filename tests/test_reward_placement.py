@@ -45,7 +45,6 @@ def _cfg(estimator):
         ("removed_estimator_gae", "turn_end"),
         # Everything else supervises per token and wants the score where it was earned.
         ("token_level_gae", "per_span"),
-        ("removed_estimator_gae_varlam", "per_span"),
         ("turn_level_gae", "per_span"),
         ("default_gae", "per_span"),
         ("trajectory_grpo", "per_span"),

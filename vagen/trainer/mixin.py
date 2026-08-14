@@ -161,7 +161,7 @@ class VagenLogicMixin:
     def _vagen_check_estimator_is_undiscounted(self) -> None:
         """Refuse a two-clock estimator when ``gamma != 1``.
 
-        ★ ``removed_estimator_gae_varlam`` runs one recursion per token and switches lambda at turn
+        ★ A two-clock estimator runs one recursion per token and switches lambda at turn
         boundaries, so a single turn is discounted twice over by two different clocks:
         the turn level pays one ``gamma`` to cross it, the token level pays
         ``gamma ** (tokens in the turn)``. They agree only at ``gamma == 1``.

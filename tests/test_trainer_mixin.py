@@ -852,8 +852,7 @@ def test_a_turn_level_loss_refuses_an_estimator_with_no_turn_id():
 
     assert spans_rows("trajectory_grpo") is True
     assert publishes_turn_id("trajectory_grpo") is False
-    for other in ("default_gae", "token_level_gae", "turn_level_gae",
-                  "removed_estimator_gae", "removed_estimator_gae_varlam"):
+    for other in ("default_gae", "token_level_gae", "turn_level_gae", "removed_estimator_gae"):
         assert publishes_turn_id(other) is True, other
 
 

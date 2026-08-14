@@ -65,6 +65,13 @@ We frame multi-turn VLM agentic tasks as a Partially Observable Markov Decision 
 
 
 ## News
+**[2026/08]** A major update to `main`, on the latest VERL agent-loop:
+- **Compact RL** — a third multi-turn paradigm alongside concat and no-concat. Turns accumulate until a token budget is reached, then the conversation is summarised and reopened from that summary, so an episode longer than the context window still trains as one trajectory. See [Multi-turn Compacted Training](#training).
+- **The context policy and the advantage estimator are now independent axes.** `trainer.harness` decides how an episode is laid out in rows; `algorithm.adv_estimator` stitches those rows back into one trajectory. Every VAGEN estimator is layout-independent, and the trainer refuses the pairings that would silently score a fraction of an episode.
+- **Environment, harness, training backend and algorithm are decoupled.** Anything subclassing `BaseEnv` or `BaseHarness` plugs into both training and evaluation without either being modified — see [Custom Harness](#custom-harness).
+- **Evaluation runs the same episode loop as training** and reads the same `harness` key, so an eval number and a validation curve are the same measurement. Every environment ships a vLLM launcher.
+- **Per-turn token budgets are measured rather than assumed**, including a `thinking_token_budget` for models with a native reasoning channel.
+
 **[2026/02]** We have migrated the `main` branch to VAGEN-Lite, a lightweight and clean reimplementation built on VERL agent-loop for easy customization and stable performance. For the previous full-featured release, please visit the [vagen-legacy](https://github.com/mll-lab-nu/VAGEN/tree/vagen-legacy) branch.
 
 **[2025/12]** Introducing [VAGEN-Lite](https://github.com/mll-lab-nu/VAGEN/tree/vagen-lite): a lightweight and clean reimplementation of VAGEN, built on the VERL agent-loop for easy customization and stable performance.
@@ -295,6 +302,54 @@ Write your training script based on:
 * [`examples/train/sokoban/train_default_gae_qwen25vl3b.sh`](examples/train/sokoban/train_default_gae_qwen25vl3b.sh)
 
 
+## Custom Harness
+
+A **harness** is the context policy: each turn it answers one question — does the next
+model call continue the current conversation, or start a new one, and seeded with what?
+`concat`, `no_concat` and `compact` are three answers to that question, not three
+mechanisms.
+
+The design VAGEN is built around: **anything that subclasses `BaseEnv` or `BaseHarness`
+plugs into training and evaluation without either being modified.** A harness holds no
+tokenizer, no client and no environment, and never sees a token, a mask or a reward — so
+the same object drives a training rollout and a closed-API evaluation, where a conversation
+id is `previous_response_id` on OpenAI's Responses API, a session on SGLang, or a cached
+prefix on vLLM.
+
+```python
+from vagen.core.harness import BaseHarness, Call
+from vagen.harness import register_harness
+
+@register_harness("mine")
+class MyHarness(BaseHarness):
+    #: Whether one episode can end up in more than one row. The trainer asks the harness
+    #: rather than keeping a list of the ones it knows, and pairs the estimator accordingly.
+    splits_episode_across_rows = True
+
+    def next_call(self) -> Call: ...       # the only required method
+```
+
+Select it the same way in either place — a registered name, or an import path for a class
+this repo has never heard of:
+
+```yaml
+trainer:
+  harness: mine                        # training
+  harness: mypkg.harnesses:MyHarness   # or an import path
+
+envs:
+  - name: Sokoban
+    harness: mine                      # evaluation, same key, same resolution
+```
+
+The import path exists because a new policy is usually tried in evaluation first, where the
+config is a yaml and there is nowhere a decorator would have run. For training the module
+has to be imported inside each worker, which is what `actor_rollout_ref.model.external_lib`
+is for.
+
+Full contract and the budget hooks: [`vagen/core/harness.py`](vagen/core/harness.py); the
+three implementations: [`vagen/harness/`](vagen/harness/).
+
 ## More Customization
 
 See the [Documentation](https://vagen.readthedocs.io/) for more customization options:
@@ -317,7 +372,7 @@ trainer:
 # time and would drop every turn's credit at the row boundary; the trainer refuses that
 # pairing at startup rather than training on it.
 algorithm:
-                                   #    | turn_level_gae | trajectory_grpo
+                                   #    | trajectory_grpo
   # default_gae is the vanilla baseline: the episode's whole reward lumped onto its
   # last token, which is what single-turn RLHF does. It stitches rows like the others,
   # so it stays comparable under no_concat and compact where verl's `gae` would not.
