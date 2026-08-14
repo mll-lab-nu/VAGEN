@@ -63,6 +63,11 @@ class EnvSpec:
     #: Only used when sizes have to be estimated (no tokenizer). It feeds the compaction
     #: trigger as well as the overflow guard -- see chat_client.DEFAULT_TOKENS_PER_IMAGE.
     tokens_per_image: Optional[int] = None
+    #: A HuggingFace tokenizer id or path. Given one, text sizes are exact instead of
+    #: estimated at 4 characters a token, which is what the compaction trigger runs on.
+    #: Images are still estimated -- a tokenizer cannot price a frame; that is
+    #: tokens_per_image's job. Leave unset for a closed API, where there is nothing to load.
+    tokenizer: Optional[str] = None
 
 
 #: Every key an env entry may set. Anything else is a typo or a setting that moved, and
@@ -163,6 +168,7 @@ def _parse_env_specs(cfg: Dict[str, Any]) -> List[EnvSpec]:
             compact_budget=item.get("compact_budget"),
             compact_summary_budget=item.get("compact_summary_budget"),
             tokens_per_image=item.get("tokens_per_image"),
+            tokenizer=item.get("tokenizer"),
         )
         specs.append(spec)
     return specs
@@ -378,6 +384,7 @@ def _expand_jobs(
                 "compact_budget": spec.compact_budget,
                 "compact_summary_budget": spec.compact_summary_budget,
                 "tokens_per_image": spec.tokens_per_image,
+                "tokenizer": spec.tokenizer,
             }
             jobs.append({"data": job_data})
     return jobs

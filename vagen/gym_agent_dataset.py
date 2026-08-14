@@ -32,16 +32,14 @@ class EnvSpec:
     max_turns: int = 1
     response_length_per_turn: Optional[int] = None
     # The largest a single observation from this environment may be, in tokens, after the
-    # processor has expanded any images. Left unset it falls back to
-    # vagen/harness/budget.py:DEFAULT_MAX_ENV_RESPONSE, and below that to a value derived
-    # from the response region -- but the derivation cannot know what this environment
-    # actually returns, and the runtime error for an oversized observation says to set
-    # this. It has to be settable for that to be advice.
+    # processor has expanded any images. An observation over it is CUT -- its text is
+    # trimmed before rendering -- so this is a real ceiling, not advice. Unset it is
+    # vagen/harness/budget.py:DEFAULT_MAX_ENV_RESPONSE, a flat 2048.
     #
-    # This is the environment-side twin of ``response_length_per_turn``: one bounds what
-    # the model may write in a turn, this bounds what the environment may hand back. With
-    # both set, a concat episode costs at most T*g + (T-1)*E and the compaction arithmetic
-    # is exact rather than self-consistent.
+    # The environment-side twin of ``response_length_per_turn``: one bounds what the model
+    # may write in a turn, this bounds what the environment may hand back. It feeds exactly
+    # two things -- that cut, and compaction's "can a conversation buy a turn" refusal. It
+    # deliberately does NOT size max_response_length or max_model_len; see budget.py.
     max_env_response_per_turn: Optional[int] = None
     #: Deprecated spelling of ``max_env_response_per_turn``. Kept because it is what the
     #: oversized-observation error told people to set.

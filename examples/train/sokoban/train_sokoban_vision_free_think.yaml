@@ -12,9 +12,9 @@
 # 96 mid-episode. So the concat episode costs
 #     5 x 2048  +  4 x 96   =  10624 tokens of response region
 # against the 11264 configured, with the system prompt (370) and first observation in the
-# 1000-token prompt region. Total window ~12.3k. The 4608 that older runs saw in the
-# budget warning was never an observation size -- it was `default_env_response`, a quarter
-# of the response region, standing in for a number no config had set.
+# 1000-token prompt region. Total window ~12.3k. The four-figure observation size older
+# runs saw in the budget warning was never measured -- it was `default_env_response`,
+# derived from the response region, standing in for a number no config had set.
 #
 # ★ `response_length_per_turn` alone is not enough, which is why `thinking_token_budget`
 # is set below. It IS enforced -- measured on 256 validation episodes, 0 rollouts exceeded
@@ -37,8 +37,8 @@ envs:
     max_turns: 5 # max number of interaction turns per episode
     response_length_per_turn: 2048 # hard cap on one generation
     # The environment-side twin of the line above. 256 against a measured 96 leaves room
-    # for a larger frame without letting a runaway observation eat the response region;
-    # unset, this would default to 2048, and before that to a tenth of the region.
+    # for a larger frame without letting a runaway observation eat the response region.
+    # Unset it is a flat 2048.
     max_env_response_per_turn: 256
     # Force the reasoning block closed at 512 tokens instead of letting the turn be cut
     # mid-thought. `response_length_per_turn` above is still the hard ceiling on the whole
