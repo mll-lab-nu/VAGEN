@@ -214,11 +214,14 @@ def _resume_mode(value) -> str:
     )
 
 
-def _purge_error_rollouts(dump_dir: Optional[str], resume_mode: str,
-                          tags: Optional[set] = None) -> None:
+def _purge_error_rollouts(dump_dir: Optional[str], resume_mode: str, *, tags: set) -> None:
     """
     Remove previous error rollouts so reruns start clean.
     Only invoked when resume mode keeps completed runs.
+
+    ``tags`` is required rather than defaulting to None: unscoped means "every tag in the
+    directory", and navigation puts three tags in one dump dir, so a caller that forgets it
+    discards results nobody asked to rerun.
     """
     if resume_mode == "off" or not dump_dir:
         return
@@ -265,15 +268,34 @@ def _purge_error_rollouts(dump_dir: Optional[str], resume_mode: str,
                 logger.warning("Failed to remove error rollout folder: %s", rollout_entry.path)
 
 
-def _refresh_tag_summaries(dump_dir: Optional[str], model: Optional[str] = None,
-                           tags: Optional[set] = None) -> None:
+def _refresh_tag_summaries(dump_dir: Optional[str], *, model: Optional[str] = None,
+                           tags: set) -> None:
+    """Recompute each tag's summary.json for ``model``, after error rollouts were purged.
+
+    ``tags`` is required rather than defaulting to None: unscoped means "every tag in the
+    directory", which for this function is the destructive reading -- see below.
+    """
     if not dump_dir or not os.path.isdir(dump_dir):
         return
     for tag_entry in os.scandir(dump_dir):
         if not tag_entry.is_dir() or not tag_entry.name.startswith("tag_"):
             continue
-        if tags is not None and tag_entry.name not in tags:
+        if tag_entry.name not in tags:
             continue
+        # ★ This runs at startup, BEFORE any of this run's rollouts exist, and the summary
+        # is filtered to `model`. So evaluating checkpoint B into the directory checkpoint A
+        # used rewrites A's summary.json as `n_episodes: 0, success_rate: 0.0` -- and the
+        # per-tag rewrite that would have fixed it only happens if B's run reaches the end.
+        # A bad api_key or a Ctrl-C then leaves A's results replaced by a zero. Keep the old
+        # file unless the new one actually has episodes behind it.
+        summary_path = os.path.join(tag_entry.path, "summary.json")
+        previous: Optional[bytes] = None
+        if os.path.isfile(summary_path):
+            try:
+                with open(summary_path, "rb") as f:
+                    previous = f.read()
+            except OSError:
+                previous = None
         try:
             # model=... so a dump directory holding two checkpoints does not get a summary
             # averaged across both. Without it, a resume that skips every job (because the
@@ -281,23 +303,42 @@ def _refresh_tag_summaries(dump_dir: Optional[str], model: Optional[str] = None,
             # rewrite below never runs, since `results` is empty.
             outp = write_rollouts_summary_from_dump(dump_dir=tag_entry.path,
                                                     filename="summary.json", model=model)
-            logger.info("Resume: refreshed summary %s", outp)
+            if previous is not None and _summary_is_empty(outp):
+                with open(summary_path, "wb") as f:
+                    f.write(previous)
+                logger.info("Resume: %s has no rollouts for this model yet; kept the "
+                            "existing summary rather than zeroing it", tag_entry.path)
+            else:
+                logger.info("Resume: refreshed summary %s", outp)
         except Exception as exc:
             logger.warning("Resume: failed to refresh summary for %s: %s", tag_entry.path, exc)
 
 
-def _collect_completed_runs(dump_dir: Optional[str]) -> Dict[Tuple[str, int, Union[int, str]], str]:
+def _summary_is_empty(path: Optional[str]) -> bool:
+    """True when a summary was written with nothing behind it. Unreadable counts as empty
+    only if it is also missing -- a summary we cannot parse is not one we should overwrite."""
+    if not path or not os.path.isfile(path):
+        return True
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return int(json.load(f).get("n_episodes") or 0) <= 0
+    except Exception:
+        return False
+
+
+def _collect_completed_runs(
+    dump_dir: Optional[str],
+) -> Dict[Tuple[str, int, Union[int, str], str], str]:
     """
-    Scan existing rollouts to find completed (success) runs keyed by (env_name, seed, tag_id).
+    Scan existing rollouts to find completed (success) runs keyed by
+    (env_name, seed, tag_id, model) -- the same shape `_job_resume_key` builds.
     """
-    completed: Dict[Tuple[str, int, Union[int, str]], str] = {}
+    completed: Dict[Tuple[str, int, Union[int, str], str], str] = {}
     if not dump_dir or not os.path.isdir(dump_dir):
         return completed
 
     for tag_entry in os.scandir(dump_dir):
         if not tag_entry.is_dir() or not tag_entry.name.startswith("tag_"):
-            continue
-        if tags is not None and tag_entry.name not in tags:
             continue
         for rollout_entry in os.scandir(tag_entry.path):
             if not rollout_entry.is_dir():
@@ -567,7 +608,7 @@ def main() -> None:
         _refresh_tag_summaries(dump_dir, model=model,
                                tags={f"tag_{j['data'].get('tag_id')}" for j in jobs})
 
-    completed_index: Dict[Tuple[str, int, int], str] = {}
+    completed_index: Dict[Tuple[str, int, Union[int, str], str], str] = {}
     # ★ Resume compares the model too. See metrics.json's "model": a rollout produced by a
     # different checkpoint answers a different question, and reusing it is silent.
     if resume_mode == "skip_completed":
@@ -605,7 +646,6 @@ def main() -> None:
             default_max_turns=default_max_turns,
             dump_dir=dump_dir,
             max_concurrent_jobs=max_concurrent,
-            resume_mode=resume_mode,
             live_summary=live_summary,
         )
     )
