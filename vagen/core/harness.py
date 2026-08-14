@@ -13,9 +13,11 @@ exchange with the model; a **turn** is one model call. The policy is which shape
     no_concat   many conversations,          1 turn each
     compact     several conversations,       many turns each
 
-Because a harness only produces calls and consumes text, the same object drives a closed
-API for evaluation: a conversation id is ``previous_response_id`` on OpenAI's Responses
-API, a session on sglang, a cached prefix on vLLM.
+Because a harness only produces calls and consumes text, the same object drives a closed API
+for evaluation. A conversation id is bookkeeping here rather than a server-side handle --
+every shipped backend re-sends the messages -- but nothing in this class assumes that, so a
+backend that does support continuation (``previous_response_id`` on OpenAI's Responses API,
+a session on sglang, a cached prefix on vLLM) can be wired up without touching the policy.
 """
 
 from __future__ import annotations

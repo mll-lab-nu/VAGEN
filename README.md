@@ -66,11 +66,11 @@ We frame multi-turn VLM agentic tasks as a Partially Observable Markov Decision 
 
 ## News
 **[2026/08]** A major update to `main`, on the latest VERL agent-loop:
-- **Compact RL** — a third multi-turn paradigm alongside concat and no-concat. Turns accumulate until a token budget is reached, then the conversation is summarised and reopened from that summary, so an episode longer than the context window still trains as one trajectory. See [Multi-turn Compacted Training](#training).
+- **Compact RL** — a third multi-turn paradigm alongside concat and no-concat. Turns accumulate until a token budget is reached, then the conversation is summarised and reopened from that summary, so an episode longer than the context window still trains as one trajectory. Closely related to **CompactionRL** ([arXiv:2607.05378](https://arxiv.org/abs/2607.05378)), which trains task execution and summary generation jointly. See [Multi-turn Compacted Training](#multi-turn-compacted-training).
 - **The context policy and the advantage estimator are now independent axes.** `trainer.harness` decides how an episode is laid out in rows; `algorithm.adv_estimator` stitches those rows back into one trajectory. Every VAGEN estimator is layout-independent, and the trainer refuses the pairings that would silently score a fraction of an episode.
 - **Environment, harness, training backend and algorithm are decoupled.** Anything subclassing `BaseEnv` or `BaseHarness` plugs into both training and evaluation without either being modified — see [Custom Harness](#custom-harness).
-- **Evaluation runs the same episode loop as training** and reads the same `harness` key, so an eval number and a validation curve are the same measurement. Every environment ships a vLLM launcher.
-- **Per-turn token budgets are measured rather than assumed**, including a `thinking_token_budget` for models with a native reasoning channel.
+- **Evaluation runs the same episode loop as training** (`vagen/core/runner.py`) and reads the same `harness` key, so an eval config that copies the val config's turn budgets is measuring the same thing. Every environment ships a vLLM launcher.
+- **Per-turn token budgets are measured rather than assumed**, including a `thinking_token_budget` for models with a native reasoning channel (a per-env key in the dataset yaml — see `examples/train/sokoban/train_sokoban_vision_free_think.yaml`, and issue 5 in [docs/issues.md](docs/issues.md) for what it does and does not buy).
 
 **[2026/02]** We have migrated the `main` branch to VAGEN-Lite, a lightweight and clean reimplementation built on VERL agent-loop for easy customization and stable performance. For the previous full-featured release, please visit the [vagen-legacy](https://github.com/mll-lab-nu/VAGEN/tree/vagen-legacy) branch.
 
@@ -159,9 +159,20 @@ wandb login                       # or: export WANDB_MODE=offline
 ```
 
 ### Training
-VAGEN currently supports PPO / GRPO with three multi-turn training paradigms:
+VAGEN currently supports PPO / GRPO with three multi-turn training paradigms. An episode is
+many turns; a training row is one conversation. The **harness** decides how the first maps
+onto the second, and it is the central choice:
 
-**Multi-turn Concatenated Training**: All turns in a trajectory are concatenated into a single training instance.
+| `trainer.harness` | one episode becomes | use when |
+|---|---|---|
+| `concat` | **one** row holding every turn | the default; the episode fits the response region |
+| `no_concat` | **one row per turn**, each a fresh conversation | history is not needed, or will not fit |
+| `compact` | a row per conversation, summarised and reopened when full | long episodes that must keep context ([CompactionRL](https://arxiv.org/abs/2607.05378)) |
+
+
+#### Multi-turn Concatenated Training
+
+All turns in a trajectory are concatenated into a single training instance.
 
 ```bash
 # Qwen/Qwen2.5-VL-3B-Instruct
@@ -183,14 +194,18 @@ bash examples/train/frozenlake/train_grpo_qwen25vl3b_filtertopp_vision.sh
 ```
 
 
-**Multi-turn Non-Concatenated Training**: Each trajectory is split into multiple turn-level training instances.
+#### Multi-turn Non-Concatenated Training
+
+Each trajectory is split into multiple turn-level training instances.
 
 ```bash
 cd VAGEN
 bash examples/train/sokoban/train_ppo_no_concat_qwen25vl3b.sh
 ```
 
-**Multi-turn Compacted Training**: Turns are concatenated until a token budget is reached, then summarised so the next conversation starts from the summary. One training instance per conversation.
+#### Multi-turn Compacted Training
+
+Turns are concatenated until a token budget is reached, then summarised so the next conversation starts from the summary. One training instance per conversation.
 
 ```bash
 cd VAGEN
@@ -311,10 +326,11 @@ mechanisms.
 
 The design VAGEN is built around: **anything that subclasses `BaseEnv` or `BaseHarness`
 plugs into training and evaluation without either being modified.** A harness holds no
-tokenizer, no client and no environment, and never sees a token, a mask or a reward — so
-the same object drives a training rollout and a closed-API evaluation, where a conversation
-id is `previous_response_id` on OpenAI's Responses API, a session on SGLang, or a cached
-prefix on vLLM.
+tokenizer, no client and no environment, and never sees a token, a mask or a reward — so the
+same object drives a training rollout and a closed-API evaluation. Nothing in it assumes the
+conversation lives client-side either, so a backend with server-side continuation
+(`previous_response_id`, an SGLang session, a vLLM prefix cache) can be added without
+touching the policy. Today every shipped backend re-sends the messages.
 
 ```python
 from vagen.core.harness import BaseHarness, Call
@@ -329,23 +345,31 @@ class MyHarness(BaseHarness):
     def next_call(self) -> Call: ...       # the only required method
 ```
 
-Select it the same way in either place — a registered name, or an import path for a class
-this repo has never heard of:
+Both places read the same key, and both accept either a registered name or an import path
+— but only if something has imported your module first, which differs between them:
 
 ```yaml
+# training -- vagen/configs/vagen_multiturn.yaml, or a -o override
 trainer:
-  harness: mine                        # training
-  harness: mypkg.harnesses:MyHarness   # or an import path
-
-envs:
-  - name: Sokoban
-    harness: mine                      # evaluation, same key, same resolution
+  harness: mine
+  # verl builds a registry per worker process, so the module has to be imported inside each
+  # one. That is what this is for; without it the decorator never runs and the name is
+  # unknown:
+  #   actor_rollout_ref.model.external_lib=mypkg.harnesses
 ```
 
-The import path exists because a new policy is usually tried in evaluation first, where the
-config is a yaml and there is nowhere a decorator would have run. For training the module
-has to be imported inside each worker, which is what `actor_rollout_ref.model.external_lib`
-is for.
+```yaml
+# evaluation -- examples/evaluate/<env>/config.yaml
+envs:
+  - name: Sokoban
+    harness: mypkg.harnesses:MyHarness   # an import path, not a bare name
+```
+
+★ Use the import path for evaluation. `run_eval` has no `external_lib` hook, so nothing
+imports your module and a bare `harness: mine` fails with
+`unknown harness 'mine'; choose from ['compact', 'concat', 'no_concat']`. This is also why
+the import path exists at all: a new policy is usually tried in evaluation first, where the
+config is a yaml and there is nowhere a decorator would have run.
 
 Full contract and the budget hooks: [`vagen/core/harness.py`](vagen/core/harness.py); the
 three implementations: [`vagen/harness/`](vagen/harness/).
