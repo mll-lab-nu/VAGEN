@@ -170,6 +170,7 @@ wandb login --host "$WANDB_BASE_URL"
 ```
 
 ### Training
+
 VAGEN's PPO trajectory estimators support three multi-turn training paradigms. The shipped
 GRPO launchers use `concat`; split-row layouts require `trajectory_grpo`, not verl's
 row-local `grpo`. An episode is many turns; a training row is one conversation. The
@@ -188,18 +189,6 @@ model family. To run only that check, append:
 ```bash
 trainer.val_only=true trainer.save_freq=-1 trainer.test_freq=-1
 ```
-
-The main entrypoints currently included are:
-
-| model / method | entrypoint | estimator | harness |
-|---|---|---|---|
-| Qwen2.5-VL baseline | `train_default_gae_qwen25vl3b.sh` | `default_gae` | dedicated concat/no-concat/compact scripts |
-| Qwen2.5-VL World Modeling RL | `train_bi_level_gae_sr_qwen25vl3b.sh` | `bi_level_gae` + state reward | `concat` |
-| Qwen3-VL | `train_default_gae_qwen3vl4b.sh`, `train_grpo_qwen3vl4b.sh` | default GAE / GRPO | `concat` |
-| Qwen3.5 | `train_default_gae_qwen35_4b.sh`, `train_default_gae_qwen35_4b_think.sh` | `default_gae` | `concat` |
-| InternVL3.5 | `train_default_gae_internvl35_2b.sh` | `default_gae` | `concat`, `no_concat`, `compact` |
-| GLM-4.6V-Flash | `train_default_gae_glm46v_flash.sh` | `default_gae` | `concat`, `no_concat`, `compact` |
-
 
 #### Multi-turn Concatenated Training
 
