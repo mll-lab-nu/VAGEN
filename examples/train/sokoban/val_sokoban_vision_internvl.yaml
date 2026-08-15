@@ -1,5 +1,5 @@
-# Validation half of train_sokoban_vision_internvl.yaml. Keep the action-only protocol
-# and reward settings identical; only the held-out seeds and environment count differ.
+# Validation half of train_sokoban_vision_internvl.yaml. Keep the strict world-model
+# protocol and reward settings identical; only held-out seeds and env count differ.
 envs:
   - name: Sokoban
     n_envs: 256
@@ -10,6 +10,7 @@ envs:
     max_env_response_per_turn: 320
     config:
       render_mode: vision
-      prompt_format: answer
+      prompt_format: wm
+      strict_format: true
       format_reward: 0.02
       min_solution_steps: [1,5]

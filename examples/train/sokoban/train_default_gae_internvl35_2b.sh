@@ -1,9 +1,8 @@
 #!/bin/bash
 # sokoban - default_gae - InternVL3.5-2B
 #
-# Select the row layout with HARNESS=concat|no_concat|compact. InternVL tokenises
-# <think>/</think> as ordinary text, but its base model repeats badly under the full
-# world-model protocol, so the environment asks it to mark only <answer>.
+# Select the row layout with HARNESS=concat|no_concat|compact. InternVL is evaluated and
+# trained with Sokoban's strict <observation><think><answer><prediction> contract.
 set -eo pipefail
 
 V=$(cd "$(dirname "$0")/../../.." && pwd)

@@ -115,6 +115,10 @@ def test_new_vlm_compact_configs_match_measured_prompt_sizes(
         assert "actor_rollout_ref.model.use_fused_kernels=False" in text
         assert "actor_rollout_ref.rollout.enable_chunked_prefill=False" in text
         assert "actor_rollout_ref.rollout.val_kwargs.do_sample=True" in text
+        for yaml_path in _script_yamls(text, script):
+            for spec in OmegaConf.load(yaml_path).envs:
+                assert spec.config.prompt_format == "wm"
+                assert spec.config.strict_format is True
     if "glm46v" in name:
         # Sampling may still use top-k/top-p/repetition penalty, but PPO must compare
         # actor logprobs against the model's raw distribution rather than vLLM's
