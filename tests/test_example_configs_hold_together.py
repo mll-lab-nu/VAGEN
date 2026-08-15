@@ -120,6 +120,10 @@ def test_new_vlm_compact_configs_match_measured_prompt_sizes(
         # actor logprobs against the model's raw distribution rather than vLLM's
         # processed sampling distribution.
         assert "actor_rollout_ref.rollout.logprobs_mode=raw_logprobs" in text
+        for yaml_path in _script_yamls(text, script):
+            for spec in OmegaConf.load(yaml_path).envs:
+                assert spec.config.prompt_format == "wm"
+                assert spec.config.strict_format is True
 
     for yaml_path in _script_yamls(text, script):
         for spec in OmegaConf.load(yaml_path).envs:
