@@ -11,13 +11,15 @@ envs:
     max_env_response_per_turn: 256
     config:
       render_mode: vision
-      format_reward: 0.02
+      # Three independent per-turn rewards are each capped at 0.03: format,
+      # state estimation, and transition prediction. Across five turns the total
+      # shaping cap is 3 * 0.03 * 5 = 0.45; with success_reward=1.0 the episode
+      # reward cap is 1.45.
+      format_reward: 0.03
       min_solution_steps: [1,5]
       state_reward:
-        # Absolute rewards for one perfect section on one turn. With both enabled and
-        # max_turns=5, perfect descriptions pay 2 * 0.01 * 5 = 0.10 per episode.
-        state_estimation:      {enable: true, reward: 0.01}
-        transition_prediction: {enable: true, reward: 0.01}
+        state_estimation:      {enable: true, reward: 0.03}
+        transition_prediction: {enable: true, reward: 0.03}
         score_base: 0.334
         judge_base_url: ${oc.env:JUDGE_BASE_URL,http://127.0.0.1:8123/v1}
         judge_model: ${oc.env:JUDGE_MODEL,Qwen/Qwen3-4B-Instruct-2507}
