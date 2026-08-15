@@ -209,6 +209,21 @@ cd VAGEN
 bash examples/train/sokoban/train_default_gae_compact_qwen25vl3b.sh
 ```
 
+InternVL3.5 and GLM-4.6V-Flash use one launcher per model family; choose the same three
+row layouts through `HARNESS` (default: `concat`):
+
+```bash
+# OpenGVLab/InternVL3_5-2B-hf
+HARNESS=concat bash examples/train/sokoban/train_default_gae_internvl35_2b.sh
+HARNESS=no_concat bash examples/train/sokoban/train_default_gae_internvl35_2b.sh
+HARNESS=compact bash examples/train/sokoban/train_default_gae_internvl35_2b.sh
+
+# zai-org/GLM-4.6V-Flash
+HARNESS=concat bash examples/train/sokoban/train_default_gae_glm46v_flash.sh
+HARNESS=no_concat bash examples/train/sokoban/train_default_gae_glm46v_flash.sh
+HARNESS=compact bash examples/train/sokoban/train_default_gae_glm46v_flash.sh
+```
+
 The paradigm is chosen with `trainer.harness=concat|no_concat|compact`, and it is independent of `algorithm.adv_estimator` — the harness decides how an episode is laid out in rows and the estimator stitches those rows back into one trajectory. Note that verl's own `gae`/`grpo` score a row at a time, so they are only correct under `concat`; the trainer refuses the other two rather than training on truncated trajectories.
 
 ```bash
