@@ -68,7 +68,12 @@ class SokobanEnvConfig:
     # against is that it makes the format unenforceable, since the format reward is the
     # only remaining pressure and it is worth 0.02 against a 1.0 success reward.
     strict_format: bool = True
-    
+
+    # State reward is intentionally not a dataclass field. The shared environment factory
+    # removes config.state_reward before constructing this class, then wraps the instance
+    # using STATE_REWARD_SPEC below. That keeps the generic switch out of every individual
+    # environment dataclass while still locating it in envs[].config for train and eval.
+
 class Sokoban(GymImageEnv, HasStateReward):
     """
     Sokoban environment that implements the EnvImageBase async interface.
@@ -87,9 +92,9 @@ class Sokoban(GymImageEnv, HasStateReward):
         6: " S ",  # player on target
     }
 
-    # What `trainer.state_reward` needs to score this environment's descriptions. Declared
-    # here rather than in a table in the agent loop, so the capability is a property of the
-    # environment and cannot disagree with the registry name.
+    # What config.state_reward needs to score this environment's descriptions. Declared
+    # here rather than in a table in the agent loop, so the capability is a property of
+    # the environment and cannot disagree with the registry name.
     STATE_REWARD_SPEC = SOKOBAN_STATE_REWARD_SPEC
 
     # Action mapping

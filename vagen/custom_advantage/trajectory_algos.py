@@ -117,6 +117,40 @@ class _Packed:
         """True at the last model-output token of each turn."""
         return _is_turn_boundary(self.index, self.valid, self.width)
 
+    def rewards_lumped_to_turn_end(self) -> torch.Tensor:
+        """``seq_r`` with each turn's rewards summed onto that turn's final token.
+
+        For estimators whose outer chain has one reward slot per turn and therefore read
+        a turn's reward only at its last token -- see ``registry.wants_turn_lumped_reward``
+        and the ★ note on :func:`removed_estimator_gae`. Anything left mid-turn is invisible to
+        that chain, so an estimator that needs this shape has to produce it.
+
+        ★ It reduces here rather than at the source. The environment pays a reward on the
+        tokens that earned it, because that is what it knows; which estimator will read it
+        is not the environment's business and is not knowable from inside a rollout. This
+        direction is also the only one available: summing spans onto a boundary is
+        well-defined, recovering spans from a boundary total is not.
+
+        The per-turn total is preserved exactly, so this opens no length-hacking channel;
+        it only moves where within a turn the reward sits.
+        """
+        bnd = self.boundary() & self.valid
+        # A trajectory's trailing tokens need a home. Every turn should end at a boundary
+        # and the last valid token should be one, but a reward summed into a turn whose
+        # boundary is missing would be dropped without a trace -- so the final valid token
+        # counts as a boundary here whether or not it is flagged as one.
+        last_valid = self.valid & ~torch.cat(
+            [self.valid[:, 1:], torch.zeros_like(self.valid[:, :1])], dim=1
+        )
+        bnd = bnd | last_valid
+
+        # Turn id per position: how many boundaries lie strictly before it. At a boundary
+        # that is the turn the boundary closes, so a boundary and its own turn agree.
+        seg = bnd.long().cumsum(dim=1) - bnd.long()
+        masked = torch.where(self.valid, self.seq_r, torch.zeros_like(self.seq_r))
+        totals = torch.zeros_like(masked).scatter_add_(1, seg, masked)
+        return torch.where(bnd, totals.gather(1, seg), torch.zeros_like(masked))
+
     def seam(self, ends_with_summary) -> torch.Tensor:
         """True at the last model-output token of a compaction summary.
 

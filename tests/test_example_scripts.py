@@ -70,24 +70,34 @@ def test_estimators_with_a_required_hyperparameter_set_it(path):
 
 @pytest.mark.parametrize("path", SCRIPTS, ids=lambda p: "/".join(p.split("/")[-2:]))
 def test_state_reward_is_only_switched_on_where_a_spec_exists(path):
-    """★ Only Sokoban declares a STATE_REWARD_SPEC, and `_maybe_state_reward`
-    raises when the environment declares none. Turning it on elsewhere is a run that dies on the first
-    step."""
+    """Every dataset that enables state reward must name a capable environment."""
     import vagen.envs.registry as R
     from vagen.envs.state_reward import state_reward_spec_of
+    import yaml
 
     R._load_registry()
     STATE_REWARD_SPECS = {n: c for n, c in R._ENV_REGISTRY.items() if state_reward_spec_of(c)}
 
     text = open(path).read()
-    if "state_reward" not in text or ".enable=True" not in text:
-        return
-    env_dir = os.path.basename(os.path.dirname(path))
-    ok = {name.lower() for name in STATE_REWARD_SPECS}
-    assert env_dir.replace("_", "") in {n.replace("_", "") for n in ok}, (
-        f"{path} enables a state reward, but {env_dir!r} has no entry in "
-        f"STATE_REWARD_SPECS ({sorted(STATE_REWARD_SPECS)})"
-    )
+    for match in re.finditer(r'data\.(?:train|val)_files="?([^"\s\\]+)', text):
+        value = match.group(1)
+        if value.startswith("$SCRIPTDIR/"):
+            yaml_path = os.path.join(os.path.dirname(path), value.removeprefix("$SCRIPTDIR/"))
+        elif "$" not in value:
+            yaml_path = value
+        else:
+            continue
+        if not os.path.exists(yaml_path):
+            continue
+        for spec in (yaml.safe_load(open(yaml_path)) or {}).get("envs", []):
+            settings = (spec.get("config") or {}).get("state_reward") or {}
+            enabled = any((settings.get(n) or {}).get("enable", False)
+                          for n in ("state_estimation", "transition_prediction"))
+            if enabled:
+                assert spec["name"] in STATE_REWARD_SPECS, (
+                    f"{yaml_path} enables state reward for {spec['name']!r}, which declares "
+                    f"no STATE_REWARD_SPEC; capable envs: {sorted(STATE_REWARD_SPECS)}"
+                )
 
 
 @pytest.mark.parametrize("path", SCRIPTS, ids=lambda p: "/".join(p.split("/")[-2:]))
@@ -114,22 +124,22 @@ def test_the_capability_lives_on_the_environment_not_in_a_table():
     edited whenever an environment gained the capability, the environment could not be
     read to find out whether it had it, and a name spelled one way in the registry and
     another in the table failed only once a run was up. Sokoban now declares
-    `STATE_REWARD_SPEC` and the loop asks the class.
+    `STATE_REWARD_SPEC` and the shared environment factory asks the class.
     """
     import inspect
 
-    import vagen.agent_loop.gym_loop as loop
     from vagen.envs.sokoban.sokoban_env import Sokoban
+    import vagen.envs.state_reward as state_reward
     from vagen.envs.state_reward import state_reward_spec_of, supports_state_reward
 
     assert supports_state_reward(Sokoban), "Sokoban no longer declares its spec"
     assert state_reward_spec_of(Sokoban).object_weights, "the declared spec is empty"
 
-    assert not hasattr(loop, "STATE_REWARD_SPECS"), (
+    assert not hasattr(state_reward, "STATE_REWARD_SPECS"), (
         "the central table is back; an environment's capability belongs on the environment"
     )
-    src = inspect.getsource(loop.GymLoop._maybe_state_reward)
-    assert "state_reward_spec_of" in src, "the loop no longer asks the environment class"
+    src = inspect.getsource(state_reward._with_state_reward)
+    assert "state_reward_spec_of" in src, "the factory no longer asks the environment class"
 
 
 def test_env_specific_reward_code_is_not_in_the_generic_package():
@@ -144,6 +154,23 @@ def test_env_specific_reward_code_is_not_in_the_generic_package():
             f"vagen/envs/{env_name}/"
         )
     assert os.path.exists("vagen/envs/sokoban/state_reward_spec.py")
+
+
+def test_the_state_reward_example_owns_the_judge_lifecycle():
+    text = open("examples/train/sokoban/train_removed_estimator_gae_sr_qwen25vl3b.sh").read()
+    assert "scripts/launch_judge.sh" in text
+    assert "/health" in text
+    assert "trap cleanup_judge EXIT" in text
+    assert "train_sokoban_vision_sr.yaml" in text
+    assert "val_sokoban_vision_sr.yaml" in text
+
+
+def test_the_judge_launcher_uses_a_toolkit_that_really_has_nvcc():
+    """A conda CUDA runtime is not necessarily a compiler toolkit."""
+    text = open("scripts/launch_judge.sh").read()
+    assert 'torch.version.cuda' in text
+    assert '[ ! -x "$CUDA_HOME/bin/nvcc" ]' in text
+    assert 'CUDA toolkit with nvcc not found' in text
 
 
 # ------------------------------------------- a seed that indexes data, not a generator
