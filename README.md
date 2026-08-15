@@ -91,7 +91,7 @@ We frame multi-turn VLM agentic tasks as a Partially Observable Markov Decision 
 conda create -n vagen python=3.12 -y
 conda activate vagen
 
-git clone --recursive https://github.com/mll-lab-nu/VAGEN.git
+git clone --recursive --branch release-ready https://github.com/JamesKrW/VAGEN.git
 cd VAGEN
 bash scripts/install.sh
 ```
@@ -100,11 +100,17 @@ bash scripts/install.sh
 engine, then verl, and checks the result. It is idempotent, so it is safe to re-run.
 `SKIP_ENGINE=1` installs VAGEN without an engine if you already have one.
 
-vLLM is the default and the verified path. For SGLang:
+vLLM is the default and the verified training path. For SGLang evaluation and local
+serving:
 
 ```bash
 BACKEND=sglang bash scripts/install.sh
 ```
+
+Installing the SGLang extra does **not** switch the shipped training launchers: they source
+`baseline_vllm.flags` and still select vLLM. Use the SGLang evaluation launchers where one
+is provided; a training launcher needs explicit SGLang rollout configuration and its own
+model-level validation.
 
 **Use one engine per environment.** They are mutually exclusive, and not by preference:
 each pins a different `flashinfer` patch version, so pip refuses to install them together.
@@ -156,16 +162,43 @@ wandb login                       # or: export WANDB_MODE=offline
                                   # or append: trainer.logger=[console]
 ```
 
+For a self-hosted W&B instance, set the host explicitly and keep the API key out of scripts:
+
+```bash
+export WANDB_BASE_URL=https://your-wandb-host
+wandb login --host "$WANDB_BASE_URL"
+```
+
 ### Training
-VAGEN currently supports PPO / GRPO with three multi-turn training paradigms. An episode is
-many turns; a training row is one conversation. The **harness** decides how the first maps
-onto the second, and it is the central choice:
+VAGEN's PPO trajectory estimators support three multi-turn training paradigms. The shipped
+GRPO launchers use `concat`; split-row layouts require `trajectory_grpo`, not verl's
+row-local `grpo`. An episode is many turns; a training row is one conversation. The
+**harness** decides how the first maps onto the second, and it is the central choice:
 
 | `trainer.harness` | one episode becomes | use when |
 |---|---|---|
 | `concat` | **one** row holding every turn | the default; the episode fits the response region |
 | `no_concat` | **one row per turn**, each a fresh conversation | history is not needed, or will not fit |
 | `compact` | a row per conversation, summarised and reopened when full | long episodes that must keep context ([CompactionRL](https://arxiv.org/abs/2607.05378)) |
+
+Every shipped launcher inherits `trainer.val_before_train=true`: held-out validation runs
+before optimizer step 1. Treat that as a harness/model smoke test, especially for a new
+model family. To run only that check, append:
+
+```bash
+trainer.val_only=true trainer.save_freq=-1 trainer.test_freq=-1
+```
+
+The main entrypoints currently included are:
+
+| model / method | entrypoint | estimator | harness |
+|---|---|---|---|
+| Qwen2.5-VL baseline | `train_default_gae_qwen25vl3b.sh` | `default_gae` | dedicated concat/no-concat/compact scripts |
+| Qwen2.5-VL World Modeling RL | `train_bi_level_gae_sr_qwen25vl3b.sh` | `bi_level_gae` + state reward | `concat` |
+| Qwen3-VL | `train_default_gae_qwen3vl4b.sh`, `train_grpo_qwen3vl4b.sh` | default GAE / GRPO | `concat` |
+| Qwen3.5 | `train_default_gae_qwen35_4b.sh`, `train_default_gae_qwen35_4b_think.sh` | `default_gae` | `concat` |
+| InternVL3.5 | `train_default_gae_internvl35_2b.sh` | `default_gae` | `concat`, `no_concat`, `compact` |
+| GLM-4.6V-Flash | `train_default_gae_glm46v_flash.sh` | `default_gae` | `concat`, `no_concat`, `compact` |
 
 
 #### Multi-turn Concatenated Training
@@ -178,9 +211,20 @@ cd VAGEN
 bash examples/train/sokoban/train_default_gae_qwen25vl3b.sh
 ```
 
+The reference World Modeling RL run combines strict world-model sections, an external
+judge, state/transition rewards, and bi-level GAE. The launcher owns the judge lifecycle:
+
+```bash
+bash examples/train/sokoban/train_bi_level_gae_sr_qwen25vl3b.sh
+```
+
+Its shipped Sokoban configuration pays at most `0.03` each for format, state estimation,
+and transition prediction per turn. Over five turns the shaping cap is `0.45`; including
+the `1.0` success reward, the episode cap is `1.45`.
+
 ```bash
 # Qwen/Qwen3-VL-4B-Instruct
-# needs transformers>=5.2.0 (pinned in setup.py; the engine extras pin ==5.12.1)
+# needs transformers>=4.57 (the engine extras currently pin ==5.12.1)
 cd VAGEN
 bash examples/train/sokoban/train_grpo_qwen3vl4b.sh
 ```
@@ -210,8 +254,9 @@ cd VAGEN
 bash examples/train/sokoban/train_default_gae_compact_qwen25vl3b.sh
 ```
 
-InternVL3.5 and GLM-4.6V-Flash use one launcher per model family; choose the same three
-row layouts through `HARNESS` (default: `concat`):
+InternVL3.5 and GLM-4.6V-Flash have **experimental vLLM launchers**. Each exposes the three
+row layouts through `HARNESS` (default: `concat`), but do not schedule a long run until its
+step-0 validation succeeds for the exact model, prompt and harness:
 
 ```bash
 # OpenGVLab/InternVL3_5-2B-hf
@@ -224,6 +269,18 @@ HARNESS=concat bash examples/train/sokoban/train_default_gae_glm46v_flash.sh
 HARNESS=no_concat bash examples/train/sokoban/train_default_gae_glm46v_flash.sh
 HARNESS=compact bash examples/train/sokoban/train_default_gae_glm46v_flash.sh
 ```
+
+Keep the model-family overrides in these launchers:
+
+- InternVL disables the generic fused forward (which is text-only for unknown VLMs) and
+  forces vLLM to load the checkpoint's untied language-model head.
+- GLM enables native thinking, its GPT-J-style multimodal RoPE compatibility hook, and raw
+  rollout logprobs. Its native boxed action is parsed as the action marker, but the sampled
+  response, token IDs and logprobs are never rewritten into `<answer>`.
+
+These launchers use strict `free_think`, not the Qwen2.5 `wm` protocol. Installing SGLang
+does not make them SGLang training scripts, and changing only `MODEL_PATH` in the Qwen2.5
+evaluation launcher does not produce a matching evaluation.
 
 The paradigm is chosen with `trainer.harness=concat|no_concat|compact`, and it is independent of `algorithm.adv_estimator` — the harness decides how an episode is laid out in rows and the estimator stitches those rows back into one trajectory. Note that verl's own `gae`/`grpo` score a row at a time, so they are only correct under `concat`; the trainer refuses the other two rather than training on truncated trajectories.
 
@@ -246,12 +303,20 @@ MODEL_PATH=Qwen/Qwen2.5-VL-3B-Instruct \
   bash examples/evaluate/sokoban/vllm/eval_qwen25_vl_3b.sh
 ```
 
-The context policy is a config key, the same one training uses, so comparing them is one
-override:
+The context policy is the same config key training uses. `no_concat` is one override:
 
 ```bash
 bash examples/evaluate/sokoban/vllm/eval_qwen25_vl_3b.sh 'envs.0.harness=no_concat'
 ```
+
+`compact` additionally needs model-specific `compact_budget` and
+`compact_summary_budget`; copying only the harness name can silently make it behave like
+`concat` or exceed the prompt region.
+
+The shipped Sokoban evaluation config is the Qwen2.5 `wm` configuration. Do not evaluate
+InternVL3.5 or GLM-4.6V-Flash by changing only `MODEL_PATH`; use a family-specific
+`free_think` config matching its training YAML, or run the corresponding training launcher
+with `trainer.val_only=true`.
 
 Every environment ships a vLLM launcher:
 
@@ -266,6 +331,10 @@ Every environment ships a vLLM launcher:
 Navigation and PrimitiveSkill also need their own environment server running
 (`python -m vagen.envs.<env>.serve --port 8000`); the launcher checks and says so.
 SpatialGym needs its room dataset — same, see `vagen/envs/spatial_gym/README.md`.
+
+On Slurm, the allocation and trainer GPU count are separate. Requesting an 8-GPU node does
+not override a launcher's `trainer.n_gpus_per_node=4`; pass
+`trainer.n_gpus_per_node=8` and confirm the effective command in the job log.
 
 ```bash
 cd VAGEN
@@ -329,18 +398,20 @@ Write your training script based on:
 
 ## Custom Harness
 
-A **harness** is the context policy: each turn it answers one question — does the next
-model call continue the current conversation, or start a new one, and seeded with what?
-`concat`, `no_concat` and `compact` are three answers to that question, not three
-mechanisms.
+A **harness** decides what the model sees on each turn: whether the next call continues the
+conversation so far, or starts a fresh one, and what that fresh one begins with. `concat`,
+`no_concat` and `compact` are three different answers to that.
 
-The design VAGEN is built around: **anything that subclasses `BaseEnv` or `BaseHarness`
-plugs into training and evaluation without either being modified.** A harness holds no
-tokenizer, no client and no environment, and never sees a token, a mask or a reward — so the
-same object drives a training rollout and a closed-API evaluation. Nothing in it assumes the
-conversation lives client-side either, so a backend with server-side continuation
-(`previous_response_id`, an SGLang session, a vLLM prefix cache) can be added without
-touching the policy. Today every shipped backend re-sends the messages.
+**Anything that subclasses `BaseEnv` or `BaseHarness` works in both training and evaluation
+without changing either.** That is possible because a harness is deliberately small: it has
+no tokenizer, no client and no environment, and it never touches tokens, masks or rewards.
+All it does is decide what goes into the next call. So the same harness can drive a training
+rollout and an evaluation run against a closed API.
+
+A harness also doesn't assume the conversation is kept on the client side. That leaves room
+to add a backend that keeps it on the server instead (OpenAI's `previous_response_id`, an
+SGLang session, a vLLM prefix cache) without rewriting any harness. No backend shipped today
+does that — they all re-send the whole message list every turn.
 
 ```python
 from vagen.core.harness import BaseHarness, Call
@@ -355,8 +426,8 @@ class MyHarness(BaseHarness):
     def next_call(self) -> Call: ...       # the only required method
 ```
 
-Both places read the same key, and both accept either a registered name or an import path
-— but only if something has imported your module first, which differs between them:
+Training and evaluation both read a `harness` key, and both accept either a registered name
+or an import path. What differs is who imports your module:
 
 ```yaml
 # training -- vagen/configs/vagen_multiturn.yaml, or a -o override
@@ -375,11 +446,17 @@ envs:
     harness: mypkg.harnesses:MyHarness   # an import path, not a bare name
 ```
 
-★ Use the import path for evaluation. `run_eval` has no `external_lib` hook, so nothing
-imports your module and a bare `harness: mine` fails with
-`unknown harness 'mine'; choose from ['compact', 'concat', 'no_concat']`. This is also why
-the import path exists at all: a new policy is usually tried in evaluation first, where the
-config is a yaml and there is nowhere a decorator would have run.
+★ In evaluation, use the import path. The `@register_harness` decorator only runs if
+something imports your module, and `run_eval` has no `external_lib` setting to make that
+happen — so a bare `harness: mine` fails with:
+
+```
+unknown harness 'mine'; choose from ['compact', 'concat', 'no_concat']
+```
+
+Give the import path instead and VAGEN imports the module itself. This is why the import
+path is supported at all: a new harness is usually tried in evaluation first, where
+everything is configured in yaml and no decorator has had a chance to run.
 
 Full contract and the budget hooks: [`vagen/core/harness.py`](vagen/core/harness.py); the
 three implementations: [`vagen/harness/`](vagen/harness/).
