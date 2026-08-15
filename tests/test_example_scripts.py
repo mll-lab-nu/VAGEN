@@ -165,6 +165,26 @@ def test_the_state_reward_example_owns_the_judge_lifecycle():
     assert "val_sokoban_vision_sr.yaml" in text
 
 
+def test_sokoban_state_reward_example_has_the_declared_145_cap():
+    """Format + two judge rewards pay 0.03 each for at most five turns."""
+    import yaml
+
+    for name in ("train_sokoban_vision_sr.yaml", "val_sokoban_vision_sr.yaml"):
+        path = os.path.join("examples/train/sokoban", name)
+        config = yaml.safe_load(open(path))["envs"][0]
+        env = config["config"]
+        assert env["format_reward"] == pytest.approx(0.03)
+        assert env["state_reward"]["state_estimation"]["reward"] == pytest.approx(0.03)
+        assert env["state_reward"]["transition_prediction"]["reward"] == pytest.approx(0.03)
+        shaping_cap = config["max_turns"] * (
+            env["format_reward"]
+            + env["state_reward"]["state_estimation"]["reward"]
+            + env["state_reward"]["transition_prediction"]["reward"]
+        )
+        assert shaping_cap == pytest.approx(0.45)
+        assert 1.0 + shaping_cap == pytest.approx(1.45)
+
+
 def test_the_judge_launcher_uses_a_toolkit_that_really_has_nvcc():
     """A conda CUDA runtime is not necessarily a compiler toolkit."""
     text = open("scripts/launch_judge.sh").read()
