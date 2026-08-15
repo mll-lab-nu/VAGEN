@@ -153,181 +153,53 @@ registry drops the environment and you get `KeyError: Unknown env name: SpatialG
 
 ## Quick Start
 
-`trainer.logger` defaults to `["console", "wandb"]` and no example script overrides it, so
-log in first — or turn it off:
-
 ```bash
-wandb login                       # or: export WANDB_MODE=offline
-                                  # or append: trainer.logger=[console]
-```
-
-For a self-hosted W&B instance, set the host explicitly and keep the API key out of scripts:
-
-```bash
-export WANDB_BASE_URL=https://your-wandb-host
-wandb login --host "$WANDB_BASE_URL"
+wandb login
+# Self-hosted W&B:
+# WANDB_BASE_URL=https://your-wandb-host wandb login --host https://your-wandb-host
 ```
 
 ### Training
 
-VAGEN's PPO trajectory estimators support three multi-turn training paradigms. The shipped
-GRPO launchers use `concat`; split-row layouts require `trajectory_grpo`, not verl's
-row-local `grpo`. An episode is many turns; a training row is one conversation. The
-**harness** decides how the first maps onto the second, and it is the central choice:
-
-| `trainer.harness` | one episode becomes | use when |
-|---|---|---|
-| `concat` | **one** row holding every turn | the default; the episode fits the response region |
-| `no_concat` | **one row per turn**, each a fresh conversation | history is not needed, or will not fit |
-| `compact` | a row per conversation, summarised and reopened when full | long episodes that must keep context ([CompactionRL](https://arxiv.org/abs/2607.05378)) |
-
-Every shipped launcher inherits `trainer.val_before_train=true`: held-out validation runs
-before optimizer step 1. Treat that as a harness/model smoke test, especially for a new
-model family. To run only that check, append:
-
 ```bash
-trainer.val_only=true trainer.save_freq=-1 trainer.test_freq=-1
-```
-
-#### Multi-turn Concatenated Training
-
-All turns in a trajectory are concatenated into a single training instance.
-
-```bash
-# Qwen/Qwen2.5-VL-3B-Instruct
 cd VAGEN
+
+# Qwen2.5-VL: concat / no-concat / compact
 bash examples/train/sokoban/train_default_gae_qwen25vl3b.sh
-```
-
-The reference World Modeling RL run combines strict world-model sections, an external
-
-```bash
-```
-
-Its shipped Sokoban configuration pays at most `0.03` each for format, state estimation,
-and transition prediction per turn. Over five turns the shaping cap is `0.45`; including
-the `1.0` success reward, the episode cap is `1.45`.
-
-```bash
-# Qwen/Qwen3-VL-4B-Instruct
-# needs transformers>=4.57 (the engine extras currently pin ==5.12.1)
-cd VAGEN
-bash examples/train/sokoban/train_grpo_qwen3vl4b.sh
-```
-
-```bash
-# Enable reward variance based top-p filtering
-cd VAGEN
-bash examples/train/frozenlake/train_grpo_qwen25vl3b_filtertopp_vision.sh
-```
-
-
-#### Multi-turn Non-Concatenated Training
-
-Each trajectory is split into multiple turn-level training instances.
-
-```bash
-cd VAGEN
 bash examples/train/sokoban/train_ppo_no_concat_qwen25vl3b.sh
-```
-
-#### Multi-turn Compacted Training
-
-Turns are concatenated until a token budget is reached, then summarised so the next conversation starts from the summary. One training instance per conversation.
-
-```bash
-cd VAGEN
 bash examples/train/sokoban/train_default_gae_compact_qwen25vl3b.sh
-```
 
-InternVL3.5 and GLM-4.6V-Flash have **experimental vLLM launchers**. Each exposes the three
-row layouts through `HARNESS` (default: `concat`), but do not schedule a long run until its
-step-0 validation succeeds for the exact model, prompt and harness:
 
-```bash
-# OpenGVLab/InternVL3_5-2B-hf
+# Qwen3-VL and Qwen3.5
+bash examples/train/sokoban/train_default_gae_qwen3vl4b.sh
+bash examples/train/sokoban/train_default_gae_qwen35_4b.sh
+
+# InternVL3.5 and GLM-4.6V-Flash; HARNESS=concat|no_concat|compact
 HARNESS=concat bash examples/train/sokoban/train_default_gae_internvl35_2b.sh
-HARNESS=no_concat bash examples/train/sokoban/train_default_gae_internvl35_2b.sh
-HARNESS=compact bash examples/train/sokoban/train_default_gae_internvl35_2b.sh
-
-# zai-org/GLM-4.6V-Flash
 HARNESS=concat bash examples/train/sokoban/train_default_gae_glm46v_flash.sh
-HARNESS=no_concat bash examples/train/sokoban/train_default_gae_glm46v_flash.sh
-HARNESS=compact bash examples/train/sokoban/train_default_gae_glm46v_flash.sh
+
+# Validation only, without starting training
+bash examples/train/sokoban/train_default_gae_internvl35_2b.sh \
+  trainer.val_only=true trainer.save_freq=-1 trainer.test_freq=-1
 ```
 
-Keep the model-family overrides in these launchers:
+See [Configuration](docs/configuration.md) for harnesses, estimators, model-specific flags,
+and state-reward settings.
 
-- InternVL disables the generic fused forward (which is text-only for unknown VLMs) and
-  forces vLLM to load the checkpoint's untied language-model head.
-- GLM enables native thinking, its GPT-J-style multimodal RoPE compatibility hook, and raw
-  rollout logprobs. Its native boxed action is parsed as the action marker, but the sampled
-  response, token IDs and logprobs are never rewritten into `<answer>`.
-
-These launchers use strict `free_think`, not the Qwen2.5 `wm` protocol. Installing SGLang
-does not make them SGLang training scripts, and changing only `MODEL_PATH` in the Qwen2.5
-evaluation launcher does not produce a matching evaluation.
-
-The paradigm is chosen with `trainer.harness=concat|no_concat|compact`, and it is independent of `algorithm.adv_estimator` — the harness decides how an episode is laid out in rows and the estimator stitches those rows back into one trajectory. Note that verl's own `gae`/`grpo` score a row at a time, so they are only correct under `concat`; the trainer refuses the other two rather than training on truncated trajectories.
-
-```bash
-# LoRA. peft raises on an outdated torchao rather than skipping it, so
-# a too-old version breaks LoRA even though nothing here quantises:
-# pip install "torchao>=0.16.0"   (or uninstall torchao entirely)
-cd VAGEN
-bash examples/train/frozenlake/train_ppo_no_concat_lora_qwen25vl3b.sh
-```
 ### Evaluation
 
-VAGEN supports evaluation using different backends (OpenAI, Claude, Gemini, sglang, vLLM). For details, see [vagen/evaluate/README.md](vagen/evaluate/README.md).
-
 ```bash
 cd VAGEN
-# Sokoban with a local vLLM server -- starts one, evaluates, and shuts it down.
-# vLLM is the engine `scripts/install.sh` gives you by default.
+
+# Local vLLM
 MODEL_PATH=Qwen/Qwen2.5-VL-3B-Instruct \
   bash examples/evaluate/sokoban/vllm/eval_qwen25_vl_3b.sh
-```
 
-The context policy is the same config key training uses. `no_concat` is one override:
-
-```bash
-bash examples/evaluate/sokoban/vllm/eval_qwen25_vl_3b.sh 'envs.0.harness=no_concat'
-```
-
-`compact` additionally needs model-specific `compact_budget` and
-`compact_summary_budget`; copying only the harness name can silently make it behave like
-`concat` or exceed the prompt region.
-
-The shipped Sokoban evaluation config is the Qwen2.5 `wm` configuration. Do not evaluate
-InternVL3.5 or GLM-4.6V-Flash by changing only `MODEL_PATH`; use a family-specific
-`free_think` config matching its training YAML, or run the corresponding training launcher
-with `trainer.val_only=true`.
-
-Every environment ships a vLLM launcher:
-
-| environment | launcher |
-|---|---|
-| Sokoban | `examples/evaluate/sokoban/vllm/eval_qwen25_vl_3b.sh` |
-| FrozenLake | `examples/evaluate/frozenlake/vllm/eval_qwen25_vl_3b.sh` |
-| Navigation | `examples/evaluate/navigation/vllm/eval_qwen25_vl_7b.sh` |
-| PrimitiveSkill | `examples/evaluate/primitive_skill/vllm/eval_qwen25_vl_3b.sh` |
-| SpatialGym | `examples/evaluate/spatial_gym/vllm/eval_qwen25_vl_3b.sh` |
-
-Navigation and PrimitiveSkill also need their own environment server running
-(`python -m vagen.envs.<env>.serve --port 8000`); the launcher checks and says so.
-SpatialGym needs its room dataset — same, see `vagen/envs/spatial_gym/README.md`.
-
-On Slurm, the allocation and trainer GPU count are separate. Requesting an 8-GPU node does
-not override a launcher's `trainer.n_gpus_per_node=4`; pass
-`trainer.n_gpus_per_node=8` and confirm the effective command in the job log.
-
-```bash
-cd VAGEN
-# Against any OpenAI-compatible endpoint already running (set OPENAI_API_KEY first --
-# the shipped config defaults to gpt-4o-mini, which is a paid remote call).
+# OpenAI-compatible endpoint
 bash examples/evaluate/sokoban/run_eval.sh
 ```
+
+See [Evaluation](vagen/evaluate/README.md) for other environments and backends.
 
 <details>
 <summary>With sglang instead</summary>
