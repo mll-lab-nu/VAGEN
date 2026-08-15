@@ -22,6 +22,9 @@ import numpy as np
 # the end from every start position. These responses run to 90k characters, so that is
 # ~8e9 steps -- it does not return. `find` is linear and the tags are unambiguous.
 _ANSWER_TAG = re.compile(r"<answer>(.*?)</answer>", re.DOTALL)
+_NATIVE_BOX_TAG = re.compile(
+    r"<\|begin_of_box\|>(.*?)<\|end_of_box\|>", re.DOTALL
+)
 
 
 def parse_free_think(response: str, action_sep: str = ",", max_actions: int = 3) -> Dict:
@@ -48,7 +51,16 @@ def parse_free_think(response: str, action_sep: str = ",", max_actions: int = 3)
     start = opened + len("<think>") if 0 <= opened < closed else 0
 
     after_close = _ANSWER_TAG.search(response, closed + len("</think>")) if closed >= 0 else None
-    format_correct = after_close is not None
+    # GLM-4.6V's official post-training protocol uses a pair of native box tokens for
+    # the final answer. Treat that pair as the model-family equivalent of <answer>, but
+    # prefer a literal <answer> when both occur (it may itself be wrapped by the box).
+    native_box = (
+        _NATIVE_BOX_TAG.search(response, closed + len("</think>"))
+        if closed >= 0 and after_close is None
+        else None
+    )
+    action_match = after_close or native_box
+    format_correct = action_match is not None
 
     if not format_correct:
         # Salvage what is there. format_correct stays False either way.
@@ -56,15 +68,20 @@ def parse_free_think(response: str, action_sep: str = ",", max_actions: int = 3)
         action_content = _loose_section(response, "answer")
     else:
         think_content = response[start:closed].strip()
-        action_content = after_close.group(1).strip()
+        action_content = action_match.group(1).strip()
 
     actions = [a.strip().lower() for a in action_content.split(action_sep) if a.strip()]
     if len(actions) > max_actions:
         actions = actions[:max_actions]
         action_content = action_sep.join(actions)
 
-    # Reconstruct formatted response
-    llm_response = f"<think>{think_content}</think><answer>{action_content}</answer>"
+    # Keep GLM's model-native tokens intact. The parser may interpret its box as the
+    # action marker, but PPO must train on exactly the sequence the model sampled.
+    llm_response = (
+        response
+        if native_box is not None
+        else f"<think>{think_content}</think><answer>{action_content}</answer>"
+    )
 
     return {
         "llm_raw_response": response,
