@@ -43,6 +43,13 @@ mapfile -t BASE < <(grep -vE '^\s*(#|$)' "$V/vagen/configs/baseline_vllm.flags" 
 # InternVL also has no family-specific fused forward in verl. The generic fused forward
 # is text-only and drops pixel_values, so actor/ref would train blind while vLLM sees the
 # image. Keep the native multimodal forward until an adapter exists.
+#
+# The outer InternVL config inherits PretrainedConfig.tie_word_embeddings=True while its
+# Qwen3 text_config and checkpoint both require False (the lm_head and token embedding
+# are distinct). vLLM 0.22's Transformers-5 compatibility shim copies that outer default
+# into text_config, silently discards the trained lm_head, and generates repetitive
+# garbage. Override the outer value at engine construction; this changes no tokens or
+# model output protocol, it only makes rollout load the checkpoint's real output head.
 PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     --config-path="$V/vagen/configs" --config-name=vagen_multiturn \
     hydra.searchpath="[file://$VERL/verl/trainer/config]" \
@@ -77,6 +84,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     actor_rollout_ref.rollout.enforce_eager=True \
     actor_rollout_ref.rollout.free_cache_engine=True \
     actor_rollout_ref.rollout.enable_chunked_prefill=False \
+    +actor_rollout_ref.rollout.engine_kwargs.vllm.hf_overrides.tie_word_embeddings=false \
     trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \
     trainer.critic_warmup=0 \
