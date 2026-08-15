@@ -256,6 +256,24 @@ Write your training script based on:
 
 * [`examples/train/sokoban/train_default_gae_qwen25vl3b.sh`](examples/train/sokoban/train_default_gae_qwen25vl3b.sh)
 
+## Custom Advantage Estimator
+
+Add an estimator under `vagen/custom_advantage/` and import its module from
+[`vagen/custom_advantage/__init__.py`](vagen/custom_advantage/__init__.py):
+
+```python
+from vagen.custom_advantage import AdvantageInputs, AdvantageOutputs, advantage_estimator
+
+@advantage_estimator("my_estimator", needs_critic=True)
+def my_estimator(inputs: AdvantageInputs):
+    returns = inputs.rewards
+    advantages = (returns - inputs.values) * inputs.response_mask
+    return AdvantageOutputs(advantages=advantages, returns=returns)
+```
+
+Select it in a training command with `algorithm.adv_estimator=my_estimator`. See
+[`inputs.py`](vagen/custom_advantage/inputs.py) for the available inputs and
+[`trajectory_algos.py`](vagen/custom_advantage/trajectory_algos.py) for complete examples.
 
 ## Custom Harness
 
