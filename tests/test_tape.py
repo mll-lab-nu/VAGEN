@@ -36,6 +36,19 @@ def test_a_response_starts_the_trainable_region():
     assert row.response_ids == [7, 8]
     assert row.response_mask == [1, 1]
     assert row.logprobs == [0.1, 0.2]
+    assert row.logprobs_complete is True
+
+
+def test_logprob_provenance_distinguishes_real_zero_from_missing():
+    supplied = _conv()
+    supplied.add_response([7, 8], [0.0, 0.0])
+    assert supplied.row().logprobs == [0.0, 0.0]
+    assert supplied.row().logprobs_complete is True
+
+    missing = _conv()
+    missing.add_response([7, 8])
+    assert missing.row().logprobs == [0.0, 0.0]
+    assert missing.row().logprobs_complete is False
 
 
 def test_observations_between_turns_are_masked_out():

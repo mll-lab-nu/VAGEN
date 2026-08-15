@@ -468,14 +468,13 @@ class GymLoop(VagenGymAgentLoopBase):
                     # complaining. The rollout still sees the frames -- only the model
                     # being optimised is blind.
                     multi_modal_data={"images": images} if images else {},
-                    # None when the engine did not return logprobs. The tape fills
-                    # unsupplied positions with 0.0, and `[0.0, 0.0, ...] or None` is the
-                    # list -- so verl received a real rollout_log_probs tensor of zeros.
-                    # Every rollout-vs-training probability metric then reads that as the
-                    # rollout's actual belief, and `apply_bypass_mode` guards only on the
-                    # key being present, so a zero vector sets old_log_probs to zero.
+                    # Numeric zero cannot distinguish "the backend omitted logprobs"
+                    # from a legitimate probability-1 token.  The tape carries that
+                    # provenance explicitly; ``any(logprobs)`` incorrectly dropped
+                    # valid all-zero GLM responses and broke mixed batches.
                     response_logprobs=(row.logprobs[:keep]
-                                       if any(row.logprobs[:keep]) else None),
+                                       if getattr(row, "logprobs_complete", bool(row.logprobs))
+                                       else None),
                     # The sum is what verl's own metrics read; the vector below is what
                     # actually trains. Both, because they answer different questions.
                     reward_score=float(sum(scores)),

@@ -46,8 +46,13 @@ envs:
       action_sep: ","
       use_example_in_sys_prompt: true
       # prompt_format wm is right here: the model under test is a Qwen2.5-VL, which emits
-      # <think> as ordinary text. A model that reserves it (Qwen3/Qwen3.5/GLM) needs
-      # free_wm or free_think -- see docs/issues.md.
+      # <think> as ordinary text. The InternVL and GLM launchers use the simpler
+      # action-only protocol after their base-model preflights repeated under free_wm:
+      #   bash run_eval.sh config.yaml envs.0.config.prompt_format=answer \
+      #     backends.openai.model=OpenGVLab/InternVL3_5-2B-hf
+      # GLM's launcher uses prompt_format=answer because it reasons in its native channel
+      # and only the action needs machine-readable markup. Qwen3/Qwen3.5/GLM reserve the
+      # think delimiters and cannot use wm; see docs/issues.md.
       prompt_format: wm
       # ★ Not the training default (True), and deliberately so -- this is the one field
       # here that is allowed to differ from val_sokoban_vision.yaml.

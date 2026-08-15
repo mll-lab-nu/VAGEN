@@ -1,0 +1,15 @@
+# InternVL3.5's base model is prone to long repetition when asked to reproduce the full
+# world-model protocol. Keep its native reasoning free-form and mark only the action.
+envs:
+  - name: Sokoban
+    n_envs: 10000
+    data_source: sokoban
+    seed: [1,10000,1]
+    max_turns: 5
+    response_length_per_turn: 512
+    max_env_response_per_turn: 320
+    config:
+      render_mode: vision
+      prompt_format: answer
+      format_reward: 0.02
+      min_solution_steps: [1,5]
