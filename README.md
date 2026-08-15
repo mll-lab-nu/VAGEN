@@ -269,7 +269,7 @@ bash examples/evaluate/frozenlake/sglang/eval_qwen25_vl_3b.sh
 ```
 </details>
 
-## Customizing Your Environment
+## Custom Environment
 
 To train on your own environment, follow the steps below.
 
