@@ -1,0 +1,153 @@
+"""Pure trainer-side logic, extracted from the vendored ``vagen/ray_trainer.py``.
+
+Nothing here imports verl, ray or hydra: every function takes plain tensors or a
+registry dict. That is deliberate -- it is the layer we want unit-testable without a
+cluster, and the layer that survives when the verl trainer underneath is swapped
+(``SeparateRayPPOTrainer`` today, verl main's V1 ``PPOTrainer`` later).
+
+``vagen/trainer/mixin.py`` is the thin adapter that binds these to verl's ``_fit_*``
+hooks and unwraps ``DataProto``.
+"""
+
+from __future__ import annotations
+
+import math
+from typing import Any, Callable, Mapping
+
+import numpy as np
+import torch
+
+# Sentinel written into `returns` at positions that carry no value supervision.
+# leaves everything else at this value; mirrors CrossEntropyLoss's ignore_index.
+IGNORE_RETURN = -100.0
+
+
+def default_eps(dtype: torch.dtype, small_eps: float = 1e-2, large_eps: float = 1e-6) -> float:
+    """Comparison tolerance for spotting the sentinel, scaled to the dtype.
+
+    bf16/fp16 cannot represent -100.0 exactly after a round trip through the batch
+    machinery, hence the far looser tolerance there.
+    """
+    return small_eps if dtype in (torch.float16, torch.bfloat16) else large_eps
+
+
+def value_mask_from_returns(
+    returns: torch.Tensor,
+    response_mask: torch.Tensor,
+    ignore_value: float = IGNORE_RETURN,
+    eps: float | None = None,
+) -> torch.Tensor:
+    """Positions where the critic actually has a return to regress towards.
+
+    Consumed by verl's patched ``workers/utils/losses.py::value_loss``, which ANDs it
+    into ``response_mask``. Returned in ``response_mask``'s dtype so the two compose
+    without a cast.
+
+    Note this only looks at ``returns``; it does not itself exclude padding. Padding is
+    already handled by ``response_mask``, and the AND happens downstream.
+    """
+    if eps is None:
+        eps = default_eps(returns.dtype)
+    is_ignored = (returns - ignore_value).abs() < eps
+    return (~is_ignored).to(dtype=response_mask.dtype)
+
+
+def collect_registry_metrics(
+    registry: Mapping[str, Callable[[Any], float | Mapping[str, float]]],
+    data: Any,
+    prefix: str = "custom_metrics",
+    strict: bool = False,
+) -> dict[str, float]:
+    """Run every metric in ``registry`` over ``data``.
+
+    A metric returns either a scalar, logged as ``{prefix}/{name}``, or a mapping, logged
+    as ``{prefix}/{name}/{key}``. The mapping form is for the quantities that are only
+    meaningful as a spread -- a turn count wants min/max/mean together, and registering
+    three entries for one concept would both read badly and recompute the same reduction
+    three times.
+
+    A misbehaving metric must not take down a training step, so by default failures
+    are caught. But a metric that silently vanishes from the dashboard is its own kind
+    of bug, so each failure also emits ``{prefix}/_failed/{name} = 1.0`` -- visible in
+    wandb rather than only in stdout, where it would go unnoticed.
+
+    Set ``strict=True`` in tests to turn failures back into exceptions.
+    """
+    out: dict[str, float] = {}
+    for name, fn in registry.items():
+        try:
+            value = fn(data)
+            if isinstance(value, Mapping):
+                out.update({f"{prefix}/{name}/{k}": v for k, v in value.items()})
+            else:
+                out[f"{prefix}/{name}"] = value
+        except Exception as exc:  # noqa: BLE001 - one bad metric must not kill the step
+            if strict:
+                raise
+            print(f"[vagen] custom metric {name!r} failed: {type(exc).__name__}: {exc}")
+            out[f"{prefix}/_failed/{name}"] = 1.0
+    return out
+
+
+def kl_penalty_term(kld: torch.Tensor, beta: float) -> torch.Tensor:
+    """The signed KL penalty actually subtracted from token-level scores.
+
+    verl folds this into ``token_level_rewards`` and never surfaces it; VAGEN logs it
+    separately so the reward and the penalty can be read apart on the dashboard.
+    """
+    return -beta * kld
+
+
+def pad_to_multiple(size: int, multiple: int) -> int:
+    """Number of rows to append so ``size`` becomes divisible by ``multiple``.
+
+    In no-concat mode one prompt expands into a variable number of samples, so the
+    batch is no longer a clean multiple of the DP world size and has to be padded
+    before ``_balance_batch``.
+    """
+    if multiple <= 0:
+        raise ValueError(f"multiple must be positive, got {multiple}")
+    return (-size) % multiple
+
+
+def row_multiple_required(world_size: int, *mini_batch_sizes: int) -> int:
+    """Row count the batch has to be a multiple of before it can be split.
+
+    Two independent divisibility constraints apply and only one of them was ever
+    enforced. ``_balance_batch`` needs a multiple of the DP world size, and
+    ``DataProto.split`` asserts ``batch_size[0] % mini_batch_size == 0`` for each of the
+    actor's and the critic's mini batch. Padding to the world size alone leaves the
+    second to chance -- which no_concat loses as soon as the row count is small, e.g.
+    ``AssertionError: 76 % 16 != 0``.
+
+    The least common multiple satisfies both at once, and is the world size itself in the
+    common case where the mini batches already divide it.
+    """
+    multiple = max(1, int(world_size))
+    for size in mini_batch_sizes:
+        if size and size > 0:
+            multiple = math.lcm(multiple, int(size))
+    return multiple
+
+
+# ------------------------------------------------------------------ no-concat indices
+
+
+def traj_idx_for_interleaved_repeat(num_rows: int, num_traj_per_sample: int) -> np.ndarray:
+    """Trajectory index within each prompt group.
+
+    ``DataProto.repeat(interleave=True)`` lays rows out as ``[A A A B B B]``, so the
+    trajectory index cycles: ``[0 1 2 0 1 2]``. Turn-level GAE groups on
+    ``(group_idx, traj_idx)``, so getting this wrong silently merges the returns of
+    unrelated trajectories rather than failing.
+    """
+    if num_traj_per_sample <= 0:
+        raise ValueError(f"num_traj_per_sample must be positive, got {num_traj_per_sample}")
+    if num_rows % num_traj_per_sample:
+        # np.tile would otherwise return a short array and the assignment would either
+        # broadcast-fail or, worse, line up by accident.
+        raise ValueError(
+            f"{num_rows} rows is not a whole number of groups of {num_traj_per_sample}; "
+            "the batch was not produced by an interleaved repeat"
+        )
+    return np.tile(np.arange(num_traj_per_sample), num_rows // num_traj_per_sample)

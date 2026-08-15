@@ -1,13 +1,31 @@
+# ★ The eval seeds are disjoint from BOTH the train and val ranges in
+# examples/train/, because the same seed is the same instance. They used to start at 0:
+# frozenlake's eval overlapped training on 127 of 128 seeds and primitive_skill's on all
+# 16, so a fine-tuned checkpoint's "eval" number was its training-set accuracy. 20000+ is
+# above every range those configs use.
+# ★ The seed range is INCLUSIVE and the third element is an occurrence limit, not a step.
+# With limit 1 the loader does `rng.sample(range(min, max+1), n_envs)`, so n_envs must equal
+# max-min+1 or a task is dropped at random on every run -- and, where the env indexes its
+# dataset as `seed % len(dataset)`, the extra value wraps onto task 0 and scores it twice.
+# Measured on navigation before this fix: 59 of 60 tasks evaluated, task 0 counted twice.
 defaults:
   - ../../../vagen/configs/eval_default
 
-fileroot: ${oc.env:HOME}/projects/vagen
+# Where rollouts and summaries are written. Override with VAGEN_EVAL_ROOT (an absolute
+# path), or set fileroot here. The old default was one developer's home directory, which
+# every shipped eval config inherited.
+#
+# ★ A relative fileroot is resolved against the CONFIG FILE's directory, not the working
+# directory and not the repo root -- so this default puts results next to the config, in
+# examples/evaluate/<env>/eval_runs/. That is gitignored. Give VAGEN_EVAL_ROOT an absolute
+# path if you want them somewhere else; a relative one will surprise you.
+fileroot: ${oc.env:VAGEN_EVAL_ROOT,./eval_runs}
 
 envs:
   - name: FrozenLake
     n_envs: 128
     tag_id: frozenlake_test
-    seed: [0,128,1]
+    seed: [20000,20127,1]
     max_turns: 5
     response_length_per_turn: 512
     config:
@@ -17,6 +35,14 @@ envs:
       is_slippery: false
       slip_prob: 0.0
       max_actions_per_step: 5
+    # ★ Without this the provider's own default applies -- 1.0 for an OpenAI-compatible
+    # server, i.e. 128 sampled episodes where every other env's eval decodes greedily.
+    # Two checkpoints scored here were not being compared on equal terms, and rerunning
+    # the same checkpoint did not reproduce. Every other eval config pins temperature 0.
+    chat_config:
+      temperature: 0
+      max_tokens: 1024
+      top_p: 1.0
 
 experiment:
   dump_dir: ${fileroot}/rollouts/eval_frozenlake

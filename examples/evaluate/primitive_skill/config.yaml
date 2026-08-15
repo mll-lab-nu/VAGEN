@@ -1,17 +1,35 @@
+# ★ The eval seeds are disjoint from BOTH the train and val ranges in
+# examples/train/, because the same seed is the same instance. They used to start at 0:
+# frozenlake's eval overlapped training on 127 of 128 seeds and primitive_skill's on all
+# 16, so a fine-tuned checkpoint's "eval" number was its training-set accuracy. 20000+ is
+# above every range those configs use.
+# ★ The seed range is INCLUSIVE and the third element is an occurrence limit, not a step.
+# With limit 1 the loader does `rng.sample(range(min, max+1), n_envs)`, so n_envs must equal
+# max-min+1 or a task is dropped at random on every run -- and, where the env indexes its
+# dataset as `seed % len(dataset)`, the extra value wraps onto task 0 and scores it twice.
+# Measured on navigation before this fix: 59 of 60 tasks evaluated, task 0 counted twice.
 defaults:
   - ../../../vagen/configs/eval_default
 
 # Before running eval, start the primitive_skill server:
 #   python -m vagen.envs.primitive_skill.serve --port 8000
 
-fileroot: ${oc.env:HOME}/projects/vagen
+# Where rollouts and summaries are written. Override with VAGEN_EVAL_ROOT (an absolute
+# path), or set fileroot here. The old default was one developer's home directory, which
+# every shipped eval config inherited.
+#
+# ★ A relative fileroot is resolved against the CONFIG FILE's directory, not the working
+# directory and not the repo root -- so this default puts results next to the config, in
+# examples/evaluate/<env>/eval_runs/. That is gitignored. Give VAGEN_EVAL_ROOT an absolute
+# path if you want them somewhere else; a relative one will surprise you.
+fileroot: ${oc.env:VAGEN_EVAL_ROOT,./eval_runs}
 
 envs:
   - name: RemoteEnv
     n_envs: 16
     tag_id: primitive_skill_align_two_cube
-    seed: [0, 16, 1]
-    max_turns: 5
+    seed: [20000, 20015, 1]
+    max_turns: 3  # matches train/val; 5 was a 67% larger turn budget than the val curve
     config:
       base_urls: "http://localhost:8000"
       timeout: 120
@@ -22,7 +40,7 @@ envs:
       action_sep: "|"
       render_mode: vision
       format_reward: 0.1
-      success_reward: 10.0
+      success_reward: 1  # matches train/val; 10.0 here made the eval scale 10x the val curve's
     chat_config:
       temperature: 0
       max_tokens: 1024
@@ -31,8 +49,8 @@ envs:
   - name: RemoteEnv
     n_envs: 16
     tag_id: primitive_skill_place_two_cube
-    seed: [0, 16, 1]
-    max_turns: 5
+    seed: [20000, 20015, 1]
+    max_turns: 3  # matches train/val; 5 was a 67% larger turn budget than the val curve
     config:
       base_urls: "http://localhost:8000"
       timeout: 120
@@ -43,7 +61,7 @@ envs:
       action_sep: "|"
       render_mode: vision
       format_reward: 0.1
-      success_reward: 10.0
+      success_reward: 1  # matches train/val; 10.0 here made the eval scale 10x the val curve's
     chat_config:
       temperature: 0
       max_tokens: 1024
@@ -52,8 +70,8 @@ envs:
   - name: RemoteEnv
     n_envs: 16
     tag_id: primitive_skill_stack_three_cube
-    seed: [0, 16, 1]
-    max_turns: 5
+    seed: [20000, 20015, 1]
+    max_turns: 3  # matches train/val; 5 was a 67% larger turn budget than the val curve
     config:
       base_urls: "http://localhost:8000"
       timeout: 120
@@ -64,7 +82,7 @@ envs:
       action_sep: "|"
       render_mode: vision
       format_reward: 0.1
-      success_reward: 10.0
+      success_reward: 1  # matches train/val; 10.0 here made the eval scale 10x the val curve's
     chat_config:
       temperature: 0
       max_tokens: 1024
@@ -73,8 +91,8 @@ envs:
   - name: RemoteEnv
     n_envs: 16
     tag_id: primitive_skill_put_apple_in_drawer
-    seed: [0, 16, 1]
-    max_turns: 5
+    seed: [20000, 20015, 1]
+    max_turns: 3  # matches train/val; 5 was a 67% larger turn budget than the val curve
     config:
       base_urls: "http://localhost:8000"
       timeout: 120
@@ -85,7 +103,7 @@ envs:
       action_sep: "|"
       render_mode: vision
       format_reward: 0.1
-      success_reward: 10.0
+      success_reward: 1  # matches train/val; 10.0 here made the eval scale 10x the val curve's
     chat_config:
       temperature: 0
       max_tokens: 1024
@@ -93,7 +111,7 @@ envs:
 
 experiment:
   dump_dir: ${fileroot}/rollouts/eval_primitive_skill
-  default_max_turns: 5
+  default_max_turns: 3  # matches train/val; 5 was a 67% larger turn budget than the val curve
 
 run:
   backend: "openai"

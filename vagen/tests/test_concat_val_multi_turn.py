@@ -30,12 +30,22 @@ from vagen.utils.concat_val_multi_turn import (
 )
 
 PAD = 0
+IMG = 700       # this fake model's image placeholder, as a real VL tokenizer declares one
 PROMPT_W = 24   # stand-in for rollout.prompt_length
 RESP_W = 16     # stand-in for rollout.response_length
 
 
-class FakeTok:
+class _DecodeMixin:
+    def decode(self, ids, **kw):
+        """Enough for the display payload; the tests assert on tensors, not text."""
+        return " ".join(str(int(i)) for i in ids)
+
+
+class FakeTok(_DecodeMixin):
     pad_token_id = PAD
+    # Declared, because a real one is: the frame goes where this id is, and a fake that
+    # ships images while claiming to have no way to mark them is not a model of anything.
+    image_token_id = IMG
 
 
 # ----------------------------- builders -----------------------------
@@ -53,7 +63,9 @@ def _right_pad(seq, width=RESP_W, pad=PAD):
 
 def _turn_row(group, traj, turn, n_resp=2, n_prompt=3, success=0.0):
     """One per-turn output row. Prompt starts with a unique marker 900+turn."""
-    prompt_real = [900 + turn] + [800 + turn] * (n_prompt - 1)   # all in prompt range
+    # One placeholder per turn, matching the single image below -- the correspondence
+    # the merge relies on to put the frame back where the model saw it.
+    prompt_real = [900 + turn, IMG] + [800 + turn] * (n_prompt - 2)   # all in prompt range
     resp_real = [100 + turn] * n_resp                            # all in response range
     return {
         "group": group, "traj": traj, "turn": turn,
@@ -164,8 +176,13 @@ def test_two_turn_contiguous_and_matches_images():
     rows = [_turn_row("A", 0, 0), _turn_row("A", 0, 1)]
     out = concat_val_multi_turn(_make_output(rows), _gen_batch(["A"]), FakeTok())
     real = _assert_trajectory_ok(out, "A", expected_turns=2)
-    # exact contiguous layout: resp0 + prompt1 + resp1  (all real, in order)
-    expected = [100, 100, 901, 801, 801, 101, 101]
+    # Exact contiguous layout: resp0 + prompt1 + resp1, all real and in order. Turn 1's
+    # prompt sits between the two responses because that is where the model read it; a
+    # merge that appends it after its own response trains on an episode that never ran.
+    # Built from the same builder as the input, so adding a token to a turn does not
+    # turn this into a literal nobody can check.
+    r0, p1, r1 = _turn_row("A", 0, 0), _turn_row("A", 0, 1), _turn_row("A", 0, 1)
+    expected = r0["resp"] + p1["prompt"] + r1["resp"]
     assert real.tolist() == expected, real.tolist()
 
 

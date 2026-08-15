@@ -1,0 +1,54 @@
+VAGEN
+Copyright (c) 2025 RAGEN.AI
+
+This product is licensed under the MIT License; see LICENSE.
+
+It includes and derives from third-party work:
+
+--------------------------------------------------------------------------------
+verl -- https://github.com/volcengine/verl
+Licensed under the Apache License, Version 2.0.
+
+Carried as the git submodule at `verl/` -- specifically
+https://github.com/JamesKrW/verl at `27c51e9`, which the tag `vagen-260812` names so that a
+`git clone --recursive` keeps resolving. Its history is three commits
+(`git -C verl log --oneline`):
+
+  5083fc5  a squashed snapshot of verl main: a root commit carrying the whole tree, so
+           upstream's own history is not reproduced here
+  12f79ab  attention_utils.py, qwen2_vl.py, glm4v.py, torch_functional.py -- fall back to
+           the Hub flash-attention kernel when flash-attn is not installed
+  27c51e9  models/transformers/glm4v.py -- unpack the vision tower output as qwen2_vl
+           already does, so GLM-4.1V trains on transformers 5.x
+
+The latter two are the only modifications to verl. Because the base is squashed, a diff
+against today's volcengine/verl main mixes them with upstream's own drift.
+
+Portions of verl are adapted into `vagen/main_ppo.py`, `vagen/agent_loop/`, and
+`vagen/trainer/`, which retain their Apache-2.0 headers. A copy of the Apache License is in
+the submodule.
+
+--------------------------------------------------------------------------------
+RAGEN -- https://github.com/RAGEN-AI/RAGEN
+The reward-filter design in `vagen/custom_filter/` follows RAGEN's.
+
+--------------------------------------------------------------------------------
+Theory-of-Space -- https://github.com/mll-lab-nu/Theory-of-Space
+MIT. `vagen/envs/spatial_gym/` is derived from it.
+
+--------------------------------------------------------------------------------
+EmbodiedBench -- https://github.com/EmbodiedBench/EmbodiedBench
+`vagen/envs/navigation/` is derived from its navigation environment, and
+`vagen/envs/navigation/assets/*.json` are its task definitions.
+
+★ EmbodiedBench publishes no LICENSE file. Redistribution here is therefore on the
+authors' permission rather than on a public grant; if you fork or redistribute this
+repository, satisfy yourself of the terms for that directory independently.
+
+--------------------------------------------------------------------------------
+rosetta -- https://github.com/StanfordVL/rosetta
+`vagen/envs/primitive_skill/maniskill/` is derived from it, which in turn builds on
+robosuite (https://github.com/ARISE-Initiative/robosuite, MIT).
+
+★ rosetta publishes no LICENSE file. The same caveat applies as for EmbodiedBench.
+--------------------------------------------------------------------------------
