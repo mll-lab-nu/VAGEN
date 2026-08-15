@@ -120,6 +120,7 @@ def test_new_vlm_compact_configs_match_measured_prompt_sizes(
                 assert spec.config.prompt_format == "free_think"
                 assert spec.config.strict_format is True
     if "glm46v" in name:
+        assert "data.apply_chat_template_kwargs.enable_thinking=True" in text
         # Sampling may still use top-k/top-p/repetition penalty, but PPO must compare
         # actor logprobs against the model's raw distribution rather than vLLM's
         # processed sampling distribution.

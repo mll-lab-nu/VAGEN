@@ -54,6 +54,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     "${BASE[@]}" \
     data.train_files="$SCRIPTDIR/train_sokoban_vision_glm.yaml" \
     data.val_files="$SCRIPTDIR/val_sokoban_vision_glm.yaml" \
+    data.apply_chat_template_kwargs.enable_thinking=True \
     actor_rollout_ref.model.path="$MODEL" \
     critic.model.path="$MODEL" \
     critic.enable=True \
