@@ -307,7 +307,7 @@ envs:
     harness: mypkg.harnesses:MyHarness   # an import path, not a bare name
 ```
 
-★ In evaluation, use the import path. The `@register_harness` decorator only runs if
+In evaluation, use the import path. The `@register_harness` decorator only runs if
 something imports your module, and `run_eval` has no `external_lib` setting to make that
 happen — so a bare `harness: mine` fails with:
 
