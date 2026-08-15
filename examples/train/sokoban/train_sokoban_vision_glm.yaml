@@ -1,6 +1,6 @@
-# GLM has a native reasoning channel. Ask it to mark only the action instead of making
-# it reproduce observation/prediction prose inside another protocol; the latter produced
-# no valid actions in the base-model preflight.
+# GLM training uses the same complete world-model contract as the established Sokoban
+# runs.  Keep this strict: a bare action is useful for engine diagnostics, but is not a
+# valid training response because it supplies no state description or prediction.
 envs:
   - name: Sokoban
     n_envs: 10000
@@ -11,6 +11,7 @@ envs:
     max_env_response_per_turn: 320
     config:
       render_mode: vision
-      prompt_format: answer
+      prompt_format: wm
+      strict_format: true
       format_reward: 0.02
       min_solution_steps: [1,5]
