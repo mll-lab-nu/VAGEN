@@ -15,12 +15,13 @@ envs:
     seed: [10001,10256,1]
     max_turns: 5
     response_length_per_turn: 512
-    # The largest one observation may be. Measured with the Qwen2.5-VL processor:
-    # sokoban vision is 80 tokens opening, 96 mid-episode. 256 leaves room for a larger frame without letting a
-    # runaway observation eat the response region. Undeclared this falls back to
+    # Match training: InternVL3.5 needs 278-292 tokens for a continuation, while
+    # Qwen2.5-VL needs only 80-96. 320 covers both and keeps the five-turn worst case
+    # inside the launchers' 4000-token response region.
+    # Undeclared this falls back to
     # DEFAULT_MAX_ENV_RESPONSE=2048, which is not a bound on anything this env does
     # and makes the episode-size warning fire on every run until nobody reads it.
-    max_env_response_per_turn: 256
+    max_env_response_per_turn: 320
     config:
       render_mode: vision
       prompt_format: free_wm

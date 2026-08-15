@@ -1,8 +1,9 @@
 #!/bin/bash
 # sokoban - default_gae - InternVL3.5-2B
 #
-# Select the row layout with HARNESS=concat|no_concat|compact. InternVL3.5 reserves
-# <think>/</think> as control tokens, so this uses the reachable free_wm format.
+# Select the row layout with HARNESS=concat|no_concat|compact. InternVL tokenises
+# <think>/</think> as ordinary text, but its base model repeats badly under the full
+# world-model protocol, so the environment asks it to mark only <answer>.
 set -eo pipefail
 
 V=$(cd "$(dirname "$0")/../../.." && pwd)
@@ -37,14 +38,21 @@ fi
 export PYTHONPATH=${VERL:+$VERL:}$V${PYTHONPATH:+:$PYTHONPATH}
 mapfile -t BASE < <(grep -vE '^\s*(#|$)' "$V/vagen/configs/baseline_vllm.flags" | sed "s|\$V|$V|g")
 
+# InternVL's real Sokoban opening is 938 tokens; reopening from a full 300-token
+# compact summary is 1244. The shared 1000-token prompt region cannot hold that
+# second conversation, so reserve measured headroom explicitly below.
+# InternVL also has no family-specific fused forward in verl. The generic fused forward
+# is text-only and drops pixel_values, so actor/ref would train blind while vLLM sees the
+# image. Keep the native multimodal forward until an adapter exists.
 PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     --config-path="$V/vagen/configs" --config-name=vagen_multiturn \
     hydra.searchpath="[file://$VERL/verl/trainer/config]" \
     data.custom_cls.path="$V/vagen/gym_agent_dataset.py" \
     "${BASE[@]}" \
-    data.train_files="$SCRIPTDIR/train_sokoban_vision_free_wm.yaml" \
-    data.val_files="$SCRIPTDIR/val_sokoban_vision_free_wm.yaml" \
+    data.train_files="$SCRIPTDIR/train_sokoban_vision_internvl.yaml" \
+    data.val_files="$SCRIPTDIR/val_sokoban_vision_internvl.yaml" \
     actor_rollout_ref.model.path="$MODEL" \
+    actor_rollout_ref.model.use_fused_kernels=False \
     critic.model.path="$MODEL" \
     critic.enable=True \
     algorithm.adv_estimator=default_gae \
@@ -52,16 +60,24 @@ PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
     trainer.compact_budget="$COMPACT_BUDGET" \
     trainer.compact_summary_budget="$COMPACT_SUMMARY_BUDGET" \
     data.train_batch_size=128 \
+    data.max_prompt_length=1600 \
     data.max_response_length=4000 \
     actor_rollout_ref.actor.ppo_mini_batch_size=32 \
     actor_rollout_ref.rollout.n=1 \
+    actor_rollout_ref.rollout.temperature=0.6 \
+    actor_rollout_ref.rollout.top_k=50 \
+    actor_rollout_ref.rollout.top_p=0.95 \
+    actor_rollout_ref.rollout.val_kwargs.temperature=0.6 \
+    actor_rollout_ref.rollout.val_kwargs.top_k=50 \
+    actor_rollout_ref.rollout.val_kwargs.top_p=0.95 \
+    actor_rollout_ref.rollout.val_kwargs.do_sample=True \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.max_model_len=6000 \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
     actor_rollout_ref.rollout.max_num_batched_tokens=10000 \
     actor_rollout_ref.rollout.enforce_eager=True \
     actor_rollout_ref.rollout.free_cache_engine=True \
-    actor_rollout_ref.rollout.enable_chunked_prefill=True \
+    actor_rollout_ref.rollout.enable_chunked_prefill=False \
     trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \
     trainer.critic_warmup=0 \

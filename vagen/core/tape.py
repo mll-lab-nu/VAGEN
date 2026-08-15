@@ -33,6 +33,10 @@ class Row:
     response_mask: list[int]
     logprobs: list[float]
     scores: list[float]
+    #: True only when every non-empty model response supplied backend logprobs.  The
+    #: numeric vector cannot encode this because 0.0 is both a valid logprob and the
+    #: alignment fill used when values are unavailable.
+    logprobs_complete: bool = True
     #: (start, end) of each model output, as offsets into ``response_ids``. One entry per
     #: turn: a conversation holds several under concat, exactly one under no_concat.
     #: Without these a conversation is one undifferentiated blob and its turns cannot be
@@ -69,6 +73,7 @@ class Conversation:
     token_ids: list[int] = field(default_factory=list)
     mask: list[int] = field(default_factory=list)
     logprobs: list[float] = field(default_factory=list)
+    _logprobs_complete: bool = True
     scores: list[float] = field(default_factory=list)
     prompt_len: int | None = None
     # Span of the most recent model output, so a turn's reward lands on that turn.
@@ -93,6 +98,12 @@ class Conversation:
 
     def add_response(self, ids: list[int], logprobs: list[float] | None = None) -> None:
         """Tokens the model produced."""
+        if logprobs is not None and len(logprobs) != len(ids):
+            raise MaskMisaligned(
+                f"response has {len(ids)} tokens but {len(logprobs)} logprobs"
+            )
+        if ids and logprobs is None:
+            self._logprobs_complete = False
         if self.prompt_len is None:
             self.prompt_len = len(self.token_ids)
         start = len(self.mask)
@@ -198,6 +209,7 @@ class Conversation:
             response_mask=list(self.mask),
             logprobs=list(self.logprobs),
             scores=list(self.scores),
+            logprobs_complete=self._logprobs_complete,
             response_spans=list(self.response_spans),
         )
 
