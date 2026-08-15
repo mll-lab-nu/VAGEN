@@ -4,9 +4,17 @@ VAGEN supports custom metrics for W&B logging during training.
 
 ## Built-in Metrics
 
-| Metric | Description |
-|--------|-------------|
-| `reward_variance` | Mean within-group reward variance |
+Three are registered in `vagen/custom_metric/metric.py`:
+
+| name | what it reports |
+|---|---|
+| `episode_score` | the episode-level reward. Under `no_concat` and `compact` a row is one turn, so the per-row mean reads as `episode_reward / rows_per_episode` — measured 17x low. This is what `critic/score/mean` points at. |
+| `episode_turns` | environment steps per episode |
+| `reward_variance` | variance of reward within a group |
+
+Two of them return `dict[str, float]` rather than a single float; `collect_registry_metrics`
+(`vagen/trainer/logic.py`) supports both. The registry calls `fn(data)` with no extra
+arguments — there is no `**kwargs` mechanism.
 
 ## Creating a Custom Metric
 
@@ -19,13 +27,12 @@ from vagen.custom_metric.metric import register_metric
 from verl import DataProto
 
 @register_metric("my_metric")
-def my_metric(data: DataProto, **kwargs) -> float:
+def my_metric(data: DataProto) -> float:
     """
     Custom metric implementation.
 
     Args:
         data: DataProto containing training data
-        **kwargs: Additional arguments
 
     Returns:
         float: Metric value for logging

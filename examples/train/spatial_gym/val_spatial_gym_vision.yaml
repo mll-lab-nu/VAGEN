@@ -1,10 +1,25 @@
 envs:
   - name: SpatialGym
-    n_envs: 50
+    # Four, not 50. The seed indexes a fixed dataset (`run{seed:02d}`), so validation is
+    # limited to the rooms train does not use, and the dataset only has 20 of them.
+    # Repeating a held-out room would not buy a second sample either: the env is
+    # deterministic given the seed and validation decodes greedily, so every repeat
+    # replays the same episode and only makes the average look better-supported.
+    #
+    # Four episodes is a coarse signal -- worth remembering when reading val_core_reward,
+    # including as the criterion for the best-actor checkpoint.
+    n_envs: 4
     data_source: spatial_gym
-    seed: [0, 49, 1]  
+    # Disjoint from train's [0,15]. They were identical, so validation was
+    # reporting training performance. [1000,1049] fixed that on paper only: no
+    # `run1000` exists, so every validation episode died on the load assertion.
+    seed: [16, 19, 1]
     max_turns: 11
-    response_length_per_turn: 2048
+    # Below data.max_response_length, which the scripts set to 18432.
+    response_length_per_turn: 1024
+    # What one observation may be. Declared rather than derived: the derivation is
+    # deliberately generous and the static checks are only exact against a real number.
+    max_env_response_per_turn: 700
     config:
       exp_type: active
       render_mode: vision

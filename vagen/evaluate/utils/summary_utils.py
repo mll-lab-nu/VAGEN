@@ -1,10 +1,18 @@
-# All comments are in English.
 from __future__ import annotations
 import os
 import json
 import datetime as dt
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+#: Endings that are episodes rather than failures, in one place.
+#:
+#: ★ There were two lists and they disagreed. runner's governed deletion and resume;
+#: summary_utils hardcoded ("done", "max_turns", "skipped_resume") in four places. So
+#: `no_room` was kept on disk and treated as completed by resume while being reported as an
+#: error rollout, and `skipped_resume` was treated as normal by the summary although
+#: nothing produces it -- and if anything did, _purge_error_rollouts would have deleted it.
+NORMAL_FINISH_REASONS = {"done", "max_turns", "no_room"}
 
 # ------------------------
 # Helpers
@@ -143,7 +151,7 @@ def write_rollouts_summary(
         sum_turns += ep["num_turns"]
 
         # Count errors (exclude normal endings like done/max_turns/skipped resumes)
-        if ep["finish_reason"] not in ("done", "max_turns", "skipped_resume"):
+        if ep["finish_reason"] not in NORMAL_FINISH_REASONS:
             rid = ep.get("rollout_id")
             if rid:
                 error_rollouts.append(rid)
@@ -165,7 +173,7 @@ def write_rollouts_summary(
                 tag_state["succ_cnt"] += 1
             tag_state["reward_sum"] += ep["cumulative_reward"]
             tag_state["turn_sum"] += ep["num_turns"]
-            if ep["finish_reason"] not in ("done", "max_turns", "skipped_resume"):
+            if ep["finish_reason"] not in NORMAL_FINISH_REASONS:
                 rid = ep.get("rollout_id")
                 if rid:
                     tag_state["error_rollouts"].add(rid)
@@ -212,6 +220,7 @@ def write_rollouts_summary_from_dump(
     dump_dir: str,
     filename: str = "summary.json",
     success_keys: Optional[List[str]] = None,
+    model: Optional[str] = None,
 ) -> str:
     """
     Aggregate summary by scanning dump_dir for metrics.json files.
@@ -229,6 +238,12 @@ def write_rollouts_summary_from_dump(
     error_rollouts: List[str] = []
     per_tag_data: Dict[int, Dict[str, Any]] = {}
 
+    # ★ Rollout directories are {timestamp}-{uuid8}, so a directory holds whatever was
+    # ever written there -- including another model's episodes. Filtering on the recorded
+    # model is what stops a summary blending two checkpoints: measured on a dump holding
+    # A and B, n_episodes came out 4 for a 2-episode config at a success rate averaged
+    # across both. `None` means "whatever is here", which is what the resume-time refresh
+    # wants, since it runs before this run has written anything.
     for run_dir in root.iterdir():
         if not run_dir.is_dir():
             continue
@@ -240,6 +255,9 @@ def write_rollouts_summary_from_dump(
             m = json.loads(metrics_path.read_text(encoding="utf-8"))
         except Exception:
             # Skip corrupted metrics
+            continue
+
+        if model is not None and str(m.get("model") or "") != str(model):
             continue
 
         rewards = m.get("rewards") or []
@@ -283,7 +301,7 @@ def write_rollouts_summary_from_dump(
         sum_cum_reward += ep["cumulative_reward"]
         sum_turns += ep["num_turns"]
 
-        if ep["finish_reason"] not in ("done", "max_turns", "skipped_resume"):
+        if ep["finish_reason"] not in NORMAL_FINISH_REASONS:
             error_rollouts.append(rollout_id)
 
         if tag_val is not None:
@@ -303,7 +321,7 @@ def write_rollouts_summary_from_dump(
                 tag_state["succ_cnt"] += 1
             tag_state["reward_sum"] += ep["cumulative_reward"]
             tag_state["turn_sum"] += ep["num_turns"]
-            if ep["finish_reason"] not in ("done", "max_turns", "skipped_resume"):
+            if ep["finish_reason"] not in NORMAL_FINISH_REASONS:
                 tag_state["error_rollouts"].add(rollout_id)
 
     n = len(episodes)

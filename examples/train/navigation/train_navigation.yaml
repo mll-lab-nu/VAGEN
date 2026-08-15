@@ -1,14 +1,19 @@
+# max_env_response_per_turn is left unset here, so it takes the 2048 default. Navigation
+# runs against a remote AI2-THOR server and a frame's token cost is a property of that
+# server's render settings, so there is no number this repo can honestly measure. Declare
+# it once you have measured yours; it is the ceiling an observation is truncated to.
 envs:
   - name: RemoteEnv
-    n_envs: 10000
+    # 1200, matching base_train.json exactly, with each task drawn once.
+    n_envs: 1200
     data_source: navigation
-    seed: [0, 30]
+    seed: [1, 1200, 1]
     max_turns: 10
     response_length_per_turn: 512
     config:
       base_urls: "http://localhost:8000"
       timeout: 120
       retries: 3
-      eval_set: base
+      eval_set: base_train
       prompt_format: eval_mode
       max_actions_per_step: 5

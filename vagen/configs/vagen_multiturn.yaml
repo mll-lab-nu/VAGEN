@@ -4,8 +4,12 @@
 # ============================================================================
 
 hydra:
+  # Relative, so it resolves against the working directory and only works when that is
+  # the repo root -- from anywhere else hydra reports "Could not load 'ppo_trainer'" with
+  # a search path reading `file://file:../../verl/...`. Every caller overrides it with an
+  # absolute one; this is the fallback, not the mechanism.
   searchpath:
-    - file:../../verl/verl/trainer/config  # Hydra search path pointing to verl's default config directory
+    - file:../../verl/verl/trainer/config
 
 defaults:
   - ppo_trainer    # Base PPO trainer config (actor/critic/rollout/algorithm defaults)
@@ -17,13 +21,16 @@ defaults:
 # ============================================================================
 data:
   max_prompt_length: 9000          # Max token length for input prompts (system prompt + first user turn message)
-  max_response_length: 8000        # Max token length for first assiastant turn response + subsequent multi-turn messages
+  max_response_length: 8000        # Max token length for first assistant turn response + subsequent multi-turn messages
   train_batch_size: 128            
   return_raw_chat: True            
   return_multi_modal_inputs: True
   apply_chat_template_kwargs:
     enable_thinking: False                # Whether to apply a chat template that encourages chain-of-thought style reasoning in the assistant's responses
   custom_cls:
+    # Relative, so like hydra.searchpath above it resolves against the working directory
+    # and only works when that is the repo root. Every caller overrides it with an
+    # absolute one; this is the fallback, not the mechanism.
     path: "vagen/gym_agent_dataset.py"  
     name: AgenticDataset                
 
@@ -41,12 +48,136 @@ actor_rollout_ref:
 # Trainer Configuration
 # ============================================================================
 trainer:
-  val_before_train: True                    
-  skip_pad_tokens: True                      # Strip pad tokens when decoding for logging 
+  val_before_train: True
+  # ★ A VAGEN run is bounded by trainer.total_training_steps, which every example script
+  # sets. But verl's fit loop is `for epoch in range(total_epochs)` -- steps only stop it
+  # early -- and verl's default total_epochs is 30. So the real limit is
+  #     min(total_training_steps, total_epochs * floor(n_envs / train_batch_size))
+  # and the second term binds whenever the seed list is small: spatial_gym (n_envs 50,
+  # batch 32) ran 1 step an epoch and stopped at 30 of its 401, never once reaching
+  # save_freq=100 -- 30 steps of training and no checkpoint to show for it. navigation
+  # stopped at 270. Set high enough that the step count is always what stops a run;
+  # there is no separate meaning to an epoch here, since the "dataset" is a seed list.
+  total_epochs: 100000
+  # ★ And therefore this must never be null. verl derives
+  #     total_training_steps = len(dataloader) * total_epochs
+  # when it is (ray_trainer.py:448), and feeds the result to the LR scheduler as its
+  # horizon -- so with the 100000 above, a launch that forgot the flag would compute
+  # millions of steps, never finish its warmup ramp, and never stop. Every shipped script
+  # sets it; this is the default for one that does not.
+  total_training_steps: 401
   replace_image_tokens_for_logging: True    # By default, we want to convert a sequence of image tokens with readable placeholders in logs
   max_actor_ckpt_to_keep: 1                # Max number of actor checkpoints to keep (saves disk space)
   max_critic_ckpt_to_keep: 1               # Max number of critic checkpoints to keep
-  concat_multi_turn: True                 # Concatenate multi-turn messages for rollout and training
+  # Validation samples logged to wandb each round, as input / output / score / frame.
+  # Aggregate metrics cannot tell a model that learned nothing from a rollout whose
+  # format was rejected every turn, and both have happened here; this is how you look.
+  log_val_generations: 32
+  # Which of them. "balanced" shows successes and failures side by side, in the ratio
+  # below: a log of failures alone has nothing to compare against, and one of successes
+  # alone hides what is going wrong. Others -- first, failures, successes, worst, best --
+  # are for looking at something specific while chasing it.
+  val_log_select: balanced
+  val_log_success_ratio: 0.5
+  # Reward the reasoning as well as the outcome: the agent's <observation> and
+  # <prediction> are scored against the real layout and the scores are paid to the
+  # tokens that carry them. Needs a judge endpoint; see scripts/launch_judge.sh.
+  # Keep a copy of the actor from the best-validating step, selected on
+  # mean val-core/<env>/reward/mean@1.
+  #
+  # ★ The actor only, in its own `best_actor/` directory, and it deliberately does not
+  # touch `latest_checkpointed_iteration.txt`: the periodic checkpoint exists to *resume*
+  # (critic + optimiser), this one exists to be *used*. Writing that file would make a
+  # resume rewind to whichever step validated best, which is not where training was.
+  #
+  # Note what "reward" includes: the format bonus is 0.10 of a 1.20 maximum at the shipped
+  # weights, so selection mildly prefers writing tags over solving. Select on
+  # val-aux/<env>/traj_success/mean@1 instead if that matters more.
+  save_best_actor: True
+  state_reward:
+    # Where a turn's scores are paid: auto | turn_end | per_span.
+    #
+    # ★ auto resolves it from `algorithm.adv_estimator`, and should stay that way. An
+    # estimator whose outer chain has one reward slot per turn (bi_level_gae) reads
+    # a turn's reward only at the turn's last token, so a score paid mid-turn is credited
+    # twice -- measured bias 0.177. The per-token estimators want the opposite (-28%
+    # variance at lam 0.9 from per-span). Neither mistake raises or shows in a curve, so
+    # setting this by hand means keeping two knobs in step forever.
+    placement: auto
+    # Independently switchable. Whichever are on decide the response format the agent
+    # is asked for, so turning one on is enough -- no separate prompt setting to keep
+    # in step with it.
+    state_estimation:            # <observation>, scored against the state acted from
+      enable: False
+      weight: 0.5                # relative only; `budget` below sets the scale
+    transition_prediction:       # <prediction>, scored against the state acted into
+      enable: False
+      weight: 0.5
+    # What a whole episode of perfect description is worth, against 1.0 for solving the
+    # level. Split across turns and across whichever rewards are on.
+    #
+    # ★ 0.1, split evenly across the enabled rewards and across the turns, so at
+    # max_turns=5 with both on each is worth **0.01 a turn** -- 2 * 0.01 * 5 = 0.10 over
+    # the episode. Paired with the environment's format_reward at 0.02 a turn (0.10 over
+    # the episode), the whole auxiliary bundle maxes at 0.20 against a success_reward of
+    # 1.0.
+    #
+    # The two have to be set together: they are separate knobs paying into the same
+    # budget, and tuning either alone moves the ratio.
+    #
+    # Both defaults were far too large. The state reward's was 1.0, equal to solving the
+    # level; the environment's format_reward is 0.1 *a turn*, which at max_turns=5 is 0.5
+    # -- half the task reward for producing well-formed text. Measured at the older fixed
+    # weights, eight trajectories with traj_success 0 scored up to 2.25, all of it
+    # description.
+    budget: 0.1
+    # ★ Subtracted from each description's f1 before it is paid, then rescaled so a
+    # perfect description still earns the full budget: max(0, (f1 - base)/(1 - base)).
+    #
+    # grouped_f1 pays 0.5 for one of two axes and each axis is a 3-way choice, so merely
+    # naming a relation scores about a third. Measured over 300 real Sokoban starts:
+    # uniform random 0.334, and the best constant answer -- "same, same", which looks at
+    # nothing -- 0.391. Without this the reward's range was 0.39 to 1.00 and the model's
+    # 0.45-0.52 sat barely above the floor, which is why descriptions that are visibly
+    # wrong were still scoring well.
+    #
+    # 0.0 restores the legacy reward exactly. 0.391 would also take away what a policy
+    # earns by finding the most common relation and repeating it.
+    score_base: 0.334
+    # Format is a gate, not a line item. A turn that skipped a section it was asked for
+    # scores nothing for the sections it did write, and writing them all pays nothing by
+    # itself -- otherwise the budget is not the budget.
+    format_reward: 0.0
+    judge_base_url: "http://127.0.0.1:8123/v1"
+    # Qwen3 generation, instruct-only: the 2507 line has no thinking mode, which for a
+    # parser on the rollout's critical path is what you want. A judge that stops to reason
+    # costs every turn of every rollout, and nothing here reads the reasoning.
+    judge_model: "Qwen/Qwen3-4B-Instruct-2507"
+
+  # Context policy, and the only thing that selects one. Named rather than left null so
+  # "the default is concat" is a fact you can read here instead of one you learn by
+  # finding the line that resolves it. Not a closed set: `harness` is looked up in
+  # vagen/harness/HARNESSES, and anything registered there that subclasses BaseHarness
+  # works, including one added outside this repo.
+  harness: concat                  # concat | no_concat | compact
+  # The largest a conversation may become before CompactHarness summarises and restarts.
+  # It has to hold the system prompt, which is re-sent every time a conversation opens,
+  # plus a summary and more than one turn -- on Sokoban the system prompt alone is 589
+  # tokens, so 400 (which this ran with) could not fit an opening call, let alone a turn.
+  #
+  # ★ Nothing checks this statically -- vagen/harness/budget.py says so in its own words,
+  # and explains why (the true threshold depends on the system prompt, which that module
+  # cannot see). A budget too small to hold one turn is caught at RUNTIME, as
+  # CompactionMakesNoProgress on every episode. If a compact run empties its batch
+  # immediately, suspect this number first.
+  compact_budget: 4000
+  # How long the summary itself may be. null derives it as compact_budget/4, which is
+  # what keeps compaction worth doing: the summary has to fit inside the budget it is
+  # compressing into and still leave room for the turns it exists to buy. Left to the
+  # turn budget -- which is what it used to do -- a summary at compact_budget=4000 could
+  # be 8000 tokens, and every environment step would cost two generations.
+  compact_summary_budget: null
+
   log_image:
     enable: false           # Whether to log environment-rendered images to logger (e.g. wandb)
     max_pending: 2          # Max pending async image dump tasks (prevents IO from blocking training)
@@ -56,8 +187,15 @@ trainer:
 # Algorithm Configuration
 # ============================================================================
 algorithm:
-  gamma: 1.0                 
-  lam: 1.0                   
+  gamma: 1.0
+  lam: 1.0
+  # VAGEN's default, overriding verl's `gae` from ppo_trainer.yaml. verl's own estimators
+  # score one row at a time and open each with nextvalues=0, which is right when a row is
+  # an episode and wrong here -- under no_concat and compact a row is one turn or one
+  # compaction window, so `gae` would cut the trajectory at every row boundary and call
+  # each piece terminal. `default_gae` stitches the rows back into one trajectory first.
+  # Inheriting the name `gae` made that a silent difference rather than an error.
+  adv_estimator: default_gae
 
 # ============================================================================
 # Data Filter Configuration

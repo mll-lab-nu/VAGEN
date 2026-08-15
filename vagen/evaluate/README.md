@@ -13,23 +13,34 @@ CLI overrides (OmegaConf dotlist):
 python -m vagen.evaluate.run_eval --config config.yaml run.backend=claude backends.claude.model=claude-opus-4-6
 ```
 
-Below is a complete example (`examples/evaluate/frozenlake/config.yaml`):
+Below is a complete example, abridged from `examples/evaluate/frozenlake/config.yaml` —
+read that file for the authoritative version:
 
 ```yaml
 defaults:
   - ../../../vagen/configs/eval_default   # inherit shared backend definitions
 
-fileroot: ${oc.env:HOME}/projects/vagen
+fileroot: ${oc.env:VAGEN_EVAL_ROOT,./eval_runs}   # relative to THIS file's directory
 
 envs:
   - name: FrozenLake                      # registered env class name
     n_envs: 128                           # how many episodes to run
     tag_id: frozenlake_test               # groups rollout outputs under tag_{tag_id}/
-    seed: [0,128,1]                       # [start, end, step] → generates seeds 0..127
+    seed: [20000,20127,1]                 # [min, max, occurrence-limit]; INCLUSIVE, so this
+                                          # is 128 values for n_envs=128. Above the training
+                                          # ranges on purpose -- same seed, same instance.
     max_turns: 5                          # max agent–env interaction turns per episode
+    response_length_per_turn: 512         # ★ becomes the API call's max_tokens. Copy it
+                                          # from the val config: without it the client
+                                          # falls back to chat_config.max_tokens below,
+                                          # and the policy gets room it never trained with
     config:                               # passed to the env constructor
       render_mode: vision
       size: 4
+    chat_config:                          # ★ per-env sampling. Pin the temperature:
+      temperature: 0                      # unset, the provider's default applies (1.0),
+      max_tokens: 1024                    # so two checkpoints are not compared on equal
+      top_p: 1.0                          # terms and a rerun does not reproduce
       p: 0.8
       is_slippery: false
       slip_prob: 0.0
@@ -74,15 +85,22 @@ backends:
 
 | Field | Type | Description |
 |---|---|---|
-| `name` | str | Registered environment class (e.g. `FrozenLake`, `Sokoban`, `RemoteEnv`, `ScannetTool`) |
+| `name` | str | Registered environment class (e.g. `FrozenLake`, `Sokoban`, `RemoteEnv`, `SpatialGym`) |
 | `n_envs` | int | Number of episodes to run |
 | `tag_id` | int/str | Output subdirectory name: `tag_{tag_id}/` |
-| `seed` | list | `[start, end, step]` to generate a range, or explicit list of seeds |
+| `seed` | list | `[base]`, `[min, max]`, or `[min, max, occurrence-limit]`. **Inclusive**, and the third element is a per-value cap, *not* a step. Explicit seeds go in `seed_list` |
+| `seed_list` | list | Explicit seeds, at least `n_envs` of them; overrides `seed` |
 | `max_turns` | int | Max agent–env turns per episode |
 | `split` | str | Dataset split identifier (default: `"default"`) |
 | `config` | dict | Kwargs passed to the environment constructor |
-| `chat_config` | dict | Kwargs passed to the LLM completion call (temperature, max_tokens, etc.) |
-| `concat_multi_turn` | bool | `true`: send full message history; `false`: only system + last turn (default: `true`) |
+| `chat_config` | dict | Kwargs passed to the LLM completion call (temperature, etc.). `max_tokens` is clamped to `response_length_per_turn` when that is set |
+| `harness` | str | Context policy: `concat` (default) \| `no_concat` \| `compact`, a registered name, or an import path `module:Class`. Any `BaseHarness` subclass works |
+| `response_length_per_turn` | int | Hard cap on one generation; becomes the call's `max_tokens` |
+| `max_response_length` | int | The response region a conversation must fit. Optional — unset, there is no accounting |
+| `max_env_response_per_turn` | int | Ceiling on one observation; over it the text is cut. Default 2048 |
+| `compact_budget`, `compact_summary_budget` | int | `compact` only. `compact` needs `compact_budget` or `max_response_length`, or no trigger can fire and it runs as concat -- so that is refused. `compact_summary_budget` alone does not satisfy it |
+| `tokens_per_image` | int | What one image costs when sizes are estimated. It feeds the **compaction trigger**, so a value far from your environment's real frame cost makes `compact` misbehave |
+| `tokenizer` | str | A HuggingFace id or path. Given one, text sizes are exact instead of 4 characters a token |
 
 **`default_chat_config`** — Top-level fallback: applied to any env that doesn't define its own `chat_config`.
 
@@ -91,9 +109,9 @@ backends:
 - `default_max_turns` — Fallback max_turns if env doesn't specify one
 
 **`run`**:
-- `backend` — Which backend to use: `openai` | `azure` | `sglang` | `vllm` | `together` | `claude` | `gemini` | `openai_responses` | `azure_responses`
+- `backend` — Which backend to use. The names with a block in `vagen/configs/eval_default.yaml`: `openai` | `azure` | `sglang` | `vllm` | `together` | `claude` | `gemini`. Any other name needs a `backends.<name>:` block of its own; without one the run stops and lists what is configured.
 - `max_concurrent_jobs` — Episode-level parallelism (how many episodes run at once)
-- `resume` — `skip_completed` skips episodes with existing successful metrics; `off` reruns everything; `force_rerun` forces rerunning all episodes regardless of existing successful metrics (overrides `skip_completed` behavior)
+- `resume` — `skip_completed` (default) skips episodes already completed **by the same model**; `force_rerun` deletes the previous rollouts and runs everything again; `off` runs everything and keeps what is there. Note YAML reads a bare `off` as the boolean `False`; both are accepted
 - `live_summary` — Refresh `summary.json` after each episode
 
 **`backends.{name}`** — Config for each backend:
@@ -108,13 +126,13 @@ backends:
 dump_dir/
 └── tag_{tag_id}/
     ├── summary.json                    # aggregated metrics
-    └── {env_name}_seed_{seed}/
+    └── {YYYYmmdd-HHMMSS}-{uuid8}/
         ├── metrics.json                # per-episode results (success, reward, finish_reason)
         ├── messages.json               # full conversation history
         ├── assistant_texts.json        # model replies only
         ├── transcript.txt              # human-readable conversation
         └── images/
-            └── turn_00_00.png          # observation images per turn
+            └── turn_01_01.png          # 1-indexed; turn 01 is the reset observation
 ```
 
 ## 2. Scripts

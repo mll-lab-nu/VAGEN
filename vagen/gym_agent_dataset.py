@@ -31,6 +31,47 @@ class EnvSpec:
     seed_list: Optional[List[int]] = None
     max_turns: int = 1
     response_length_per_turn: Optional[int] = None
+    # The largest a single observation from this environment may be, in tokens, after the
+    # processor has expanded any images. An observation over it is CUT -- its text is
+    # trimmed before rendering -- so this is a real ceiling, not advice. Unset it is
+    # vagen/harness/budget.py:DEFAULT_MAX_ENV_RESPONSE, a flat 2048.
+    #
+    # The environment-side twin of ``response_length_per_turn``: one bounds what the model
+    # may write in a turn, this bounds what the environment may hand back. It feeds exactly
+    # two things -- that cut, and compaction's "can a conversation buy a turn" refusal. It
+    # deliberately does NOT size max_response_length or max_model_len; see budget.py.
+    max_env_response_per_turn: Optional[int] = None
+    #: Deprecated spelling of ``max_env_response_per_turn``. Kept because it is what the
+    #: oversized-observation error told people to set.
+    env_response_length: Optional[int] = None
+    # How many tokens the model may spend *inside* its reasoning block before the engine
+    # closes it for it. Unset, nothing is passed and behaviour is unchanged.
+    #
+    # ★ Not the same lever as ``response_length_per_turn``, and this is the whole point.
+    # ``response_length_per_turn`` is ``max_tokens`` -- a guillotine. The model is not told
+    # how much room it has, so it plans as if unbounded and is cut mid-sentence; measured
+    # on Qwen3.5, that lands the cut before ``</think>`` on 92% of turns at a 2048 cap, and
+    # a turn that never closed its reasoning has no answer to score. This instead makes the
+    # engine *force* the closing token when the budget runs out, so the model stops
+    # reasoning and answers. A bounded turn rather than a truncated one.
+    #
+    # Model-agnostic here: this is a token count, and nothing in VAGEN knows what a
+    # reasoning block looks like. The delimiters live in engine config
+    # (``rollout.engine_kwargs.vllm.reasoning_config``: either a registered
+    # ``reasoning_parser`` name or an explicit start/end string pair), which is where
+    # per-family knowledge belongs. vLLM refuses the request if this is set and that is
+    # not configured.
+    thinking_token_budget: Optional[int] = None
+
+    def __post_init__(self):
+        if self.max_env_response_per_turn is None:
+            self.max_env_response_per_turn = self.env_response_length
+        elif self.env_response_length not in (None, self.max_env_response_per_turn):
+            raise ValueError(
+                f"env spec {self.name!r} sets both max_env_response_per_turn="
+                f"{self.max_env_response_per_turn} and its old name env_response_length="
+                f"{self.env_response_length}. They are one quantity; drop the old one."
+            )
 
 @dataclass
 class EnvSpecs:
@@ -38,7 +79,6 @@ class EnvSpecs:
 
 
 def load_envspecs(yaml_path: str) -> EnvSpecs:
-    print(yaml_path)
     cfg = OmegaConf.load(yaml_path)
     specs = [EnvSpec(**OmegaConf.to_container(s, resolve=True)) for s in cfg.get("envs", [])]
     return EnvSpecs(specs=specs)
@@ -142,9 +182,13 @@ def _generate_seeds_for_spec(
     """Generate `n_envs` seeds using either seed_list or seed directive rules."""
     explicit_list = _coerce_to_int_list(spec.seed_list)
     if explicit_list is not None:
-        if len(explicit_list) <= spec.n_envs:
+        # `<`, not `<=`: a list of exactly n_envs values is used in full, so demanding
+        # "more than" rejected the obvious way to name every seed you want. The eval side
+        # has always required only `>= n_envs`; this was the one that disagreed.
+        if len(explicit_list) < spec.n_envs:
             raise ValueError(
-                f"seed_list for env '{spec.name}' must contain more than n_envs values"
+                f"seed_list for env '{spec.name}' has {len(explicit_list)} values for "
+                f"n_envs={spec.n_envs}; it must contain at least n_envs values"
             )
         return explicit_list[: spec.n_envs]
 
@@ -202,8 +246,16 @@ class AgenticDataset(Dataset):
                         "config": spec.config,
                         "max_turns": spec.max_turns,
                         "response_length_per_turn": spec.response_length_per_turn,
+                        "max_env_response_per_turn": spec.max_env_response_per_turn,
+                        "thinking_token_budget": spec.thinking_token_budget,
                         "data_source": data_source,
                         "agent_name":"gym_agent",
+                        # verl's agent loop stores raw_prompt on every output and reads
+                        # it unconditionally. VAGEN builds the prompt inside the loop
+                        # from environment observations, so there is no dataset-side
+                        # chat to carry -- an empty list keeps the type consistent with
+                        # RLHFDataset, which puts the chat messages here.
+                        "raw_prompt": [],
                         "input_ids": torch.tensor([0]),  # dummy
                         "attention_mask": torch.tensor([0]),  # dummy
                         "position_ids": torch.tensor([0]),  # dummy
@@ -215,21 +267,3 @@ class AgenticDataset(Dataset):
 
     def __getitem__(self, idx):
         return self.items[idx]
-
-
-if __name__ == "__main__":
-    # Simple test
-    dataset = AgenticDataset(
-        data_files="verl/recipe/viewsuite/configs/val_config.yaml",
-        config={"base_seed": 42},
-    )
-    print(f"Total envs: {len(dataset)}")
-    #shuffle and sample
-    import random
-    random.seed(42)
-    indices = list(range(len(dataset)))
-    random.shuffle(indices)
-    sample_indices = indices[:10]
-    for i in sample_indices:
-        item = dataset[i]
-        print(item)

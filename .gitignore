@@ -34,3 +34,48 @@ wandb/
 outputs/
 room_data/
 rollouts/
+
+# Downloaded run artifacts. `wandb.Api().artifact.download()` defaults to ./artifacts,
+# so querying a table from the repo root writes 30 HTML files with embedded frames into
+# the working tree -- and a `git add -A` then commits them. It has happened once.
+artifacts/
+wandb/
+
+# Run outputs and model weights. None of these belong in a repo, and a `git add -A`
+# after an experiment is how they get here.
+*.jsonl
+*.pt
+*.ckpt
+*.safetensors
+*.tar
+checkpoints/
+ray_results/
+runs/
+tensorboard/
+nohup.out
+
+# Local environment and credentials
+.venv/
+.env
+.netrc
+
+# Cluster launchers: site-specific, kept local rather than published.
+examples/slurm/
+eval_runs/
+
+# Built mkdocs output. .readthedocs.yaml rebuilds from source on every push, so a tracked
+# copy only ever serves a stale one to whoever browses the repo on GitHub.
+site/
+
+# Never commit credentials. These are here so a stray key cannot be added by accident,
+# not because one ever was.
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+credentials.json
+.aws/
+*.env
+.env.*

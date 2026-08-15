@@ -1,6 +1,5 @@
-# All comments are in English.
 from __future__ import annotations
-from typing import Any, Dict, List, Optional, Literal
+from typing import Any, Dict, List, Optional
 from PIL import Image
 import os
 import json
@@ -9,17 +8,17 @@ import uuid
 import logging
 
 from vagen.evaluate.adapters.base_adapter import ModelAdapter
-from vagen.evaluate.utils.mm_utils import _now_tag, extract_images
+from vagen.evaluate.utils.mm_utils import _now_tag
 from vagen.evaluate.utils.json_utils import sanitize_for_json
+from vagen.core.env_adapter import GymEnvAdapter
+from vagen.core.runner import run_episode
+from vagen.evaluate.chat_client import ChatClient
+from vagen.harness import build_harness, resolve_harness
+from vagen.harness.compact import CompactHarness
+from vagen.harness.budget import DEFAULT_MAX_ENV_RESPONSE, default_summary_budget
 
 logger = logging.getLogger(__name__)
 
-# Optional: import provider error base class
-try:
-    import openai
-    OpenAIError = openai.OpenAIError  # type: ignore
-except Exception:  # pragma: no cover
-    OpenAIError = Exception
 
 
 class GenericVisionInferenceWorkflow:
@@ -35,11 +34,39 @@ class GenericVisionInferenceWorkflow:
         success_keys: Optional[List[str]] = None,
         success_threshold: float = 0.99,
         chat_config: Optional[Dict[str, Any]] = None,
-        concat_multi_turn: bool = True,
+        harness: str = "concat",
+        response_length_per_turn: Optional[int] = None,
+        max_response_length: Optional[int] = None,
+        max_env_response_per_turn: Optional[int] = None,
+        compact_budget: Optional[int] = None,
+        compact_summary_budget: Optional[int] = None,
+        tokenizer: Any = None,
+        processor: Any = None,
+        tokens_per_image: Optional[int] = None,
     ):
         self.adapter = adapter
         self.dump_dir = dump_dir
-        self.concat_multi_turn = concat_multi_turn
+        # ★ The context policy is the same object training uses, chosen by name. It was a
+        # bool here (`concat_multi_turn`), which could express concat and approximately
+        # no_concat and could not express compaction at all -- training deleted that bool
+        # rather than deprecating it, precisely so a stale config would be rejected instead
+        # of quietly outvoting `harness`.
+        # Resolved now rather than at the first episode, so a bad name fails once at
+        # construction instead of once per rollout -- and any BaseHarness subclass is
+        # accepted, whether registered by name or given as an import path.
+        resolve_harness(harness)
+        self.harness_name = harness
+        self.response_length_per_turn = response_length_per_turn
+        self.max_response_length = max_response_length
+        self.max_env_response_per_turn = max_env_response_per_turn
+        self.compact_budget = compact_budget
+        self.compact_summary_budget = compact_summary_budget
+        self.tokenizer = tokenizer
+        self.processor = processor
+        # See chat_client.DEFAULT_TOKENS_PER_IMAGE: this feeds the compaction trigger, not
+        # just an overflow guard, so a value far off the environment's real frame cost
+        # makes `compact` close conversations before they have bought a turn.
+        self.tokens_per_image = tokens_per_image
         # IMPORTANT: dump_enabled is ignored; we always dump for executed episodes
         self.dump_enabled = True
         self.success_keys = success_keys or ["success", "is_success", "solved"]
@@ -126,6 +153,53 @@ class GenericVisionInferenceWorkflow:
                 )
             )
 
+
+    def _build_harness(self, max_turns: int):
+        """The harness, and the two per-call ceilings the client enforces.
+
+        ★ ``response_len`` is NOT derived from ``response_length_per_turn * max_turns``.
+        That looks like the episode's budget and is not: under concat the observations land
+        in the same region, so ``g*T`` has to hold T generations *and* T observations, and
+        ``_left()`` runs out early. Measured on the shipped frozenlake eval -- g=512, T=5,
+        one frame an observation -- it ended the episode after 3 turns of 5 and still
+        reported ``max_turns``. Training passes an independent ``data.max_response_length``
+        for exactly this reason. Here the region is opt-in: unset, there is no accounting,
+        which is the closed-API case ``BaseHarness`` documents as ``response_len=None``.
+
+        The floor matches training's ``min(per_turn, response_len // 4)`` rather than
+        ``per_turn``. A floor equal to a full 1/T of the region deletes turns on its own.
+        """
+        per_turn = self.response_length_per_turn
+        response_len = self.max_response_length
+
+        kw = {"response_len": response_len}
+        if per_turn and response_len:
+            kw["floor"] = min(per_turn, max(1, response_len // 4))
+        elif per_turn:
+            kw["floor"] = per_turn
+        if issubclass(resolve_harness(self.harness_name), CompactHarness):
+            budget = self.compact_budget
+            if not budget and not response_len:
+                # Neither trigger can fire, so the conversation would grow forever and this
+                # would silently be concat -- the exact failure `harness:` was added to fix.
+                raise ValueError(
+                    "harness: compact needs compact_budget (or max_response_length) in the "
+                    "eval config. With neither, no trigger can fire and it runs as concat."
+                )
+            summary = self.compact_summary_budget
+            if not summary:
+                summary = default_summary_budget(budget or response_len, per_turn or budget
+                                                 or response_len)
+            kw.update(budget=budget, summary_budget=summary)
+        harness = build_harness(self.harness_name, **kw)
+
+        # An observation is still bounded: that ceiling is a property of the environment,
+        # not of whether there is a row to fit.
+        continuation = self.max_env_response_per_turn
+        if continuation is None:
+            continuation = DEFAULT_MAX_ENV_RESPONSE
+        return harness, None, continuation
+
     async def arun_episode(
         self,
         env_cls,
@@ -165,85 +239,80 @@ class GenericVisionInferenceWorkflow:
         turn_limit = int(max_turns)
         assert turn_limit > 0, f"Invalid max_turns={turn_limit} in workflow"
 
+        # Built before the try so that a failure mid-episode still has the turns that
+        # finished. They were being thrown away: the client was local to the try and the
+        # transcript was only harvested on the success path, so a provider error on call 3
+        # of 6 reported num_turns=0 and an empty transcript -- and `finish_reason: error`
+        # then makes _purge_error_rollouts delete the dump on the next resumed run.
+        harness, opening, continuation = self._build_harness(turn_limit)
+        client = ChatClient(self.adapter, self.chat_config, tokenizer=self.tokenizer,
+                                processor=self.processor,
+                            response_limit=self.response_length_per_turn,
+                            **({} if self.tokens_per_image is None
+                               else {"tokens_per_image": self.tokens_per_image}))
+        client.opening_limit, client.continuation_limit = opening, continuation
+        adapted = _Recording(GymEnvAdapter(env, env_config.get("name", "env"), env_config))
+        outcome = None
+
         try:
-            # Reset and obtain system/user initial messages
-            obs, info = await env.reset(seed=seed)
-            infos.append(info)
+            # ★ The shared episode loop, the same one training runs. `core/runner.py` was
+            # written to drive "a verl rollout and a closed chat API"; this is the second
+            # caller it was waiting for. Everything the old hand-rolled loop here did by
+            # hand -- deciding what history a call carries, when a conversation is full,
+            # how much of the budget a turn may spend -- is the harness's job, and doing it
+            # twice is how evaluation ended up unable to express compaction.
+            outcome = await run_episode(adapted, harness, client, seed=seed,
+                                        max_turns=turn_limit)
+        except Exception as e:  # noqa: BLE001 - recorded, never propagated
+            error_info = {"error": repr(e), "error_type": type(e).__name__,
+                          "message": str(e)}
+            logger.info("Rollout %s failed with %s: %s", rid, type(e).__name__, e)
+            finish_reason = "error"
 
-            # Normal execution path (this episode WILL be dumped)
-            sys_obs = await env.system_prompt()
-            sys_text = sys_obs.get("obs_str", "")
-            sys_imgs = extract_images(sys_obs)
-            messages.append(self.adapter.format_system(sys_text, sys_imgs))
+        rewards = list(adapted.rewards)
+        cumulative_reward = float(sum(rewards))
+        infos = list(adapted.infos)
+        user_imgs_per_turn = list(adapted.images)
+        # The transcript is what the client actually sent, across every conversation the
+        # harness opened. Under no_concat and compact that is more than one, and reading
+        # only the last would report a fraction of the episode.
+        for conv in client.conversations():
+            messages.extend(client.messages(conv.conversation_id))
+        assistant_texts = [_text_of(m) for m in messages if m.get("role") == "assistant"]
 
-            user_text = obs.get("obs_str", "")
-            user_imgs = extract_images(obs)
-            messages.append(self.adapter.format_user_turn(user_text, user_imgs))
-            user_imgs_per_turn.append(user_imgs)
+        if outcome is not None:
+            terminated = bool(outcome.terminated)
+            # ★ outcome.turns is environment steps. Recomputing it from the transcript
+            # counts a compaction summary as a turn, so avg_turns grew with how often the
+            # policy triggered compaction rather than with episode length.
+            n_turns = outcome.turns
+            if adapted.env_error:
+                # The adapter reports a crashed env as done=True, which would otherwise be
+                # indistinguishable from a solved episode in the summary.
+                finish_reason, terminated = "env_error", False
+            elif terminated:
+                finish_reason = "done"
+            elif n_turns == 0 and not adapted.rewards:
+                # ★ Zero turns is not an ending, it is a non-answer: the endpoint returned
+                # nothing (a refusal or a content filter) and run_episode stopped before
+                # the first env step. Calling it `no_room` filed it as a completed episode,
+                # so it counted as a zero in success_rate, stayed out of error_rollouts,
+                # survived the purge, and was marked done by resume -- which means rerunning
+                # could never repair it.
+                finish_reason = "empty_generation"
+            elif n_turns >= turn_limit:
+                # run_episode marks running out of turns as `truncated` too, so the flag
+                # alone cannot tell "used its whole budget" from "stopped early for lack
+                # of room". The turn count can, and only the second is worth a name.
+                finish_reason = "max_turns"
+            elif outcome.truncated:
+                finish_reason = "no_room"
+            else:
+                finish_reason = "max_turns"
+        else:
+            n_turns = len(rewards)
 
-            for t in range(turn_limit):
-                # Safeguard completion
-                try:
-                    # In non-concat mode, only send system prompt + current user message
-                    if self.concat_multi_turn:
-                        api_messages = messages
-                    else:
-                        api_messages = [messages[0], messages[-1]]
-                    reply = await self.adapter.acompletion(api_messages, **self.chat_config)
-                except OpenAIError as e:
-                    error_info = {
-                        "provider_error": repr(e),
-                        "error_type": type(e).__name__,
-                        "message": str(e),
-                    }
-                    logger.info("Rollout %s provider error: %s", rid, repr(e))
-                    finish_reason = "model_error"
-                    terminated = False
-                    break
-                except Exception as e:
-                    error_info = {
-                        "unexpected_error": repr(e),
-                        "error_type": type(e).__name__,
-                        "message": str(e),
-                    }
-                    logger.info("Rollout %s unexpected model error: %s", rid, repr(e))
-                    finish_reason = "model_error"
-                    terminated = False
-                    break
-
-                assistant_texts.append(reply)
-                messages.append(self.adapter.format_assistant_turn(reply))
-
-                try:
-                    next_obs, r, done, step_info = await env.step(reply)
-                except Exception as e:
-                    error_info = {
-                        "env_step_error": repr(e),
-                        "error_type": type(e).__name__,
-                        "message": str(e),
-                    }
-                    logger.info("Rollout %s env step error: %s", rid, repr(e))
-                    finish_reason = "env_error"
-                    terminated = False
-                    break
-
-                rewards.append(float(r))
-                cumulative_reward += float(r)
-                infos.append(step_info or {})
-
-                user_text = next_obs.get("obs_str", "")
-                user_imgs = extract_images(next_obs)
-                messages.append(self.adapter.format_user_turn(user_text, user_imgs))
-                user_imgs_per_turn.append(user_imgs)
-
-                if done:
-                    terminated = True
-                    finish_reason = "done"
-                    break
-                if t + 1 >= turn_limit:
-                    finish_reason = "max_turns"
-                    break
-
+        try:
             # Success heuristic
             success = False
             if infos:
@@ -269,9 +338,15 @@ class GenericVisionInferenceWorkflow:
                 "success": success,
                 "cumulative_reward": float(cumulative_reward),
                 "rewards": rewards,
-                "num_turns": len(assistant_texts),
+                "num_turns": n_turns,
                 "infos": final_infos,
                 "env_config": env_config_dump,
+                # ★ Recorded so resume can tell whose rollout this is. Without it the key
+                # is (env, seed, tag_id) alone, so evaluating a second model into the same
+                # dump directory skips every episode and reprints the first model's
+                # success_rate under the second model's name, exit 0, no warning.
+                "model": getattr(self.adapter, "model", None) or getattr(
+                    getattr(self.adapter, "inner", None), "model", None),
             }
             metrics.setdefault("max_turns", turn_limit)
             if error_info is not None:
@@ -290,7 +365,7 @@ class GenericVisionInferenceWorkflow:
             result = {
                 "rollout_id": rid,
                 "final_text": assistant_texts[-1] if assistant_texts else "",
-                "num_turns": len(assistant_texts),
+                "num_turns": n_turns,
                 "messages": messages,
                 "terminated": terminated,
                 "finish_reason": finish_reason,
@@ -323,6 +398,12 @@ class GenericVisionInferenceWorkflow:
                         "num_turns": 0,
                         "infos": (infos or []) + [{"error": repr(e)}],
                         "env_config": env_config_dump,
+                # ★ Recorded so resume can tell whose rollout this is. Without it the key
+                # is (env, seed, tag_id) alone, so evaluating a second model into the same
+                # dump directory skips every episode and reprints the first model's
+                # success_rate under the second model's name, exit 0, no warning.
+                "model": getattr(self.adapter, "model", None) or getattr(
+                    getattr(self.adapter, "inner", None), "model", None),
                         "error_details": {
                             "error": repr(e),
                             "error_type": type(e).__name__,
@@ -366,8 +447,59 @@ class GenericVisionInferenceWorkflow:
             if metadata:
                 result.update(metadata)
             return result
-        finally:
-            try:
-                await env.close()
-            except Exception:
-                pass
+        # No env.close() here: `run_episode` closes it in its own `finally`, so doing it
+        # again closed every environment twice. Harmless for the shipped envs -- gym closes
+        # are idempotent and the remote client guards on its session id -- but it would
+        # bite the first env whose close is not.
+
+
+def _text_of(message: dict) -> str:
+    """The plain text of an API message, whatever content shape the adapter used."""
+    content = message.get("content", "")
+    if isinstance(content, str):
+        return content
+    return "".join(p.get("text", "") for p in content if isinstance(p, dict))
+
+
+class _Recording:
+    """Wraps the env adapter to keep what ``run_episode`` merges away.
+
+    ``EpisodeResult`` carries one merged ``info`` dict and a reward list, which is all
+    training needs. Evaluation's summary aligns per-turn fields on
+    ``len(infos) == len(rewards) + 1`` (`summary_utils._build_per_turn_with_turn0`), so a
+    single merged dict makes every turn past the first report ``{}``. And a *vision*
+    harness that does not keep the frames cannot dump them: `images/` was being created
+    empty on every rollout.
+    """
+
+    def __init__(self, inner):
+        self.inner = inner
+        self.infos: list = []
+        self.rewards: list = []
+        self.images: list = []
+        self.env_error = False
+
+    async def reset(self, seed=None):
+        message, info = await self.inner.reset(seed)
+        self.infos.append(dict(info or {}))
+        self.images.append(_images_of(message))
+        return message, info
+
+    async def system_prompt(self):
+        return await self.inner.system_prompt()
+
+    async def step(self, action, **kw):
+        message, reward, terminated, truncated, info = await self.inner.step(action, **kw)
+        self.rewards.append(reward if isinstance(reward, (int, float)) else sum(reward))
+        self.infos.append(dict(info or {}))
+        self.images.append(_images_of(message))
+        if (info or {}).get("env_error"):
+            self.env_error = True
+        return message, reward, terminated, truncated, info
+
+    async def close(self):
+        await self.inner.close()
+
+
+def _images_of(message: dict) -> list:
+    return list((message or {}).get("images") or [])

@@ -1,3 +1,7 @@
+# max_env_response_per_turn is left unset here, so it takes the 2048 default. Navigation
+# runs against a remote AI2-THOR server and a frame's token cost is a property of that
+# server's render settings, so there is no number this repo can honestly measure. Declare
+# it once you have measured yours; it is the ceiling an observation is truncated to.
 envs:
   - name: RemoteEnv
     n_envs: 1200

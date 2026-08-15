@@ -1,14 +1,37 @@
 defaults:
   - ../../../vagen/configs/eval_default
 
-fileroot: ${oc.env:HOME}/projects/vagen
+# Where rollouts and summaries are written. Override with VAGEN_EVAL_ROOT (an absolute
+# path), or set fileroot here. The old default was one developer's home directory, which
+# every shipped eval config inherited.
+#
+# ★ A relative fileroot is resolved against the CONFIG FILE's directory, not the working
+# directory and not the repo root -- so this default puts results next to the config, in
+# examples/evaluate/<env>/eval_runs/. That is gitignored. Give VAGEN_EVAL_ROOT an absolute
+# path if you want them somewhere else; a relative one will surprise you.
+fileroot: ${oc.env:VAGEN_EVAL_ROOT,./eval_runs}
 
 envs:
   - name: SpatialGym
     n_envs: 20
     tag_id: spatial_gym_2room
+    # ★ All twenty rooms, deliberately. The seed is an INDEX into a fixed dataset
+    # (`run{seed:02d}`) rather than a generator seed, so an overlap with training would be
+    # the same room twice -- but this is the 2-ROOM set, and both training configs read
+    # `room_data/1-room` (examples/train/spatial_gym/{train,val}_spatial_gym_vision.yaml).
+    # Nothing under examples/train/ reads 2-room, so there is no held-out subset to carve
+    # out here and no contamination to avoid.
+    #
+    # config_1room.yaml is the file where this mattered: it indexes the same rooms training
+    # does, and it used to ask for all twenty of them.
     seed: [0, 19, 1]
     max_turns: 16
+    # ★ Both from val_spatial_gym_vision.yaml. Without response_length_per_turn the client
+    # falls through to chat_config.max_tokens (32768) -- thirty-two times the turn the
+    # policy was trained to write. And an unset ceiling here takes DEFAULT_MAX_ENV_RESPONSE
+    # (2048) rather than the 700 training bounded observations to.
+    response_length_per_turn: 1024
+    max_env_response_per_turn: 700
     config:
       exp_type: active
       render_mode: vision
@@ -25,7 +48,7 @@ envs:
       top_p: 1.0
 
 experiment:
-  dump_dir: ./rollouts/spatial_gym_2room
+  dump_dir: ${fileroot}/rollouts/eval_spatial_gym
   default_max_turns: 16
 
 run:

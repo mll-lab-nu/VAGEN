@@ -2,7 +2,7 @@ envs:
   - name: RemoteEnv
     n_envs: 16
     data_source: AlignTwoCube
-    seed: [5000, 5016, 1]
+    seed: [5000, 5015, 1]
     max_turns: 3
     response_length_per_turn: 1024
     config:
@@ -15,12 +15,12 @@ envs:
       action_sep: "|"
       render_mode: vision
       format_reward: 0.1
-      success_reward: 10.0
+      success_reward: 1
 
   - name: RemoteEnv
     n_envs: 16
     data_source: PlaceTwoCube
-    seed: [5000, 5016, 1]
+    seed: [5000, 5015, 1]
     max_turns: 3
     response_length_per_turn: 1024
     config:
@@ -33,12 +33,12 @@ envs:
       action_sep: "|"
       render_mode: vision
       format_reward: 0.1
-      success_reward: 10.0
+      success_reward: 1
 
   - name: RemoteEnv
     n_envs: 16
     data_source: StackThreeCube
-    seed: [5000, 5016, 1]
+    seed: [5000, 5015, 1]
     max_turns: 3
     response_length_per_turn: 1024
     config:
@@ -51,12 +51,12 @@ envs:
       action_sep: "|"
       render_mode: vision
       format_reward: 0.1
-      success_reward: 10.0
+      success_reward: 1
 
   - name: RemoteEnv
     n_envs: 16
     data_source: PutAppleInDrawer
-    seed: [5000, 5016, 1]
+    seed: [5000, 5015, 1]
     max_turns: 3
     response_length_per_turn: 1024
     config:
@@ -69,4 +69,4 @@ envs:
       action_sep: "|"
       render_mode: vision
       format_reward: 0.1
-      success_reward: 10.0
+      success_reward: 1

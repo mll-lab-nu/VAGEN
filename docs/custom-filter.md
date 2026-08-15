@@ -69,10 +69,13 @@ filter:
 
 ## Example: Reward Variance Filter
 
-The built-in `reward_variance` filter keeps only groups with the highest reward variance:
+A **sketch** of what the built-in `reward_variance` does — it keeps the groups with the
+highest reward variance. Read `vagen/custom_filter/filter.py` for the real one; this is
+simplified, and the name is already taken, so pasting it as-is raises
+`ValueError: already registered`.
 
 ```python
-@register_filter("reward_variance")
+@register_filter("my_reward_variance")   # not "reward_variance" -- that name is taken
 def reward_variance_filter(data_proto: DataProto, metrics, **kwargs) -> tuple[DataProto, dict]:
     topk_ratio = kwargs.get("topk", 0.2)  # Keep top 20% groups
 
@@ -113,3 +116,11 @@ filter:
     topk: 0.2                # Example: keep top 20% groups
   enable: False              # Set to True to enable filtering
 ```
+
+## A filter can change your effective learning rate
+
+`reward_variance_top_p` — the name `vagen_multiturn.yaml` ships as the default — rescales
+the surviving advantages by `sqrt(selected / total)` so the batch's gradient magnitude does
+not jump when the filter drops rows. That is deliberate, and it means turning
+`filter.enable: True` on is not a neutral change: the effective step size moves with how
+much the filter keeps. Worth knowing before reading a curve against an unfiltered run.

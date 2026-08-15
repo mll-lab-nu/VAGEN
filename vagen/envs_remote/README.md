@@ -53,7 +53,8 @@ env = GymImageEnvClient({
 })
 
 obs, info = await env.reset(seed=42)
-obs, reward, done, info = await env.step(action)
+obs, reward, done, info = await env.step(action)   # the GymImageEnv 4-tuple; vagen/core
+                                                  # /env_adapter.py widens it for the runner
 await env.close()
 ```
 
@@ -62,6 +63,10 @@ Or via eval config (`RemoteEnv` is registered in `env_registry.yaml`):
 ```yaml
 envs:
   - name: RemoteEnv
+    n_envs: 8            # required
+    tag_id: remote_test  # required -- names the results directory and is part of the
+                         # resume key, so two entries in one run must not share it
+    max_turns: 10
     config:
       base_urls: "http://localhost:8000"
       timeout: 120

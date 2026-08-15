@@ -4,39 +4,46 @@
 
 ### Prerequisites
 
-- Python 3.12+
-- CUDA-compatible GPU
+- Python 3.12 exactly — `scripts/install.sh` checks for it and stops otherwise
+- **GPUs.** The shipped scripts ask for `trainer.n_gpus_per_node` of 4 (most), 8
+  (navigation, spatial_gym, and the state-reward judge), 2, or 1 — check the script you
+  intend to run. `default_gae` and `ppo` also train a critic the size of the actor, so a
+  3B run holds two 3B models plus the rollout engine; A100-80G class cards are what these
+  were developed on. Lower `n_gpus_per_node` and `data.train_batch_size` together.
 - Conda (recommended)
 
 ### Setup
 
 ```bash
-# Create conda environment
 conda create -n vagen python=3.12 -y
 conda activate vagen
 
-# Clone repository
-git clone https://github.com/mll-lab-nu/VAGEN.git
+git clone --recursive https://github.com/mll-lab-nu/VAGEN.git
 cd VAGEN
+bash scripts/install.sh
+```
+
+`scripts/install.sh` is idempotent and verifies the result. It installs vLLM by default;
+`BACKEND=sglang bash scripts/install.sh` picks SGLang instead, and `SKIP_ENGINE=1` skips
+the engine if you already have one. Install **one** engine per environment — each pins a
+different `flashinfer` patch version, so pip refuses the two together.
+
+To do it by hand, the order matters — VAGEN with its engine first, then verl:
+
+```bash
 git submodule update --init --recursive
 
-# Install VAGEN
-pip install -e .
-
-# Install VERL
-cd verl
-USE_MEGATRON=0 bash scripts/install_vllm_sglang_mcore.sh
-pip install --no-deps -e .
-
-# Additional dependencies
-pip install "trl==0.26.2"
+pip install -e ".[vllm]"           # or ".[sglang]" -- pick one, never both
+pip install --no-deps -e ./verl    # --no-deps: verl's pins would undo the line above
+pip install accelerate codetiming datasets dill hydra-core numpy pandas peft pyarrow \
+            pybind11 pylatexenc ray tensordict torchdata wandb
 ```
 
 ## Quick Start
 
 ### Training Paradigms
 
-VAGEN supports two multi-turn training paradigms:
+VAGEN supports three multi-turn training paradigms:
 
 #### 1. Concatenated Training
 
@@ -50,7 +57,7 @@ sys + obs_0 + response_0 + obs_1 + response_1 + ...
 ```bash
 cd VAGEN
 wandb login
-bash examples/sokoban/train_ppo_qwen25vl3b.sh
+bash examples/train/sokoban/train_default_gae_qwen25vl3b.sh
 ```
 
 #### 2. Non-Concatenated Training
@@ -63,11 +70,44 @@ Turn 1: sys + obs_1 → response_1
 ...
 ```
 
-This paradigm uses custom GAE for cross-turn credit assignment.
+Because an episode is now spread over several rows, this **requires** a trajectory-level
+advantage estimator. verl's own estimators score one row at a time and would treat each
+turn as a complete episode; the trainer refuses that combination at startup rather than
+training on it:
+
+```
+ValueError: algorithm.adv_estimator=... scores one row at a time, but
+trainer.harness=... splits an episode across rows
+```
 
 **Run:**
 ```bash
 cd VAGEN
 wandb login
-bash examples/sokoban/train_ppo_no_concat_qwen25vl3b.sh
+bash examples/train/sokoban/train_ppo_no_concat_qwen25vl3b.sh
 ```
+
+#### 3. Compaction
+
+The conversation is summarised and reopened when it grows past `trainer.compact_budget`,
+so a long episode keeps its context without one row having to hold all of it. Like
+non-concatenated, it splits an episode across rows and so needs a trajectory estimator.
+
+```
+conversation 1: sys + obs_0 + resp_0 + obs_1 + resp_1 + <summary>
+conversation 2: sys + <summary> + obs_2 + resp_2 + ...
+```
+
+**Run:**
+```bash
+cd VAGEN
+wandb login
+bash examples/train/sokoban/train_default_gae_compact_qwen25vl3b.sh
+```
+
+!!! tip "Size `compact_budget` against `max_turns`"
+    If a whole episode fits inside one conversation, compaction never fires and the run is
+    silently `concat` under another name. See [Configuration](configuration.md).
+
+All three are selected by one key, `trainer.harness`, and a custom policy can be plugged in
+without editing the trainer — see [Configuration](configuration.md).

@@ -1,0 +1,57 @@
+# Sokoban for a model that reasons in its own thinking channel: think, then answer, with
+# the thinking bounded rather than truncated.
+#
+# Run it with `train_default_gae_qwen35_4b_think.sh`, which supplies the two things this
+# file cannot: `enable_thinking=True` (so the reasoning lands in the response, under
+# response_mask, where the RL objective can train it) and the engine's reasoning
+# delimiters. Without the first, the chat template closes an empty think block in the
+# prompt and there is nothing to train; without the second, vLLM refuses every request.
+#
+# ★ The episode fits, and by a wide margin, because observations are cheap. Measured with
+# Qwen3.5's processor on the 96x96 sokoban frame: 80 tokens for the opening observation,
+# 96 mid-episode. So the concat episode costs
+#     5 x 2048  +  4 x 96   =  10624 tokens of response region
+# against the 11264 configured, with the system prompt (370) and first observation in the
+# 1000-token prompt region. Total window ~12.3k. The four-figure observation size older
+# runs saw in the budget warning was never measured -- it was `default_env_response`,
+# derived from the response region, standing in for a number no config had set.
+#
+# ★ `response_length_per_turn` alone is not enough, which is why `thinking_token_budget`
+# is set below. It IS enforced -- measured on 256 validation episodes, 0 rollouts exceeded
+# the cap -- but `max_tokens` is a guillotine: the model is never told its budget, plans as
+# if unbounded, and is cut wherever it happens to be. At 2048 that put the cut before
+# `</think>` on 92% of turns, and a turn that never closed its reasoning has no answer to
+# score. Measured on the same untrained model and seeds, with only the budget added:
+#
+#                        format_correct   traj_success   tokens/turn
+#   2048 cap alone            0.146          0.129           1882
+#   + thinking_token_budget   0.829          0.453            847
+#
+# The budget makes the engine force the closing token, so a long trace is bounded and still
+# answers, instead of being thrown away.
+envs:
+  - name: Sokoban # registered env name
+    n_envs: 10000
+    data_source: sokoban # nickname for logging
+    seed: [1,10000,1] # sample n_env seeds from seed[0] to seed[1] with each seed repeat at most seed[2] times
+    max_turns: 5 # max number of interaction turns per episode
+    response_length_per_turn: 2048 # hard cap on one generation
+    # The environment-side twin of the line above. 256 against a measured 96 leaves room
+    # for a larger frame without letting a runaway observation eat the response region.
+    # Unset it is a flat 2048.
+    max_env_response_per_turn: 256
+    # Force the reasoning block closed at 512 tokens instead of letting the turn be cut
+    # mid-thought. `response_length_per_turn` above is still the hard ceiling on the whole
+    # turn; this bounds only the thinking inside it, and leaves room for the answer.
+    # Needs the engine's reasoning delimiters, which train_default_gae_qwen35_4b_think.sh
+    # supplies; vLLM refuses the request if this is set and those are not.
+    thinking_token_budget: 512
+    config: # env-specific config
+      render_mode: vision
+      prompt_format: free_think
+      use_example_in_sys_prompt: True
+      # 0.02 a turn, not the 0.1 default: at max_turns=5 the default pays 0.5 for
+      # formatting alone, half of what solving the level is worth. 0.02 pays 0.10 over
+      # the episode, matching what the two state rewards pay together.
+      format_reward: 0.02
+      min_solution_steps: [1,5]
