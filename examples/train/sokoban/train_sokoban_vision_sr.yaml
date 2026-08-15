@@ -1,0 +1,25 @@
+# Sokoban training split with state reward enabled. Kept separate from the ordinary
+# train_sokoban_vision.yaml so using that shared dataset never starts judge scoring by
+# accident.
+envs:
+  - name: Sokoban
+    n_envs: 10000
+    data_source: sokoban
+    seed: [1,10000,1]
+    max_turns: 5
+    response_length_per_turn: 512
+    max_env_response_per_turn: 256
+    config:
+      render_mode: vision
+      # Three independent per-turn rewards are each capped at 0.03: format,
+      # state estimation, and transition prediction. Across five turns the total
+      # shaping cap is 3 * 0.03 * 5 = 0.45; with success_reward=1.0 the episode
+      # reward cap is 1.45.
+      format_reward: 0.03
+      min_solution_steps: [1,5]
+      state_reward:
+        state_estimation:      {enable: true, reward: 0.03}
+        transition_prediction: {enable: true, reward: 0.03}
+        score_base: 0.334
+        judge_base_url: ${oc.env:JUDGE_BASE_URL,http://127.0.0.1:8123/v1}
+        judge_model: ${oc.env:JUDGE_MODEL,Qwen/Qwen3-4B-Instruct-2507}

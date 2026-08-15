@@ -1,0 +1,20 @@
+# Validation half of train_sokoban_vision_sr.yaml. Reward settings intentionally match
+# training; only the seed range and number of environments differ.
+envs:
+  - name: Sokoban
+    n_envs: 256
+    data_source: sokoban
+    seed: [10001,10256,1]
+    max_turns: 5
+    response_length_per_turn: 512
+    max_env_response_per_turn: 256
+    config:
+      render_mode: vision
+      format_reward: 0.03
+      min_solution_steps: [1,5]
+      state_reward:
+        state_estimation:      {enable: true, reward: 0.03}
+        transition_prediction: {enable: true, reward: 0.03}
+        score_base: 0.334
+        judge_base_url: ${oc.env:JUDGE_BASE_URL,http://127.0.0.1:8123/v1}
+        judge_model: ${oc.env:JUDGE_MODEL,Qwen/Qwen3-4B-Instruct-2507}

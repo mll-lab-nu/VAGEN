@@ -15,7 +15,11 @@ pytestmark = pytest.mark.parametrize(
     "repo,expects_mrope,expected_token",
     [
         ("Qwen/Qwen2.5-VL-3B-Instruct", True, "<|image_pad|>"),
+        ("Qwen/Qwen3-VL-4B-Instruct", True, "<|image_pad|>"),
+        ("Qwen/Qwen3.5-4B", True, "<|image_pad|>"),
         ("OpenGVLab/InternVL3-1B-hf", False, "<IMG_CONTEXT>"),
+        ("OpenGVLab/InternVL3_5-2B-hf", False, "<IMG_CONTEXT>"),
+        ("zai-org/GLM-4.6V-Flash", True, "<|image|>"),
         ("llava-hf/llava-1.5-7b-hf", False, "<image>"),
     ],
 )

@@ -1,0 +1,16 @@
+# Validation half of train_sokoban_vision_internvl.yaml. Keep strict free-think parsing
+# and reward settings identical; only held-out seeds and env count differ.
+envs:
+  - name: Sokoban
+    n_envs: 256
+    data_source: sokoban
+    seed: [10001,10256,1]
+    max_turns: 5
+    response_length_per_turn: 512
+    max_env_response_per_turn: 320
+    config:
+      render_mode: vision
+      prompt_format: free_think
+      strict_format: true
+      format_reward: 0.02
+      min_solution_steps: [1,5]
