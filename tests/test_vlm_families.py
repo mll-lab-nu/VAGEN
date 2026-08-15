@@ -16,6 +16,8 @@ pytestmark = pytest.mark.parametrize(
     [
         ("Qwen/Qwen2.5-VL-3B-Instruct", True, "<|image_pad|>"),
         ("OpenGVLab/InternVL3-1B-hf", False, "<IMG_CONTEXT>"),
+        ("OpenGVLab/InternVL3_5-2B-hf", False, "<IMG_CONTEXT>"),
+        ("zai-org/GLM-4.6V-Flash", True, "<|image|>"),
         ("llava-hf/llava-1.5-7b-hf", False, "<image>"),
     ],
 )
