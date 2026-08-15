@@ -65,12 +65,9 @@ We frame multi-turn VLM agentic tasks as a Partially Observable Markov Decision 
 
 
 ## News
-**[2026/08]** A major update to `main`, on the latest VERL agent-loop:
-- **Compact RL** — a third multi-turn paradigm alongside concat and no-concat. Turns accumulate until a token budget is reached, then the conversation is summarised and reopened from that summary, so an episode longer than the context window still trains as one trajectory. Closely related to **CompactionRL** ([arXiv:2607.05378](https://arxiv.org/abs/2607.05378)), which trains task execution and summary generation jointly. See [Multi-turn Compacted Training](#multi-turn-compacted-training).
-- **The context policy and the advantage estimator are now independent axes.** `trainer.harness` decides how an episode is laid out in rows; `algorithm.adv_estimator` stitches those rows back into one trajectory. Every VAGEN estimator is layout-independent, and the trainer refuses the pairings that would silently score a fraction of an episode.
-- **Environment, harness, training backend and algorithm are decoupled.** Anything subclassing `BaseEnv` or `BaseHarness` plugs into both training and evaluation without either being modified — see [Custom Harness](#custom-harness).
-- **Evaluation runs the same episode loop as training** (`vagen/core/runner.py`) and reads the same `harness` key, so an eval config that copies the val config's turn budgets is measuring the same thing. Every environment ships a vLLM launcher.
-- **Per-turn token budgets are measured rather than assumed**, including a `thinking_token_budget` for models with a native reasoning channel (a per-env key in the dataset yaml — see `examples/train/sokoban/train_sokoban_vision_free_think.yaml`, and issue 3 in [docs/issues.md](docs/issues.md) for what it does and does not buy).
+**[2026/08]**: Added support for Verl 0.9.0, introduced compaction RL, and decoupled the harness layer.
+- **Compaction RL** — a multi-turn paradigm alongside concat and no-concat. Turns accumulate until a token budget is reached, then the conversation is summarised and reopened from that summary, so an episode longer than the context window still trains as one trajectory. See [Multi-turn Compacted Training](#multi-turn-compacted-training). Reference: ([CompactionRL](https://arxiv.org/abs/2607.05378))
+- **Environment, harness, training backend and algorithm are decoupled.** Anything subclassing `BaseEnv` or `BaseHarness` plugs into both training and evaluation without either being modified — see [Custom Harness](#custom-harness) and [Custom Environment](#custom-environment).
 
 **[2026/02]** We have migrated the `main` branch to VAGEN-Lite, a lightweight and clean reimplementation built on VERL agent-loop for easy customization and stable performance. For the previous full-featured release, please visit the [vagen-legacy](https://github.com/mll-lab-nu/VAGEN/tree/vagen-legacy) branch.
 
