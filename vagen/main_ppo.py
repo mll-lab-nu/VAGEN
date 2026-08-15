@@ -36,12 +36,22 @@ from verl.utils.import_utils import deprecated
 # copy differed from upstream by exactly one line -- the trainer import -- so a fork bought
 # nothing and froze the entrypoint at 0.6.
 #
-# Upstream marks this entrypoint deprecated in favour of main_ppo_sync.py, which builds a
-# standalone PPOTrainer with no _fit_* hooks. VagenPPOTrainer needs those hooks, and they
-# live on SeparateRayPPOTrainer, whose launcher this is. Known debt: moving to the sync
-# entrypoint means porting the hooks, so it waits until upstream removes this one.
+# As of verl 0.9.0 upstream's main_ppo.py is no longer the deprecated one: it dispatches on
+# `trainer.use_v1` (default true) to the unified V1 trainer, and main_ppo_sync.py is gone
+# entirely. What VAGEN launches is the legacy path -- main_ppo_v0.py's SeparateRayPPOTrainer
+# -- and that is what upstream now marks for removal. It outlived its own warning, which
+# still reads "removed in v0.9.0", so read the deadline as 0.10.0 rather than as passed.
+#
+# Known debt, unchanged in shape but not in target: V1's PPOTrainer has no _fit_* hooks at
+# all. It offers on_* lifecycle callbacks plus concrete _compute_advantage /
+# _compute_metrics / _save_checkpoint / _validate, so porting VagenV0Mixin's six hooks means
+# re-attaching each one to a differently named method -- and a mismatch is silent, exactly
+# the way ppo_trainer.py describes. V1 additionally requires TransferQueue (not a declared
+# verl dependency, not installed in this env) and TQ variants of the agent loop, which is
+# where the no-concat multi-output behaviour lives.
 @deprecated(
-    "main_ppo.py is deprecated, and wil be replaced by main_ppo_sync.py in v0.8.0, please use main_ppo_sync.py instead."
+    "vagen/main_ppo.py launches verl's legacy SeparateRayPPOTrainer, which upstream plans to "
+    "remove (expect v0.10.0) in favour of the unified V1 trainer; that port is not done yet."
 )
 @hydra.main(config_path="config", config_name="ppo_trainer", version_base=None)
 def main(config):
