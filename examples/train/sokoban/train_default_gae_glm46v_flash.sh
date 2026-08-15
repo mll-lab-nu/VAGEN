@@ -1,9 +1,9 @@
 #!/bin/bash
 # sokoban - default_gae - GLM-4.6V-Flash
 #
-# Select the row layout with HARNESS=concat|no_concat|compact. GLM-4.6V reasons through
-# its native thinking channel, so the environment asks it to mark only <answer> rather
-# than reproduce a second observation/reasoning/prediction protocol.
+# Select the row layout with HARNESS=concat|no_concat|compact. GLM-4.6V is evaluated and
+# trained with Sokoban's strict world-model protocol:
+# <observation><think><answer><prediction>.
 set -eo pipefail
 
 V=$(cd "$(dirname "$0")/../../.." && pwd)
