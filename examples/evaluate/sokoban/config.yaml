@@ -46,9 +46,36 @@ envs:
       action_sep: ","
       use_example_in_sys_prompt: true
       # prompt_format wm is right here: the model under test is a Qwen2.5-VL, which emits
-      # <think> as ordinary text. A model that reserves it (Qwen3/Qwen3.5/GLM) needs
-      # free_wm or free_think -- see docs/issues.md.
+      # <think> as ordinary text. The InternVL and GLM launchers use the simpler
+      # action-only protocol after their base-model preflights repeated under free_wm:
+      #   bash run_eval.sh config.yaml envs.0.config.prompt_format=answer \
+      #     backends.openai.model=OpenGVLab/InternVL3_5-2B-hf
+      # GLM's launcher uses prompt_format=answer because it reasons in its native channel
+      # and only the action needs machine-readable markup. Qwen3/Qwen3.5/GLM reserve the
+      # think delimiters and cannot use wm; see docs/issues.md.
       prompt_format: wm
+      # ★ Not the training default (True), and deliberately so -- this is the one field
+      # here that is allowed to differ from val_sokoban_vision.yaml.
+      #
+      # Served through an OpenAI-compatible endpoint, this model does not open with
+      # `<observation>`; it writes the same sentence untagged and goes straight to
+      # `<think>`. Measured on Qwen2.5-VL-3B: 0 of 240 turns well-formed, against 1.0 in
+      # training validation on the SAME seeds, the SAME byte-identical system prompt, the
+      # SAME 625-token prompt and the same greedy settings. It is not the seeds, the
+      # images (text render mode fails too), the chat template, or the engine flags -- the
+      # two paths split on the very first token, where the served model returns 'The'
+      # (logprob -1.42) while reporting '<' (-0.92) as its own argmax. That is a serving
+      # -layer discrepancy, not something this config can fix.
+      #
+      # Under strict_format: true that costs every action in the run -- a malformed turn
+      # is a no-op -- so the whole eval reports success_rate 0.00 regardless of how well
+      # the policy plays. False keeps the salvaged action, so this measures whether the
+      # model can solve Sokoban rather than whether the endpoint emits angle brackets.
+      #
+      # The price, and it is real: with this off the environment's format_reward is paid
+      # for any runnable action, so `reward` here is worth ~0.02/turn more than the val
+      # curve pays. Read traj_success, not reward, when comparing the two.
+      strict_format: false
       # ★ Both must match val_sokoban_vision.yaml or the eval number is not comparable
       # with the val curve it will be read against. Absent, format_reward falls back to
       # the dataclass default of 0.1 -- five times what training pays -- and

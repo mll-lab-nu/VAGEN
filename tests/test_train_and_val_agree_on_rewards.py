@@ -19,7 +19,9 @@ import pytest
 import yaml
 
 #: Keys that define what the agent is being paid for. These must not differ.
-REWARD_KEYS = ("format_reward", "success_reward", "per_turn_format_reward", "penalty")
+REWARD_KEYS = (
+    "format_reward", "success_reward", "per_turn_format_reward", "penalty", "state_reward",
+)
 
 
 def _pairs():

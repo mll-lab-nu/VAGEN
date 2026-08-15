@@ -3,11 +3,10 @@
 Under `prompt_format=wm` the policy is asked for four sections. It collapsed to a bare
 `<answer>` and nothing in wandb said so:
 
-* `val-aux/<env>/format_reward` is the *state reward's* format term, which ships at
-  `state_reward.format_reward: 0.0` on purpose ("format is a gate, not a line item"), so
-  the curve is a constant zero -- and reads as "never once well-formed";
-* the format reward actually being paid is the *environment's* (`SokobanEnvConfig.
-  format_reward`), a different knob with the same name, published nowhere;
+* the old state reward had a second `format_reward` term, usually fixed at zero, so its
+  curve read as "never once well-formed" even though it was only an inactive line item;
+* the format reward actually being paid is the environment's (`SokobanEnvConfig.
+  format_reward`), and the correctness flag was published nowhere;
 * `turn_metrics.action_is_valid` already carries the flag and never reaches the logger.
 
 So the question the format exists to ask had no answer, and it took reading a rollout by
@@ -20,45 +19,24 @@ from __future__ import annotations
 import pytest
 
 
-class _Cfg(dict):
-    def __getattr__(self, k):
-        try:
-            return self[k]
-        except KeyError as e:
-            raise AttributeError(k) from e
+def test_state_reward_metrics_name_only_enabled_description_scores():
+    from vagen.envs.state_reward import state_reward_names
 
-    def get(self, k, d=None):
-        return dict.get(self, k, d)
-
-
-def _loop(**state_reward):
-    from vagen.agent_loop.gym_loop import GymLoop
-
-    cfg = {"state_estimation": {"enable": True, "weight": 0.5},
-           "transition_prediction": {"enable": True, "weight": 0.5},
-           "budget": 0.1, "format_reward": 0.0}
-    cfg.update(state_reward)
-    loop = object.__new__(GymLoop)
-    loop.config = _Cfg(trainer=_Cfg(state_reward=cfg))
-    return loop
-
-
-def test_the_constant_zero_format_curve_is_not_published():
-    """★ At the shipped `state_reward.format_reward: 0.0` the term is identically zero,
-    so publishing it draws a flat line that reads as a failing model."""
-    assert "format" not in _loop()._enabled_state_rewards()
-    assert set(_loop()._enabled_state_rewards()) == {"state_estimation", "transition_prediction"}
-
-
-def test_it_is_published_when_it_can_actually_be_earned():
-    """...and when someone does pay a state-reward format bonus, the curve comes back --
-    the rule is "publish what is computed", not "never publish format"."""
-    assert "format" in _loop(format_reward=0.02)._enabled_state_rewards()
+    cfg = {"state_reward": {
+        "state_estimation": {"enable": True, "reward": 0.01},
+        "transition_prediction": {"enable": True, "reward": 0.01},
+    }}
+    assert state_reward_names(cfg) == ("state_estimation", "transition_prediction")
+    assert "format" not in state_reward_names(cfg)
 
 
 def test_nothing_is_published_when_state_reward_is_off():
-    loop = _loop(state_estimation={"enable": False}, transition_prediction={"enable": False})
-    assert loop._enabled_state_rewards() == ()
+    from vagen.envs.state_reward import state_reward_names
+
+    assert state_reward_names({}) == ()
+    assert state_reward_names({"state_reward": {
+        "state_estimation": {"enable": False, "reward": 0.01},
+    }}) == ()
 
 
 # ----------------------------------------------------------------- format_correct_rate
@@ -117,9 +95,7 @@ def test_the_loop_emits_the_rate_only_when_it_was_measured():
 
     src = inspect.getsource(GymLoop)
     assert "format_correct_rate" in src
-    # rindex, not index: the name is also mentioned in `_enabled_state_rewards`'s
-    # docstring, and matching the prose instead of the code is how a source-reading test
-    # passes while checking nothing.
+    # rindex, not index: matching prose instead of the emission code would check nothing.
     i = src.rindex("format_correct_rate")
     window = src[i - 400 : i + 400]
     assert "reports_format" in window, "the rate is emitted without checking it was measured"

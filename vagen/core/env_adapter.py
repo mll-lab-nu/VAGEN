@@ -36,14 +36,12 @@ class GymEnvAdapter:
     def __init__(self, env, env_name: str, kwargs: dict, score_names=()):
         self.env, self.env_name, self.kwargs = env, env_name, kwargs
         self.success = False
-        # ★ Only the scores that are actually switched on. Anything in here is published
-        # as a `<name>_reward` extra field, and verl turns every extra field into a
-        # val_aux curve -- so declaring all of them unconditionally drew a flat zero line
-        # for `state_estimation_reward`, `transition_prediction_reward` and
-        # `format_reward` in every run that had state_reward off, which reads as "the
-        # reward is on and the agent is scoring nothing" rather than "the reward is off".
-        # `format` belongs to this set too: it is the state-reward gate, not a separate
-        # signal, so with state_reward off there is no format reward to report.
+        # ★ Only the description scores that are actually switched on. Anything in here
+        # is published as a `<name>_reward` extra field, and verl turns every extra field
+        # into a val_aux curve -- so declaring them unconditionally draws flat zero lines
+        # that read as "the reward is on and the agent scores nothing" rather than "the
+        # reward is off". Format correctness has its own rate below; state reward has no
+        # second format-reward line item.
         #
         # Empty when nothing is enabled, which is the point: a metric that does not exist
         # is the honest representation of a term that is not being computed.
@@ -91,7 +89,12 @@ class GymEnvAdapter:
             self.reports_format = True
             self.turns_seen += 1
             self.turns_well_formed += bool(info["format_correct"])
-        return self._message(obs), reward, bool(done), False, info
+        # An environment that stopped because it ran out of turns says so through
+        # `info["truncated"]` (see vagen/envs/turn_limit.py). Truncated and terminated are
+        # not interchangeable: the first should bootstrap from V, the second must not.
+        # Collapsing them was how "ran out of time" became "worth zero from here on".
+        truncated = bool((info or {}).get("truncated", False))
+        return self._message(obs), reward, bool(done) and not truncated, truncated, info
 
     async def close(self):
         await self.env.close()

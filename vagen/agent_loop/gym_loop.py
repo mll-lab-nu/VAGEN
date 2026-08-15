@@ -21,10 +21,7 @@ from verl.experimental.agent_loop.agent_loop import AgentLoopOutput, cap_token_i
 from verl.utils.rollout_trace import rollout_trace_op
 
 from vagen.agent_loop.base import VagenGymAgentLoopBase
-from vagen.rewards.judge import shared_judge
-from vagen.envs.registry import get_env_cls
-from vagen.envs.state_reward import state_reward_spec_of
-from vagen.rewards.state_reward import DEFAULT_SCORE_BASE, TAGS, StateRewardWrapper
+from vagen.envs.state_reward import build_env, state_reward_names
 from vagen.agent_loop.verl_client import VerlClient
 from vagen.harness import budget_mode, build_harness, resolve_harness
 from vagen.harness.compact import CompactHarness
@@ -32,7 +29,6 @@ from vagen.harness.budget import (
     Budgets, check as check_budgets, context_limits, default_env_response,
     default_summary_budget,
 )
-from vagen.harness.compact import CompactHarness
 from vagen.utils.image_token_utils import (
     image_token_ids, placeholder_blocks, truncate_keeping_images_whole,
     vision_sentinel_ids,
@@ -81,31 +77,6 @@ def _spans_within(spans, keep: int) -> tuple[list[tuple[int, int]], int]:
     return out, safe_end
 
 
-def resolve_reward_placement(config, configured: str = "auto") -> str:
-    """Where a turn's scores are paid, resolved from the advantage estimator by default.
-
-    ★ Placement and estimator are one choice. An estimator whose outer chain has a single
-    reward slot per turn reads a turn's reward only at the turn's last token, so a score
-    paid mid-turn is credited twice (measured bias 0.177); the per-token estimators prefer
-    the opposite, because a lumped score has to be remembered by ``V`` for the rest of the
-    turn (-28% variance at lam 0.9 from per-span). Neither mistake raises and neither is
-    visible in a curve, so the estimator decides and ``placement`` exists to be overridden
-    rather than to be set.
-
-    ``auto`` is the default for the same reason an estimator hyperparameter that defines the
-    algorithm is made required rather than defaulted (see ``custom_advantage/params.py``):
-    a value that must be kept in step with another setting by hand is one that eventually
-    disagrees with it, silently.
-    """
-    from vagen.custom_advantage import wants_turn_lumped_reward
-
-    if configured != "auto":
-        return configured
-    algorithm = config.get("algorithm", {}) or {}
-    estimator = algorithm.get("adv_estimator", "") if hasattr(algorithm, "get") else ""
-    return "turn_end" if wants_turn_lumped_reward(estimator) else "per_span"
-
-
 # Registered under both names: the dataset emits "gym_agent"
 # (gym_agent_dataset.py) and that is what actually dispatches, via
 # configs/agent_v2.yaml. "gym_agent_v2" is the decorator's own name and
@@ -119,8 +90,8 @@ class GymLoop(VagenGymAgentLoopBase):
     async def run(self, sampling_params: dict[str, Any], **kwargs) -> list[AgentLoopOutput]:
         # No silent default: falling back to a single turn would look like a working
         # run whose episodes all stop after one step, which is nearly invisible --
-        # every row is well-formed, just short. Read here rather than at the call to
-        # run_episode because the auxiliary reward budget is divided by it.
+        # every row is well-formed, just short. The same value constructs TurnLimit and
+        # remains run_episode's backstop, so the environment and runner cannot drift.
         if not kwargs.get("max_turns"):
             raise KeyError(
                 f"the dataset row for env {kwargs['env_name']!r} carries no max_turns; "
@@ -135,12 +106,13 @@ class GymLoop(VagenGymAgentLoopBase):
         episode_id = uuid4().hex
 
         env_cls = self.resolve_env_class(kwargs["env_name"])
-        scored_env = self._maybe_state_reward(
-            env_cls(env_config=kwargs["config"]), kwargs["env_name"], max_turns
-        )
+        # Whether descriptions are scored, and by which judge, is read from the
+        # environment's own config block -- the same one evaluation builds from. The
+        # trainer holds no state-reward settings and this loop passes none.
         env = GymEnvAdapter(
-            scored_env, kwargs["env_name"], kwargs,
-            score_names=self._enabled_state_rewards(),
+            build_env(env_cls, kwargs["config"], max_turns=max_turns),
+            kwargs["env_name"], kwargs,
+            score_names=state_reward_names(kwargs["config"]),
         )
 
         per_turn = min(int(kwargs.get("response_length_per_turn") or self.response_length), self.response_length)
@@ -198,68 +170,6 @@ class GymLoop(VagenGymAgentLoopBase):
                            episode_id, type(exc).__name__, exc)
             return []
 
-    def _enabled_state_rewards(self) -> tuple[str, ...]:
-        """The score names this run will actually compute, in publication order.
-
-        ``format`` rides along only when it can be non-zero. It is the gate on the others
-        rather than a signal of its own, and the shipped setting is
-        ``state_reward.format_reward: 0.0`` -- so publishing it unconditionally drew a
-        flat zero line called ``format_reward`` in every state-reward run. That reads as
-        "the agent never once produced the right format", which is both alarming and
-        false; the format reward that is actually paid is the *environment's*
-        (``SokobanEnvConfig.format_reward``), a different knob that this curve never
-        showed. ``format_correct_rate`` below is the honest version of the question.
-        """
-        cfg = self.config.trainer.get("state_reward", {}) or {}
-        names = tuple(n for n in TAGS if (cfg.get(n) or {}).get("enable", False))
-        if not names:
-            return ()
-        return (*names, "format") if float(cfg.get("format_reward", 0.0) or 0.0) > 0 else names
-
-    def _maybe_state_reward(self, env, env_name: str, max_turns: int = 1):
-        """Wrap the environment so the reasoning is scored, if configured.
-
-        Off by default: it needs a judge endpoint, and a run that silently scored
-        nothing would be indistinguishable from one that scored badly.
-        """
-        cfg = self.config.trainer.get("state_reward", {}) or {}
-        enabled = {
-            name: float(cfg[name].get("weight", 0.5))
-            for name in TAGS
-            if (cfg.get(name) or {}).get("enable", False)
-        }
-        if not enabled:
-            return env
-
-        # The configured weights are relative; the budget sets the scale. A whole episode
-        # described perfectly is worth `budget` in total, against 1 for solving the level,
-        # so the auxiliary signal cannot outbid the task it exists to support. Measured
-        # before this: eight trajectories, every one with traj_success 0, scoring up to
-        # 2.25 -- all of it description.
-        #
-        # Derived rather than written down, because a per-turn constant silently doubles
-        # the episode's auxiliary total the day someone raises max_turns.
-        budget = float(cfg.get("budget", 1.0))
-        total = sum(enabled.values()) or 1.0
-        enabled = {n: budget * (w / total) / max(1, int(max_turns)) for n, w in enabled.items()}
-
-        spec = state_reward_spec_of(get_env_cls(env_name))
-        if spec is None:
-            raise ValueError(
-                f"a state reward is on but the environment {env_name!r} declares no "
-                f"STATE_REWARD_SPEC. Add one next to the environment (see "
-                f"vagen/envs/sokoban/state_reward_spec.py) and set it on the class, "
-                f"rather than registering it anywhere central."
-            )
-        return StateRewardWrapper(
-            env=env,
-            spec=spec,
-            judge=shared_judge(cfg["judge_base_url"], cfg["judge_model"]),
-            enabled=enabled,
-            format_reward=float(cfg.get("format_reward", 0.1)),
-            score_base=float(cfg.get("score_base", DEFAULT_SCORE_BASE)),
-            placement=resolve_reward_placement(self.config, str(cfg.get("placement", "auto"))),
-        )
     def _summary_request_len(self) -> int:
         """What the summary request costs as the client will actually send it.
 
@@ -558,14 +468,13 @@ class GymLoop(VagenGymAgentLoopBase):
                     # complaining. The rollout still sees the frames -- only the model
                     # being optimised is blind.
                     multi_modal_data={"images": images} if images else {},
-                    # None when the engine did not return logprobs. The tape fills
-                    # unsupplied positions with 0.0, and `[0.0, 0.0, ...] or None` is the
-                    # list -- so verl received a real rollout_log_probs tensor of zeros.
-                    # Every rollout-vs-training probability metric then reads that as the
-                    # rollout's actual belief, and `apply_bypass_mode` guards only on the
-                    # key being present, so a zero vector sets old_log_probs to zero.
+                    # Numeric zero cannot distinguish "the backend omitted logprobs"
+                    # from a legitimate probability-1 token.  The tape carries that
+                    # provenance explicitly; ``any(logprobs)`` incorrectly dropped
+                    # valid all-zero GLM responses and broke mixed batches.
                     response_logprobs=(row.logprobs[:keep]
-                                       if any(row.logprobs[:keep]) else None),
+                                       if getattr(row, "logprobs_complete", bool(row.logprobs))
+                                       else None),
                     # The sum is what verl's own metrics read; the vector below is what
                     # actually trains. Both, because they answer different questions.
                     reward_score=float(sum(scores)),

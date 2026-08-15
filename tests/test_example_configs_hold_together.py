@@ -38,6 +38,12 @@ def _flag(text, key, default=None):
     return int(m.group(1).rstrip(" \\")) if m else default
 
 
+def _shell_default(text, key):
+    """The integer in ``KEY=${KEY:-N}``, used by model-family launchers."""
+    m = re.search(rf"^{re.escape(key)}=\$\{{{re.escape(key)}:-(\d+)\}}$", text, re.M)
+    return int(m.group(1)) if m else None
+
+
 def _script_yamls(text, script):
     out = []
     for m in re.finditer(r'data\.(?:train|val)_files="\$SCRIPTDIR/([^"]+)"', text):
@@ -80,6 +86,60 @@ def test_the_context_window_covers_both_regions(script):
     n_r = _flag(text, "data.max_response_length") or _flag(BASE_FLAGS, "data.max_response_length")
     assert n_r is not None, f"{script}: no data.max_response_length anywhere"
     assert n_p + n_r <= ctx, f"{script}: prompt {n_p} + response {n_r} > max_model_len {ctx}"
+
+
+@pytest.mark.parametrize(
+    "name,min_prompt,compact_budget,summary_budget",
+    [
+        ("train_default_gae_internvl35_2b.sh", 1600, 2000, 300),
+        ("train_default_gae_glm46v_flash.sh", 1400, 1000, 128),
+    ],
+)
+def test_new_vlm_compact_configs_match_measured_prompt_sizes(
+    name, min_prompt, compact_budget, summary_budget
+):
+    """The shared 1000-token prompt region predates these processors.
+
+    Measured Sokoban openings are 938 tokens for InternVL and 686 for GLM. Reopening
+    from the old 300-token summary takes them to 1244 and 992 respectively, so inheriting
+    the shared prompt size either crashes at the first compaction or leaves no useful
+    margin. GLM's old 1600-token compact trigger also held a normal five-turn episode and
+    silently ran concat. Pin the family-specific numbers that were tested instead.
+    """
+    script = os.path.join(_ROOT, "examples/train/sokoban", name)
+    text = open(script).read()
+    assert _flag(text, "data.max_prompt_length") >= min_prompt
+    assert _shell_default(text, "COMPACT_BUDGET") == compact_budget
+    assert _shell_default(text, "COMPACT_SUMMARY_BUDGET") == summary_budget
+    if "internvl" in name:
+        assert "actor_rollout_ref.model.use_fused_kernels=False" in text
+        assert "actor_rollout_ref.rollout.enable_chunked_prefill=False" in text
+        assert (
+            "+actor_rollout_ref.rollout.engine_kwargs.vllm.hf_overrides."
+            "tie_word_embeddings=false"
+        ) in text
+        assert "actor_rollout_ref.rollout.val_kwargs.do_sample=True" in text
+        for yaml_path in _script_yamls(text, script):
+            for spec in OmegaConf.load(yaml_path).envs:
+                assert spec.config.prompt_format == "free_think"
+                assert spec.config.strict_format is True
+    if "glm46v" in name:
+        assert "data.apply_chat_template_kwargs.enable_thinking=True" in text
+        # Sampling may still use top-k/top-p/repetition penalty, but PPO must compare
+        # actor logprobs against the model's raw distribution rather than vLLM's
+        # processed sampling distribution.
+        assert "actor_rollout_ref.rollout.logprobs_mode=raw_logprobs" in text
+        for yaml_path in _script_yamls(text, script):
+            for spec in OmegaConf.load(yaml_path).envs:
+                assert spec.config.prompt_format == "free_think"
+                assert spec.config.strict_format is True
+
+    for yaml_path in _script_yamls(text, script):
+        for spec in OmegaConf.load(yaml_path).envs:
+            assert int(spec.max_env_response_per_turn) >= 320, (
+                f"{yaml_path}: InternVL continuations measure 278-292 tokens; a lower "
+                "cap clips the observation before the next model call"
+            )
 
 
 def test_every_example_yaml_is_reachable_from_a_script():
