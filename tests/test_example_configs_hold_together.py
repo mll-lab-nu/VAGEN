@@ -117,7 +117,7 @@ def test_new_vlm_compact_configs_match_measured_prompt_sizes(
         assert "actor_rollout_ref.rollout.val_kwargs.do_sample=True" in text
         for yaml_path in _script_yamls(text, script):
             for spec in OmegaConf.load(yaml_path).envs:
-                assert spec.config.prompt_format == "wm"
+                assert spec.config.prompt_format == "free_think"
                 assert spec.config.strict_format is True
     if "glm46v" in name:
         # Sampling may still use top-k/top-p/repetition penalty, but PPO must compare
@@ -126,7 +126,7 @@ def test_new_vlm_compact_configs_match_measured_prompt_sizes(
         assert "actor_rollout_ref.rollout.logprobs_mode=raw_logprobs" in text
         for yaml_path in _script_yamls(text, script):
             for spec in OmegaConf.load(yaml_path).envs:
-                assert spec.config.prompt_format == "wm"
+                assert spec.config.prompt_format == "free_think"
                 assert spec.config.strict_format is True
 
     for yaml_path in _script_yamls(text, script):

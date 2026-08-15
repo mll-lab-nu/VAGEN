@@ -1,5 +1,5 @@
-# InternVL uses the complete Sokoban world-model contract. Keep it strict so an
-# action-only response cannot silently train away observation, reasoning, and prediction.
+# InternVL uses explicit reasoning followed by an answer. Keep the closing reasoning tag
+# and action marker strict while avoiding the much heavier full world-model protocol.
 envs:
   - name: Sokoban
     n_envs: 10000
@@ -10,7 +10,7 @@ envs:
     max_env_response_per_turn: 320
     config:
       render_mode: vision
-      prompt_format: wm
+      prompt_format: free_think
       strict_format: true
       format_reward: 0.02
       min_solution_steps: [1,5]

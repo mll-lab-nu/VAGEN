@@ -1,8 +1,8 @@
 #!/bin/bash
 # sokoban - default_gae - InternVL3.5-2B
 #
-# Select the row layout with HARNESS=concat|no_concat|compact. InternVL is evaluated and
-# trained with Sokoban's strict <observation><think><answer><prediction> contract.
+# Select the row layout with HARNESS=concat|no_concat|compact. InternVL uses strict
+# <think>...</think><answer>...</answer> parsing.
 set -eo pipefail
 
 V=$(cd "$(dirname "$0")/../../.." && pwd)
