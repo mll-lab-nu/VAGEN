@@ -114,6 +114,10 @@ def test_new_vlm_compact_configs_match_measured_prompt_sizes(
     if "internvl" in name:
         assert "actor_rollout_ref.model.use_fused_kernels=False" in text
         assert "actor_rollout_ref.rollout.enable_chunked_prefill=False" in text
+        assert (
+            "+actor_rollout_ref.rollout.engine_kwargs.vllm.hf_overrides."
+            "tie_word_embeddings=false"
+        ) in text
         assert "actor_rollout_ref.rollout.val_kwargs.do_sample=True" in text
         for yaml_path in _script_yamls(text, script):
             for spec in OmegaConf.load(yaml_path).envs:
