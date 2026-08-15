@@ -3,6 +3,11 @@
 	url = https://github.com/JamesKrW/verl.git
 	# A tag, not the branch. A submodule pins a SHA either way, but the SHA is only
 	# fetchable while something references it -- delete or rewrite the branch and every
-	# `git clone --recursive` of this repo breaks, with no warning here. vagen-260812
-	# points at 27c51e9, the commit this release was built and tested against.
-	branch = vagen-260812
+	# `git clone --recursive` of this repo breaks, with no warning here. vagen-260814
+	# points at f427a60, the commit this release was built and tested against.
+	#
+	# That commit is upstream verl v0.9.0 (volcengine/verl 483b8a00) plus four VAGEN
+	# patches on top -- nothing between them. So "which verl is this?" has one answer:
+	# 0.9.0. Rebasing onto the next release means replaying those four commits onto the
+	# new tag; keep it that shape rather than letting upstream main creep in underneath.
+	branch = vagen-260814
