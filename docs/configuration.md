@@ -263,30 +263,71 @@ FrozenLake's defaults are **not** the same — `prompt_format` defaults to `free
 
 ## State reward
 
-An optional judge scoring the observation and prediction sections. Off by default, and it
-needs a judge server — `scripts/launch_judge.sh` starts one.
+An optional extra reward for what the agent *says* about the world, alongside what it does.
+A judge model reads the `<observation>` and `<prediction>` sections, turns them into
+structured relations, and compares those with the environment's real state. Off by default.
+
+★ It is configured under **`envs[].config.state_reward`**, not under `trainer`. Training and
+evaluation both construct the environment from that block, so the same reward definition
+applies in both paths. The old `trainer.state_reward` location is deleted, with no fallback.
+
+There are two halves to it:
+
+1. **The per-environment settings**, under `envs[].config.state_reward`: which sections to
+   score, the absolute reward for one perfect section on one turn, and the judge endpoint.
+2. **The environment's own spec**, a `STATE_REWARD_SPEC` attribute on the environment class.
+   This is what reads the true state and phrases the question for the judge, so it has to be
+   written per environment. Sokoban's is
+   [`vagen/envs/sokoban/state_reward_spec.py`](../vagen/envs/sokoban/state_reward_spec.py),
+   set on the class in `sokoban_env.py`. Turning the reward on for an environment that has
+   no spec raises an error rather than quietly scoring zero.
+
+Sokoban already ships a spec. A complete working example is
+— the `sr` in the name. It starts the judge, waits for `/health`, and reaps it on exit; its
+train/validation yaml files contain:
+
+```yaml
+envs:
+  - name: Sokoban
+    config:
+      state_reward:
+        state_estimation:      {enable: true, reward: 0.01}
+        transition_prediction: {enable: true, reward: 0.01}
+        score_base: 0.334
+        judge_base_url: ${oc.env:JUDGE_BASE_URL,http://127.0.0.1:8123/v1}
+        judge_model: ${oc.env:JUDGE_MODEL,Qwen/Qwen3-4B-Instruct-2507}
+```
 
     Before spending GPU time on it, check the judge can actually do the conversion on your
     environment: `JUDGE_URL=http://127.0.0.1:8123/v1 python tools/judge_eval.py` scores it
     against hand-labelled cases. A judge that reads the descriptions wrong pays a reward
     signal that looks like learning.
 
-```yaml
-trainer:
-  state_reward:
-    placement: auto                        # auto | turn_end | per_span
-    state_estimation:      {enable: false, weight: 0.5}
-    transition_prediction: {enable: false, weight: 0.5}
-    budget: 0.1
-    score_base: 0.334
-    format_reward: 0.0
-    judge_base_url: "http://127.0.0.1:8123/v1"
-    judge_model: ...
-```
+**`state_estimation`** scores the `<observation>`, i.e. the state the agent acted *from*.
+**`transition_prediction`** scores the `<prediction>`, the state it acted *into*. They switch
+on independently, and whichever are on decide the response format the agent is asked for —
+there is no separate prompt setting to keep in step.
 
-`placement: auto` resolves from the estimator, because the two are one choice: an estimator
-with a single reward slot per turn reads only the turn's last token, so a score paid
-mid-turn is credited twice.
+**`reward` is absolute and per turn.** The number in the yaml is exactly what a perfect
+description of that section pays on one turn; it is not divided by `max_turns` and there is
+no `weight` or episode `budget`. In the example above, both sections over five perfect turns
+pay `2 × 0.01 × 5 = 0.10`. Raising `max_turns` therefore changes the maximum possible episode
+total explicitly rather than silently shrinking every turn's learning signal.
+
+**`score_base`** is subtracted from each description's F1 before it is paid, then the rest is
+rescaled so a perfect description still earns the configured per-turn reward. It exists because scoring
+about a third is free: naming any relation at all gets you there. Measured over 300 real
+Sokoban starts, uniform random scores 0.334 and the best constant answer — "same, same",
+which looks at nothing — scores 0.391. Set `0.0` to restore the old behaviour.
+
+There is no state-reward `format_reward`. A turn that omits any enabled section earns no
+state reward for that turn; writing the sections is the gate that makes them scoreable, not
+a separate line item. The environment's own `format_reward` remains the single format knob.
+
+There is also no `placement`. The environment pays each score on the final token of the span
+that earned it. An estimator that requires one reward slot per turn performs that reduction
+the environment independent of the estimator and preserves the richer per-span signal for
+estimators that can use it.
 
 ---
 

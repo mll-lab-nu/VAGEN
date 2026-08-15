@@ -15,6 +15,8 @@ from __future__ import annotations
 import pytest
 
 from vagen.agent_loop.gym_loop import GymEnvAdapter, _accepts_response
+from vagen.envs.state_reward import build_env, state_reward_names
+from vagen.envs.turn_limit import TurnLimit
 from vagen.rewards.state_reward import StateRewardSpec, StateRewardWrapper
 
 
@@ -73,12 +75,13 @@ class _Tok:
 
 
 def _stack():
-    """GymEnvAdapter over StateRewardWrapper over a gym env -- the real arrangement."""
+    """Adapter -> turn limit -> state reward -> gym env: the real arrangement."""
     inner = _Env()
     wrapped = StateRewardWrapper(
-        env=inner, spec=_spec(), judge=_Judge(), enabled={"state_estimation": 0.5}, format_reward=0.1
+        env=inner, spec=_spec(), judge=_Judge(), enabled={"state_estimation": 0.5}
     )
-    return inner, wrapped, GymEnvAdapter(env=wrapped, env_name="Sokoban", kwargs={})
+    limited = TurnLimit(wrapped, 2)
+    return inner, wrapped, GymEnvAdapter(env=limited, env_name="Sokoban", kwargs={})
 
 
 @pytest.mark.asyncio
@@ -135,60 +138,71 @@ async def test_a_plain_env_is_not_handed_arguments_it_never_asked_for():
 
 def test_the_forwarding_predicate_reads_the_signature():
     assert _accepts_response(StateRewardWrapper.step) is True
+    assert _accepts_response(TurnLimit.step) is True
     assert _accepts_response(_Env.step) is False
     assert _accepts_response(None) is False       # never raise while deciding
 
 
-# ---------------------------------------------------------------- reward budget
-class _Loop:
-    """Just enough of GymLoop to exercise the budget arithmetic."""
-
-    def __init__(self, **state_reward):
-        from vagen.agent_loop.gym_loop import GymLoop
-
-        cfg = {"state_estimation": {"enable": True, "weight": 0.5},
-               "transition_prediction": {"enable": True, "weight": 0.5},
-               "budget": 1.0, "format_reward": 0.0,
-               "judge_base_url": "http://127.0.0.1:1/v1", "judge_model": "m"}
-        cfg.update(state_reward)
-        self.config = _Cfg(trainer=_Cfg(state_reward=cfg))
-        self._maybe_state_reward = GymLoop._maybe_state_reward.__get__(self)
+# ---------------------------------------------------------- shared env construction
 
 
-class _Cfg(dict):
-    def __getattr__(self, k):
-        try:
-            return self[k]
-        except KeyError as e:
-            raise AttributeError(k) from e
+class _ConfiguredEnv(_Env):
+    STATE_REWARD_SPEC = _spec()
+
+    def __init__(self, env_config):
+        super().__init__()
+        self.env_config = env_config
 
 
-def test_a_perfect_episode_is_worth_exactly_the_budget():
-    """Auxiliary reward must not outbid the task. Solving is 1; describing is `budget`."""
-    for max_turns in (1, 5, 10):
-        w = _Loop()._maybe_state_reward(_Env(), "Sokoban", max_turns)
-        per_turn = sum(w.enabled.values())
-        assert per_turn * max_turns == pytest.approx(1.0), f"max_turns={max_turns}"
+class _NoSpecConfiguredEnv(_ConfiguredEnv):
+    STATE_REWARD_SPEC = None
 
 
-def test_raising_max_turns_does_not_inflate_the_budget():
-    """The bug this replaces: a fixed per-turn weight doubles the episode total when
-    someone doubles max_turns, silently."""
-    a = _Loop()._maybe_state_reward(_Env(), "Sokoban", 5)
-    b = _Loop()._maybe_state_reward(_Env(), "Sokoban", 10)
-    assert sum(a.enabled.values()) == pytest.approx(2 * sum(b.enabled.values()))
+def _config(**state_reward):
+    cfg = {
+        "state_estimation": {"enable": True, "reward": 0.01},
+        "transition_prediction": {"enable": True, "reward": 0.02},
+        "judge_base_url": "http://127.0.0.1:1/v1",
+        "judge_model": "judge",
+    }
+    cfg.update(state_reward)
+    return {"ordinary": 7, "state_reward": cfg}
 
 
-def test_relative_weights_are_respected_within_the_budget():
-    loop = _Loop(state_estimation={"enable": True, "weight": 3.0},
-                 transition_prediction={"enable": True, "weight": 1.0})
-    w = loop._maybe_state_reward(_Env(), "Sokoban", 4)
-    e, t = w.enabled["state_estimation"], w.enabled["transition_prediction"]
-    assert e == pytest.approx(3 * t)
-    assert (e + t) * 4 == pytest.approx(1.0)
+def test_state_reward_lives_in_the_env_config_and_is_removed_before_construction():
+    env = build_env(_ConfiguredEnv, _config(), max_turns=5)
+    assert isinstance(env, TurnLimit)
+    assert isinstance(env.env, StateRewardWrapper)
+    assert env.env.env.env_config == {"ordinary": 7}
+    assert env.env.enabled == {"state_estimation": 0.01, "transition_prediction": 0.02}
 
 
-def test_one_reward_alone_still_gets_the_whole_budget():
-    loop = _Loop(transition_prediction={"enable": False, "weight": 0.5})
-    w = loop._maybe_state_reward(_Env(), "Sokoban", 5)
-    assert sum(w.enabled.values()) * 5 == pytest.approx(1.0)
+def test_per_turn_rewards_do_not_change_when_max_turns_changes():
+    five = build_env(_ConfiguredEnv, _config(), max_turns=5)
+    ten = build_env(_ConfiguredEnv, _config(), max_turns=10)
+    assert five.env.enabled == ten.env.enabled
+
+
+def test_only_enabled_rewards_are_named_for_metrics():
+    cfg = _config(transition_prediction={"enable": False, "reward": 99.0})
+    assert state_reward_names(cfg) == ("state_estimation",)
+
+
+def test_on_without_an_environment_spec_is_rejected():
+    with pytest.raises(ValueError, match="declares no STATE_REWARD_SPEC"):
+        build_env(_NoSpecConfiguredEnv, _config(), max_turns=5)
+
+
+def test_on_without_a_judge_is_rejected():
+    cfg = _config()
+    del cfg["state_reward"]["judge_base_url"]
+    with pytest.raises(ValueError, match="judge_base_url/judge_model"):
+        build_env(_ConfiguredEnv, cfg, max_turns=5)
+
+
+@pytest.mark.asyncio
+async def test_turn_limit_is_reported_as_truncation_by_the_adapter():
+    env = GymEnvAdapter(TurnLimit(_Env(), 1), "Stub", {})
+    _obs, _reward, terminated, truncated, info = await env.step("go")
+    assert not terminated and truncated
+    assert info["truncated"] is True

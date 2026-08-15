@@ -12,6 +12,7 @@ from vagen.evaluate.utils.mm_utils import _now_tag
 from vagen.evaluate.utils.json_utils import sanitize_for_json
 from vagen.core.env_adapter import GymEnvAdapter
 from vagen.core.runner import run_episode
+from vagen.envs.state_reward import build_env, state_reward_names
 from vagen.evaluate.chat_client import ChatClient
 from vagen.harness import build_harness, resolve_harness
 from vagen.harness.compact import CompactHarness
@@ -214,7 +215,10 @@ class GenericVisionInferenceWorkflow:
         """
         Run a single rollout and return episode results. Never raises.
         """
-        env = env_cls(env_config)
+        # Same factory training uses, so a `state_reward` block in envs[].config means the
+        # same thing here. Evaluation has no trainer to read it from, which is most of why
+        # the setting belongs to the environment.
+        env = build_env(env_cls, env_config, max_turns=max_turns)
         dump_root: Optional[str]
         if isinstance(dump_override, str) and dump_override:
             dump_root = dump_override
@@ -251,7 +255,10 @@ class GenericVisionInferenceWorkflow:
                             **({} if self.tokens_per_image is None
                                else {"tokens_per_image": self.tokens_per_image}))
         client.opening_limit, client.continuation_limit = opening, continuation
-        adapted = _Recording(GymEnvAdapter(env, env_config.get("name", "env"), env_config))
+        adapted = _Recording(GymEnvAdapter(
+            env, env_config.get("name", "env"), env_config,
+            score_names=state_reward_names(env_config),
+        ))
         outcome = None
 
         try:

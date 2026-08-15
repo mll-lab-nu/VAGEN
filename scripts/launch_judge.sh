@@ -34,15 +34,31 @@ if [ "$TP" -gt "$_gpus" ]; then
 fi
 MEM=${MEM:-0.10}
 
-export PATH="$ENV/bin:$PATH"
-export CUDA_HOME="$ENV"
-# flashinfer JITs its sampling kernel on first use, and needs to find both the headers
-# and the runtime library. conda keeps headers under targets/ and the libraries in lib/;
-# without these the build dies as "cannot find -lcudart", several frames below a message
-# that only says "Engine core initialization failed".
-export CPLUS_INCLUDE_PATH="$ENV/targets/x86_64-linux/include:$ENV/include${CPLUS_INCLUDE_PATH:+:$CPLUS_INCLUDE_PATH}"
-export LIBRARY_PATH="$ENV/lib:$ENV/targets/x86_64-linux/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
-export LD_LIBRARY_PATH="$ENV/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+# FlashInfer JITs kernels on first use, so CUDA_HOME must name a real toolkit with nvcc.
+# The conda environment carries Python and CUDA runtime libraries but not necessarily the
+# compiler; pointing CUDA_HOME at it made startup fail as `$ENV/bin/nvcc: No such file`.
+if [ -z "${CUDA_HOME:-}" ] || [ ! -x "$CUDA_HOME/bin/nvcc" ]; then
+  _cuda_version=$(
+    "$ENV/bin/python" -c 'import torch; print(torch.version.cuda or "")' 2>/dev/null || true
+  )
+  for d in "/usr/local/cuda-${_cuda_version}" /usr/local/cuda; do
+    if [ -x "$d/bin/nvcc" ]; then
+      CUDA_HOME=$d
+      break
+    fi
+  done
+fi
+if [ -z "${CUDA_HOME:-}" ] || [ ! -x "$CUDA_HOME/bin/nvcc" ]; then
+  echo "CUDA toolkit with nvcc not found; set CUDA_HOME=/path/to/cuda." >&2
+  exit 1
+fi
+
+export CUDA_HOME
+export PATH="$ENV/bin:$CUDA_HOME/bin:$PATH"
+# Conda supplies the Python-facing runtime; the toolkit supplies nvcc, headers and lib64.
+export CPLUS_INCLUDE_PATH="$CUDA_HOME/include:$ENV/targets/x86_64-linux/include:$ENV/include${CPLUS_INCLUDE_PATH:+:$CPLUS_INCLUDE_PATH}"
+export LIBRARY_PATH="$CUDA_HOME/lib64:$ENV/lib:$ENV/targets/x86_64-linux/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
+export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$ENV/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 exec "$ENV/bin/python" -m vllm.entrypoints.openai.api_server \
   --model "$MODEL" \
