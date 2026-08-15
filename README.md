@@ -21,7 +21,7 @@
   <a href="https://vagen-ai.github.io/"><img src="https://img.shields.io/badge/🌐_Website-00C851?style=for-the-badge&logoColor=white" alt="Website"></a>
 </p>
 
-**VAGEN** is a **reinforcement learning (RL) framework that trains multi-turn VLM agents** (vision-language model agents) to build an internal **world model** through explicit visual state reasoning. Instead of rewarding only task success, VAGEN reinforces the agent's world model reasoning itself, decomposed into **StateEstimation** ("what is the current state?") and **TransitionModeling** ("what comes next?"), with a turn-level **WorldModeling Reward** (LLM-as-Judge) and **Bi-Level GAE** for turn-aware credit assignment. Combining world models with reinforcement learning, a 3B VLM trained with VAGEN scores **0.82** across five visual agent benchmarks, a 3x improvement over its untrained backbone (0.21), outperforming GPT-5 (0.75), Gemini 2.5 Pro (0.67), and Claude 4.5 (0.62). Accepted to **NeurIPS 2025** ([arXiv:2510.16907](https://arxiv.org/abs/2510.16907)).
+**VAGEN** is a **reinforcement learning (RL) framework that trains multi-turn VLM agents** (vision-language model agents) to build an internal **world model** through explicit visual state reasoning. Instead of rewarding only task success, VAGEN reinforces the agent's world model reasoning itself, decomposed into **StateEstimation** ("what is the current state?") and **TransitionModeling** ("what comes next?"), with a turn-level **WorldModeling Reward** (LLM-as-Judge) and **Bi-Level GAE** for turn-aware credit assignment. Combining world models with reinforcement learning, a 3B VLM trained with VAGEN scores **0.82** across five visual agent benchmarks, a 3x improvement over its untrained backbone (0.21), outperforming GPT-5 (0.75), Gemini 2.5 Pro (0.67), and Claude 4.5 (0.62).
 
 <div style="width:100%; overflow-x:auto;">
   <table style="width:100%;">
@@ -66,12 +66,9 @@ We frame multi-turn VLM agentic tasks as a Partially Observable Markov Decision 
 
 
 ## News
-**[2026/08]** A major update to `main`, on the latest VERL agent-loop:
-- **Compact RL** — a third multi-turn paradigm alongside concat and no-concat. Turns accumulate until a token budget is reached, then the conversation is summarised and reopened from that summary, so an episode longer than the context window still trains as one trajectory. Closely related to **CompactionRL** ([arXiv:2607.05378](https://arxiv.org/abs/2607.05378)), which trains task execution and summary generation jointly. See [Multi-turn Compacted Training](#multi-turn-compacted-training).
-- **The context policy and the advantage estimator are now independent axes.** `trainer.harness` decides how an episode is laid out in rows; `algorithm.adv_estimator` stitches those rows back into one trajectory. Every VAGEN estimator is layout-independent, and the trainer refuses the pairings that would silently score a fraction of an episode.
-- **Environment, harness, training backend and algorithm are decoupled.** Anything subclassing `BaseEnv` or `BaseHarness` plugs into both training and evaluation without either being modified — see [Custom Harness](#custom-harness).
-- **Evaluation runs the same episode loop as training** (`vagen/core/runner.py`) and reads the same `harness` key, so an eval config that copies the val config's turn budgets is measuring the same thing. Every environment ships a vLLM launcher.
-- **Per-turn token budgets are measured rather than assumed**, including a `thinking_token_budget` for models with a native reasoning channel (a per-env key in the dataset yaml — see `examples/train/sokoban/train_sokoban_vision_free_think.yaml`, and issue 3 in [docs/issues.md](docs/issues.md) for what it does and does not buy).
+**[2026/08]**: Added support for Verl 0.9.0, introduced compaction RL, and decoupled the harness layer.
+- **Compaction RL** — a multi-turn paradigm alongside concat and no-concat. Turns accumulate until a token budget is reached, then the conversation is summarised and reopened from that summary, so an episode longer than the context window still trains as one trajectory. See [Multi-turn Compacted Training](#multi-turn-compacted-training). Reference: ([CompactionRL](https://arxiv.org/abs/2607.05378))
+- **Environment, harness, training backend and algorithm are decoupled.** Anything subclassing `BaseEnv` or `BaseHarness` plugs into both training and evaluation without either being modified — see [Custom Harness](#custom-harness) and [Custom Environment](#custom-environment).
 
 **[2026/02]** We have migrated the `main` branch to VAGEN-Lite, a lightweight and clean reimplementation built on VERL agent-loop for easy customization and stable performance. For the previous full-featured release, please visit the [vagen-legacy](https://github.com/mll-lab-nu/VAGEN/tree/vagen-legacy) branch.
 
