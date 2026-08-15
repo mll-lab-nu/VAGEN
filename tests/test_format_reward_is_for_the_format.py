@@ -1,0 +1,163 @@
+"""The format bonus must be paid for the format, not for a salvageable action.
+
+``parse_*`` in every env is deliberately two-tier: ``format_correct`` is a strict regex
+over the full tag sequence, while extraction is lenient so that a malformed turn still
+yields its action and the episode keeps its data (measured: half of all base-model
+episodes reached zero usable actions when extraction was strict).
+
+That split only works if the *reward* reads the strict tier. Sokoban read the lenient one
+-- it paid `format_reward` whenever an action could be salvaged -- so under
+``prompt_format=wm`` a policy that emitted ``<answer>Left, Left</answer>`` and nothing
+else collected exactly what a policy writing all four sections collected, while spending
+~100 fewer tokens. Sokoban rollouts collapsed to precisely that string.
+
+These tests are parametrised over the envs rather than written once for sokoban, because
+the bug was an inconsistency between four implementations of the same idea.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+WM_FULL = (
+    "<observation>The box is below and right of the player</observation>"
+    "<think>I should move right</think>"
+    "<answer>Right</answer>"
+    "<prediction>The box will be below and same column of the player</prediction>"
+)
+#: What the collapsed sokoban policy actually emitted, `<th` and all.
+ANSWER_ONLY = "<answer>Right</answer><th"
+
+
+# ------------------------------------------------------------------- the parsers agree
+
+
+@pytest.mark.parametrize(
+    "module,fmt",
+    [
+        ("vagen.envs.sokoban.utils.utils", "wm"),
+        ("vagen.envs.frozenlake.utils.utils", "wm"),
+    ],
+)
+def test_answer_only_is_not_format_correct(module, fmt):
+    """★ The strict tier must reject it. If this ever passes, every reward gate built on
+    `format_correct` silently stops gating."""
+    import importlib
+
+    parse = importlib.import_module(module).parse_response
+    assert parse(WM_FULL, prompt_format=fmt)["format_correct"] is True
+    assert parse(ANSWER_ONLY, prompt_format=fmt)["format_correct"] is False
+
+
+def test_the_two_parsers_differ_on_salvage_and_that_is_recorded():
+    """★ The envs disagree, and the disagreement is the finding.
+
+    sokoban's `parse_wm` salvages -- it returns the action even when `format_correct` is
+    False, on the measured grounds that strict extraction sent half of all base-model
+    episodes to zero usable actions. frozenlake's returns nothing at all. Neither is
+    obviously wrong, but they cannot both be the intended policy, and the difference was
+    invisible: it is enforced nowhere and stated nowhere.
+
+    Sokoban's salvaged action is now discarded by the *env* under `strict_format`, which
+    leaves the parser's two tiers intact for anyone who wants them.
+    """
+    from vagen.envs.frozenlake.utils.utils import parse_response as fl_parse
+    from vagen.envs.sokoban.utils.utils import parse_response as sk_parse
+
+    assert [a.lower() for a in sk_parse(ANSWER_ONLY, prompt_format="wm")["actions"]] == ["right"]
+    assert fl_parse(ANSWER_ONLY, prompt_format="wm")["actions"] == []
+
+
+def test_sokoban_strict_format_discards_the_salvaged_action():
+    """The env-level gate: with `strict_format` the salvaged action must not be executed,
+    so a turn that skipped <observation>/<think>/<prediction> does nothing at all."""
+    import inspect
+
+    from vagen.envs.sokoban.sokoban_env import Sokoban, SokobanEnvConfig
+
+    assert SokobanEnvConfig().strict_format is True, "the default must enforce the format"
+    src = inspect.getsource(Sokoban.step)
+    assert "strict_format" in src and "action_list = []" in src, (
+        "the strict_format gate is gone from Sokoban.step; a malformed turn will act again"
+    )
+
+
+# --------------------------------------------------------------- the reward gate itself
+
+
+def _gate_source(env_module: str, fn: str = "step") -> str:
+    import importlib
+    import inspect
+
+    mod = importlib.import_module(env_module)
+    env_cls = next(
+        v for v in vars(mod).values()
+        if isinstance(v, type) and v.__module__ == env_module and hasattr(v, fn)
+        and not v.__name__.endswith("Config")
+    )
+    return inspect.getsource(getattr(env_cls, fn))
+
+
+@pytest.mark.parametrize(
+    "env_module",
+    [
+        "vagen.envs.sokoban.sokoban_env",
+        "vagen.envs.frozenlake.frozenlake_env",
+    ],
+)
+def test_the_format_reward_is_gated_on_format_correct(env_module):
+    """★ The structural guard, over every env that pays a per-turn format reward.
+
+    Asserted on the source rather than by running the env, because constructing a real gym
+    env needs rendering and the property is about which flag the branch reads. The failure
+    it catches -- `if self.valid_actions:` without the conjunct -- is one line and reads as
+    correct.
+
+    Parsed with `ast` rather than matched line by line: the sokoban guard became a
+    multi-line condition when `strict_format` was folded into it, and a line-based version
+    of this test silently started reading only `if self.valid_actions and (`.
+    """
+    import ast
+
+    import textwrap
+
+    tree = ast.parse(textwrap.dedent(_gate_source(env_module)))
+    guards = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.If) and "format_reward" in ast.unparse(node.body)
+    ]
+    assert guards, f"{env_module} no longer pays a format reward; update this test"
+    for node in guards:
+        cond = ast.unparse(node.test)
+        assert "format_correct" in cond, (
+            f"{env_module} pays format_reward under `{cond}`, which does not consult "
+            "format_correct -- any response with a salvageable <answer> collects it"
+        )
+
+
+def test_strict_format_is_one_switch_for_the_whole_environment():
+    """★ Reproducing a pre-fix run must be one knob, not two kept in step by hand.
+
+    `strict_format=False` has to restore *both* halves -- run the salvaged action and pay
+    the format reward for it -- or "the old environment" is not a thing anyone can
+    actually configure, and the old/new comparison quietly comes from a third environment
+    that never existed.
+    """
+    import ast
+    import inspect
+
+    from vagen.envs.sokoban.sokoban_env import Sokoban
+
+    import textwrap
+
+    tree = ast.parse(textwrap.dedent(inspect.getsource(Sokoban.step)))
+
+    pay = next(n for n in ast.walk(tree)
+               if isinstance(n, ast.If) and "format_reward" in ast.unparse(n.body))
+    assert "strict_format" in ast.unparse(pay.test), (
+        "the format-reward gate ignores strict_format, so strict_format=False cannot "
+        "reproduce the pre-fix environment"
+    )
+    drop = next(n for n in ast.walk(tree)
+                if isinstance(n, ast.If) and "action_list = []" in ast.unparse(n.body))
+    assert "strict_format" in ast.unparse(drop.test)

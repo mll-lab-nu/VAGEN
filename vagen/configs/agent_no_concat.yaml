@@ -1,2 +1,0 @@
-- name: gym_agent
-  _target_: vagen.agent_loop.gym_agent_loop_no_concat.GymAgentLoop

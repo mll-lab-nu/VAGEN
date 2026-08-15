@@ -31,18 +31,20 @@ python -m mani_skill.utils.download_asset ycb
 python -m vagen.envs.primitive_skill.serve 2>&1 | tee serve_$(date +%Y%m%d_%H%M%S).log
 
 # Custom settings
-python -m vagen.envs.primitive_skill.serve --devices='[0,1]' --max_envs=32 --port=8001 2>&1 | tee serve_$(date +%Y%m%d_%H%M%S).log
+python -m vagen.envs.primitive_skill.serve --devices='[0,1]' --max_envs_per_gpu=16 --port=8001 2>&1 | tee serve_$(date +%Y%m%d_%H%M%S).log
 ```
 
 Key parameters:
 - `devices`: GPU IDs (default: auto-detect)
-- `max_envs`: max concurrent environments, bounds GPU memory (default: 64)
-- `thread_pool_size`: should be >= max_envs (default: 64)
+- `max_envs_per_gpu`: environments per GPU, bounds GPU memory (default: 16)
+- `max_inflight`: concurrent in-flight requests (default: 0 = unlimited)
+- `session_timeout`: seconds before an idle session is reaped (default: 600.0)
 
 ## Evaluation
 
 ```bash
 # Terminal 1: start server
+python -m vagen.envs.primitive_skill.serve
 
 # Terminal 2: run eval
 bash examples/evaluate/primitive_skill/run_eval.sh
@@ -54,10 +56,11 @@ Config: `examples/evaluate/primitive_skill/config.yaml`
 
 ```bash
 # Terminal 1: start server
+python -m vagen.envs.primitive_skill.serve
 
 # Terminal 2: run training
 cd VAGEN
-bash examples/train/primitive_skill/train_ppo_qwen25vl3b.sh
+bash examples/train/primitive_skill/train_default_gae_qwen25vl3b.sh
 ```
 
 ## Prompt Formats

@@ -1,0 +1,31 @@
+# max_turns is 5, the published setting and the one every run in this repo uses. The repo
+# used to ship 20 here and rely on the cluster wrapper to normalise it, which left a
+# standalone run with an episode that could not fit its response region:
+#   20 x 512 + 19 x 256 = 15104   against  data.max_response_length=4000
+# At 5 it is 5 x 512 + 4 x 256 = 3584 and the startup warning goes away for a real reason.
+#
+# ★ If you change this, change trainer.compact_budget with it. The compact arm is sized so
+# that a conversation buys about three turns before it has to summarise; a cap that lets a
+# whole episode fit inside one conversation means compaction never fires and that arm
+# silently measures concat instead. See train_default_gae_compact_qwen25vl3b.sh.
+envs:
+  - name: Sokoban # registered env name
+    n_envs: 10000
+    data_source: sokoban # nickname for logging
+    seed: [1,10000,1] # sample n_env seeds from seed[0] to seed[1] with each seed repeat at most seed[2] times
+    max_turns: 5 # max number of interaction turns per episode
+    response_length_per_turn: 512 # max response length per turn
+    # The largest one observation may be. Measured with the Qwen2.5-VL processor:
+    # sokoban vision is 80 tokens opening, 96 mid-episode. 256 leaves room for a larger frame without letting a
+    # runaway observation eat the response region. Undeclared this falls back to
+    # DEFAULT_MAX_ENV_RESPONSE=2048, which is not a bound on anything this env does
+    # and makes the episode-size warning fire on every run until nobody reads it.
+    max_env_response_per_turn: 256
+    config: # env-specific config
+      render_mode: vision
+      prompt_format: free_wm
+      # 0.02 a turn, not the 0.1 default: at max_turns=5 the default pays 0.5 for
+      # formatting alone, half of what solving the level is worth. 0.02 pays 0.10 over
+      # the episode, matching what the two state rewards pay together.
+      format_reward: 0.02
+      min_solution_steps: [1,5]

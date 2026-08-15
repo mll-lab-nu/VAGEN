@@ -1,0 +1,11 @@
+# What `agent_name` selects. The dataset emits "gym_agent" (gym_agent_dataset.py), and
+# GymLoop carries @register for BOTH "gym_agent" and "gym_agent_v2" (agent_loop/gym_loop.py),
+# so the class is reachable either way. This file is what verl's agent-loop config actually
+# reads to build the entry, and it names the module that has to be imported for those
+# decorators to have run at all -- which is why deleting it breaks dispatch even though the
+# decorator is there.
+#
+# agent.yaml and agent_no_concat.yaml were byte-identical copies of this and referenced
+# by nothing; deleted. Which harness runs is `trainer.harness`, not a separate loop.
+- name: gym_agent
+  _target_: vagen.agent_loop.gym_loop.GymLoop

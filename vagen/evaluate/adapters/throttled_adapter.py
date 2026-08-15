@@ -1,4 +1,3 @@
-# All comments are in English.
 from __future__ import annotations
 import asyncio
 import random
@@ -77,34 +76,48 @@ def _is_transient_network_error(exc: BaseException) -> bool:
     return any(h in msg for h in hints) or any(h in name for h in ["timeout", "ratelimit", "rate"])
 
 def _is_non_retryable(exc: BaseException) -> bool:
-    """Check if exception is clearly non-retryable (auth, invalid params, etc.)."""
-    # Check for non-retryable status codes (client errors except 429)
+    """Whether this error will fail again however many times it is sent.
+
+    ★ The status code decides whenever there is one, and the prose is only consulted when
+    there is not. It used to be the other way round: the message was substring-matched for
+    "invalid", "auth", "not found" *before* the code was considered, so a 500 whose body
+    happened to contain the word "invalid" -- common in upstream-proxy wording -- was
+    classified permanent and never retried. The episode then died and was scored as a task
+    failure. Measured: `500 with 'invalid' in body` -> retry=False, against
+    `500 server` -> retry=True.
+    """
     code = _get_status_code(exc)
     if code is not None:
-        # 4xx client errors (except 429 rate limit) are usually not retryable
-        if 400 <= code < 500 and code != 429:
-            return True
+        # 4xx is the client's fault and will not change on a retry. 429 is the exception:
+        # it is a request to wait, not a refusal.
+        return 400 <= code < 500 and code != 429
 
-    # Check exception class name and message for non-retryable errors
     name = exc.__class__.__name__.lower()
     msg = str(exc).lower()
+    # No code to go on, so the wording is all there is. Kept narrow, and it can no longer
+    # overrule a 5xx.
     non_retryable_hints = [
-        "authentication", "auth", "api key", "invalid",
-        "permission", "not found", "bad request",
+        "authentication", "api key", "permission", "not found", "bad request",
+        "invalid_api_key", "invalid api key",
     ]
-    if any(h in name or h in msg for h in non_retryable_hints):
-        return True
-
-    return False
+    return any(h in name or h in msg for h in non_retryable_hints)
 
 def _is_retryable(exc: BaseException, retryable_codes: Tuple[int, ...]) -> bool:
-    """By default retry all errors except clearly non-retryable ones."""
-    # If it's clearly non-retryable, don't retry
-    if _is_non_retryable(exc):
-        return False
+    """Retry anything not clearly permanent. The default is to retry.
 
-    # Otherwise retry: could be rate limit, timeout, server error, etc.
-    return True
+    ★ ``retryable_codes`` is deliberately NOT used as a whitelist. It was accepted and
+    ignored, and switching it on looked like the fix -- but the declared
+    ``(429, 500, 502, 503, 504)`` is not the set of codes that mean "try again". It omits
+    520/522/524 (Cloudflare in front of an endpoint), **529** (Anthropic's routine
+    `overloaded_error`), 501 and 507. Treating those as permanent makes one HTTP call and
+    then scores the episode as a task failure, which on a loaded endpoint eats episodes.
+
+    So the parameter narrows nothing and the decision is entirely
+    ``not _is_non_retryable``: a 4xx other than 429 is the client's fault, everything else
+    gets another go.
+    """
+    del retryable_codes
+    return not _is_non_retryable(exc)
 
 class ThrottledAdapter(ModelAdapter):
     """Thin wrapper adding concurrency gate and retry backoff to any ModelAdapter."""

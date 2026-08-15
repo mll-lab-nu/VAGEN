@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections import defaultdict, Counter
 from typing import Any, Dict, List, Tuple, Optional
 
@@ -8,8 +9,15 @@ import torch
 from tensordict import TensorDict
 from verl import DataProto
 
+from vagen.utils.image_token_utils import (
+    ImagePlaceholderMismatch, count_placeholder_runs, image_token_ids,
+    split_on_images, vision_sentinel_ids,
+)
+
 PAD_TOKEN_ID = 0
 
+
+logger = logging.getLogger(__name__)
 
 def _as_1d_object_array(items: List[Any]) -> np.ndarray:
     """
@@ -53,6 +61,7 @@ def concat_val_multi_turn(
     test_output_gen_batch: DataProto,
     test_gen_batch: DataProto,
     tokenizer,
+    processor=None,
 ) -> DataProto:
     """
     Turn -> trajectory concatenation and STRICT reorder by test_gen_batch.uid,
@@ -86,16 +95,45 @@ def concat_val_multi_turn(
     group_arr = nt["group_idx"]
     traj_arr = nt["traj_idx"]
     turn_arr = nt.get("turn_idx", [0] * n)
+    # ★ What identifies a trajectory here: `episode_id` when the loop published one,
+    # falling back to `(group_idx, traj_idx)`. Same rule as `TrajectoryView.build`, and
+    # for the same reason -- that pair identifies a *rollout*, not an episode.
+    #
+    # On this path the two provably differ. `_validate` pads the generation batch to a
+    # multiple of the worker count by duplicating rows from the front; the duplicates run
+    # as genuinely separate episodes, and `_vagen_assign_indices` re-tiles traj_idx
+    # positionally so a copy lands on the same pair as its original. Grouping by the pair
+    # then merges two distinct episodes into one, which shows up as the strict count check
+    # below firing -- 126 trajectories against 256 prompts on the compact run that found
+    # this, i.e. half the validation set silently folded into the other half. It had
+    # already been reported on val_navigation (n_envs 30 and 60) and val_spatial_gym (50).
+    #
+    # `group_idx`/`traj_idx` are still carried on every merged entry; only the grouping
+    # key changes, so the uid bucketing below is unaffected.
 
     # ------------------------------------------------------------------
     # 1) Group turns by (group_idx, traj_idx)
     # ------------------------------------------------------------------
+    episode_arr = nt.get("episode_id")
+    if episode_arr is None:
+        logger.warning(
+            "concat_val_multi_turn: no `episode_id` column; grouping by "
+            "(group_idx, traj_idx) instead. That pair identifies a rollout, and on the "
+            "validation path padding duplicates make one rollout hold several episodes -- "
+            "they will be merged into a single row."
+        )
+
     trajectory_groups: Dict[Tuple[str, int], List[Tuple[int, int]]] = defaultdict(list)
+    # Keeps the (group_idx, traj_idx) each key came from, so the merged entry can still
+    # report them even when the key is an episode_id.
+    key_identity: Dict[Tuple[str, int], Tuple[str, int]] = {}
     for i in range(n):
         g = str(group_arr[i])
         t = int(traj_arr[i])
         ti = int(turn_arr[i])
-        trajectory_groups[(g, t)].append((ti, i))
+        key = (str(episode_arr[i]), 0) if episode_arr is not None else (g, t)
+        trajectory_groups[key].append((ti, i))
+        key_identity[key] = (g, t)
 
     # Sort turns inside each trajectory by turn_idx
     for k in trajectory_groups:
@@ -106,7 +144,8 @@ def concat_val_multi_turn(
     # ------------------------------------------------------------------
     # 2) Concatenate per trajectory
     # ------------------------------------------------------------------
-    for (group_idx_str, traj_idx), turns in sorted(trajectory_groups.items()):
+    for key, turns in sorted(trajectory_groups.items()):
+        group_idx_str, traj_idx = key_identity[key]
         first_i = turns[0][1]
         concat_prompt = test_output_gen_batch.batch["prompts"][first_i]
 
@@ -114,7 +153,24 @@ def concat_val_multi_turn(
         mask_parts: List[torch.Tensor] = []
         rm_parts: List[torch.Tensor] = []
 
+
         pad_id = tokenizer.pad_token_id
+        # One batch row is one conversation. Rebuild each as it was actually spoken:
+        #
+        #   conversation 0   system + first observation, then response / observation ...
+        #   conversation 1   system + observation carrying the summary, then ...
+        #
+        # A conversation's own prompt belongs at its *start*. Attaching it to the
+        # previous turn as an "observation" -- which is where the next row's prompt
+        # naturally falls when you walk the batch -- put each new system prompt after
+        # the response before it, so the boundary marker landed a whole turn early.
+        conversations: List[Dict[str, Any]] = []
+        # Where the pictures actually sit in the sequence, so they can replace their
+        # placeholders instead of being appended near them.
+        source = processor if processor is not None else tokenizer
+        placeholders = image_token_ids(source)
+        sentinels = vision_sentinel_ids(source)
+
         for j, (_, i) in enumerate(turns):
             resp = test_output_gen_batch.batch["responses"][i]
 
@@ -124,29 +180,102 @@ def concat_val_multi_turn(
                 mask = torch.ones_like(resp)
 
             rm = test_output_gen_batch.batch["rm_scores"][i]
-
-            # Strip the right-padding of this turn's response before concatenating.
-            # Each per-turn tensor is individually padded (response right-padded to
-            # response_length, prompts left-padded to prompt_length); concatenating
-            # them as-is would bury pad tokens *inside* the sequence, which then
-            # breaks the trailing-pad assumption of the `s[:l]` decode in _validate
-            # (later turns get truncated from the logged text while image_data keeps
-            # every turn's image -> "N images but fewer visible turns").
+            # Length from the mask when there is one, not from token values. The pad id
+            # is a stop token on this model family -- Qwen2.5-VL lists <|endoftext|>,
+            # which is also pad, among its eos ids -- so a turn that stops on it has a
+            # real final token indistinguishable by value from padding. Trimming by
+            # value drops that token, and with it the turn's reward: verl writes the
+            # whole row's score at the last real position, computed from the attention
+            # mask, so the score lands exactly on the token the value-based trim cuts.
             r_len = _real_len_right(resp, pad_id)
+            if "attention_mask" in test_output_gen_batch.batch:
+                plen = test_output_gen_batch.batch["prompts"].shape[1]
+                r_len = int(test_output_gen_batch.batch["attention_mask"][i, plen:].sum().item())
+            elif "response_mask" in test_output_gen_batch.batch:
+                nz = (mask != 0).nonzero()
+                if nz.numel():
+                    r_len = max(r_len, int(nz.max().item()) + 1)
+
+            this_prompt = test_output_gen_batch.batch["prompts"][i]
+            p_start = _real_start_left(this_prompt, pad_id)
+
+            # A turn's prompt comes BEFORE the response it elicited. Emitting the
+            # response first and the prompt after produces the same tokens in the wrong
+            # order -- r0 r1 p1 r2 p2 instead of r0 p1 r1 p2 r2 -- which nothing
+            # downstream shape-checks, because it is a permutation of the same length.
+            # Every log-prob on such a row is then conditioned on context the model
+            # never saw in that position.
+            if j:
+                prompt_seg = this_prompt[p_start:]
+                resp_parts.append(prompt_seg)
+                mask_parts.append(torch.zeros_like(prompt_seg))
+                rm_parts.append(torch.zeros(prompt_seg.shape[0], dtype=rm.dtype, device=rm.device))
+
             resp_parts.append(resp[:r_len])
             mask_parts.append(mask[:r_len])
             rm_parts.append(rm[:r_len])
 
-            # insert next prompt segment (left-padding stripped, marked mask/rm = 0)
-            if j < len(turns) - 1:
-                next_i = turns[j + 1][1]
-                next_prompt = test_output_gen_batch.batch["prompts"][next_i]
+            frames = []
+            if "image_data" in nt and nt["image_data"][i] is not None:
+                v = nt["image_data"][i]
+                frames = list(v) if isinstance(v, (list, tuple, np.ndarray)) else [v]
 
-                p_start = _real_start_left(next_prompt, pad_id)
-                prompt_seg = next_prompt[p_start:]
-                resp_parts.append(prompt_seg)
-                mask_parts.append(torch.zeros_like(prompt_seg))
-                rm_parts.append(torch.zeros(prompt_seg.shape[0], dtype=rm.dtype, device=rm.device))
+            # Split the conversation into its turns using the spans the tape recorded.
+            # What sits between two responses is the observation that came back.
+            spans = nt["response_spans"][i] if nt.get("response_spans") is not None else None
+            spans = [(int(x), int(y)) for x, y in spans] if spans else [(0, r_len)]
+            spans = [(x, y) for x, y in spans if 0 <= x < y <= r_len] or [(0, r_len)]
+
+            # Frames are consumed in sequence order across the whole conversation: the
+            # prompt's placeholders first, then each observation's.
+            remaining = list(frames)
+            # Every frame has to be accounted for by a run somewhere in this conversation.
+            # Fewer runs than frames means two pictures rendered as one indistinguishable
+            # placeholder block -- which happens on a family that declares no vision
+            # sentinels -- and the frames then slide: a span takes the wrong picture and
+            # the last is dropped, with nothing raised. This is detectable; adjacency
+            # itself is not.
+            total_runs = (count_placeholder_runs(this_prompt[p_start:], placeholders)
+                          + count_placeholder_runs(resp[:r_len], placeholders))
+            if remaining and total_runs < len(remaining):
+                raise ImagePlaceholderMismatch(
+                    f"{total_runs} placeholder run(s) for {len(remaining)} frame(s) in one "
+                    f"conversation"
+                    + ("" if sentinels else
+                       " -- this model declares no vision sentinels, so adjacent pictures "
+                       "render as a single run and cannot be told apart. Register the "
+                       "family in IMAGE_TOKEN_ADAPTERS.")
+                )
+
+            def take(span_ids):
+                # Hand this span only the frames it has room for. Passing the whole
+                # remaining list made every span look like it had frames left over, and
+                # the leftover check -- which exists to catch a real placeholder/feature
+                # mismatch -- fired on the first span of any conversation whose pictures
+                # were not all in its prompt. That is every multimodal concat and compact
+                # episode, since their later frames sit in the response region.
+                span_ids = list(span_ids)
+                runs = count_placeholder_runs(span_ids, placeholders)
+                mine, del_ = remaining[:runs], remaining[runs:]
+                remaining[:] = del_
+                return split_on_images(span_ids, placeholders, tokenizer, mine)
+
+            prompt_parts = take(this_prompt[p_start:])
+
+            turn_list = []
+            for k, (start, end) in enumerate(spans):
+                nxt = spans[k + 1][0] if k + 1 < len(spans) else r_len
+                turn_list.append({
+                    "turn_id": k,
+                    "response": take(resp[start:end]),
+                    "observation": take(resp[end:nxt]) if nxt > end else [],
+                })
+
+            conversations.append({
+                "conversation_id": j,
+                "prompt": prompt_parts,
+                "turns": turn_list,
+            })
 
         concat_response = torch.cat(resp_parts, dim=0)
         concat_response_mask = torch.cat(mask_parts, dim=0)
@@ -180,11 +309,42 @@ def concat_val_multi_turn(
             "rm_scores": concat_rm_scores,
         }
 
+        # The identity chain, carried across the merge. Validation folds an episode's
+        # per-turn rows into one, so afterwards a row *is* an episode -- but only if the
+        # ids come with it. Dropping them left the episode log grouping merged rows by
+        # the dataset's axis, which is unique per row, so every episode read as one turn.
+        def _first(key, default=None):
+            arr = nt.get(key)
+            if arr is None:
+                return default
+            for _, i in turns:
+                if arr[i] is not None:
+                    return arr[i]
+            return default
+
         non_tensor_entry: Dict[str, Any] = {
             "group_idx": group_idx_str,
             "traj_idx": int(traj_idx),
             "image_data": merged_images,
             "reward_extra_info": reward_extra_info,
+            "episode_id": _first("episode_id"),
+            # The episode as it was spoken, conversation by conversation. The
+            # concatenated response above is what gets trained on; this is what gets read.
+            "conversations": conversations,
+            # Turns the episode ran. Prefer what the loop counted; fall back to the rows
+            # merged here, which is the same number under no_concat.
+            # The runner's count, which excludes summaries. Counting response spans
+            # instead adds one per compaction: a summary is a model output like any
+            # other, but the environment never acted on it.
+            "episode_turns": _first(
+                "episode_turns", sum(len(c["turns"]) for c in conversations) or len(turns)
+            ),
+            # How many conversations the episode spanned: 1 for concat, one per turn for
+            # no_concat, and however many compactions happened plus one for compact.
+            "n_conversations": len(conversations),
+            # data_source is deliberately absent: the input batch already carries it, and
+            # _validate unions the two. union asserts that a key present on both sides is
+            # the same object, so supplying it here fails the whole validation pass.
         }
 
         # Copy all reward_extra_info kv to top-level
@@ -266,7 +426,9 @@ def concat_val_multi_turn(
         vals = [_pad_1d(v, max_len, k) for v in vals]
         stacked_batch[k] = torch.stack(vals, dim=0)
 
-    # Dynamic non-tensor keys copied from reward_extra_info
+    # Keys the stacking below writes explicitly. This is a *skip* list for the generic
+    # copy that follows, so adding a key here without also stacking it drops the column
+    # -- which is how the identity chain went missing twice.
     base_nt_keys = {"group_idx", "traj_idx", "image_data", "reward_extra_info"}
     extra_keys: List[str] = []
     seen = set()

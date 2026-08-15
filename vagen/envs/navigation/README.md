@@ -39,6 +39,7 @@ Key parameters:
 
 ```bash
 # Terminal 1: start server
+python -m vagen.envs.navigation.serve
 
 # Terminal 2: run eval
 bash examples/evaluate/navigation/run_eval.sh
@@ -50,10 +51,11 @@ Config: `examples/evaluate/navigation/config.yaml`
 
 ```bash
 # Terminal 1: start server
+python -m vagen.envs.navigation.serve
 
 # Terminal 2: run training
 cd VAGEN
-bash examples/train/navigation/train_ppo_qwen25vl7b.sh
+bash examples/train/navigation/train_default_gae_qwen25vl7b.sh
 ```
 
 ## Performance
