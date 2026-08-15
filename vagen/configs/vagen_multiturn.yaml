@@ -94,65 +94,12 @@ trainer:
   # weights, so selection mildly prefers writing tags over solving. Select on
   # val-aux/<env>/traj_success/mean@1 instead if that matters more.
   save_best_actor: True
-  state_reward:
-    # Where a turn's scores are paid: auto | turn_end | per_span.
-    #
-    # ★ auto resolves it from `algorithm.adv_estimator`, and should stay that way. An
-    # estimator whose outer chain has one reward slot per turn (bi_level_gae) reads
-    # a turn's reward only at the turn's last token, so a score paid mid-turn is credited
-    # twice -- measured bias 0.177. The per-token estimators want the opposite (-28%
-    # variance at lam 0.9 from per-span). Neither mistake raises or shows in a curve, so
-    # setting this by hand means keeping two knobs in step forever.
-    placement: auto
-    # Independently switchable. Whichever are on decide the response format the agent
-    # is asked for, so turning one on is enough -- no separate prompt setting to keep
-    # in step with it.
-    state_estimation:            # <observation>, scored against the state acted from
-      enable: False
-      weight: 0.5                # relative only; `budget` below sets the scale
-    transition_prediction:       # <prediction>, scored against the state acted into
-      enable: False
-      weight: 0.5
-    # What a whole episode of perfect description is worth, against 1.0 for solving the
-    # level. Split across turns and across whichever rewards are on.
-    #
-    # ★ 0.1, split evenly across the enabled rewards and across the turns, so at
-    # max_turns=5 with both on each is worth **0.01 a turn** -- 2 * 0.01 * 5 = 0.10 over
-    # the episode. Paired with the environment's format_reward at 0.02 a turn (0.10 over
-    # the episode), the whole auxiliary bundle maxes at 0.20 against a success_reward of
-    # 1.0.
-    #
-    # The two have to be set together: they are separate knobs paying into the same
-    # budget, and tuning either alone moves the ratio.
-    #
-    # Both defaults were far too large. The state reward's was 1.0, equal to solving the
-    # level; the environment's format_reward is 0.1 *a turn*, which at max_turns=5 is 0.5
-    # -- half the task reward for producing well-formed text. Measured at the older fixed
-    # weights, eight trajectories with traj_success 0 scored up to 2.25, all of it
-    # description.
-    budget: 0.1
-    # ★ Subtracted from each description's f1 before it is paid, then rescaled so a
-    # perfect description still earns the full budget: max(0, (f1 - base)/(1 - base)).
-    #
-    # grouped_f1 pays 0.5 for one of two axes and each axis is a 3-way choice, so merely
-    # naming a relation scores about a third. Measured over 300 real Sokoban starts:
-    # uniform random 0.334, and the best constant answer -- "same, same", which looks at
-    # nothing -- 0.391. Without this the reward's range was 0.39 to 1.00 and the model's
-    # 0.45-0.52 sat barely above the floor, which is why descriptions that are visibly
-    # wrong were still scoring well.
-    #
-    # 0.0 restores the legacy reward exactly. 0.391 would also take away what a policy
-    # earns by finding the most common relation and repeating it.
-    score_base: 0.334
-    # Format is a gate, not a line item. A turn that skipped a section it was asked for
-    # scores nothing for the sections it did write, and writing them all pays nothing by
-    # itself -- otherwise the budget is not the budget.
-    format_reward: 0.0
-    judge_base_url: "http://127.0.0.1:8123/v1"
-    # Qwen3 generation, instruct-only: the 2507 line has no thinking mode, which for a
-    # parser on the rollout's critical path is what you want. A judge that stops to reason
-    # costs every turn of every rollout, and nothing here reads the reasoning.
-    judge_model: "Qwen/Qwen3-4B-Instruct-2507"
+  # ★ There is no state_reward here, deliberately. Scoring the agent's <observation> and
+  # <prediction> is configured in the ENVIRONMENT's own block -- envs[].config.state_reward
+  # in the train/val yaml -- alongside the judge endpoint that answers for it. Whether an
+  # environment scores descriptions, what one turn pays for one, and which judge to ask are
+  # properties of that environment, not of the trainer; evaluation needs the same three
+  # answers and has no trainer to read them from. See docs/configuration.md.
 
   # Context policy, and the only thing that selects one. Named rather than left null so
   # "the default is concat" is a fact you can read here instead of one you learn by

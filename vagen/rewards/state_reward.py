@@ -7,17 +7,22 @@ Two rewards, independently switchable:
 * **transition prediction** -- it says where they will be after
   (``<prediction>``), scored against the state it acted *into*.
 
-★ Both scores are paid on the turn's **last** token, together with the outcome and the
-format bonus. This was per-span -- each score on the last token of the section that earned
-it, a signal *within* a turn -- which is the better placement for ``token_level_gae`` and
-a variable-lambda estimator, and the wrong one for the paper's nested Bi-Level
-GAE, whose outer chain has a single reward slot per turn. Placement and advantage
-estimator are one choice, not two; ``_place`` has the measurements. The per-section
-breakdown moves to ``info`` rather than disappearing.
+★ Each score is paid **per span** -- on the last token of the section that earned it. The
+environment decides where a reward belongs; it does not know, and must not know, which
+advantage estimator will read it. An estimator that wants a turn's reward lumped onto the
+turn's final token does that lumping itself: ``bi_level_gae`` segment-sums each turn onto
+its own boundary, which it already computes. That direction is the only one that works --
+per-span can always be reduced to turn-end, while a turn-end scalar cannot be split back
+into the spans that earned it.
 
-Whichever rewards are on decide the response format the agent is asked for, and the
-format bonus is paid only when exactly those sections are present -- asking for a section
-nobody scores, or scoring one nobody asked for, are both ways to get silent zeros.
+This used to be a ``placement`` setting resolved from ``algorithm.adv_estimator``, which
+put the estimator's business inside the environment and made the two a single choice
+spread across two configs.
+
+Whichever rewards are on decide the response format the agent is asked for. Every section
+that was asked for has to be present for any of them to pay -- see ``_score`` -- so asking
+for a section nobody scores, or scoring one nobody asked for, are both ways to get silent
+zeros.
 """
 
 from __future__ import annotations
@@ -31,9 +36,6 @@ from vagen.rewards.spatial import grouped_f1
 
 #: reward name -> the tag the agent writes it in
 TAGS = {"state_estimation": "observation", "transition_prediction": "prediction"}
-
-#: where a turn's scores are paid. See `StateRewardWrapper._place`.
-PLACEMENTS = ("turn_end", "per_span")
 
 #: What a description that looked at nothing already scores. Subtracted before paying.
 #:
@@ -73,28 +75,23 @@ class StateRewardWrapper:
     env: Any
     spec: StateRewardSpec
     judge: Any = field(default_factory=NullJudge)
-    #: reward name -> weight; only the names present here are asked for and scored
+    #: reward name -> what ONE turn pays for a perfect description of that section.
+    #: An absolute per-turn number, straight from the environment's config: there is no
+    #: episode budget divided by a turn count anywhere. The number in the yaml is the
+    #: number a turn can earn, so raising `max_turns` does not silently change what the
+    #: auxiliary signal is worth relative to the task.
     enabled: dict[str, float] = field(default_factory=dict)
-    format_reward: float = 0.1
     #: Subtracted from each f1 before it is paid, then the remainder is rescaled so a
-    #: perfect description still earns the full weight: ``max(0, (f1 - base)/(1 - base))``.
-    #: Rescaled rather than merely shifted so that `budget` keeps meaning what it says --
-    #: "what a whole episode of perfect description is worth". 0.0 restores the legacy
+    #: perfect description still earns the full per-turn reward:
+    #: ``max(0, (f1 - base)/(1 - base))``. Rescaled rather than merely shifted, so the
+    #: number configured stays the number a perfect turn earns. 0.0 restores the legacy
     #: reward exactly. See `DEFAULT_SCORE_BASE` for where the number comes from.
     score_base: float = DEFAULT_SCORE_BASE
-    #: "turn_end" -- the whole turn's reward on its last token, which is what an
-    #: estimator with one reward slot per turn requires; "per_span" -- each section's
-    #: score on the last token of the section that earned it. See `_place`. Resolved from
-    #: the advantage estimator in use by `gym_loop`, not set independently, because the
-    #: two are one choice.
-    placement: str = "turn_end"
 
     def __post_init__(self):
         unknown = set(self.enabled) - set(TAGS)
         if unknown:
             raise ValueError(f"unknown state rewards {sorted(unknown)}; choose from {sorted(TAGS)}")
-        if self.placement not in PLACEMENTS:
-            raise ValueError(f"unknown placement {self.placement!r}; choose from {sorted(PLACEMENTS)}")
         self.last_scores: dict[str, float] = {}
 
     # ------------------------------------------------------------------ env facade
@@ -167,7 +164,7 @@ class StateRewardWrapper:
         spans = {name: tagged_span(action, tag) for name, tag in TAGS.items() if name in self.enabled}
         present = [(name, span) for name, span in spans.items() if span is not None]
 
-        scores: dict[str, Any] = {"spans": spans, "format": 0.0}
+        scores: dict[str, Any] = {"spans": spans}
         for name in self.enabled:
             scores[name] = 0.0
 
@@ -175,6 +172,10 @@ class StateRewardWrapper:
         # was asked for scores nothing for the ones it did write. Paying per-section
         # makes the rest optional, and an agent that learns to describe well while
         # skipping a section has learned to farm the auxiliary reward.
+        #
+        # There is deliberately no format reward of its own here. Writing the sections is
+        # what makes the descriptions scoreable; it is not separately worth money. The one
+        # format knob a run has is the environment's own `format_reward`.
         if len(present) < len(self.enabled):
             return scores
 
@@ -193,16 +194,15 @@ class StateRewardWrapper:
                     grouped_f1(items, gold[name], self.spec.object_weights)
                 )
             )
-        scores["format"] = self.format_reward
         return scores
 
     def _above_base(self, f1: float) -> float:
         """How much of the description was better than saying something at random.
 
-        ``max(0, (f1 - base) / (1 - base))``. The rescale is what keeps `budget` honest:
-        a perfect description still earns the full weight, so "an episode of perfect
-        description is worth `budget`" stays true. A plain subtraction would quietly cap
-        the achievable auxiliary reward at ``(1 - base)`` of what the config promises.
+        ``max(0, (f1 - base) / (1 - base))``. The rescale keeps the configured per-turn
+        reward honest: a perfect description still earns the full number written in the
+        yaml. A plain subtraction would quietly cap the achievable auxiliary reward at
+        ``(1 - base)`` of what the config promises.
 
         Clipped at zero: a description worse than chance is not a debt, it is just worth
         nothing, and a negative auxiliary reward would push against the task reward.
@@ -213,62 +213,41 @@ class StateRewardWrapper:
         return max(0.0, (f1 - base) / (1.0 - base))
 
     def _place(self, scored: dict, outcome: float, token_ids, tokenizer) -> list[float]:
-        """Pay the turn's scores, either all on its last token or each on its own section.
+        """Pay each section's score on the last token of the section that earned it.
 
-        ★ Which of the two is right is decided by the advantage estimator, not by taste,
-        and ``gym_loop`` resolves it from the estimator in use rather than letting the two
-        be configured apart:
+        On the *last* token because a span's score is a property of the whole span, so it
+        is only determined at the token that completes it.
 
-        ``turn_end``
-            Everything on the turn's final token. Required by an estimator whose outer
-            chain has one reward slot per turn -- ``bi_level_gae`` reads a turn's
-            reward only there, so a score left mid-turn is credited once by the inner
-            token chain and again by the outer turn chain (measured bias 0.177 against an
-            exact policy gradient, and a critic fixed-point error of exactly the misplaced
-            weight).
+        ★ This environment does not ask what the advantage estimator is, and the answer
+        would not change what it does here. A reward belongs where it was earned; turning
+        that into whatever shape an estimator needs is the estimator's job.
+        ``bi_level_gae`` reads a turn's reward only at the turn's final token, so it
+        segment-sums each turn onto its own boundary before its outer pass -- see
+        ``vagen/custom_advantage/trajectory_algos.py``. The reduction only runs in that
+        direction: per-span carries strictly more information than a turn-end scalar, and
+        a scalar cannot be split back into the spans that earned it.
 
-        ``per_span``
-            Each section's score on the last token of the section that earned it -- on the
-            last, because a span's score is a property of the whole span, so it is
-            determined at the step that completes it. Better for ``token_level_gae`` and
-            a variable-lambda estimator: measured -28% variance at lam 0.9 and
-            -45% at 0.8, and exactly invariant once the critic is self-consistent, because
-            a lumped score otherwise has to be *remembered* by ``V`` for the rest of the
-            turn.
+        The outcome reward is different in kind -- it is the environment's verdict on the
+        whole turn, not on any span of text -- so it goes on the turn's last token.
 
-        The per-turn total is identical either way, so nothing here opens a length-hacking
-        channel, and the per-section breakdown is reported through ``info`` regardless.
-
-        ``turn_end`` also skips the tokenizer entirely. Locating a span needs
-        ``token_offsets``, which decodes every prefix of the response -- O(n) decodes over
-        O(n) characters, once per turn per rollout.
+        Cost, stated because it is the price of the decoupling and not free: locating a
+        span needs ``token_offsets``, which decodes every prefix of the response, O(n)
+        decodes over O(n) characters once per turn per rollout. The old ``turn_end``
+        placement skipped the tokenizer entirely. It bought that by knowing which
+        estimator was downstream.
         """
-        if self.placement == "per_span":
-            offsets = token_offsets(list(token_ids), tokenizer)
-            vector = [0.0] * len(offsets)
-            for name in self.enabled:
-                span, value = scored["spans"].get(name), scored.get(name)
-                if span is None or not value:
-                    continue
-                covered = tokens_covering(span, offsets)
-                if covered:
-                    vector[covered[-1]] += value
-            # The outcome and the format bonus belong to the turn as a whole either way.
-            if vector:
-                vector[-1] += outcome + scored.get("format", 0.0)
-            return vector
-
-        total = 0.0
+        offsets = token_offsets(list(token_ids), tokenizer)
+        vector = [0.0] * len(offsets)
         for name in self.enabled:
-            value = scored.get(name)
+            span, value = scored["spans"].get(name), scored.get(name)
             # A section with no span scored nothing anyway -- `_score` gates on every
             # section being present -- but a score without the span that justifies it
             # must never be paid, however `_score` is changed later.
-            if scored["spans"].get(name) is None or not value:
+            if span is None or not value:
                 continue
-            total += value
-
-        vector = [0.0] * len(token_ids)
+            covered = tokens_covering(span, offsets)
+            if covered:
+                vector[covered[-1]] += value
         if vector:
-            vector[-1] += total + outcome + scored.get("format", 0.0)
+            vector[-1] += outcome
         return vector

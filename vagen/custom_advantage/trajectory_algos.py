@@ -117,6 +117,40 @@ class _Packed:
         """True at the last model-output token of each turn."""
         return _is_turn_boundary(self.index, self.valid, self.width)
 
+    def rewards_lumped_to_turn_end(self) -> torch.Tensor:
+        """``seq_r`` with each turn's rewards summed onto that turn's final token.
+
+        For estimators whose outer chain has one reward slot per turn and therefore read
+        a turn's reward only at its last token -- see ``registry.wants_turn_lumped_reward``
+        and the ★ note on :func:`bi_level_gae`. Anything left mid-turn is invisible to
+        that chain, so an estimator that needs this shape has to produce it.
+
+        ★ It reduces here rather than at the source. The environment pays a reward on the
+        tokens that earned it, because that is what it knows; which estimator will read it
+        is not the environment's business and is not knowable from inside a rollout. This
+        direction is also the only one available: summing spans onto a boundary is
+        well-defined, recovering spans from a boundary total is not.
+
+        The per-turn total is preserved exactly, so this opens no length-hacking channel;
+        it only moves where within a turn the reward sits.
+        """
+        bnd = self.boundary() & self.valid
+        # A trajectory's trailing tokens need a home. Every turn should end at a boundary
+        # and the last valid token should be one, but a reward summed into a turn whose
+        # boundary is missing would be dropped without a trace -- so the final valid token
+        # counts as a boundary here whether or not it is flagged as one.
+        last_valid = self.valid & ~torch.cat(
+            [self.valid[:, 1:], torch.zeros_like(self.valid[:, :1])], dim=1
+        )
+        bnd = bnd | last_valid
+
+        # Turn id per position: how many boundaries lie strictly before it. At a boundary
+        # that is the turn the boundary closes, so a boundary and its own turn agree.
+        seg = bnd.long().cumsum(dim=1) - bnd.long()
+        masked = torch.where(self.valid, self.seq_r, torch.zeros_like(self.seq_r))
+        totals = torch.zeros_like(masked).scatter_add_(1, seg, masked)
+        return torch.where(bnd, totals.gather(1, seg), torch.zeros_like(masked))
+
     def seam(self, ends_with_summary) -> torch.Tensor:
         """True at the last model-output token of a compaction summary.
 
@@ -465,9 +499,11 @@ def compute_bi_level_gae(inputs: AdvantageInputs):
     turn boundary, and the overwrite is why the token carrying the outcome reward learns
     from the turn advantage rather than its own delta.
 
-    ★ Requires the turn's reward to sit on the turn's last token, because pass 1 reads the
-    reward only there. ``vagen/rewards/state_reward.py`` places it that way; a reward left
-    mid-turn is invisible to the outer chain and credited by the inner one alone.
+    ★ Pass 1 reads a turn's reward only at the turn's last token, so this estimator lumps
+    it there itself, via ``_Packed.rewards_lumped_to_turn_end``. It does not ask the
+    environment to pay it that way: where a reward is earned is the environment's business,
+    what shape this recursion needs is this function's, and a reward left mid-turn would
+    otherwise be invisible to the outer chain and credited by the inner one alone.
 
     ★ Two clocks, two gammas -- ``gamma`` for tokens, ``+algorithm.high_level_gamma`` for
     turns. Two explicit gammas is what makes this well-defined away from 1.0, and why it
@@ -494,7 +530,11 @@ def compute_bi_level_gae(inputs: AdvantageInputs):
 
     with torch.no_grad():
         packed = _pack(inputs)
-        valid, seq_r, seq_v = packed.valid, packed.seq_r, packed.seq_v
+        valid, seq_v = packed.valid, packed.seq_v
+        # Pass 1 steps only over turn-final tokens, so fold each turn's reward onto its own
+        # boundary first. The environment pays per span; this is where that becomes the
+        # one-slot-per-turn shape the outer chain requires.
+        seq_r = packed.rewards_lumped_to_turn_end()
         # The released code's `reward_mask`: one position per turn, at its last token.
         turn_end = packed.boundary() & valid
         n_traj, max_len = valid.shape

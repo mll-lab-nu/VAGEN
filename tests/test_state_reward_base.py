@@ -40,10 +40,8 @@ def test_the_base_is_subtracted_and_rescaled(f1, base, expected):
     assert _w(base)._above_base(f1) == pytest.approx(expected, abs=1e-6)
 
 
-def test_a_perfect_description_still_earns_the_full_budget():
-    """★ Rescaled, not merely shifted. A plain `f1 - base` would cap the achievable
-    auxiliary reward at (1 - base) of what `budget` promises, so the config would quietly
-    stop meaning what it says."""
+def test_a_perfect_description_still_earns_the_configured_reward():
+    """Rescaled, not merely shifted, so the yaml's per-turn number stays truthful."""
     for base in (0.0, 0.334, 0.5, 0.9):
         assert _w(base)._above_base(1.0) == pytest.approx(1.0), base
 
@@ -71,9 +69,9 @@ async def test_it_reaches_the_paid_score_end_to_end():
     ids = [ord(c) for c in action]
 
     full = StateRewardWrapper(env=Env(BOX, BOX, reward=0.0), spec=_spec(), judge=Judge(BOX),
-                              enabled={"state_estimation": 1.0}, format_reward=0.0, score_base=0.0)
+                              enabled={"state_estimation": 1.0}, score_base=0.0)
     based = StateRewardWrapper(env=Env(BOX, BOX, reward=0.0), spec=_spec(), judge=Judge(BOX),
-                               enabled={"state_estimation": 1.0}, format_reward=0.0, score_base=0.5)
+                               enabled={"state_estimation": 1.0}, score_base=0.5)
     # A *perfect* description is unchanged by the base -- that is the rescale working.
     _, _, _, i_full = await full.step(action, ids, CharTokenizer())
     _, _, _, i_based = await based.step(action, ids, CharTokenizer())
@@ -83,9 +81,9 @@ async def test_it_reaches_the_paid_score_end_to_end():
     # A half-right one is not.
     half = [{"object_id": "box", "vertical_relation": "below", "horizontal_relation": "WRONG"}]
     a = StateRewardWrapper(env=Env(BOX, BOX, reward=0.0), spec=_spec(), judge=Judge(half),
-                           enabled={"state_estimation": 1.0}, format_reward=0.0, score_base=0.0)
+                           enabled={"state_estimation": 1.0}, score_base=0.0)
     b = StateRewardWrapper(env=Env(BOX, BOX, reward=0.0), spec=_spec(), judge=Judge(half),
-                           enabled={"state_estimation": 1.0}, format_reward=0.0, score_base=0.5)
+                           enabled={"state_estimation": 1.0}, score_base=0.5)
     _, _, _, ia = await a.step(action, ids, CharTokenizer())
     _, _, _, ib = await b.step(action, ids, CharTokenizer())
     assert ia["state_reward/state_estimation"] == pytest.approx(0.5)

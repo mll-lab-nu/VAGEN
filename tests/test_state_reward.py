@@ -3,9 +3,9 @@
 What matters is where the credit lands, not only how much of it there is. A scalar that
 sums correctly but sits on the wrong tokens is exactly as invisible as a misplaced mask.
 
-Since 2026-08-10 everything a turn earns is paid on the turn's last token; the per-section
-breakdown lives in ``info`` instead. See ``StateRewardWrapper._place`` for why that is
-coupled to which advantage estimator is in use.
+Each description score is paid on the final token of the section that earned it. An
+advantage estimator that needs a coarser shape reduces it itself; the environment does
+not know which estimator will consume the reward.
 """
 
 import types
@@ -109,7 +109,7 @@ async def test_only_the_enabled_reward_is_scored():
     """Turning one off must stop paying for it, not merely stop asking."""
     action = "<observation>A</observation><prediction>B</prediction>"
     w = _wrapper(Env(BOX, BOX, reward=0.0), Judge(BOX, BOX),
-                 enabled={"state_estimation": 1.0}, format_reward=0.0)
+                 enabled={"state_estimation": 1.0})
 
     _, _, _, info = await w.step(action, [ord(c) for c in action], CharTokenizer())
 
@@ -123,38 +123,21 @@ async def test_only_the_enabled_reward_is_scored():
 
 
 @pytest.mark.asyncio
-async def test_everything_a_turn_earned_lands_on_its_last_token():
-    """★ Every score a turn earns is paid at the turn's last token, not at the section
-    that earned it.
-
-    This was per-span, and per-span is the better placement for ``token_level_gae`` and
-    a variable-lambda estimator. It is the wrong one for the paper's nested
-    Bi-Level GAE, whose outer chain has a single reward slot per turn: a score sitting
-    mid-turn is credited by the inner token chain and then again by the outer one
-    (measured bias 0.177 against an exact policy gradient). The estimator and the
-    placement have to be chosen together, and this is the pair the paper defines.
-
-    The per-section breakdown is not lost, it moves -- see the ``info`` assertions
-    below. What is lost is the *within-turn* gradient signal, which is the price.
-    """
+async def test_each_description_is_paid_on_the_span_that_earned_it():
+    """The environment preserves within-turn credit; estimators may reduce it later."""
     action = "<observation>A</observation>zz<prediction>B</prediction>"
     moved = [{"object_id": "box", "vertical_relation": "above", "horizontal_relation": "same"}]
     w = _wrapper(
         Env(before=BOX, after=moved), Judge(BOX, moved),
-        enabled={"state_estimation": 1.0, "transition_prediction": 1.0}, format_reward=0.0,
+        enabled={"state_estimation": 1.0, "transition_prediction": 1.0},
     )
 
     _, vector, _, info = await w.step(action, [ord(c) for c in action], CharTokenizer())
 
-    # 1.0 estimation + 1.0 prediction + Env's own 1.0 outcome, all on one token: the
-    # outcome already sat there, and the two description scores now join it.
-    assert vector[-1] == pytest.approx(3.0), "the turn's whole reward belongs on its last token"
-    assert sum(vector[:-1]) == pytest.approx(0.0), "nothing may be paid before the turn ends"
-    # The total is what it always was -- this moves reward, it does not create any, so
-    # no length-hacking channel opens.
+    assert vector[action.index("A")] == pytest.approx(1.0)
+    assert vector[action.index("B")] == pytest.approx(1.0)
+    assert vector[-1] == pytest.approx(1.0), "the environment outcome belongs to the turn"
     assert sum(vector) == pytest.approx(3.0)
-    # ★ Which half of the reasoning was right is still reported, on the channel that
-    # survives the move. Without this the two terms become indistinguishable everywhere.
     assert info["state_reward/state_estimation"] == pytest.approx(1.0)
     assert info["state_reward/transition_prediction"] == pytest.approx(1.0)
 
@@ -167,10 +150,10 @@ async def test_prediction_is_scored_against_the_state_after_the_step():
     moved = [{"object_id": "box", "vertical_relation": "above", "horizontal_relation": "same"}]
     on = {"transition_prediction": 1.0}
 
-    w = _wrapper(Env(before=BOX, after=moved), Judge(moved), enabled=on, format_reward=0.0)
+    w = _wrapper(Env(before=BOX, after=moved), Judge(moved), enabled=on)
     _, _, _, after = await w.step(action, [ord(c) for c in action], CharTokenizer())
 
-    w2 = _wrapper(Env(before=BOX, after=BOX), Judge(moved), enabled=on, format_reward=0.0)
+    w2 = _wrapper(Env(before=BOX, after=BOX), Judge(moved), enabled=on)
     _, _, _, before = await w2.step(action, [ord(c) for c in action], CharTokenizer())
 
     assert after["state_reward/transition_prediction"] == pytest.approx(1.0)
@@ -181,7 +164,7 @@ async def test_prediction_is_scored_against_the_state_after_the_step():
 async def test_a_wrong_description_earns_nothing_but_does_not_go_negative():
     action = "<observation>A</observation>"
     wrong = [{"object_id": "box", "vertical_relation": "above", "horizontal_relation": "left"}]
-    w = _wrapper(Env(BOX, BOX, reward=0.0), Judge(wrong), format_reward=0.0)
+    w = _wrapper(Env(BOX, BOX, reward=0.0), Judge(wrong))
 
     _, vector, _, _ = await w.step(action, [ord(c) for c in action], CharTokenizer())
 
@@ -193,7 +176,7 @@ async def test_a_judge_outage_costs_the_process_reward_not_the_rollout():
     """★ The judge is a parser, not part of training. Losing it should cost one turn's
     shaping, not raise into the rollout."""
     action = "<observation>A</observation>"
-    w = _wrapper(Env(BOX, BOX, reward=2.0), Judge(None), format_reward=0.0)
+    w = _wrapper(Env(BOX, BOX, reward=2.0), Judge(None))
 
     _, vector, _, _ = await w.step(action, [ord(c) for c in action], CharTokenizer())
 
@@ -202,32 +185,32 @@ async def test_a_judge_outage_costs_the_process_reward_not_the_rollout():
 
 @pytest.mark.asyncio
 async def test_the_outcome_reward_stays_on_the_last_token():
-    """The outcome always sat there; now the description score joins it, so the last
-    token carries the turn's whole 3.0 + 1.0 rather than the outcome alone."""
+    """The turn outcome stays at the end while description credit stays on its span."""
     action = "<observation>A</observation>zz"
-    w = _wrapper(Env(BOX, BOX, reward=3.0), Judge(BOX), format_reward=0.0)
+    w = _wrapper(Env(BOX, BOX, reward=3.0), Judge(BOX))
 
     _, vector, _, _ = await w.step(action, [ord(c) for c in action], CharTokenizer())
 
-    assert vector[-1] == pytest.approx(4.0)
+    assert vector[action.index("A")] == pytest.approx(1.0)
+    assert vector[-1] == pytest.approx(3.0)
     assert sum(vector) == pytest.approx(4.0)
 
 
 @pytest.mark.asyncio
-async def test_the_format_bonus_needs_every_section_that_is_scored():
-    """Paying it for a subset makes the rest optional."""
-    both_on = {"state_estimation": 0.0, "transition_prediction": 0.0}
+async def test_every_enabled_section_is_required_before_any_description_pays():
+    """A partial response must not farm the section it happened to include."""
+    both_on = {"state_estimation": 1.0, "transition_prediction": 1.0}
     one = "<observation>A</observation>"
     both = "<observation>A</observation><prediction>B</prediction>"
 
-    w1 = _wrapper(Env(BOX, BOX, reward=0.0), Judge(BOX), enabled=both_on, format_reward=0.5)
+    w1 = _wrapper(Env(BOX, BOX, reward=0.0), Judge(BOX), enabled=both_on)
     _, v1, _, _ = await w1.step(one, [ord(c) for c in one], CharTokenizer())
 
-    w2 = _wrapper(Env(BOX, BOX, reward=0.0), Judge(BOX, BOX), enabled=both_on, format_reward=0.5)
+    w2 = _wrapper(Env(BOX, BOX, reward=0.0), Judge(BOX, BOX), enabled=both_on)
     _, v2, _, _ = await w2.step(both, [ord(c) for c in both], CharTokenizer())
 
     assert sum(v1) == pytest.approx(0.0)
-    assert sum(v2) == pytest.approx(0.5)
+    assert sum(v2) == pytest.approx(2.0)
 
 
 @pytest.mark.asyncio
@@ -247,7 +230,7 @@ async def test_both_descriptions_of_a_turn_go_out_in_one_batch():
 async def test_without_tokens_the_wrapper_degrades_to_a_scalar():
     """An env used outside the token-aware loop should still work, just coarsely."""
     action = "<observation>A</observation>"
-    w = _wrapper(Env(BOX, BOX, reward=1.0), Judge(BOX), format_reward=0.0)
+    w = _wrapper(Env(BOX, BOX, reward=1.0), Judge(BOX))
 
     _, reward, _, _ = await w.step(action)
 

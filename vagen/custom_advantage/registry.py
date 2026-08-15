@@ -166,19 +166,21 @@ def requires_undiscounted(adv_estimator) -> bool:
 
 
 def wants_turn_lumped_reward(adv_estimator) -> bool:
-    """Whether a turn's reward must sit on the turn's last token for this estimator.
+    """Whether this estimator reads a turn's reward only at the turn's last token.
 
-    ★ Reward placement and advantage estimator are one choice, not two. An estimator
-    whose outer chain has a single reward slot per turn -- ``bi_level_gae`` reads
-    the reward only at each turn-final token -- credits a mid-turn reward once through
-    the inner token chain and again through the outer turn chain: measured bias 0.177
-    against an exact policy gradient, and a critic fixed-point error of exactly the
-    misplaced weight. The estimators with a reward slot per *token* prefer the opposite,
-    because a lumped score has to be remembered by ``V`` for the rest of the turn
-    (measured -28% variance at lam 0.9 from placing per span, -45% at 0.8).
+    ★ Declarative, not a lever. An estimator whose outer chain has a single reward slot
+    per turn -- ``bi_level_gae`` reads the reward only at each turn-final token -- would
+    otherwise credit a mid-turn reward once through the inner token chain and again
+    through the outer turn chain: measured bias 0.177 against an exact policy gradient,
+    and a critic fixed-point error of exactly the misplaced weight. The estimators with a
+    reward slot per *token* want the opposite, because a lumped score has to be remembered
+    by ``V`` for the rest of the turn (measured -28% variance at lam 0.9 from per-span,
+    -45% at 0.8).
 
-    Neither failure raises. This is what lets the reward wrapper resolve its placement
-    from the estimator in use instead of both being set by hand and drifting apart.
+    Neither failure raises. An estimator that needs the lumped shape therefore builds it
+    itself, from the per-span rewards the environment paid -- see
+    ``_Packed.rewards_lumped_to_turn_end``. Environments do not know which estimator will
+    read them, and nothing asks them to.
     """
     return _name_of(adv_estimator) in TURN_LUMPED_REWARD_ESTIMATORS
 

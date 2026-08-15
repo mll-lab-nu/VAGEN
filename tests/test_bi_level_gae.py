@@ -90,8 +90,9 @@ class _Cfg(dict):
 
 
 #: One episode, three turns of unequal length, an observation between each.
-#: ``.`` = model token, ``o`` = observation. Reward sits on each turn's LAST model token,
-#: which is where `state_reward._place` now puts it and where pass 1 reads it.
+#: ``.`` = model token, ``o`` = observation. This fixture is already turn-lumped so it can
+#: be compared directly with the released implementation; a separate test below pins the
+#: new reduction from per-span rewards.
 MASK = [1, 1, 1, 0, 1, 1, 0, 1]           # turns: [0,1,2] [4,5] [7]
 SCORES = [0.0, 0.0, 0.3, 0.0, 0.0, -0.2, 0.0, 1.0]
 VALUES = [0.10, 0.25, 0.40, 9.9, 0.55, 0.70, 9.9, 0.85]
@@ -254,6 +255,18 @@ def test_the_two_layouts_agree():
     a_split, r_split, m_split = _call("bi_level_gae", _split(), lam=0.9)
     assert _at(r_concat, m_concat) == pytest.approx(_at(r_split, m_split))
     assert _at(a_concat, m_concat) == pytest.approx(_at(a_split, m_split))
+
+
+def test_per_span_rewards_are_reduced_to_the_same_turn_totals_internally():
+    """The environment no longer has to know that this estimator wants one slot/turn."""
+    per_span = [0.3, 0.0, 0.0, 0.0, -0.2, 0.0, 0.0, 1.0]
+    layout = ([per_span], [MASK], [VALUES], ["g"], [0], [0])
+
+    a_lumped, r_lumped, m_lumped = _call("bi_level_gae", _concat(1), lam=0.9)
+    a_span, r_span, m_span = _call("bi_level_gae", layout, lam=0.9)
+
+    assert _at(r_span, m_span) == pytest.approx(_at(r_lumped, m_lumped))
+    assert _at(a_span, m_span) == pytest.approx(_at(a_lumped, m_lumped))
 
 
 def test_registry_declarations():
