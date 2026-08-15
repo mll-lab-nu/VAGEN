@@ -1,5 +1,5 @@
-# InternVL3.5's base model is prone to long repetition when asked to reproduce the full
-# world-model protocol. Keep its native reasoning free-form and mark only the action.
+# InternVL uses the complete Sokoban world-model contract. Keep it strict so an
+# action-only response cannot silently train away observation, reasoning, and prediction.
 envs:
   - name: Sokoban
     n_envs: 10000
@@ -10,6 +10,7 @@ envs:
     max_env_response_per_turn: 320
     config:
       render_mode: vision
-      prompt_format: answer
+      prompt_format: wm
+      strict_format: true
       format_reward: 0.02
       min_solution_steps: [1,5]
