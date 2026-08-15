@@ -273,9 +273,6 @@ bash examples/evaluate/frozenlake/sglang/eval_qwen25_vl_3b.sh
 
 To train on your own environment, follow the steps below.
 
-> A ★ in a comment, in the code or in a config, marks something that was got wrong once —
-> the note says what the failure looked like rather than what the line does. Worth reading
-> before changing the line it sits on.
 
 ### 1. Create Your Environment Class
 
