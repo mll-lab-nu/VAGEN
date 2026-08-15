@@ -7,13 +7,15 @@ confusion:
 |---|---|---|
 | **The training script** | model, GPUs, batch sizes, budgets — as hydra overrides | `examples/train/<env>/*.sh` |
 | **The dataset yaml** | which environments, how many, how many turns, per-turn budgets | `data.train_files` / `data.val_files` |
-| **The base config** | everything else, with defaults | [`vagen/configs/vagen_multiturn.yaml`](https://github.com/mll-lab-nu/VAGEN/blob/main/vagen/configs/vagen_multiturn.yaml) |
+| **The base config** | everything else, with defaults | [`vagen/configs/vagen_multiturn.yaml`](../vagen/configs/vagen_multiturn.yaml) |
 
 !!! warning "`baseline_vllm.flags` overrides the base config"
     Every shipped script sources `vagen/configs/baseline_vllm.flags`, and it wins over
     `vagen_multiturn.yaml`. Two that matter: `data.max_prompt_length` is **1000** in the
     flags file and 9000 in the yaml, and `actor_rollout_ref.rollout.name` is **vllm** in
-    the flags file and `sglang` in the yaml. Read the flags file, not only the yaml.
+    the flags file and `sglang` in the yaml. A model launcher can override the flags again
+    later (InternVL uses 1600 prompt tokens and GLM uses 1400), so the final command-line
+    occurrence wins.
 
 ---
 
@@ -88,23 +90,27 @@ envs:
     harness: mypkg.harnesses:MyHarness   # an import path
 ```
 
-(One key per block: `harness` twice under one `trainer:` is a duplicate mapping key and
-OmegaConf raises on it.)
+(Only one `harness` key per block. Writing it twice under the same `trainer:` is a duplicate
+mapping key, and OmegaConf raises an error.)
 
-For training, the module has to be imported inside the workers, which is what
-`actor_rollout_ref.model.external_lib` is for: verl builds a registry per worker process.
+In training, verl builds a separate registry in each worker process, so your module has to
+be imported inside every one of them. That is what `actor_rollout_ref.model.external_lib`
+does.
 
-★ Evaluation accepts both spellings but imports nothing, so in practice use the import path
-there: `run_eval` has no `external_lib` hook, and a bare registered name fails with
-`unknown harness 'mine'; choose from ['compact', 'concat', 'no_concat']`.
+★ In evaluation, use the import path. `run_eval` never imports anything on your behalf —
+there is no `external_lib` setting there — so a registered name on its own fails with:
+
+```
+unknown harness 'mine'; choose from ['compact', 'concat', 'no_concat']
+```
 
 ---
 
 ## Advantage estimator — `algorithm.adv_estimator`
 
 VAGEN overrides verl's default `gae` with `default_gae`. verl's own estimators open every
-row with `nextvalues=0`, which is right when a row is an episode and wrong when it is one
-turn.
+row with `nextvalues=0`, which is right only when the row ends in a true terminal state and
+wrong when it is merely one turn of a longer trajectory.
 
 | estimator | scores | extra parameter |
 |---|---|---|
@@ -114,7 +120,8 @@ turn.
 | `trajectory_grpo` | group-relative, over trajectories | — |
 | verl's `gae`, `grpo`, … | one row — **`concat` only** | — |
 
-falls back to `algorithm.gamma` with a warning if omitted.
+code can fall back to `algorithm.gamma`, but that is not the published/shipped experiment:
+GAE. Set it explicitly for reproduction.
 
 ```bash
 ```
@@ -127,6 +134,13 @@ falls back to `algorithm.gamma` with a warning if omitted.
     run unless `algorithm.gamma=1.0`. None of the shipped estimators does; it is there for
     a custom one that mixes a per-token and a per-turn clock, where the two only agree at
     1.0 and the disagreement otherwise looks like noise rather than a bug.
+
+!!! warning "Timeout truncation is not yet value-bootstrapped"
+    `TurnLimit` distinguishes an environment termination from a `max_turns` truncation,
+    but the final observation value is not yet carried into the training batch. Both GAE
+    implementations therefore currently start their backward recursion from zero at either
+    kind of episode boundary. Do not describe a time-limit cutoff as theoretically terminal
+    when interpreting returns; proper truncation bootstrapping remains follow-up work.
 
 ---
 
@@ -144,7 +158,7 @@ envs:
     max_turns: 5
     response_length_per_turn: 512
     max_env_response_per_turn: 256
-    config: {}             # passed to the environment untouched -- see below
+    config: {}             # environment settings; shared wrappers are handled first
 ```
 
 | key | meaning |
@@ -160,7 +174,7 @@ envs:
 | `max_env_response_per_turn` | ceiling on one observation; over it the text is cut. Default 2048 |
 | `thinking_token_budget` | tokens allowed *inside* a reasoning block — see **Budgets** |
 | `env_response_length` | deprecated spelling of `max_env_response_per_turn`; setting both raises |
-| `config` | environment-specific, passed straight through |
+| `config` | environment-specific settings. `state_reward` is removed to build its shared wrapper; remaining keys initialize the environment config dataclass |
 
 ### Seeds
 
@@ -220,15 +234,17 @@ required: hydra's override lexer rejects a bare `<think>`.
 
 ## Per-environment `config:`
 
-Passed to the environment's config dataclass untouched, so the keys differ per environment
-— **and so do the defaults for keys they share.** Sokoban
+Most keys are passed to the environment's config dataclass, so they differ per environment
+— **and so do the defaults for keys they share.** `state_reward` is the shared exception:
+VAGEN removes it first and builds `StateRewardWrapper`; `max_turns` lives outside this block
+and builds `TurnLimit`. Sokoban
 (`vagen/envs/sokoban/sokoban_env.py`):
 
 | key | default | notes |
 |---|---|---|
 | `render_mode` | `text` | `text` or `vision` |
 | `prompt_format` | **`wm`** | see below |
-| `format_reward` | **`0.1`** | the shipped yamls set `0.02`: at `max_turns: 5` the default pays 0.5 for formatting against 1.0 for solving |
+| `format_reward` | **`0.1`** | ordinary shipped yamls set `0.02`; the state-reward yamls set `0.03` |
 | `success_reward` | `1.0` | |
 | `strict_format` | `true` | a malformed turn has its actions discarded |
 | `use_example_in_sys_prompt` | `true` | |
@@ -242,7 +258,7 @@ FrozenLake's defaults are **not** the same — `prompt_format` defaults to `free
 | format | shape | available on |
 |---|---|---|
 | `wm` | `<observation><think><answer><prediction>` | sokoban, frozenlake, primitive_skill |
-| `free_think` | `<think>…</think>` then `<answer>` | sokoban, frozenlake, primitive_skill |
+| `free_think` | free reasoning closed by `</think>`, then an accepted action marker | sokoban, frozenlake, primitive_skill |
 | `free_wm` | observation / answer / prediction, free prose between | **sokoban only** |
 | `answer` | `<answer>` only | **sokoban only** |
 | `wm`, `free_think`, `no_think`, `eval_mode` | navigation's own set, and it tags the action `<action>`, not `<answer>` | **navigation only** |
@@ -250,14 +266,34 @@ FrozenLake's defaults are **not** the same — `prompt_format` defaults to `free
 `SpatialGym` has no `prompt_format`: the field is `init=False` and it parses `THINK:` /
 `FINAL ANSWER:` labels with a whole-text fallback.
 
-!!! danger "`<think>` is a reserved token on some model families"
-    On Qwen2.5-VL and InternVL3 it is ordinary text. On **Qwen3-VL, Qwen3.5 and GLM** it is
-    a single reserved control token that the model will not emit as text — so `wm`, which
-    requires it, scores **zero** there while every other metric looks healthy. Use `free_wm`
-    or `free_think` on those families. Note that `primitive_skill` *defaults* to `wm`.
+!!! danger "Thinking delimiters are model-family specific"
+    Qwen2.5-VL and InternVL3/3.5 can emit a literal `<think>` string. On **Qwen3-VL,
+    Qwen3.5 and GLM**, thinking delimiters are reserved control tokens and the chat template
+    may open the reasoning channel before generation. A strict `wm` prompt that demands a
+    newly generated literal `<think>` can therefore score zero even when actions are sound.
 
-    `free_think` is for a model reasoning in its own thinking channel. A non-thinking model
-    should stay on `wm`.
+    `free_think` permits either opening convention, but still requires reasoning to close
+    with `</think>` before the action. For GLM, the parser also accepts its native
+    `<|begin_of_box|>…<|end_of_box|>` action marker. This is parser equivalence only: VAGEN
+    does not replace or rewrite the sampled text, token IDs, or rollout logprobs into
+    `<answer>`. Note that `primitive_skill` *defaults* to `wm`.
+
+### Model-family compatibility
+
+The shared vLLM flags enable fused kernels, but the experimental model launchers need
+family-specific exceptions:
+
+- **InternVL3.5:** set `actor_rollout_ref.model.use_fused_kernels=False`; the generic fused
+  path is text-only for an unknown VLM. Also keep
+  `engine_kwargs.vllm.hf_overrides.tie_word_embeddings=false`, so vLLM loads the checkpoint's
+  separate language-model head.
+- **GLM-4.6V-Flash:** keep native thinking enabled, raw rollout logprobs enabled, and the
+  GPT-J-style multimodal RoPE compatibility hook used by its launcher.
+
+The shipped launchers still select vLLM. Installing the SGLang extra does not switch their
+training backend. Before a long run, use the exact launcher and append
+`trainer.val_only=true trainer.save_freq=-1 trainer.test_freq=-1` to validate prompt,
+parser, vision inputs and harness together.
 
 ---
 
@@ -291,17 +327,17 @@ envs:
   - name: Sokoban
     config:
       state_reward:
-        state_estimation:      {enable: true, reward: 0.01}
-        transition_prediction: {enable: true, reward: 0.01}
+        state_estimation:      {enable: true, reward: 0.03}
+        transition_prediction: {enable: true, reward: 0.03}
         score_base: 0.334
         judge_base_url: ${oc.env:JUDGE_BASE_URL,http://127.0.0.1:8123/v1}
         judge_model: ${oc.env:JUDGE_MODEL,Qwen/Qwen3-4B-Instruct-2507}
 ```
 
-    Before spending GPU time on it, check the judge can actually do the conversion on your
-    environment: `JUDGE_URL=http://127.0.0.1:8123/v1 python tools/judge_eval.py` scores it
-    against hand-labelled cases. A judge that reads the descriptions wrong pays a reward
-    signal that looks like learning.
+Before spending GPU time on it, check the judge can actually do the conversion on your
+environment: `JUDGE_URL=http://127.0.0.1:8123/v1 python tools/judge_eval.py` scores it
+against hand-labelled cases. A judge that reads the descriptions wrong pays a reward
+signal that looks like learning.
 
 **`state_estimation`** scores the `<observation>`, i.e. the state the agent acted *from*.
 **`transition_prediction`** scores the `<prediction>`, the state it acted *into*. They switch
@@ -310,9 +346,11 @@ there is no separate prompt setting to keep in step.
 
 **`reward` is absolute and per turn.** The number in the yaml is exactly what a perfect
 description of that section pays on one turn; it is not divided by `max_turns` and there is
-no `weight` or episode `budget`. In the example above, both sections over five perfect turns
-pay `2 × 0.01 × 5 = 0.10`. Raising `max_turns` therefore changes the maximum possible episode
-total explicitly rather than silently shrinking every turn's learning signal.
+no `weight` or episode `budget`. In the example above, both judged sections over five
+perfect turns pay `2 × 0.03 × 5 = 0.30`; format pays up to `0.03 × 5 = 0.15`. The shaping
+cap is therefore `0.45`, and including Sokoban's `1.0` success reward the episode cap is
+`1.45`. Raising `max_turns` changes that maximum explicitly rather than silently shrinking
+every turn's learning signal.
 
 **`score_base`** is subtracted from each description's F1 before it is paid, then the rest is
 rescaled so a perfect description still earns the configured per-turn reward. It exists because scoring
