@@ -200,6 +200,34 @@ def test_free_think_allows_visible_prose_between_the_close_and_the_answer():
     assert p["actions"] == ["up", "left"]
 
 
+def test_free_think_accepts_glm_native_box_as_answer():
+    """GLM-4.6V is post-trained to close reasoning and answer between native box
+    tokens.  It is the same semantic contract as <answer>, not malformed prose."""
+    from vagen.envs.sokoban.utils.utils import parse_response
+
+    raw = (
+        "<think>The box is below me, so I should move down.</think>\n"
+        "<|begin_of_box|>Down<|end_of_box|>"
+    )
+    p = parse_response(raw, prompt_format="free_think")
+    assert p["format_correct"] is True
+    assert p["actions"] == ["down"]
+    assert p["llm_raw_response"] == raw
+    assert p["llm_response"] == raw
+
+
+def test_free_think_prefers_answer_nested_inside_glm_native_box():
+    from vagen.envs.sokoban.utils.utils import parse_response
+
+    p = parse_response(
+        "<think>reasoning</think>"
+        "<|begin_of_box|><answer>Left</answer><|end_of_box|>",
+        prompt_format="free_think",
+    )
+    assert p["format_correct"] is True
+    assert p["actions"] == ["left"]
+
+
 def test_free_think_rejects_a_trace_that_never_closed_its_thinking():
     """★ The failure this format exists to catch. Measured on Qwen3.5-4B under the
     `answer` format, half of all rollouts ran to the 16384-token cap without emitting

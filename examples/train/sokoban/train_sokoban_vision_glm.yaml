@@ -1,6 +1,5 @@
-# GLM training uses the same complete world-model contract as the established Sokoban
-# runs.  Keep this strict: a bare action is useful for engine diagnostics, but is not a
-# valid training response because it supplies no state description or prediction.
+# GLM's native response is reasoning followed by boxed action tokens. The free-think
+# parser treats that native box as the model-family equivalent of <answer>.
 envs:
   - name: Sokoban
     n_envs: 10000
@@ -11,7 +10,7 @@ envs:
     max_env_response_per_turn: 320
     config:
       render_mode: vision
-      prompt_format: wm
+      prompt_format: free_think
       strict_format: true
       format_reward: 0.02
       min_solution_steps: [1,5]
