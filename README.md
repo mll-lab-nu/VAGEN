@@ -9,7 +9,7 @@
 <h4 align="center"><b>🔥 NeurIPS 2025 🔥</b></h4>
 
 <p align="center" style="font-size: 16px;">
-  Kangrui Wang*, Pingyue Zhang*, Zihan Wang*, Yaning Gao*, Linjie Li*, Qineng Wang, Hanyang Chen, Chi Wan, Yiping Lu, Zhengyuan Yang, Lijuan Wang, Ranjay Krishna, Jiajun Wu, Li Fei-Fei, Yejin Choi, Manling Li
+  Kangrui Wang*, Pingyue Zhang*, Zihan Wang*, Yaning Gao*, Linjie Li*, Qineng Wang, Hanyang Chen, Chi Wan, Yiping Lu, Zhengyuan Yang, Lijuan Wang, Ranjay Krishna, Jiajun Wu, Li Fei-Fei, Yejin Choi, <a href="https://limanling.github.io/">Manling Li</a>
 </p>
 <p align="center" style="font-size: 12px;"><i>(* equal contribution)</i></p>
 
