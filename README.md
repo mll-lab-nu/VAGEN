@@ -65,7 +65,7 @@ We frame multi-turn VLM agentic tasks as a Partially Observable Markov Decision 
 
 
 ## News
-**[2026/08]**: Added support for Verl 0.9.0, decoupled the environment and harness layer, and added toy compact harness (reference: [CompactionRL](https://arxiv.org/abs/2607.05378)). 
+**[2026/08]**: Added support for Verl 0.9.0, decoupled the environment and harness layer. This is a major update. The last commit before these changes is [here](vagen-lite-verl-v0.6.1-final); please check out the tag if you need the previous codebase.
 
 **[2026/02]** We have migrated the `main` branch to VAGEN-Lite, a lightweight and clean reimplementation built on VERL agent-loop for easy customization and stable performance. For the previous full-featured release, please visit the [vagen-legacy](https://github.com/mll-lab-nu/VAGEN/tree/vagen-legacy) branch.
 
