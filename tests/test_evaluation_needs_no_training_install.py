@@ -1,7 +1,6 @@
 """Nothing on the evaluation path may import verl, torch or ray. That is what lets a user
-score a checkpoint against a hosted API without a training install, and it is the reason
-`vagen/core/env_adapter.py` exists at all -- `GymEnvAdapter` was moved out of
-`agent_loop/gym_loop.py`, which does import verl, purely so evaluation could reach it.
+score a checkpoint against a hosted API without a training install. Shared environment
+contracts live in ``vagen/envs/_common`` so evaluation never reaches into training code.
 
 The rule was written down and enforced by review. A single `import torch` at the top of any
 of these modules breaks it, costs a multi-gigabyte install for an eval run, and nothing
@@ -18,19 +17,13 @@ import pytest
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 #: Packages that must import none of FORBIDDEN.
-CLEAN_PACKAGES = ["vagen/core", "vagen/harness", "vagen/evaluate", "vagen/envs_remote",
-                  "vagen/envs"]
+CLEAN_PACKAGES = ["vagen/rollout", "vagen/harness", "vagen/evaluation", "vagen/envs"]
 
 FORBIDDEN = {"verl", "torch", "ray"}
 
-#: ★ Also forbidden: reaching into VAGEN's own training packages. `vagen/core/env_adapter.py`
-#: imported `vagen.agent_loop.obs` -- which happens to be pure PIL and typing today, so the
-#: verl/torch/ray check above passed while the layering the file exists to maintain was
-#: already broken. One `import torch` added to anything under agent_loop/ would have taken
-#: evaluation with it, silently. (obs.py now lives in core/, which is the real fix; this is
-#: what stops the next one.)
-FORBIDDEN_PACKAGES = {"vagen.agent_loop", "vagen.trainer", "vagen.custom_advantage",
-                      "vagen.custom_loss", "vagen.custom_filter", "vagen.custom_metric"}
+#: ★ Also forbidden: reaching into VAGEN's own training packages. Pure-looking helpers
+#: there can gain a heavyweight dependency later and silently pull it into evaluation.
+FORBIDDEN_PACKAGES = {"vagen.training", "vagen.algorithms"}
 
 #: ManiSkill's own simulation code, vendored under primitive_skill. It is torch-native --
 #: the simulator returns tensors -- and it is reached only by the primitive_skill
@@ -94,5 +87,5 @@ def test_the_evaluation_path_imports_no_training_dependency(rel):
         f"{rel} imports {found}. Evaluation is meant to run without a training install, so "
         f"this makes `pip install` for an eval-only user pull in a training dependency -- "
         f"directly, or transitively through a VAGEN training package that is free of one "
-        f"only until someone adds it. Shared helpers belong in vagen/core."
+        f"only until someone adds it. Shared helpers belong in the owning axis's _common package."
     )

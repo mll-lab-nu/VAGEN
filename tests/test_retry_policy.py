@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from vagen.evaluate.adapters.throttled_adapter import _is_non_retryable, _is_retryable
+from vagen.evaluation.backends._common.retry import _is_non_retryable, _is_retryable
 
 CODES = (429, 500, 502, 503, 504)
 

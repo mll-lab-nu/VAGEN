@@ -24,13 +24,13 @@ https://github.com/JamesKrW/verl at `27c51e9`, which the tag `vagen-260812` name
 The latter two are the only modifications to verl. Because the base is squashed, a diff
 against today's volcengine/verl main mixes them with upstream's own drift.
 
-Portions of verl are adapted into `vagen/main_ppo.py`, `vagen/agent_loop/`, and
-`vagen/trainer/`, which retain their Apache-2.0 headers. A copy of the Apache License is in
-the submodule.
+Portions of verl are adapted into `vagen/training/main.py`,
+`vagen/training/agent_loop/`, and `vagen/training/trainer/`, which retain their
+Apache-2.0 headers. A copy of the Apache License is in the submodule.
 
 --------------------------------------------------------------------------------
 RAGEN -- https://github.com/RAGEN-AI/RAGEN
-The reward-filter design in `vagen/custom_filter/` follows RAGEN's.
+The reward-filter design in `vagen/training/filters/` follows RAGEN's.
 
 --------------------------------------------------------------------------------
 Theory-of-Space -- https://github.com/mll-lab-nu/Theory-of-Space

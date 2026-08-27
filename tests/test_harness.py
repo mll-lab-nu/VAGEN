@@ -195,7 +195,7 @@ def test_the_contract_holds_no_implementations():
     live in the base module is how the split stops being real."""
     import inspect
 
-    from vagen.core import harness as contract
+    from vagen.harness._common import base as contract
 
     classes = [
         name

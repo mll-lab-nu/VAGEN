@@ -9,7 +9,7 @@ import torch
 from tensordict import TensorDict
 from verl import DataProto
 
-from vagen.utils.image_token_utils import (
+from vagen.models import (
     ImagePlaceholderMismatch, count_placeholder_runs, image_token_ids,
     split_on_images, vision_sentinel_ids,
 )

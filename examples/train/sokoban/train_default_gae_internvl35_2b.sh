@@ -50,10 +50,10 @@ mapfile -t BASE < <(grep -vE '^\s*(#|$)' "$V/vagen/configs/baseline_vllm.flags" 
 # into text_config, silently discards the trained lm_head, and generates repetitive
 # garbage. Override the outer value at engine construction; this changes no tokens or
 # model output protocol, it only makes rollout load the checkpoint's real output head.
-PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
+PYTHONUNBUFFERED=1 python3 -m vagen.training.main \
     --config-path="$V/vagen/configs" --config-name=vagen_multiturn \
     hydra.searchpath="[file://$VERL/verl/trainer/config]" \
-    data.custom_cls.path="$V/vagen/gym_agent_dataset.py" \
+    data.custom_cls.path="$V/vagen/training/dataset.py" \
     "${BASE[@]}" \
     data.train_files="$SCRIPTDIR/train_sokoban_vision_internvl.yaml" \
     data.val_files="$SCRIPTDIR/val_sokoban_vision_internvl.yaml" \

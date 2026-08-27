@@ -223,7 +223,7 @@ class StateRewardWrapper:
         that into whatever shape an estimator needs is the estimator's job.
         ``removed_estimator_gae`` reads a turn's reward only at the turn's final token, so it
         segment-sums each turn onto its own boundary before its outer pass -- see
-        ``vagen/custom_advantage/trajectory_algos.py``. The reduction only runs in that
+        ``vagen/algorithms/_common/trajectory_algos.py``. The reduction only runs in that
         direction: per-span carries strictly more information than a turn-end scalar, and
         a scalar cannot be split back into the spans that earned it.
 

@@ -23,7 +23,7 @@ import types
 
 import pytest
 
-from vagen.agent_loop.verl_client import VerlClient
+from vagen.training.agent_loop.verl_client import VerlClient
 
 
 class Proc:

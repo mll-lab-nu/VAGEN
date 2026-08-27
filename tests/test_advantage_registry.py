@@ -10,16 +10,14 @@ the estimator sources and fails if one writes ``IGNORE_RETURN`` without declarin
 
 import ast
 import inspect
-import re
-
 import pytest
 
-from vagen.custom_advantage import (
+from vagen.algorithms import (
     SENTINEL_RETURN_ESTIMATORS,
     TRAJECTORY_ESTIMATORS,
     needs_value_mask,
 )
-from vagen.custom_advantage import trajectory_algos as impl
+from vagen.algorithms._common import trajectory_algos as impl
 
 
 def test_known_estimators_are_registered():
@@ -78,11 +76,11 @@ def test_every_sentinel_writing_estimator_is_declared():
         writes_sentinel = "ignore_value" in body or "IGNORE_RETURN" in body
         if not writes_sentinel:
             continue
-        decorators = " ".join(ast.unparse(d) for d in node.decorator_list)
-        if "advantage_estimator" not in decorators:
+        if not node.name.startswith("_compute_"):
             continue
-        if "sentinel_returns=True" not in decorators:
-            offenders.append(node.name)
+        estimator = node.name.removeprefix("_compute_")
+        if estimator not in SENTINEL_RETURN_ESTIMATORS:
+            offenders.append(estimator)
 
     assert not offenders, (
         f"{offenders} write sentinel returns but register with plain @register_adv_est; "
@@ -127,7 +125,7 @@ def test_every_value_reading_estimator_declares_needs_critic():
     exists -- not an error. Registering it without `needs_critic=True` puts it back in
     reach of verl's "is the name literally gae" fallback, silently.
     """
-    from vagen.custom_advantage import CRITIC_ESTIMATORS
+    from vagen.algorithms import CRITIC_ESTIMATORS
 
     src = inspect.getsource(impl)
     tree = ast.parse(src)
@@ -139,10 +137,11 @@ def test_every_value_reading_estimator_declares_needs_critic():
         body = ast.unparse(node)
         if "inputs.values" not in body:
             continue
-        decorators = " ".join(ast.unparse(d) for d in node.decorator_list)
-        name = re.search(r"""advantage_estimator\(['"]([^'"]+)['"]""", decorators)
-        if name and name.group(1) not in CRITIC_ESTIMATORS:
-            offenders.append(name.group(1))
+        if not node.name.startswith("_compute_"):
+            continue
+        estimator = node.name.removeprefix("_compute_")
+        if estimator not in CRITIC_ESTIMATORS:
+            offenders.append(estimator)
 
     assert not offenders, (
         f"{offenders} read the critic's values but did not declare needs_critic=True; "

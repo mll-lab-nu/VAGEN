@@ -22,7 +22,7 @@ from typing import List, Optional
 import fire
 import uvicorn
 
-from vagen.envs_remote import GymService
+from vagen.envs._common.remote.service import GymService
 from vagen.envs.primitive_skill.handler import PrimitiveSkillHandler
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")

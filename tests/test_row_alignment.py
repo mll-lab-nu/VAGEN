@@ -21,7 +21,7 @@ import torch
 from verl import DataProto
 from verl.experimental.separation.ray_trainer import SeparateRayPPOTrainer
 
-from vagen.agent_loop.multi_output import ROLLOUT_SOURCE
+from vagen.training.agent_loop.multi_output import ROLLOUT_SOURCE
 
 ALIGN = SeparateRayPPOTrainer._align_generated_rows
 SOURCE = SeparateRayPPOTrainer.ROLLOUT_SOURCE_COLUMN
@@ -281,7 +281,7 @@ def test_the_loop_manager_stamps_the_source_column():
 
     import inspect
 
-    from vagen.agent_loop.multi_output import MultiOutputAgentLoopManager
+    from vagen.training.agent_loop.multi_output import MultiOutputAgentLoopManager
 
     src = inspect.getsource(MultiOutputAgentLoopManager._vagen_assign_indices)
     assert "ROLLOUT_SOURCE" in src and "np.arange" in src
@@ -292,7 +292,7 @@ def test_the_worker_expands_the_column_per_row():
     per-rollout row counts -- the same mechanism that expands uid and data_source."""
     import inspect
 
-    from vagen.agent_loop.multi_output import MultiOutputAgentLoopWorker
+    from vagen.training.agent_loop.multi_output import MultiOutputAgentLoopWorker
 
     src = inspect.getsource(MultiOutputAgentLoopWorker._postprocess)
     assert "np.repeat(val, counts" in src, (

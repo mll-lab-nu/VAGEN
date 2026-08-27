@@ -7,8 +7,8 @@ LLMServerClient, a chat API) are thin by design and covered by the GPU runs.
 
 import pytest
 
-from vagen.core.client import BackendOutput, InferenceClient, Response
-from vagen.core.tape import MaskMisaligned
+from vagen.rollout.client import BackendOutput, InferenceClient, Response
+from vagen.rollout.trajectory import MaskMisaligned
 
 
 class FakeClient(InferenceClient):

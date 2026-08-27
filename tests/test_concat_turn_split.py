@@ -208,7 +208,7 @@ def test_two_pictures_rendering_as_one_run_are_refused_not_slid():
     from verl import DataProto
 
     from vagen.utils.concat_val_multi_turn import concat_val_multi_turn, _as_1d_object_array
-    from vagen.utils.image_token_utils import ImagePlaceholderMismatch
+    from vagen.models import ImagePlaceholderMismatch
 
     IMG, PAD = 700, 0
 
