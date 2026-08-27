@@ -31,7 +31,7 @@ data:
     # Relative, so like hydra.searchpath above it resolves against the working directory
     # and only works when that is the repo root. Every caller overrides it with an
     # absolute one; this is the fallback, not the mechanism.
-    path: "vagen/gym_agent_dataset.py"  
+    path: "vagen/training/dataset.py"
     name: AgenticDataset                
 
 # ============================================================================

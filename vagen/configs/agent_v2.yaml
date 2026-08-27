@@ -8,4 +8,4 @@
 # agent.yaml and agent_no_concat.yaml were byte-identical copies of this and referenced
 # by nothing; deleted. Which harness runs is `trainer.harness`, not a separate loop.
 - name: gym_agent
-  _target_: vagen.agent_loop.gym_loop.GymLoop
+  _target_: vagen.training.agent_loop.gym_loop.GymLoop

@@ -30,8 +30,8 @@ import numpy as np
 import pytest
 import torch
 
-import vagen.custom_advantage  # noqa: F401  -- registers the estimators
-from vagen.custom_advantage.trajectory_algos import _is_turn_boundary, _pack
+import vagen.algorithms  # noqa: F401  -- registers the estimators
+from vagen.algorithms._common.packing import _is_turn_boundary, _pack
 
 
 class _View:
@@ -203,7 +203,7 @@ def test_the_property_reads_the_column_the_agent_loop_writes():
     """
     import numpy as np
 
-    from vagen.custom_advantage.inputs import AdvantageInputs
+    from vagen.algorithms._common.inputs import AdvantageInputs
 
     written = COLUMN_THE_LOOP_WRITES
     inputs = AdvantageInputs(
@@ -225,7 +225,7 @@ def test_the_agent_loop_still_writes_that_column():
     rather than a test of AdvantageInputs against itself."""
     import inspect
 
-    from vagen.agent_loop import gym_loop, multi_output
+    from vagen.training.agent_loop import gym_loop, multi_output
 
     lit = f'"{COLUMN_THE_LOOP_WRITES}"'
     assert lit in inspect.getsource(gym_loop), (

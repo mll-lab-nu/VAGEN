@@ -25,7 +25,7 @@ pip install -r vagen/envs/spatial_gym/requirements.txt
 Run evaluation with OpenAI-compatible backends:
 
 ```bash
-python -m vagen.evaluate.run_eval --config examples/evaluate/spatial_gym/config.yaml
+python -m vagen.evaluation --config examples/evaluate/spatial_gym/config.yaml
 ```
 
 Available eval configs:

@@ -1,4 +1,4 @@
-"""Unit tests for vagen/trainer/mixin.py.
+"""Unit tests for vagen/training/trainer/mixin.py.
 
 The mixin is exercised against a fake base trainer rather than a real
 ``SeparateRayPPOTrainer``: the point of the two-layer split is that the logic does not
@@ -18,10 +18,10 @@ import pytest
 import torch
 from omegaconf import OmegaConf
 
-import vagen.custom_advantage  # noqa: F401  registers the estimators these lists read
-from vagen.custom_advantage import CRITIC_ESTIMATORS, TRAJECTORY_ESTIMATORS
-from vagen.trainer.logic import IGNORE_RETURN
-from vagen.trainer.mixin import VagenV0Mixin
+import vagen.algorithms  # noqa: F401  registers the estimators these lists read
+from vagen.algorithms import CRITIC_ESTIMATORS, TRAJECTORY_ESTIMATORS
+from vagen.training.trainer.logic import IGNORE_RETURN
+from vagen.training.trainer.mixin import VagenV0Mixin
 
 #: Read from the registry, never listed. A parametrize list that goes stale keeps
 #: passing while quietly not covering whatever was added last.
@@ -120,7 +120,7 @@ def test_trajectory_estimators_are_allowed_everywhere(adv, harness):
     """The other half of the claim: these stitch the rows back together, so every policy
     is fine. If one of them were rejected the guard would be over-broad, which is the
     failure mode a permissive test never catches."""
-    import vagen.custom_advantage  # noqa: F401  registers the estimators
+    import vagen.algorithms  # noqa: F401  registers the estimators
 
     _Trainer(_cfg(adv=adv, harness=harness))._vagen_check_estimator_spans_the_layout()
 
@@ -137,7 +137,7 @@ def test_the_check_runs_at_startup():
     deleting it there is caught here rather than by a wasted training run."""
     import inspect
 
-    from vagen.trainer.mixin import VagenLogicMixin
+    from vagen.training.trainer.mixin import VagenLogicMixin
 
     src = inspect.getsource(VagenLogicMixin._vagen_init)
     assert "_vagen_check_estimator_spans_the_layout()" in src
@@ -148,7 +148,7 @@ def test_the_guard_reads_the_registry_rather_than_a_local_list():
     A list kept in the trainer would drift the moment one is added."""
     import inspect
 
-    from vagen.trainer.mixin import VagenLogicMixin
+    from vagen.training.trainer.mixin import VagenLogicMixin
 
     src = inspect.getsource(VagenLogicMixin._vagen_check_estimator_spans_the_layout)
     assert "spans_rows" in src
@@ -166,7 +166,7 @@ def test_a_value_based_estimator_without_a_critic_is_refused(adv):
     test, so `values` reads as zeros and GAE becomes a whitened discounted reward sum.
     The run starts, uses half the memory, trains faster, and says so only in a warning
     that reads "Disabled critic as algorithm.adv_estimator != gae"."""
-    import vagen.custom_advantage  # noqa: F401  registers them
+    import vagen.algorithms  # noqa: F401  registers them
 
     t = _Trainer(_cfg(adv=adv))
     t.use_critic = False
@@ -176,7 +176,7 @@ def test_a_value_based_estimator_without_a_critic_is_refused(adv):
 
 @pytest.mark.parametrize("adv", VALUE_BASED)
 def test_the_same_estimators_pass_with_a_critic(adv):
-    import vagen.custom_advantage  # noqa: F401
+    import vagen.algorithms  # noqa: F401
 
     t = _Trainer(_cfg(adv=adv))
     t.use_critic = True
@@ -187,7 +187,7 @@ def test_the_same_estimators_pass_with_a_critic(adv):
 def test_critic_free_estimators_are_not_required_to_have_one(adv):
     """Over-broad would be just as bad: GRPO needs no critic and must not be forced to
     pay for one."""
-    import vagen.custom_advantage  # noqa: F401
+    import vagen.algorithms  # noqa: F401
 
     t = _Trainer(_cfg(adv=adv))
     t.use_critic = False
@@ -198,7 +198,7 @@ def test_the_critic_check_runs_at_startup():
     """A guard nothing calls is not a guard."""
     import inspect
 
-    from vagen.trainer.mixin import VagenLogicMixin
+    from vagen.training.trainer.mixin import VagenLogicMixin
 
     assert "_vagen_check_estimator_has_its_critic()" in inspect.getsource(VagenLogicMixin._vagen_init)
 
@@ -209,7 +209,7 @@ def test_the_real_trainer_calls_vagen_init():
     guards existed and never ran. This pins the seam itself."""
     import inspect
 
-    from vagen.trainer.ppo_trainer import VagenPPOTrainer
+    from vagen.training.trainer.ppo_trainer import VagenPPOTrainer
 
     src = inspect.getsource(VagenPPOTrainer.__init__)
     assert "self._vagen_init()" in src, (
@@ -249,7 +249,7 @@ def test_super_advantage_runs_first():
 
 
 def test_custom_metrics_land_on_self_metrics(monkeypatch):
-    import vagen.trainer.mixin as m
+    import vagen.training.trainer.mixin as m
 
     monkeypatch.setattr(m, "METRIC_REGISTRY", {"foo": lambda b: 1.5})
     t = _Trainer(_cfg())
@@ -259,7 +259,7 @@ def test_custom_metrics_land_on_self_metrics(monkeypatch):
 
 
 def test_broken_metric_does_not_abort_the_step(monkeypatch):
-    import vagen.trainer.mixin as m
+    import vagen.training.trainer.mixin as m
 
     def boom(_):
         raise RuntimeError("nope")
@@ -285,7 +285,7 @@ def test_filter_runs_and_rebalances(monkeypatch):
     updates; `fit_step` calls _fit_compute_advantage immediately before them, so
     seeing the filter fire from this hook is what we want. (Hanging it off
     _fit_experimental would run it after the actor update -- a no-op.)"""
-    import vagen.trainer.mixin as m
+    import vagen.training.trainer.mixin as m
 
     seen = {}
 
@@ -304,7 +304,7 @@ def test_filter_runs_and_rebalances(monkeypatch):
 
 
 def test_filter_skips_rebalance_when_balance_batch_off(monkeypatch):
-    import vagen.trainer.mixin as m
+    import vagen.training.trainer.mixin as m
 
     monkeypatch.setattr(m, "FILTER_REGISTRY", {"noop": lambda b, mt, **kw: (b, mt)})
     t = _Trainer(_cfg(filter_enable=True, balance=False))
@@ -396,7 +396,7 @@ def test_mixin_overrides_win_the_mro():
     failure mode this whole path already produced once."""
     from verl.experimental.separation.ray_trainer import SeparateRayPPOTrainer
 
-    from vagen.trainer.ppo_trainer import VagenPPOTrainer
+    from vagen.training.trainer.ppo_trainer import VagenPPOTrainer
 
     mro = VagenPPOTrainer.__mro__
     assert mro.index(VagenV0Mixin) < mro.index(SeparateRayPPOTrainer)
@@ -409,7 +409,7 @@ def test_super_from_the_mixin_reaches_the_trainer():
     base implementation would be skipped entirely."""
     from verl.experimental.separation.ray_trainer import SeparateRayPPOTrainer
 
-    from vagen.trainer.ppo_trainer import VagenPPOTrainer
+    from vagen.training.trainer.ppo_trainer import VagenPPOTrainer
 
     after_mixin = VagenPPOTrainer.__mro__[VagenPPOTrainer.__mro__.index(VagenV0Mixin) + 1 :]
     assert SeparateRayPPOTrainer in after_mixin
@@ -430,7 +430,7 @@ def test_actor_rollout_placement_is_implemented():
     been spun up and models loaded."""
     from verl.experimental.separation.ray_trainer import SeparateRayPPOTrainer
 
-    from vagen.trainer.ppo_trainer import VagenPPOTrainer
+    from vagen.training.trainer.ppo_trainer import VagenPPOTrainer
 
     assert "_create_actor_rollout_classes" in vars(SeparateRayPPOTrainer), (
         "base no longer declares the hook; re-check whether an override is still needed"
@@ -460,7 +460,7 @@ def test_placeholder_prompt_tensors_leave_the_batch():
     import torch
     from verl import DataProto
 
-    from vagen.trainer.ppo_trainer import VagenPPOTrainer
+    from vagen.training.trainer.ppo_trainer import VagenPPOTrainer
 
     batch = DataProto.from_single_dict(
         {
@@ -486,7 +486,7 @@ def test_get_gen_batch_tolerates_absent_placeholders():
     import torch
     from verl import DataProto
 
-    from vagen.trainer.ppo_trainer import VagenPPOTrainer
+    from vagen.training.trainer.ppo_trainer import VagenPPOTrainer
 
     batch = DataProto.from_single_dict(
         {"input_ids": torch.zeros(2, 1, dtype=torch.long), "uid": np.array(["a", "b"], dtype=object)}
@@ -533,7 +533,7 @@ def test_batch_without_images_is_skipped():
 def test_in_flight_writes_are_capped(monkeypatch):
     """★ An environment that renders every turn queues frames faster than they are
     written; without the cap the driver's object store grows without bound."""
-    import vagen.trainer.mixin as m
+    import vagen.training.trainer.mixin as m
 
     monkeypatch.setattr(m, "METRIC_REGISTRY", {}, raising=False)
     fake_ray = MagicMock()
@@ -612,7 +612,7 @@ def test_collapsing_can_be_turned_off():
 def test_unknown_processor_leaves_text_alone_rather_than_failing():
     """★ A processor that declares no image token must not break the dump -- the log is
     then merely long, which is not worth failing a training step over."""
-    from vagen.utils.image_token_utils import replace_image_tokens_for_logging
+    from vagen.models import replace_image_tokens_for_logging
 
     class _Bare:
         pass
@@ -630,7 +630,7 @@ def test_unknown_processor_leaves_text_alone_rather_than_failing():
 def test_image_token_is_read_from_the_tokenizer_when_only_an_id_is_exposed():
     """Processors vary in where they keep the placeholder; a per-family table is what
     this avoids."""
-    from vagen.utils.image_token_utils import get_image_token
+    from vagen.models import get_image_token
 
     class _Tok:
         def convert_ids_to_tokens(self, i):
@@ -655,7 +655,7 @@ def test_the_splitting_property_is_declared_by_each_harness():
     guard silently stops guarding for it and a row-local estimator is accepted under a
     policy that truncates every trajectory.
     """
-    from vagen.core.harness import BaseHarness
+    from vagen.harness import BaseHarness
     from vagen.harness import HARNESSES
 
     assert HARNESSES, "no harnesses registered; this test is vacuous"
@@ -680,7 +680,7 @@ def test_the_trainer_does_not_keep_its_own_list_of_them():
     """
     import inspect
 
-    from vagen.trainer import mixin
+    from vagen.training.trainer import mixin
 
     classes = [c for _, c in inspect.getmembers(mixin, inspect.isclass)
                if c.__module__ == mixin.__name__]
@@ -699,7 +699,7 @@ def test_a_harness_defined_outside_this_repo_is_honoured():
     to fire for it. Under the old tuple this passed silently -- the unknown name was not
     listed, so the run proceeded with an estimator that drops every turn after the first.
     """
-    from vagen.core.harness import BaseHarness
+    from vagen.harness import BaseHarness
     from vagen.harness import HARNESSES
 
     class ThirdPartyHarness(BaseHarness):
@@ -729,7 +729,7 @@ def test_an_unregistered_harness_is_assumed_to_split():
 def test_a_metric_returning_a_mapping_is_spread_over_subkeys(monkeypatch):
     """A turn count is only meaningful as min/max/mean together, so a metric may return
     a mapping rather than forcing three registry entries for one concept."""
-    import vagen.trainer.mixin as m
+    import vagen.training.trainer.mixin as m
 
     monkeypatch.setattr(m, "METRIC_REGISTRY", {"spread": lambda b: {"min": 1.0, "max": 9.0}})
     t = _Trainer(_cfg())
@@ -848,7 +848,7 @@ def test_a_turn_level_loss_refuses_an_estimator_with_no_turn_id():
     `turn_id` -- and the turn-level losses read that column. Keyed off the wrong predicate
     the pairing passed every startup check and raised inside the first backward pass,
     which is exactly what this guard exists to pre-empt."""
-    from vagen.custom_advantage import publishes_turn_id, spans_rows
+    from vagen.algorithms import publishes_turn_id, spans_rows
 
     assert spans_rows("trajectory_grpo") is True
     assert publishes_turn_id("trajectory_grpo") is False
@@ -866,7 +866,7 @@ def test_padding_rows_carry_no_gradient():
     import torch
     from verl import DataProto
 
-    from vagen.trainer.mixin import VagenLogicMixin
+    from vagen.training.trainer.mixin import VagenLogicMixin
 
     n, width = 3, 4
     batch = DataProto.from_dict({

@@ -14,7 +14,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from vagen.custom_advantage import AdvantageInputs  # noqa: E402
+from vagen.algorithms import AdvantageInputs  # noqa: E402
 
 
 def _inputs(**columns):
@@ -44,18 +44,15 @@ def test_no_estimator_reads_the_raw_scores_directly():
     and then searched the *whole file* when the split failed -- so it was asserting
     against a string that had moved, not against the estimators.
     """
-    import ast
     import inspect
 
-    from vagen.custom_advantage import trajectory_algos
+    from vagen.algorithms import ALGORITHMS
 
-    tree = ast.parse(inspect.getsource(trajectory_algos))
     offenders = [
-        node.name
-        for node in tree.body
-        if isinstance(node, ast.FunctionDef)
-        and any("advantage_estimator" in ast.unparse(d) for d in node.decorator_list)
-        and ("token_level_scores" in ast.unparse(node) or "inputs.scores" in ast.unparse(node))
+        name
+        for name, spec in ALGORITHMS.items()
+        if "token_level_scores" in inspect.getsource(spec.implementation)
+        or "inputs.scores" in inspect.getsource(spec.implementation)
     ]
     assert not offenders, (
         f"{offenders} read the un-penalised scores; use inputs.rewards or "
@@ -71,7 +68,7 @@ def test_critic_metrics_ignore_the_unsupervised_sentinel():
     from verl import DataProto
     from verl.trainer.ppo.metric_utils import compute_data_metrics
 
-    from vagen.trainer.logic import IGNORE_RETURN
+    from vagen.training.trainer.logic import IGNORE_RETURN
 
     n, width = 2, 4
     returns = torch.full((n, width), IGNORE_RETURN)
@@ -105,7 +102,7 @@ def test_critic_metrics_ignore_the_unsupervised_sentinel():
 def _view(masks, group, traj, turn=None):
     import numpy as np
 
-    from vagen.custom_advantage.trajectory import TrajectoryView
+    from vagen.algorithms._common.trajectory import TrajectoryView
 
     nt = {"group_idx": np.array(group, dtype=object),
           "traj_idx": np.array(traj, dtype=object)}
@@ -150,7 +147,7 @@ def _turns_batch(episode_ids, turns):
 
 def test_episode_turns_reports_the_real_count_not_the_per_row_one():
     """verl's num_turns is 1 per row by construction; this is the count that is not."""
-    from vagen.custom_metric.metric import episode_turns
+    from vagen.training.metrics import episode_turns
 
     got = episode_turns(_turns_batch(["e0", "e1", "e2"], [3, 11, 20]))
     assert got == {"min": 3.0, "max": 20.0, "mean": pytest.approx(34 / 3)}
@@ -163,7 +160,7 @@ def test_episode_turns_does_not_weight_an_episode_by_how_many_rows_it_split_into
     times against a 4-turn episode that stayed whole -- so the long episodes would drag
     the mean up exactly when the harness fragments them most.
     """
-    from vagen.custom_metric.metric import episode_turns
+    from vagen.training.metrics import episode_turns
 
     rows = _turns_batch(["long"] * 4 + ["short"], [20, 20, 20, 20, 4])
     assert episode_turns(rows) == {"min": 4.0, "max": 20.0, "mean": 12.0}
@@ -174,7 +171,7 @@ def test_episode_turns_says_so_when_the_agent_loop_never_recorded_it():
     import numpy as np
     from verl import DataProto
 
-    from vagen.custom_metric.metric import episode_turns
+    from vagen.training.metrics import episode_turns
 
     bare = DataProto.from_dict(tensors={}, non_tensors={"episode_id": np.array(["e0"], dtype=object)})
     with pytest.raises(KeyError, match="episode_turns"):

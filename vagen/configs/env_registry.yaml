@@ -5,4 +5,4 @@ env_registry:
   SpatialGym: vagen.envs.spatial_gym.spatial_gym_env.SpatialGym
   PrimitiveSkill: vagen.envs.primitive_skill.primitive_skill_env.PrimitiveSkillEnv
   # Remote environment client (generic, reusable for any remote env)
-  RemoteEnv: vagen.envs_remote.GymImageEnvClient
+  RemoteEnv: vagen.envs.remote.RemoteEnv

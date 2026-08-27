@@ -23,7 +23,7 @@ from __future__ import annotations
 import importlib
 from typing import Callable
 
-from vagen.core.harness import BaseHarness, Call
+from vagen.harness._common import BaseHarness, Call
 from vagen.harness.compact import CompactHarness
 from vagen.harness.concat import ConcatHarness
 from vagen.harness.no_concat import NoConcatHarness

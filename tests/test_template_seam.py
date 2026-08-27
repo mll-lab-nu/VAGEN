@@ -20,7 +20,7 @@ MODEL = "Qwen/Qwen2.5-VL-3B-Instruct"
 
 
 def _client(tok):
-    from vagen.agent_loop.verl_client import VerlClient
+    from vagen.training.agent_loop.verl_client import VerlClient
 
     c = VerlClient.__new__(VerlClient)
     c.tokenizer, c.processor = tok, None

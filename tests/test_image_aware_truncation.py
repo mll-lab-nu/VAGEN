@@ -20,7 +20,7 @@ from __future__ import annotations
 import inspect
 import pytest
 
-from vagen.utils.image_token_utils import (
+from vagen.models import (
     ImagePlaceholderMismatch,
     NoValidTruncation,
     placeholder_blocks,
@@ -147,7 +147,7 @@ def test_every_cut_survives_the_real_position_id_path(keep):
 
     from PIL import Image
 
-    from vagen.utils.image_token_utils import image_token_ids
+    from vagen.models import image_token_ids
 
     placeholders = {i for i in image_token_ids(processor)}
     sentinels = vision_sentinel_ids(processor)
@@ -242,7 +242,7 @@ def test_the_batch_boundary_cuts_with_the_image_aware_helper():
     """
     from omegaconf import OmegaConf
 
-    from vagen.agent_loop.gym_loop import GymLoop
+    from vagen.training.agent_loop.gym_loop import GymLoop
 
     #  model turn | observation with a picture | model turn | observation with a picture
     ids = [1, 2] + [VS, PAD, PAD, PAD, VE] + [3] * 10 + [VS, PAD, PAD, PAD, VE] + [4]
@@ -299,8 +299,8 @@ def test_a_vision_token_the_policy_invented_is_refused():
     """
     from omegaconf import OmegaConf
 
-    from vagen.agent_loop.gym_loop import GymLoop, SampledVisionToken
-    from vagen.core.client import EpisodeUnusable
+    from vagen.training.agent_loop.gym_loop import GymLoop, SampledVisionToken
+    from vagen.rollout.client import EpisodeUnusable
 
     assert issubclass(SampledVisionToken, EpisodeUnusable), (
         "the policy's output is not a configuration error; it should cost one rollout"
@@ -365,7 +365,7 @@ def test_a_trimmed_continuation_still_ends_with_the_generation_prompt():
 
     from transformers import AutoTokenizer
 
-    from vagen.core.client import BackendOutput, InferenceClient
+    from vagen.rollout.client import BackendOutput, InferenceClient
     from model_path import local_snapshot
 
     tok = AutoTokenizer.from_pretrained(local_snapshot("Qwen/Qwen2.5-VL-3B-Instruct"))
@@ -405,7 +405,7 @@ def test_the_cut_happens_before_rendering_not_after():
     stores for a conversation must be something `encode` could have produced."""
     import asyncio
 
-    from vagen.core.client import BackendOutput, InferenceClient
+    from vagen.rollout.client import BackendOutput, InferenceClient
 
     SENTINEL = 999_999          # stands in for the generation prompt
 

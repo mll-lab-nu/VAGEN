@@ -1,7 +1,7 @@
 # Evaluation
 
 Evaluation runs the **same episode loop and the same context policies as training**
-(`vagen/core/runner.py`), against any OpenAI-compatible endpoint. So an eval number and a
+(`vagen/rollout/runner.py`), against any supported backend. So an eval number and a
 training `val-core` number are comparable — provided the configs agree, which is what
 `tests/test_eval_matches_val.py` checks for the shipped pairs.
 
@@ -92,5 +92,5 @@ If *every* episode ends in one of the failure reasons, the run stops with a non-
 rather than writing `success_rate: 0.0` — an evaluation where nothing ran is not a score of
 zero, and it used to be reported as one.
 
-See [`vagen/evaluate/README.md`](https://github.com/mll-lab-nu/VAGEN/blob/main/vagen/evaluate/README.md)
+See [`vagen/evaluation/README.md`](https://github.com/mll-lab-nu/VAGEN/blob/main/vagen/evaluation/README.md)
 for the full config reference.

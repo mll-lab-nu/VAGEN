@@ -32,7 +32,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from PIL import Image
 
-from vagen.envs_remote.handler import BaseGymHandler, HandlerResult, SessionContext
+from vagen.envs._common.remote.handler import BaseGymHandler, HandlerResult, SessionContext
 
 LOGGER = logging.getLogger(__name__)
 
@@ -479,7 +479,7 @@ class PrimitiveSkillHandler(BaseGymHandler):
         params: Dict[str, Any],
         images: List[Image.Image],
     ) -> HandlerResult:
-        from vagen.envs_remote.handler import SessionNotFoundError
+        from vagen.envs._common.remote.handler import SessionNotFoundError
 
         info = self._session_info.get(session_id)
         if info is None:

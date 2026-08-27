@@ -13,10 +13,10 @@ import asyncio
 
 import pytest
 
-from vagen.core.client import BackendOutput, InferenceClient
-from vagen.core.runner import run_episode
+from vagen.rollout.client import BackendOutput, InferenceClient
+from vagen.rollout.runner import run_episode
 from vagen.harness import build_harness
-from vagen.harness.budget import Budgets, check, context_limits
+from vagen.harness._common.budget import Budgets, check, context_limits
 from vagen.harness.compact import CompactHarness
 
 #: The harness sends this string, so a Budgets that declares a different length has the
@@ -136,7 +136,7 @@ def test_a_legal_episode_keeps_the_peak_inside_the_guarantee():
     """The guarantee holds only while a turn costs at most E + g, so the ceiling that
     enforces E is what makes it a guarantee rather than a hope. An observation over E is
     refused at the call rather than allowed to blow the bound silently."""
-    from vagen.core.client import ContextTooLarge
+    from vagen.rollout.client import ContextTooLarge
 
     b = Budgets(prompt_len=2000, response_len=16000, per_turn=1024, max_turns=8,
                 env_response=200, compact_budget=4000, summary_budget=512,
@@ -162,7 +162,7 @@ def test_the_defaults_pass_their_own_checks():
     still has to be a number the rest of the arithmetic tolerates."""
     from dataclasses import replace
 
-    from vagen.harness.budget import default_env_response, default_summary_budget
+    from vagen.harness._common.budget import default_env_response, default_summary_budget
 
     b = Budgets(prompt_len=1024, response_len=8192, per_turn=1024, max_turns=5,
                 compact_budget=4096, summary_budget=default_summary_budget(4096, 1024),
@@ -177,7 +177,7 @@ def test_a_region_that_cannot_hold_one_turn_says_so_once():
     """The band search is gone with compact_budget's demotion. What is left is the one
     thing no runtime can recover from: no room for a summary, its request and a
     generation, so every conversation closes before its first turn."""
-    from vagen.harness.budget import BudgetError
+    from vagen.harness._common.budget import BudgetError
 
     b = Budgets(prompt_len=512, response_len=1024, per_turn=512, max_turns=3,
                 env_response=64, compact_budget=800, summary_budget=500,
@@ -190,7 +190,7 @@ def test_a_region_that_cannot_hold_one_turn_says_so_once():
 def test_an_environment_is_closed_even_when_the_episode_raises():
     """Every guard added to this path raises mid-episode, and a leaked gym env is held
     for the rest of the batch."""
-    from vagen.core.client import ContextTooLarge
+    from vagen.rollout.client import ContextTooLarge
 
     b = Budgets(prompt_len=100, response_len=8000, per_turn=64, max_turns=3,
                 env_response=50)
@@ -263,7 +263,7 @@ def test_asking_for_zero_tokens_is_refused_not_silently_maximised():
     the *whole* limit -- the opposite of what was asked -- and the conversation overflows
     by a full generation. A negative passes through untouched.
     """
-    from vagen.agent_loop.verl_client import VerlClient
+    from vagen.training.agent_loop.verl_client import VerlClient
 
     c = VerlClient.__new__(VerlClient)
     c.sampling_params, c.response_limit = {}, 512
@@ -320,7 +320,7 @@ def test_every_harness_is_given_the_room_it_has_to_work_in(mode):
     """
     from omegaconf import OmegaConf
 
-    from vagen.agent_loop.gym_loop import GymLoop
+    from vagen.training.agent_loop.gym_loop import GymLoop
 
     loop = GymLoop.__new__(GymLoop)
     loop.prompt_length, loop.response_length = 2048, 6144
@@ -442,7 +442,7 @@ def test_an_unset_per_turn_budget_does_not_collapse_concat_to_one_turn():
     """
     from omegaconf import OmegaConf
 
-    from vagen.agent_loop.gym_loop import GymLoop
+    from vagen.training.agent_loop.gym_loop import GymLoop
 
     def floor_for(per_turn, configured):
         loop = GymLoop.__new__(GymLoop)
@@ -474,7 +474,7 @@ def test_the_compact_budget_lever_works_in_the_range_it_is_for():
     call by it, so a small budget -- the whole point of the lever -- died on the episode's
     first call: the opening is the system prompt plus the first observation, and there is
     no summary in it yet to compact away."""
-    from vagen.harness.budget import context_limits
+    from vagen.harness._common.budget import context_limits
 
     b = Budgets(prompt_len=2048, response_len=6144, per_turn=512, max_turns=20,
                 env_response=1000, compact_budget=400, summary_budget=100,
@@ -491,10 +491,10 @@ def test_an_unusable_episode_costs_one_episode_not_the_batch():
     rollout; a bad configuration is evidence about every one, and still stops the run."""
     from omegaconf import OmegaConf
 
-    from vagen.agent_loop.gym_loop import GymLoop
-    from vagen.core.client import ContextTooLarge, EpisodeUnusable
-    from vagen.harness.budget import BudgetError
-    from vagen.utils.image_token_utils import ImagePlaceholderMismatch
+    from vagen.training.agent_loop.gym_loop import GymLoop
+    from vagen.rollout.client import ContextTooLarge, EpisodeUnusable
+    from vagen.harness._common.budget import BudgetError
+    from vagen.models import ImagePlaceholderMismatch
 
     assert issubclass(ContextTooLarge, EpisodeUnusable)
     from vagen.harness.compact import CompactionMakesNoProgress
@@ -517,7 +517,7 @@ def test_the_opening_ceiling_is_checked_against_what_the_engine_actually_ran():
     something bigger. That is the end-of-episode surprise the per-call ceilings exist to
     replace.
     """
-    from vagen.core.client import BackendOutput, ContextTooLarge, InferenceClient
+    from vagen.rollout.client import BackendOutput, ContextTooLarge, InferenceClient
 
     class _Expanding(InferenceClient):
         """Renders 10 tokens; the engine says it ran 40."""

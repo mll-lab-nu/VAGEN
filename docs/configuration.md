@@ -70,8 +70,7 @@ trainer:
 path and register nothing:
 
 ```python
-from vagen.core.harness import BaseHarness
-from vagen.harness import register_harness
+from vagen.harness import BaseHarness, register_harness
 
 @register_harness("mine")
 class MyHarness(BaseHarness): ...

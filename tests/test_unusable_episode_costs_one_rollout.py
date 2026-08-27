@@ -19,8 +19,8 @@ import inspect
 
 import pytest
 
-from vagen.agent_loop.gym_loop import GymLoop, SampledVisionToken
-from vagen.core.client import EpisodeUnusable
+from vagen.training.agent_loop.gym_loop import GymLoop, SampledVisionToken
+from vagen.rollout.client import EpisodeUnusable
 
 
 def _run_body():

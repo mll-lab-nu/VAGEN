@@ -1,7 +1,7 @@
 import numpy as np
 from typing import List, Dict, Any, Optional, Tuple
 
-from vagen.envs.gym_image_env import GymImageEnv
+from vagen.envs import GymImageEnv
 from .env_config import SpatialGymConfig
 from .managers.exploration_manager import ExplorationManager
 from .managers.cognitive_map_manager import CognitiveMapManager

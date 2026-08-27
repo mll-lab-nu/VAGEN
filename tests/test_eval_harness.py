@@ -18,7 +18,7 @@ import asyncio
 
 import pytest
 
-from vagen.evaluate.vision_workflow import GenericVisionInferenceWorkflow
+from vagen.evaluation.workflow import GenericVisionInferenceWorkflow
 
 
 #: A reply of a realistic size. The stub used to answer in 39 characters (~10 tokens)
@@ -154,7 +154,7 @@ def test_an_unknown_harness_is_refused_by_name():
 def test_the_harness_key_reaches_the_workflow_from_the_yaml(tmp_path):
     """★ The bug this whole change exists for: the key used to be dropped between the
     config and the workflow, silently, so every eval ran concat whatever it said."""
-    from vagen.evaluate.run_eval import _parse_env_specs
+    from vagen.evaluation.cli import _parse_env_specs
 
     specs = _parse_env_specs(
         {"envs": [{"name": "Sokoban", "n_envs": 1, "tag_id": 0,
@@ -165,7 +165,7 @@ def test_the_harness_key_reaches_the_workflow_from_the_yaml(tmp_path):
 
 
 def test_a_key_nothing_reads_is_an_error_rather_than_a_shrug():
-    from vagen.evaluate.run_eval import _parse_env_specs
+    from vagen.evaluation.cli import _parse_env_specs
 
     with pytest.raises(ValueError, match="which nothing reads"):
         _parse_env_specs({"envs": [{"name": "Sokoban", "n_envs": 1,
@@ -213,7 +213,7 @@ def test_num_turns_counts_environment_steps_not_transcript_messages():
 def test_the_finish_reason_of_a_full_episode_is_one_the_summary_treats_as_normal():
     """Anything outside NORMAL_FINISH_REASONS is filed as an error rollout and deleted by
     _purge_error_rollouts on the next resumed run."""
-    from vagen.evaluate.runner import NORMAL_FINISH_REASONS
+    from vagen.evaluation.runner import NORMAL_FINISH_REASONS
 
     _, result = _run("concat", turns=3)
     assert result["finish_reason"] in NORMAL_FINISH_REASONS
@@ -281,7 +281,7 @@ def test_resume_will_not_reuse_a_rollout_from_a_different_model():
     """★ The key is (env, seed, tag, model). Without the model, evaluating checkpoint B
     into the directory checkpoint A used skipped all of A's episodes and reprinted A's
     success_rate under B's name -- exit 0, nothing in the output saying so."""
-    from vagen.evaluate.run_eval import _job_resume_key
+    from vagen.evaluation.cli import _job_resume_key
 
     base = {"env_name": "Sokoban", "seed": 1, "tag_id": "t"}
     a = _job_resume_key({**base, "resume_model": "/ckpt/A"})
@@ -293,8 +293,8 @@ def test_resume_will_not_reuse_a_rollout_from_a_different_model():
 def test_one_normal_finish_reason_set_governs_deletion_and_reporting():
     """There were two, and they disagreed: `no_room` was kept on disk and treated as
     completed by resume while being reported as an error rollout."""
-    from vagen.evaluate.runner import NORMAL_FINISH_REASONS as a
-    from vagen.evaluate.utils.summary_utils import NORMAL_FINISH_REASONS as b
+    from vagen.evaluation.runner import NORMAL_FINISH_REASONS as a
+    from vagen.evaluation.summary import NORMAL_FINISH_REASONS as b
 
     assert a == b
     _, result = _run("concat", turns=3)
@@ -307,7 +307,7 @@ def test_a_job_that_cannot_even_be_set_up_does_not_take_the_batch_with_it():
     aborted the run and discarded every episode that had already finished."""
     import inspect
 
-    from vagen.evaluate import runner
+    from vagen.evaluation import runner
 
     src = inspect.getsource(runner)
     assert "async def _run_one" in src, "setup is not inside the guarded path"
@@ -443,7 +443,7 @@ def test_an_unusable_observation_ceiling_is_refused_not_silently_emptied():
 
     A ceiling that cannot hold one observation is a config error, and has to say so.
     """
-    from vagen.core.client import ContextTooLarge
+    from vagen.rollout.client import ContextTooLarge
 
     adapter = _Adapter()
     wf = GenericVisionInferenceWorkflow(
@@ -465,7 +465,7 @@ def test_a_processor_prices_a_frame_instead_of_guessing_at_it():
     from transformers import AutoProcessor
 
     from model_path import local_snapshot
-    from vagen.evaluate.chat_client import ChatClient
+    from vagen.evaluation.client import ChatClient
 
     msg = {"role": "user", "content": "<image>\nDecide your next action(s).",
            "images": [Image.new("RGB", (96, 96))]}

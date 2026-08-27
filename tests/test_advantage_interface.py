@@ -15,7 +15,7 @@ import torch
 from tensordict import TensorDict
 from verl.trainer.ppo.core_algos import get_adv_estimator_fn
 
-from vagen.custom_advantage import (
+from vagen.algorithms import (
     AdvantageInputs,
     AdvantageOutputs,
     advantage_estimator,
@@ -30,7 +30,7 @@ def _restore_the_registries():
     fails -- and only when the files run in that order, which is the worst kind."""
     from verl.trainer.ppo.core_algos import ADV_ESTIMATOR_REGISTRY
 
-    from vagen.custom_advantage import (
+    from vagen.algorithms import (
         SENTINEL_RETURN_ESTIMATORS,
         TRAJECTORY_ESTIMATORS,
     )
@@ -246,7 +246,7 @@ def test_registering_declares_the_estimator_spans_rows():
 
 
 def test_sentinel_returns_is_declared_at_registration():
-    from vagen.custom_advantage import needs_value_mask
+    from vagen.algorithms import needs_value_mask
 
     @advantage_estimator("probe_sentinel", sentinel_returns=True)
     def _probe(inputs):

@@ -11,7 +11,7 @@ from vagen.envs.frozenlake.utils.prompt import (
 )
 from vagen.envs.frozenlake.utils.utils import parse_response, numpy_to_pil, generate_random_map
 
-from vagen.envs.gym_image_env import GymImageEnv
+from vagen.envs import GymImageEnv
 
 import asyncio
 from dataclasses import dataclass

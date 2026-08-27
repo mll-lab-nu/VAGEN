@@ -13,7 +13,7 @@ import torch
 from tensordict import TensorDict
 from verl.trainer.ppo.core_algos import get_adv_estimator_fn
 
-from vagen.custom_advantage.trajectory import TrajectoryView
+from vagen.algorithms._common.trajectory import TrajectoryView
 
 TOKEN_GAE = get_adv_estimator_fn("token_level_gae")
 TRAJ_GRPO = get_adv_estimator_fn("trajectory_grpo")
@@ -284,7 +284,7 @@ def test_token_gae_runs_without_a_turn_column():
 def test_turn_boundaries_are_found_under_both_layouts():
     import torch
 
-    from vagen.custom_advantage.trajectory_algos import _is_turn_boundary
+    from vagen.algorithms._common.packing import _is_turn_boundary
 
     # one row of width 5, two turns: positions 0,1 then 3,4 -- the gap ends turn one
     index = torch.tensor([[0, 1, 3, 4]])
@@ -419,7 +419,7 @@ def test_turn_values_are_not_lost_to_a_scatter_collision():
 
 
 def test_turn_gae_still_needs_a_value_mask():
-    from vagen.custom_advantage import needs_value_mask
+    from vagen.algorithms import needs_value_mask
 
     assert needs_value_mask("turn_level_gae") is True
 
@@ -427,7 +427,7 @@ def test_turn_gae_still_needs_a_value_mask():
 # ------------------------------------------------- _backward_gae's variable-lambda branch
 
 def _bwd(rewards, values, valid, gamma, lam):
-    from vagen.custom_advantage.trajectory_algos import _backward_gae
+    from vagen.algorithms._common.packing import _backward_gae
 
     import torch
     t = lambda x, d=torch.float32: torch.tensor(x, dtype=d)

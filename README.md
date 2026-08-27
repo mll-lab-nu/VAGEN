@@ -78,7 +78,7 @@ We frame multi-turn VLM agentic tasks as a Partially Observable Markov Decision 
 - New service architecture for efficient distributed training
 - Check out our new guides:
   - [Creating Environments](./docs/custom-environment.md): New environment protocol.
-  - [Creating Services](./vagen/envs_remote/README.md): We now support hosting environments in a separate process
+  - [Creating Services](./vagen/envs/_common/remote/README.md): We support hosting environments in a separate process
 
 **[2025/03]** We release VAGEN, a multi-turn reinforcement learning framework for training VLM Agents!
 
@@ -197,7 +197,7 @@ MODEL_PATH=Qwen/Qwen2.5-VL-3B-Instruct \
 bash examples/evaluate/sokoban/run_eval.sh
 ```
 
-See [Evaluation](vagen/evaluate/README.md) for other environments and backends.
+See [Evaluation](vagen/evaluation/README.md) for other environments and backends.
 
 <details>
 <summary>With sglang instead</summary>
@@ -209,6 +209,29 @@ bash examples/evaluate/frozenlake/sglang/eval_qwen25_vl_3b.sh
 ```
 </details>
 
+## Repository Layout
+
+VAGEN separates stable orchestration from selectable implementations:
+
+```text
+vagen/
+├── algorithms/              # advantage algorithms and registry
+├── envs/                    # environment facade, shared contracts, implementations
+├── harness/                 # context-policy facade and implementations
+├── models/                  # model-family adaptation
+├── rollout/                 # framework-independent episode execution
+├── evaluation/              # standalone evaluation and backend plugins
+└── training/                # VERL agent-loop and trainer integration
+```
+
+Extension axes use `axis/_common/` for shared contracts and one directory per concrete
+implementation. Import shared APIs from the axis facade, such as `vagen.envs`,
+`vagen.harness`, or `vagen.algorithms`. Training-only integration lives under
+`vagen.training`; framework-independent rollout code lives under `vagen.rollout`.
+
+See [Repository structure rules](docs/common/repository_structure.md) for dependency and
+naming requirements.
+
 ## Custom Environment
 
 To train on your own environment, follow the steps below.
@@ -216,9 +239,13 @@ To train on your own environment, follow the steps below.
 
 ### 1. Create Your Environment Class
 
-* Use `GymImageEnv` as the base class:
+* Import `GymImageEnv` from the environment facade:
 
-  * [`vagen/envs/gym_image_env.py`](vagen/envs/gym_image_env.py)
+  ```python
+  from vagen.envs import GymImageEnv
+  ```
+
+  The shared contract lives under [`vagen/envs/_common`](vagen/envs/_common/).
 * Refer to Sokoban for a full implementation example:
 
   * [`vagen/envs/sokoban/sokoban_env.py`](vagen/envs/sokoban/sokoban_env.py)
@@ -253,11 +280,11 @@ Write your training script based on:
 
 ## Custom Advantage Estimator
 
-Add an estimator under `vagen/custom_advantage/` and import its module from
-[`vagen/custom_advantage/__init__.py`](vagen/custom_advantage/__init__.py):
+Add an estimator under `vagen/algorithms/<name>/` and import it from the
+[`vagen.algorithms`](vagen/algorithms/__init__.py) facade:
 
 ```python
-from vagen.custom_advantage import AdvantageInputs, AdvantageOutputs, advantage_estimator
+from vagen.algorithms import AdvantageInputs, AdvantageOutputs, advantage_estimator
 
 @advantage_estimator("my_estimator", needs_critic=True)
 def my_estimator(inputs: AdvantageInputs):
@@ -267,8 +294,8 @@ def my_estimator(inputs: AdvantageInputs):
 ```
 
 Select it in a training command with `algorithm.adv_estimator=my_estimator`. See
-[`inputs.py`](vagen/custom_advantage/inputs.py) for the available inputs and
-[`trajectory_algos.py`](vagen/custom_advantage/trajectory_algos.py) for complete examples.
+[`inputs.py`](vagen/algorithms/_common/inputs.py) for the available inputs and the
+implementation directories under [`vagen/algorithms`](vagen/algorithms/) for examples.
 
 ## Custom Harness
 
@@ -288,8 +315,7 @@ SGLang session, a vLLM prefix cache) without rewriting any harness. No backend s
 does that — they all re-send the whole message list every turn.
 
 ```python
-from vagen.core.harness import BaseHarness, Call
-from vagen.harness import register_harness
+from vagen.harness import BaseHarness, Call, register_harness
 
 @register_harness("mine")
 class MyHarness(BaseHarness):
@@ -332,8 +358,8 @@ Give the import path instead and VAGEN imports the module itself. This is why th
 path is supported at all: a new harness is usually tried in evaluation first, where
 everything is configured in yaml and no decorator has had a chance to run.
 
-Full contract and the budget hooks: [`vagen/core/harness.py`](vagen/core/harness.py); the
-three implementations: [`vagen/harness/`](vagen/harness/).
+The public contract and registry are exported by [`vagen/harness`](vagen/harness/), with
+shared internals under `_common/` and one directory per implementation.
 
 ## More Customization
 
@@ -390,7 +416,7 @@ huggingface_hub:
 ```yaml
 
 filter:
-  name: reward_variance_top_p # refer to vagen/custom_filter
+  name: reward_variance_top_p # registered by vagen.training.filters
   filter_kwargs: 
     top_p: 0.9 
   enable: False # set to true to enable filtering, recommended for grpo trainining

@@ -10,5 +10,5 @@ LOG_DIR="${VAGEN_EVAL_ROOT:-$SCRIPT_DIR/eval_runs}/logs"
 mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/run_$$.log"
 
-python -m vagen.evaluate.run_eval --config "$CONFIG" "$@" \
+python -m vagen.evaluation --config "$CONFIG" "$@" \
   2>&1 | tee "${LOG_FILE}"
