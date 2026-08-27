@@ -46,4 +46,4 @@ critic.fsdp.optimizer_offload=True
 # looking healthy while none of this repo's rollout code executes. The manager class
 # takes a `+` because it is not materialised in the YAML schema.
 actor_rollout_ref.rollout.agent.agent_loop_config_path=$V/vagen/configs/agent_v2.yaml
-+actor_rollout_ref.rollout.agent.agent_loop_manager_class=vagen.agent_loop.multi_output.MultiOutputAgentLoopManager
++actor_rollout_ref.rollout.agent.agent_loop_manager_class=vagen.training.agent_loop.multi_output.MultiOutputAgentLoopManager

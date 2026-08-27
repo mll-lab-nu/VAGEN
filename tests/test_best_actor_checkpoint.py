@@ -13,7 +13,7 @@ import os
 
 import pytest
 
-from vagen.trainer.mixin import VagenV0Mixin
+from vagen.training.trainer.mixin import VagenV0Mixin
 
 
 class _Cfg(dict):

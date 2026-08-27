@@ -12,8 +12,8 @@ from vagen.envs.sokoban.utils.prompt import (
 from .utils.utils import parse_response, numpy_to_pil
 
 
-from vagen.envs.gym_image_env import GymImageEnv
-from vagen.envs.state_reward import HasStateReward
+from vagen.envs import GymImageEnv
+from vagen.envs import HasStateReward
 from vagen.envs.sokoban.state_reward_spec import SPEC as SOKOBAN_STATE_REWARD_SPEC
 
 import asyncio

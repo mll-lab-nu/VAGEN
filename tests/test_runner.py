@@ -9,9 +9,9 @@ import types
 
 import pytest
 
-from vagen.core.client import BackendOutput, InferenceClient
+from vagen.rollout.client import BackendOutput, InferenceClient
 from vagen.harness import ConcatHarness, NoConcatHarness
-from vagen.core.runner import run_episode
+from vagen.rollout.runner import run_episode
 
 
 class Env:
@@ -208,7 +208,7 @@ def test_the_environment_contract_is_written_down():
     satisfy it by accident and fail in the one case nobody had written down."""
     import inspect
 
-    from vagen.core.env import BaseEnv
+    from vagen.envs import BaseEnv
 
     step = inspect.signature(BaseEnv.step)
     assert {"action", "response_token_ids", "tokenizer"} <= set(step.parameters)
@@ -231,8 +231,8 @@ def test_a_turn_cannot_take_unboundedly_many_model_calls():
 
     import pytest
 
-    from vagen.core.harness import BaseHarness, Call
-    from vagen.core.runner import MAX_CALLS_PER_TURN, run_episode
+    from vagen.harness import BaseHarness, Call
+    from vagen.rollout.runner import MAX_CALLS_PER_TURN, run_episode
 
     calls = []
 
@@ -275,7 +275,7 @@ def test_a_non_string_response_is_treated_as_an_empty_generation():
     loop would take for an action."""
     import asyncio
 
-    from vagen.core.client import BackendOutput, InferenceClient
+    from vagen.rollout.client import BackendOutput, InferenceClient
 
     class _C(InferenceClient):
         tokenizer = None

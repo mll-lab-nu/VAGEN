@@ -16,7 +16,7 @@ import pytest
 
 
 def _emitted_key():
-    from vagen.agent_loop import gym_loop
+    from vagen.training.agent_loop import gym_loop
 
     src = inspect.getsource(gym_loop.GymLoop._outputs)
     keys = {k for k in ("images", "image") if f'multi_modal_data={{"{k}"' in src}

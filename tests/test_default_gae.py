@@ -20,7 +20,7 @@ import torch
 from tensordict import TensorDict
 from verl.trainer.ppo.core_algos import compute_gae_advantage_return, get_adv_estimator_fn
 
-from vagen.custom_advantage import (
+from vagen.algorithms import (
     TRAJECTORY_ESTIMATORS,
     UNDISCOUNTED_ESTIMATORS,
     needs_critic,
@@ -289,7 +289,7 @@ def test_the_short_trajectorys_last_turn_closes():
     must give a return of 1.0 at the turn's anchor, not the bare 0.5 of a turn that never
     ran.
     """
-    from vagen.trainer.logic import IGNORE_RETURN
+    from vagen.training.trainer.logic import IGNORE_RETURN
 
     layout = (
         [[0.0, 0.0, 0.0, 0.0, END], [0.0, END, 0.0, 0.0, 0.0]],

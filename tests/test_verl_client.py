@@ -9,7 +9,7 @@ import types
 
 import pytest
 
-from vagen.agent_loop.verl_client import VerlClient
+from vagen.training.agent_loop.verl_client import VerlClient
 
 
 class Proc:
@@ -176,7 +176,7 @@ def test_every_tokenizer_path_flattens_parts_to_text():
     import ast
     import inspect
 
-    from vagen.agent_loop import verl_client
+    from vagen.training.agent_loop import verl_client
 
     tree = ast.parse(inspect.getsource(verl_client))
 

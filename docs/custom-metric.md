@@ -4,7 +4,7 @@ VAGEN supports custom metrics for W&B logging during training.
 
 ## Built-in Metrics
 
-Three are registered in `vagen/custom_metric/metric.py`:
+Three are registered in `vagen/training/metrics/episode/`:
 
 | name | what it reports |
 |---|---|
@@ -13,17 +13,17 @@ Three are registered in `vagen/custom_metric/metric.py`:
 | `reward_variance` | variance of reward within a group |
 
 Two of them return `dict[str, float]` rather than a single float; `collect_registry_metrics`
-(`vagen/trainer/logic.py`) supports both. The registry calls `fn(data)` with no extra
+(`vagen/training/trainer/logic.py`) supports both. The registry calls `fn(data)` with no extra
 arguments — there is no `**kwargs` mechanism.
 
 ## Creating a Custom Metric
 
 ### Step 1: Create Your Metric
 
-Add your metric in [`vagen/custom_metric/metric.py`](https://github.com/mll-lab-nu/VAGEN/blob/main/vagen/custom_metric/metric.py):
+Add your metric in its own directory under [`vagen/training/metrics`](https://github.com/mll-lab-nu/VAGEN/tree/main/vagen/training/metrics):
 
 ```python
-from vagen.custom_metric.metric import register_metric
+from vagen.training.metrics import register_metric
 from verl import DataProto
 
 @register_metric("my_metric")
@@ -94,4 +94,3 @@ def reward_variance(data: DataProto, ddof=0) -> float:
 
     return float(np.mean(per_group_vars)) if per_group_vars else 0.0
 ```
-

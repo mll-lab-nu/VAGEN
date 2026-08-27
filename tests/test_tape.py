@@ -8,7 +8,7 @@ rather than about outputs looking plausible.
 
 import pytest
 
-from vagen.core.tape import Conversation, MaskMisaligned, Row
+from vagen.rollout.trajectory import Conversation, MaskMisaligned, Row
 
 
 def _conv(prompt=(1, 2, 3)):

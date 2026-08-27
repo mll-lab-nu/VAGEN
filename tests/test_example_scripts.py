@@ -13,8 +13,8 @@ import re
 
 import pytest
 
-import vagen.custom_advantage  # noqa: F401  registers the estimators
-from vagen.custom_advantage import TRAJECTORY_ESTIMATORS
+import vagen.algorithms  # noqa: F401  registers the estimators
+from vagen.algorithms import TRAJECTORY_ESTIMATORS
 
 SCRIPTS = sorted(glob.glob("examples/train/*/*.sh"))
 VERL_OWN = {"gae", "grpo", "reinforce_plus_plus", "rloo", "remax"}
@@ -72,7 +72,7 @@ def test_estimators_with_a_required_hyperparameter_set_it(path):
 def test_state_reward_is_only_switched_on_where_a_spec_exists(path):
     """Every dataset that enables state reward must name a capable environment."""
     import vagen.envs.registry as R
-    from vagen.envs.state_reward import state_reward_spec_of
+    from vagen.envs._common.state_reward import state_reward_spec_of
     import yaml
 
     R._load_registry()
@@ -129,8 +129,8 @@ def test_the_capability_lives_on_the_environment_not_in_a_table():
     import inspect
 
     from vagen.envs.sokoban.sokoban_env import Sokoban
-    import vagen.envs.state_reward as state_reward
-    from vagen.envs.state_reward import state_reward_spec_of, supports_state_reward
+    import vagen.envs._common.state_reward as state_reward
+    from vagen.envs._common.state_reward import state_reward_spec_of, supports_state_reward
 
     assert supports_state_reward(Sokoban), "Sokoban no longer declares its spec"
     assert state_reward_spec_of(Sokoban).object_weights, "the declared spec is empty"
@@ -224,7 +224,7 @@ def test_every_seed_a_config_asks_for_resolves_to_data_that_exists(path):
     """
     import random
 
-    from vagen.gym_agent_dataset import _generate_from_len_three
+    from vagen.training.dataset import _generate_from_len_three
 
     for spec in _dataset_specs(path):
         data_dir = spec["config"]["data_dir"]

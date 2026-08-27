@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import pytest
 
-from vagen.trainer.mixin import VagenV0Mixin
+from vagen.training.trainer.mixin import VagenV0Mixin
 from vagen.utils.episode_log import rows_from_validation
 from vagen.utils.wandb_episodes import _PER_EPISODE, EpisodeTableLogger
 

@@ -16,8 +16,8 @@ import os
 
 import pytest
 
-from vagen.evaluate.registry import REGISTRY
-from vagen.evaluate.runner import run_eval_parallel
+from vagen.evaluation.backends import REGISTRY
+from vagen.evaluation.runner import run_eval_parallel
 
 BACKEND = "stub_for_tests"
 
@@ -71,7 +71,7 @@ def _stub_backend(monkeypatch):
     # becomes ~3 HuggingFace HEAD requests per job. Swallowed, so the tests pass either way
     # -- but on an air-gapped runner that is a DNS timeout per job, and one run here took
     # 100s against 6s offline. Nothing in this file asserts on sizes.
-    monkeypatch.setattr("vagen.evaluate.runner._load_sizers", lambda name: (None, None))
+    monkeypatch.setattr("vagen.evaluation.runner._load_sizers", lambda name: (None, None))
     yield
     REGISTRY._adapters.pop(BACKEND, None)
     REGISTRY._clients.pop(BACKEND, None)
@@ -152,7 +152,7 @@ def test_resume_matches_a_rollout_to_its_own_model_and_no_other(tmp_path):
 
     Note `run_eval_parallel` cannot cover this: resume lives in `main()`.
     """
-    from vagen.evaluate.run_eval import _collect_completed_runs, _job_resume_key
+    from vagen.evaluation.cli import _collect_completed_runs, _job_resume_key
 
     _run([_job(seed=1)], tmp_path, model="m-A")
     completed = _collect_completed_runs(str(tmp_path))
@@ -187,7 +187,7 @@ def test_the_purge_clears_only_the_tags_this_run_writes(tmp_path):
     Both rollouts must be *error* rollouts: the purge only ever removes those, so seeding
     finished ones makes the assertion true whatever the scoping does.
     """
-    from vagen.evaluate.run_eval import _purge_error_rollouts
+    from vagen.evaluation.cli import _purge_error_rollouts
 
     keep = _error_rollout(tmp_path / "tag_keep")
     rerun = _error_rollout(tmp_path / "tag_rerun")
@@ -202,8 +202,8 @@ def test_the_startup_refresh_does_not_zero_another_model_s_summary(tmp_path):
     second checkpoint it found nothing and wrote `n_episodes: 0, success_rate: 0.0` over the
     first checkpoint's results. The per-tag rewrite that would repair it only runs if the
     run reaches the end -- a bad api_key or a Ctrl-C made the loss permanent."""
-    from vagen.evaluate.run_eval import _refresh_tag_summaries
-    from vagen.evaluate.utils.summary_utils import write_rollouts_summary_from_dump
+    from vagen.evaluation.cli import _refresh_tag_summaries
+    from vagen.evaluation.summary import write_rollouts_summary_from_dump
 
     _run([_job(seed=1)], tmp_path, model="m-A")
     tag = tmp_path / "tag_t"
@@ -223,7 +223,7 @@ def test_the_summary_counts_one_run_not_two(tmp_path):
     """A rerun writes new {timestamp}-{uuid8} directories beside the old ones, and the
     summary scans the directory -- so without the model filter a 1-episode config reported
     two episodes at a blended rate."""
-    from vagen.evaluate.utils.summary_utils import write_rollouts_summary_from_dump
+    from vagen.evaluation.summary import write_rollouts_summary_from_dump
 
     _run([_job(seed=1)], tmp_path, model="m-A")
     _run([_job(seed=1)], tmp_path, model="m-B")
@@ -254,7 +254,7 @@ def test_a_mistyped_override_is_refused_rather_than_invented(tmp_path, override,
     `experiment.dumpdir=/tmp/x` were both accepted in silence -- the run went ahead on the
     real setting and exited 0, so the only evidence was results in the wrong place, or a
     backend you did not choose."""
-    from vagen.evaluate.run_eval import _load_config
+    from vagen.evaluation.cli import _load_config
 
     cfg = "examples/evaluate/sokoban/config.yaml"
     if ok:
@@ -265,7 +265,7 @@ def test_a_mistyped_override_is_refused_rather_than_invented(tmp_path, override,
 
 
 def test_the_refusal_names_the_key_it_meant(tmp_path):
-    from vagen.evaluate.run_eval import _load_config
+    from vagen.evaluation.cli import _load_config
 
     with pytest.raises(ValueError, match=r"Did you mean run\.backend\?"):
         _load_config("examples/evaluate/sokoban/config.yaml", ["run.backendd=vllm"])

@@ -91,7 +91,7 @@ def test_the_turn_estimator_reads_the_value_at_the_turn_start():
     """
     import numpy as np
 
-    import vagen.custom_advantage  # noqa: F401  importing is what registers them
+    import vagen.algorithms  # noqa: F401  importing is what registers them
     from verl.trainer.ppo.core_algos import get_adv_estimator_fn
 
     # Through the registry, so this exercises the same dispatch verl uses rather than
@@ -119,7 +119,7 @@ def test_the_turn_estimator_reads_the_value_at_the_turn_start():
 
     # Real returns sit only at anchors; everywhere else carries the sentinel that says
     # "no supervision here".
-    from vagen.custom_advantage.trajectory_algos import IGNORE_RETURN
+    from vagen.algorithms._common.trajectory_algos import IGNORE_RETURN
 
     anchors = (ret[0] != IGNORE_RETURN).nonzero().flatten().tolist()
     assert anchors == [0, 3], (

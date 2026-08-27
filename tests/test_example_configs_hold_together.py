@@ -177,8 +177,8 @@ def test_the_two_seed_derivations_agree():
     declared ranges rather than realised sets."""
     from types import SimpleNamespace
 
-    from vagen.evaluate.utils.seeding_utils import generate_seeds_for_spec as ev
-    from vagen.gym_agent_dataset import _generate_seeds_for_spec as tr
+    from vagen.evaluation.seeding import generate_seeds_for_spec as ev
+    from vagen.training.dataset import _generate_seeds_for_spec as tr
 
     for directive in ([100, 200], [1, 50, 1], [7]):
         a = SimpleNamespace(name="Sokoban", n_envs=8, seed=directive, seed_list=None, split="test")
@@ -191,8 +191,8 @@ def test_a_seed_list_of_exactly_n_envs_is_accepted_on_both_sides():
     the seeds you want was rejected. Evaluation always accepted it."""
     from types import SimpleNamespace
 
-    from vagen.evaluate.utils.seeding_utils import generate_seeds_for_spec as ev
-    from vagen.gym_agent_dataset import _generate_seeds_for_spec as tr
+    from vagen.evaluation.seeding import generate_seeds_for_spec as ev
+    from vagen.training.dataset import _generate_seeds_for_spec as tr
 
     a = SimpleNamespace(name="S", n_envs=3, seed=[0], seed_list=[1, 2, 3], split="test")
     b = SimpleNamespace(name="S", n_envs=3, seed=[0], seed_list=[1, 2, 3])

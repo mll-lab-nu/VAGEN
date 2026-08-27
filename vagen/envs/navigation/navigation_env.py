@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 from PIL import Image
 
-from vagen.envs.gym_image_env import GymImageEnv
+from vagen.envs import GymImageEnv
 from vagen.envs.navigation.utils.prompt import system_prompt, init_observation_template, action_template, get_format_instruction
 from vagen.envs.navigation.utils.parse import parse_response, compute_reward
 

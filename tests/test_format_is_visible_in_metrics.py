@@ -20,7 +20,7 @@ import pytest
 
 
 def test_state_reward_metrics_name_only_enabled_description_scores():
-    from vagen.envs.state_reward import state_reward_names
+    from vagen.envs._common.state_reward import state_reward_names
 
     cfg = {"state_reward": {
         "state_estimation": {"enable": True, "reward": 0.01},
@@ -31,7 +31,7 @@ def test_state_reward_metrics_name_only_enabled_description_scores():
 
 
 def test_nothing_is_published_when_state_reward_is_off():
-    from vagen.envs.state_reward import state_reward_names
+    from vagen.envs._common.state_reward import state_reward_names
 
     assert state_reward_names({}) == ()
     assert state_reward_names({"state_reward": {
@@ -46,7 +46,7 @@ class _Adapter:
     """Just the accumulator under test."""
 
     def __init__(self):
-        from vagen.agent_loop.gym_loop import GymEnvAdapter
+        from vagen.training.agent_loop.gym_loop import GymEnvAdapter
 
         self.a = object.__new__(GymEnvAdapter)
         self.a.state_scores = {}
@@ -91,7 +91,7 @@ def test_the_loop_emits_the_rate_only_when_it_was_measured():
     and must use getattr, since `env` is whatever the runner was handed."""
     import inspect
 
-    from vagen.agent_loop.gym_loop import GymLoop
+    from vagen.training.agent_loop.gym_loop import GymLoop
 
     src = inspect.getsource(GymLoop)
     assert "format_correct_rate" in src
@@ -118,7 +118,7 @@ def test_model_tokens_per_turn_counts_only_generated_tokens():
     """
     import inspect
 
-    from vagen.agent_loop.gym_loop import GymLoop
+    from vagen.training.agent_loop.gym_loop import GymLoop
 
     src = inspect.getsource(GymLoop)
     assert "model_tokens_per_turn" in src

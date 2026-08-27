@@ -55,7 +55,7 @@ class _Result:
 
 
 def _output():
-    from vagen.agent_loop.gym_loop import GymLoop
+    from vagen.training.agent_loop.gym_loop import GymLoop
 
     loop = GymLoop.__new__(GymLoop)
     loop.prompt_length = 100
@@ -75,7 +75,7 @@ def test_the_vector_is_published_not_only_its_sum():
 def test_the_scalar_is_the_sum_of_the_vector_that_trains():
     """verl's metrics read the scalar and the loss reads the vector, so a run whose
     reported reward and actual reward disagree looks healthy from the outside."""
-    from vagen.agent_loop.gym_loop import GymLoop
+    from vagen.training.agent_loop.gym_loop import GymLoop
 
     loop = GymLoop.__new__(GymLoop)
     loop.prompt_length, loop.response_length = 100, 100     # both fit
@@ -105,7 +105,7 @@ def test_the_key_does_not_collide_with_a_tensor_verl_already_has():
 
     import inspect
 
-    from vagen.agent_loop import gym_loop
+    from vagen.training.agent_loop import gym_loop
 
     src = inspect.getsource(gym_loop.GymLoop._outputs)
     tensor_names = {"token_level_scores", "token_level_rewards", "responses",
@@ -151,7 +151,7 @@ class _TruncatedClient:
 def _truncated_output(response_length):
     from omegaconf import OmegaConf
 
-    from vagen.agent_loop.gym_loop import GymLoop
+    from vagen.training.agent_loop.gym_loop import GymLoop
 
     loop = GymLoop.__new__(GymLoop)
     loop.prompt_length = 100
