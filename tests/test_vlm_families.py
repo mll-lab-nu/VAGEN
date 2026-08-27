@@ -71,7 +71,7 @@ def test_position_ids_match_what_the_family_needs(repo, expects_mrope, expected_
 def test_image_token_is_discovered_per_family(repo, expects_mrope, expected_token):
     """Three families, three different placeholder strings -- which is why this is read
     off the processor instead of matched against a table."""
-    from vagen.utils.image_token_utils import get_image_token, replace_image_tokens_for_logging
+    from vagen.models import get_image_token, replace_image_tokens_for_logging
 
     processor = _processor(repo)
     token = get_image_token(processor)
@@ -92,7 +92,7 @@ def test_the_client_forwards_mm_processor_kwargs_both_ways(repo, expects_mrope, 
     import ast
     import inspect
 
-    from vagen.agent_loop.verl_client import VerlClient
+    from vagen.training.agent_loop.verl_client import VerlClient
 
     source = inspect.getsource(VerlClient)
     tree = ast.parse(source)

@@ -23,7 +23,7 @@ import os
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
-from vagen.envs_remote.handler import BaseGymHandler, HandlerResult, SessionContext
+from vagen.envs._common.remote.handler import BaseGymHandler, HandlerResult, SessionContext
 from .navigation_env import NavigationEnv
 
 LOGGER = logging.getLogger(__name__)

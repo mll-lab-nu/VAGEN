@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from vagen.trainer.mixin import VagenV0Mixin
+from vagen.training.trainer.mixin import VagenV0Mixin
 
 
 class _Cfg(dict):
@@ -137,7 +137,7 @@ def test_upstream_collects_and_forwards_what_regrouping_needs():
 
     from verl.trainer.ppo.ray_trainer import RayPPOTrainer
 
-    from vagen.trainer.mixin import VagenV0Mixin
+    from vagen.training.trainer.mixin import VagenV0Mixin
 
     for col in ("image_data", "group_idx", "traj_idx", "episode_id", "conversations"):
         assert col in VagenV0Mixin.val_log_columns, f"{col} no longer requested"
@@ -164,7 +164,7 @@ def test_the_agent_loop_publishes_the_columns_the_logger_regroups_on():
     """The other end of the same contract: the loop has to emit these per row."""
     import inspect
 
-    from vagen.agent_loop import gym_loop
+    from vagen.training.agent_loop import gym_loop
 
     src = inspect.getsource(gym_loop.GymLoop._outputs)
     for col in ("group_idx", "traj_idx", "turn_idx", "conversation_id"):
@@ -216,7 +216,7 @@ def test_with_neither_it_still_falls_back():
 def test_the_diagnostic_reports_on_columns_that_exist():
     """It exists to catch a dropped column. Naming one that was renamed makes it report
     a permanent false alarm, which is worse than not reporting."""
-    from vagen.trainer.mixin import VagenV0Mixin
+    from vagen.training.trainer.mixin import VagenV0Mixin
     from vagen.utils.episode_log import describe_columns
 
     line = describe_columns({}, 4)

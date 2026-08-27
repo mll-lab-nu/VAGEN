@@ -45,7 +45,7 @@ fi
 vagen_serve_vllm "$MODEL_PATH" "$PORT" "$TP_SIZE" "$MEM_FRACTION" \
                  "$MAX_MODEL_LEN" "$MAX_IMAGES" "${LOG_DIR}/vllm_server_$$.log"
 
-python -m vagen.evaluate.run_eval --config "${CONFIG}" \
+python -m vagen.evaluation --config "${CONFIG}" \
   run.backend=openai \
   backends.openai.base_url="http://127.0.0.1:${PORT}/v1" \
   backends.openai.model="${MODEL_PATH}" \

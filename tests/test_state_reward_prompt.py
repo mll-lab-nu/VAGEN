@@ -14,7 +14,7 @@ import pytest
 
 from model_path import local_snapshot
 
-from vagen.envs.state_reward import state_reward_spec_of
+from vagen.envs._common.state_reward import state_reward_spec_of
 
 def _state_reward_specs() -> dict:
     """Every environment that declares a state-reward spec, keyed by registry name.
@@ -24,7 +24,7 @@ def _state_reward_specs() -> dict:
     central has to be edited to agree with it.
     """
     import vagen.envs.registry as R
-    from vagen.envs.state_reward import state_reward_spec_of
+    from vagen.envs._common.state_reward import state_reward_spec_of
 
     R._load_registry()
     out = {}

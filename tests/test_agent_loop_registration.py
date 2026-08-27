@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import pytest
 
-import vagen.agent_loop.gym_loop  # noqa: F401  importing is what registers
+import vagen.training.agent_loop.gym_loop  # noqa: F401  importing is what registers
 from verl.experimental.agent_loop.agent_loop import _agent_loop_registry as REGISTRY
 
 
@@ -25,7 +25,7 @@ def test_the_name_resolves_to_the_loop_class(name):
     ``configs/agent_v2.yaml`` dispatches on; it must reach ``GymLoop`` and nothing else."""
     entry = REGISTRY.get(name)
     assert entry is not None, f"{name} is not registered; the config will fail to resolve"
-    assert entry["_target_"] == "vagen.agent_loop.gym_loop.GymLoop", (
+    assert entry["_target_"] == "vagen.training.agent_loop.gym_loop.GymLoop", (
         f"{name} resolves to {entry['_target_']!r}. A decorator landed on the wrong "
         "object -- check for anything inserted between @register and `class GymLoop`."
     )
@@ -36,7 +36,7 @@ def test_the_target_is_importable_and_is_a_loop():
     only fails once a rollout starts. Resolve it here instead."""
     import importlib
 
-    from vagen.agent_loop.gym_loop import GymLoop
+    from vagen.training.agent_loop.gym_loop import GymLoop
 
     module, _, attr = REGISTRY["gym_agent"]["_target_"].rpartition(".")
     obj = getattr(importlib.import_module(module), attr)
@@ -50,7 +50,7 @@ def test_no_module_level_function_sits_between_the_decorator_and_the_class():
     mistake is rather than as a TypeError inside Ray three minutes into a job."""
     import inspect
 
-    import vagen.agent_loop.gym_loop as mod
+    import vagen.training.agent_loop.gym_loop as mod
 
     src = inspect.getsource(mod)
     tail = src[src.index('@register("gym_agent")'):]

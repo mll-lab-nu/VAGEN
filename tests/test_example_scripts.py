@@ -10,13 +10,18 @@ from __future__ import annotations
 import glob
 import os
 import re
+import subprocess
 
 import pytest
 
-import vagen.custom_advantage  # noqa: F401  registers the estimators
-from vagen.custom_advantage import TRAJECTORY_ESTIMATORS
+import vagen.algorithms  # noqa: F401  registers the estimators
+from vagen.algorithms import TRAJECTORY_ESTIMATORS
 
 SCRIPTS = sorted(glob.glob("examples/train/*/*.sh"))
+ALL_SHELL_SCRIPTS = sorted(
+    glob.glob("examples/train/**/*.sh", recursive=True)
+    + glob.glob("examples/evaluate/**/*.sh", recursive=True)
+)
 VERL_OWN = {"gae", "grpo", "reinforce_plus_plus", "rloo", "remax"}
 
 
@@ -38,6 +43,38 @@ def _flag(text, name):
 
 def test_there_are_scripts_to_check():
     assert SCRIPTS, "found no example scripts; this test is silently vacuous"
+
+
+@pytest.mark.parametrize("path", ALL_SHELL_SCRIPTS)
+def test_every_example_shell_script_parses(path):
+    subprocess.run(["bash", "-n", path], check=True)
+
+
+@pytest.mark.parametrize("path", SCRIPTS, ids=lambda p: "/".join(p.split("/")[-2:]))
+def test_training_examples_use_canonical_entrypoints(path):
+    text = open(path).read()
+    assert "-m vagen.training.main" in text
+    assert "vagen/training/dataset.py" in text
+
+
+def test_examples_do_not_reference_removed_packages():
+    legacy = re.compile(
+        r"vagen(?:\.|/)(?:core|agent_loop|trainer|custom_advantage|custom_filter|"
+        r"custom_metric|custom_loss|evaluate|envs_remote|main_ppo|gym_agent_dataset)"
+    )
+    offenders = []
+    shipped = glob.glob("examples/train/**/*", recursive=True)
+    shipped += glob.glob("examples/evaluate/**/*", recursive=True)
+    for path in shipped:
+        if not os.path.isfile(path):
+            continue
+        try:
+            text = open(path).read()
+        except UnicodeDecodeError:
+            continue
+        if legacy.search(text):
+            offenders.append(path)
+    assert not offenders, f"examples reference removed package paths: {offenders}"
 
 
 @pytest.mark.parametrize("path", SCRIPTS, ids=lambda p: "/".join(p.split("/")[-2:]))
@@ -72,7 +109,7 @@ def test_estimators_with_a_required_hyperparameter_set_it(path):
 def test_state_reward_is_only_switched_on_where_a_spec_exists(path):
     """Every dataset that enables state reward must name a capable environment."""
     import vagen.envs.registry as R
-    from vagen.envs.state_reward import state_reward_spec_of
+    from vagen.envs._common.state_reward import state_reward_spec_of
     import yaml
 
     R._load_registry()
@@ -129,8 +166,8 @@ def test_the_capability_lives_on_the_environment_not_in_a_table():
     import inspect
 
     from vagen.envs.sokoban.sokoban_env import Sokoban
-    import vagen.envs.state_reward as state_reward
-    from vagen.envs.state_reward import state_reward_spec_of, supports_state_reward
+    import vagen.envs._common.state_reward as state_reward
+    from vagen.envs._common.state_reward import state_reward_spec_of, supports_state_reward
 
     assert supports_state_reward(Sokoban), "Sokoban no longer declares its spec"
     assert state_reward_spec_of(Sokoban).object_weights, "the declared spec is empty"
@@ -224,7 +261,7 @@ def test_every_seed_a_config_asks_for_resolves_to_data_that_exists(path):
     """
     import random
 
-    from vagen.gym_agent_dataset import _generate_from_len_three
+    from vagen.training.dataset import _generate_from_len_three
 
     for spec in _dataset_specs(path):
         data_dir = spec["config"]["data_dir"]

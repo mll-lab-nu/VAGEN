@@ -1,4 +1,4 @@
-"""Unit tests for vagen/agent_loop/multi_output.py.
+"""Unit tests for vagen/training/agent_loop/multi_output.py.
 
 The two overrides are tested against a stubbed ``AgentLoopWorker`` base rather than a
 live worker: instantiating a real one needs an LLM server, a tokenizer and a Ray actor,
@@ -17,8 +17,8 @@ import numpy as np
 import pytest
 from verl.experimental.agent_loop.agent_loop import AgentLoopManager, AgentLoopWorker
 
-import vagen.agent_loop.multi_output as mo
-from vagen.agent_loop.multi_output import (
+import vagen.training.agent_loop.multi_output as mo
+from vagen.training.agent_loop.multi_output import (
     MultiOutputAgentLoopManager,
     MultiOutputAgentLoopWorker,
 )
@@ -196,7 +196,7 @@ def test_manager_is_reachable_by_fqn():
     """The config passes a string; a rename here would only surface at launch time."""
     from verl.utils.import_utils import load_class_from_fqn
 
-    fqn = "vagen.agent_loop.multi_output.MultiOutputAgentLoopManager"
+    fqn = "vagen.training.agent_loop.multi_output.MultiOutputAgentLoopManager"
     assert load_class_from_fqn(fqn, "AgentLoopManager") is MultiOutputAgentLoopManager
 
 

@@ -20,9 +20,9 @@ from __future__ import annotations
 import pytest
 import torch
 
-import vagen.custom_advantage  # noqa: F401
-import vagen.custom_loss  # noqa: F401
-from vagen.custom_loss.turn_gspo import (
+import vagen.algorithms  # noqa: F401
+import vagen.training.losses  # noqa: F401
+from vagen.training.losses.turn_gspo import (
     aggregate_seq_mean_turn_sum_token_mean,
     compute_policy_loss_turn_gspo,
     turn_geometric_mean_log_ratio,
@@ -274,18 +274,18 @@ def test_the_estimators_publish_the_column_the_loss_needs():
     publishing would leave `turn_gspo` raising at the first step of a real run."""
     import inspect
 
-    from vagen.custom_advantage import trajectory_algos
+    from vagen.algorithms._common import packing
 
-    src = inspect.getsource(trajectory_algos._Packed.emit)
+    src = inspect.getsource(packing._Packed.emit)
     assert '"turn_id"' in src, "emit no longer publishes turn_id"
 
 
 # ---------------------------------------------------- refusing a config that cannot work
 
-def _trainer(loss_mode="turn_gspo", estimator="turn_level_gae", external_lib="vagen.custom_loss"):
+def _trainer(loss_mode="turn_gspo", estimator="turn_level_gae", external_lib="vagen.training.losses"):
     from omegaconf import OmegaConf
 
-    from vagen.trainer.mixin import VagenLogicMixin
+    from vagen.training.trainer.mixin import VagenLogicMixin
 
     t = object.__new__(type("T", (VagenLogicMixin,), {}))
     t.config = OmegaConf.create({
@@ -306,7 +306,7 @@ def test_turn_gspo_without_the_worker_import_is_refused_here_not_minutes_in():
     """★ The registry lives in the actor worker's process, so registering `turn_gspo` on
     the driver proves nothing. Left unchecked the run comes up, rolls out, and dies on
     'Unsupported loss mode' at the first update."""
-    with pytest.raises(ValueError, match="external_lib=vagen.custom_loss"):
+    with pytest.raises(ValueError, match="external_lib=vagen.training.losses"):
         _trainer(external_lib=None)._vagen_check_turn_level_loss_has_what_it_needs()
 
 
@@ -325,7 +325,7 @@ def test_other_losses_are_left_alone():
 def test_the_check_runs_at_startup():
     import inspect
 
-    from vagen.trainer.mixin import VagenLogicMixin
+    from vagen.training.trainer.mixin import VagenLogicMixin
 
     assert "_vagen_check_turn_level_loss_has_what_it_needs()" in inspect.getsource(
         VagenLogicMixin._vagen_init
@@ -420,7 +420,7 @@ def test_turns_per_row_is_reported_because_it_is_that_factor():
 
 # ================================================================= turn_ppo
 
-from vagen.custom_loss.turn_gspo import compute_policy_loss_turn_ppo, turn_log_ratio  # noqa: E402
+from vagen.training.losses.turn_gspo import compute_policy_loss_turn_ppo, turn_log_ratio  # noqa: E402
 
 
 def test_turn_ppo_clips_the_literal_product_ratio():

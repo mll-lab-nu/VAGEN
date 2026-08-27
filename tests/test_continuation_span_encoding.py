@@ -39,7 +39,7 @@ class _Started:
 
 
 def _client(tok, *, mid_conversation=True):
-    from vagen.agent_loop.verl_client import VerlClient
+    from vagen.training.agent_loop.verl_client import VerlClient
 
     c = VerlClient.__new__(VerlClient)
     c.tokenizer, c.processor = tok, None
@@ -128,7 +128,7 @@ def test_the_placeholder_used_to_strip_is_the_one_prepended():
 
 
 def verl_client_module():
-    from vagen.agent_loop import verl_client
+    from vagen.training.agent_loop import verl_client
 
     return verl_client
 

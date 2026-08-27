@@ -1,4 +1,4 @@
-"""Unit tests for vagen/trainer/logic.py.
+"""Unit tests for vagen/training/trainer/logic.py.
 
 Pure tensor logic -- no verl, no ray, no GPU. Should run in well under a second.
 """
@@ -6,7 +6,7 @@ Pure tensor logic -- no verl, no ray, no GPU. Should run in well under a second.
 import pytest
 import torch
 
-from vagen.trainer.logic import (
+from vagen.training.trainer.logic import (
     IGNORE_RETURN,
     collect_registry_metrics,
     default_eps,
@@ -150,7 +150,7 @@ def test_pad_to_multiple_rejects_nonpositive():
 
 import numpy as np
 
-from vagen.trainer.logic import traj_idx_for_interleaved_repeat
+from vagen.training.trainer.logic import traj_idx_for_interleaved_repeat
 
 
 def test_traj_idx_cycles_within_each_prompt_group():
@@ -173,5 +173,4 @@ def test_traj_idx_rejects_a_ragged_batch():
 def test_traj_idx_rejects_nonpositive_repeat():
     with pytest.raises(ValueError):
         traj_idx_for_interleaved_repeat(6, 0)
-
 

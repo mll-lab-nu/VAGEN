@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from vagen.harness.budget import Budgets, BudgetError, check, default_summary_budget
+from vagen.harness._common.budget import Budgets, BudgetError, check, default_summary_budget
 from vagen.harness.compact import CompactHarness, CompactionMakesNoProgress
 
 
@@ -109,7 +109,7 @@ def test_the_derived_defaults_satisfy_the_rules_they_are_checked_against():
     """Defaults its own checker rejects would fail every unconfigured run."""
     from dataclasses import replace
 
-    from vagen.harness.budget import default_env_response
+    from vagen.harness._common.budget import default_env_response
 
     for m in (8, 100, 400, 4000, 40000):
         for per_turn in (64, 1024, 8000):
@@ -307,8 +307,8 @@ def test_the_runner_forwards_a_calls_own_limits():
     bounded everywhere it is written down."""
     import asyncio
 
-    from vagen.core.harness import BaseHarness, Call
-    from vagen.core.runner import run_episode
+    from vagen.harness import BaseHarness, Call
+    from vagen.rollout.runner import run_episode
 
     seen = []
 
@@ -346,7 +346,7 @@ def test_an_oversized_observation_is_cut_to_the_ceiling():
     """Cut rather than refused: max_env_response_per_turn exists so an episode is bounded,
     and a bound that kills the rollout when an environment exceeds it only moves the
     failure. One oversized observation costs its own tail."""
-    from vagen.core.client import InferenceClient
+    from vagen.rollout.client import InferenceClient
 
     class _C(InferenceClient):
         # one token per character, so sizes are legible
@@ -363,7 +363,7 @@ def test_an_oversized_observation_is_cut_to_the_ceiling():
 
 
 def _char_client():
-    from vagen.core.client import InferenceClient
+    from vagen.rollout.client import InferenceClient
 
     class _C(InferenceClient):
         def encode(self, messages): return [0] * sum(len(m["content"]) for m in messages)
@@ -386,7 +386,7 @@ def test_an_oversized_opening_is_trimmed_but_the_system_prompt_is_never_cut():
 
 def test_an_opening_whose_system_prompt_alone_does_not_fit_still_refuses():
     """No cut repairs a prompt region too small to hold the instructions."""
-    from vagen.core.client import ContextTooLarge
+    from vagen.rollout.client import ContextTooLarge
 
     c = _char_client()
     c.opening_limit, c.continuation_limit = 1000, 400
@@ -397,7 +397,7 @@ def test_an_opening_whose_system_prompt_alone_does_not_fit_still_refuses():
 def test_a_cut_drops_whole_images_once_the_text_is_gone():
     """A partial image is not an image: placeholders and frames have to stay 1:1, so a
     frame that will not fit is dropped entire, along with its placeholder."""
-    from vagen.core.client import InferenceClient
+    from vagen.rollout.client import InferenceClient
 
     class _C(InferenceClient):
         def encode(self, messages):
@@ -417,7 +417,7 @@ def test_a_cut_drops_whole_images_once_the_text_is_gone():
 
 
 def test_the_two_ceilings_come_from_the_mode():
-    from vagen.harness.budget import context_limits
+    from vagen.harness._common.budget import context_limits
 
     b = _b(prompt_len=9000, response_len=8000, per_turn=512, max_turns=5,
            env_response=1360, compact_budget=1300, summary_budget=325)
@@ -452,7 +452,7 @@ def test_the_default_env_response_is_a_flat_ceiling_not_a_share_of_the_region():
     measured sokoban observation of 96 tokens, and the T*g + (T-1)*E warning then reported
     a 5-turn episode as needing 51k where a real one needs 11k -- firing on every rollout
     of every correctly sized config, which is how a warning stops being read."""
-    from vagen.harness.budget import DEFAULT_MAX_ENV_RESPONSE, default_env_response
+    from vagen.harness._common.budget import DEFAULT_MAX_ENV_RESPONSE, default_env_response
 
     big = default_env_response("concat", _b(response_len=12288, per_turn=2048))
     assert big == DEFAULT_MAX_ENV_RESPONSE == 2048
@@ -465,7 +465,7 @@ def test_the_ceiling_does_not_depend_on_the_configuration_at_all(mode):
     observation a function of how much room the model was given to answer it. From the
     worst-case sum it went negative and refused every observation; from the room left it
     grew with the response region, reaching 10240 against a measured 96."""
-    from vagen.harness.budget import DEFAULT_MAX_ENV_RESPONSE, default_env_response
+    from vagen.harness._common.budget import DEFAULT_MAX_ENV_RESPONSE, default_env_response
 
     for b in (_b(response_len=2000, per_turn=1000), _b(response_len=64000, per_turn=1000)):
         assert default_env_response(mode, b) == DEFAULT_MAX_ENV_RESPONSE
@@ -486,7 +486,7 @@ def test_a_five_turn_episode_passes_without_warning(mode):
 
 
 def test_the_spec_accepts_the_new_name_and_the_old_one():
-    from vagen.gym_agent_dataset import EnvSpec
+    from vagen.training.dataset import EnvSpec
 
     assert EnvSpec(name="Sokoban", n_envs=1, max_env_response_per_turn=256).max_env_response_per_turn == 256
     # the deprecated spelling is what the oversized-observation error told people to set
@@ -495,7 +495,7 @@ def test_the_spec_accepts_the_new_name_and_the_old_one():
 
 
 def test_the_spec_refuses_two_different_values_for_one_quantity():
-    from vagen.gym_agent_dataset import EnvSpec
+    from vagen.training.dataset import EnvSpec
 
     with pytest.raises(ValueError, match="They are one quantity"):
         EnvSpec(name="Sokoban", n_envs=1, max_env_response_per_turn=256, env_response_length=512)
@@ -516,7 +516,7 @@ def test_the_budget_is_carried_as_a_sampling_key_and_nothing_else():
     `<think>` is the delimiter -- the next family spells it differently."""
     import inspect
 
-    from vagen.agent_loop import gym_loop
+    from vagen.training.agent_loop import gym_loop
 
     src = inspect.getsource(gym_loop)
     assert "thinking_token_budget" in src
@@ -527,7 +527,7 @@ def test_the_budget_is_carried_as_a_sampling_key_and_nothing_else():
 def test_the_spec_carries_the_budget_and_defaults_to_off():
     """Off unless asked for: set, it makes vLLM refuse the request unless the engine also
     has reasoning_config, so a default would break every run that does not want it."""
-    from vagen.gym_agent_dataset import EnvSpec
+    from vagen.training.dataset import EnvSpec
 
     assert EnvSpec(name="Sokoban", n_envs=1).thinking_token_budget is None
     assert EnvSpec(name="Sokoban", n_envs=1, thinking_token_budget=512).thinking_token_budget == 512

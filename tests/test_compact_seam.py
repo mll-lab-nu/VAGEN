@@ -17,7 +17,7 @@ import torch
 from tensordict import TensorDict
 from verl.trainer.ppo.core_algos import get_adv_estimator_fn
 
-from vagen.custom_advantage.trajectory import TrajectoryView
+from vagen.algorithms._common.trajectory import TrajectoryView
 
 TOKEN_GAE = get_adv_estimator_fn("token_level_gae")
 

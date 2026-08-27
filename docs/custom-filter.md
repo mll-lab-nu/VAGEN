@@ -13,10 +13,10 @@ VAGEN supports custom filters to preprocess training data before optimization. T
 
 ### Step 1: Create Your Filter
 
-Add your filter in [`vagen/custom_filter/filter.py`](https://github.com/mll-lab-nu/VAGEN/blob/main/vagen/custom_filter/filter.py):
+Add your filter in its own directory under [`vagen/training/filters`](https://github.com/mll-lab-nu/VAGEN/tree/main/vagen/training/filters):
 
 ```python
-from vagen.custom_filter.filter import register_filter
+from vagen.training.filters import register_filter
 from verl import DataProto
 
 @register_filter("my_filter")
@@ -70,7 +70,7 @@ filter:
 ## Example: Reward Variance Filter
 
 A **sketch** of what the built-in `reward_variance` does — it keeps the groups with the
-highest reward variance. Read `vagen/custom_filter/filter.py` for the real one; this is
+highest reward variance. Read `vagen/training/filters/reward_variance/` for the real one; this is
 simplified, and the name is already taken, so pasting it as-is raises
 `ValueError: already registered`.
 

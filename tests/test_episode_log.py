@@ -104,7 +104,7 @@ def test_the_manager_restores_the_per_row_columns():
     """
     import numpy as np
 
-    from vagen.agent_loop.multi_output import MultiOutputAgentLoopWorker as W
+    from vagen.training.agent_loop.multi_output import MultiOutputAgentLoopWorker as W
 
     class _Out:
         def __init__(self, turn, conversation):
@@ -123,7 +123,7 @@ def test_the_manager_restores_the_per_row_columns():
 def test_restore_does_not_clobber_columns_that_survived():
     import numpy as np
 
-    from vagen.agent_loop.multi_output import MultiOutputAgentLoopWorker as W
+    from vagen.training.agent_loop.multi_output import MultiOutputAgentLoopWorker as W
 
     class _Out:
         extra_fields = {"turn_idx": 99, "conversation_id": "x"}

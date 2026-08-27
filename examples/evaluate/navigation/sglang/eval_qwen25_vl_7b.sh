@@ -74,7 +74,7 @@ source "${SCRIPT_DIR}/../../wait_for_server.sh"
 wait_for_server
 
 # ---------- Run Eval ----------
-python -m vagen.evaluate.run_eval --config "${CONFIG}" \
+python -m vagen.evaluation --config "${CONFIG}" \
   run.backend=sglang \
   backends.sglang.base_url="http://127.0.0.1:${PORT}/v1" \
   backends.sglang.model="${MODEL_PATH}" \

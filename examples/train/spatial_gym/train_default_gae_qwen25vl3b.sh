@@ -80,10 +80,10 @@ mapfile -t BASE < <(grep -vE '^\s*(#|$)' "$V/vagen/configs/baseline_vllm.flags" 
 
 # train_batch_size is 32, not 128: the dataset is n_envs=50 and the loader drops
 # the last partial batch, so 128 yields zero batches and the trainer asserts.
-PYTHONUNBUFFERED=1 python3 -m vagen.main_ppo \
+PYTHONUNBUFFERED=1 python3 -m vagen.training.main \
     --config-path="$V/vagen/configs" --config-name=vagen_multiturn \
     hydra.searchpath="[file://$VERL/verl/trainer/config]" \
-    data.custom_cls.path="$V/vagen/gym_agent_dataset.py" \
+    data.custom_cls.path="$V/vagen/training/dataset.py" \
     "${BASE[@]}" \
     data.train_files="$SCRIPTDIR/train_spatial_gym_vision.yaml" \
     data.val_files="$SCRIPTDIR/val_spatial_gym_vision.yaml" \

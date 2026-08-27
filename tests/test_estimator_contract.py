@@ -17,7 +17,7 @@ import torch
 from tensordict import TensorDict
 from verl.trainer.ppo.core_algos import get_adv_estimator_fn
 
-from vagen.custom_advantage import TRAJECTORY_ESTIMATORS
+from vagen.algorithms import TRAJECTORY_ESTIMATORS
 
 ESTIMATORS = sorted(TRAJECTORY_ESTIMATORS)
 
@@ -216,8 +216,8 @@ def test_returns_are_supervised_or_declared_unsupervised(name):
     """Every position of `returns` either carries a real target or is excluded by
     `value_mask`. The failure this catches is the critic regressing towards the -100
     sentinel, which makes its loss *fall* -- so nothing looks wrong."""
-    from vagen.custom_advantage import needs_value_mask
-    from vagen.trainer.logic import IGNORE_RETURN
+    from vagen.algorithms import needs_value_mask
+    from vagen.training.trainer.logic import IGNORE_RETURN
 
     _, ret, mask, batch = _call(name, _concat_rows())
     sentinel_at = (ret == IGNORE_RETURN) & mask

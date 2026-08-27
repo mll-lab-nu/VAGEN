@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-from vagen.agent_loop.gym_loop import GymLoop
+from vagen.training.agent_loop.gym_loop import GymLoop
 
 class _NoCompaction:
     """A harness that never summarised. `_outputs` asks it which conversations ended at a
@@ -89,7 +89,7 @@ def test_every_per_row_column_the_loop_publishes_survives_the_trip_to_the_traine
     Listing them one by one is what let ``ends_with_summary`` be added to the loop and
     forgotten here, so this asks the loop what it publishes rather than being told.
     """
-    from vagen.agent_loop.multi_output import MultiOutputAgentLoopWorker as _M
+    from vagen.training.agent_loop.multi_output import MultiOutputAgentLoopWorker as _M
 
     carried = set(_M.INDEX_COLUMNS) | set(_M.ROW_COLUMNS)
     # Not per-row identity: these are either per-rollout (restored from the input batch),

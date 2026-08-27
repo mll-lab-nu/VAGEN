@@ -21,16 +21,16 @@ from __future__ import annotations
 
 import pytest
 
-import vagen.custom_advantage  # noqa: F401  -- registers the estimators
-from vagen.custom_advantage import requires_undiscounted
-from vagen.custom_advantage.registry import (
+import vagen.algorithms  # noqa: F401  -- registers the estimators
+from vagen.algorithms import requires_undiscounted
+from vagen.algorithms._common.registry import (
     CRITIC_ESTIMATORS,
     PUBLISHES_TURN_ID,
     TRAJECTORY_ESTIMATORS,
     UNDISCOUNTED_ESTIMATORS,
     register_trajectory_adv_est,
 )
-from vagen.trainer.mixin import VagenLogicMixin
+from vagen.training.trainer.mixin import VagenLogicMixin
 
 TWO_CLOCK = "_test_two_clock_estimator"
 

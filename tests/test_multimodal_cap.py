@@ -75,7 +75,7 @@ def test_an_over_budget_response_is_truncated_and_an_over_budget_prompt_is_not()
     """
     from omegaconf import OmegaConf
 
-    from vagen.agent_loop.gym_loop import GymLoop
+    from vagen.training.agent_loop.gym_loop import GymLoop
 
     class _Row:
         ordinal = 0
@@ -130,7 +130,7 @@ def test_an_over_budget_response_is_truncated_and_an_over_budget_prompt_is_not()
 
 def test_the_overflow_hint_differs_by_mode():
     """One message for all three modes would send you to raise a number every time."""
-    from vagen.agent_loop.gym_loop import GymLoop
+    from vagen.training.agent_loop.gym_loop import GymLoop
 
     def hint(trainer):
         loop = GymLoop.__new__(GymLoop)
@@ -153,7 +153,7 @@ def test_gym_loop_defers_to_the_guard_rather_than_slicing():
     """
     import inspect
 
-    from vagen.agent_loop import gym_loop
+    from vagen.training.agent_loop import gym_loop
 
     src = inspect.getsource(gym_loop.GymLoop._outputs)
     assert "cap_token_ids" in src, "_outputs no longer routes through the guard"
@@ -172,7 +172,7 @@ def test_a_turn_straddling_the_cut_is_dropped_whole_not_clipped():
     """
     from omegaconf import OmegaConf
 
-    from vagen.agent_loop.gym_loop import GymLoop
+    from vagen.training.agent_loop.gym_loop import GymLoop
 
     class _Row:
         ordinal = 0
@@ -220,7 +220,7 @@ def test_absent_logprobs_are_published_as_absent():
     actual belief."""
     from omegaconf import OmegaConf
 
-    from vagen.agent_loop.gym_loop import GymLoop
+    from vagen.training.agent_loop.gym_loop import GymLoop
 
     class _Row:
         ordinal = 0
