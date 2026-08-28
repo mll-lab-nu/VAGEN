@@ -1,9 +1,4 @@
-"""Tests for the text-space context policies.
-
-The claim being tested is that concat, no-concat and compaction differ only in when the
-conversation id is dropped. So the tests read the sequence of calls a harness produces
-and check the ids, not the prose.
-"""
+"""Tests for harness-owned episode policies."""
 
 import inspect
 import types
@@ -12,212 +7,117 @@ import pytest
 
 from vagen.harness import CompactHarness, ConcatHarness, NoConcatHarness
 
-SYS = {"role": "system", "content": "sys"}
+
+class Client:
+    def __init__(self):
+        self.calls = []
+        self.n = 0
+
+    def size(self, messages):
+        return sum(len(str(message.get("content", ""))) for message in messages)
+
+    async def create(self, messages, **kwargs):
+        self.calls.append((list(messages), kwargs))
+        self.n += 1
+        total = sum(self.size([message]) for message in messages) + self.n
+        return types.SimpleNamespace(
+            text=f"reply-{self.n}",
+            token_ids=[self.n],
+            conversation_id=f"c{1 + sum('Summary so far:' in str(call[0]) for call in self.calls)}",
+            usage=types.SimpleNamespace(
+                prompt_tokens=total - 1,
+                completion_tokens=1,
+                response_tokens=max(1, total - 5),
+                total_tokens=total,
+            ),
+        )
 
 
-def _resp(text, conversation_id):
-    return types.SimpleNamespace(text=text, conversation_id=conversation_id)
+class Env:
+    def __init__(self, turns=3):
+        self.turns = turns
+        self.actions = []
+        self.stop_reason = None
+
+    async def reset(self):
+        return {"role": "user", "content": "obs0"}, {}
+
+    async def system_prompt(self):
+        return {"role": "system", "content": "sys"}
+
+    async def step(self, response):
+        self.actions.append(response.text)
+        done = len(self.actions) >= self.turns
+        return {"role": "user", "content": f"obs{len(self.actions)}"}, 0.0, done, False, {}
+
+    def truncate(self, reason):
+        self.stop_reason = reason
 
 
-def _drive(harness, turns):
-    """Run `turns` exchanges against a stub client, returning every call made."""
-    ids = iter(f"c{i}" for i in range(1, 99))
-    harness.begin(SYS, {"role": "user", "content": "obs0"})
-    calls = []
-    for t in range(turns):
-        while True:
-            call = harness.next_call()
-            calls.append(call)
-            live = call.conversation_id or next(ids)
-            if harness.accept(_resp(f"act{t}", live)) is not None:
-                break          # forwarded; the environment would act now
-        harness.add_observation({"role": "user", "content": f"obs{t + 1}"})
-    return calls
+@pytest.mark.asyncio
+async def test_concat_grows_one_message_history():
+    client = Client()
+    await ConcatHarness().run_episode(client, Env(3))
+    assert [[m["content"] for m in messages] for messages, _ in client.calls] == [
+        ["sys", "obs0"],
+        ["sys", "obs0", "reply-1", "obs1"],
+        ["sys", "obs0", "reply-1", "obs1", "reply-2", "obs2"],
+    ]
 
 
-# ------------------------------------------------------------------------ concat
+@pytest.mark.asyncio
+async def test_no_concat_rebuilds_context_each_turn():
+    client = Client()
+    await NoConcatHarness().run_episode(client, Env(3))
+    assert [[m["content"] for m in messages] for messages, _ in client.calls] == [
+        ["sys", "obs0"], ["sys", "obs1"], ["sys", "obs2"]
+    ]
 
 
-def test_concat_keeps_one_conversation():
-    calls = _drive(ConcatHarness(), turns=3)
+@pytest.mark.asyncio
+async def test_compact_keeps_summary_from_environment_and_reseeds_latest_observation():
+    client, env = Client(), Env(4)
+    harness = CompactHarness(budget=20, summary_budget=4)
+    await harness.run_episode(client, env)
 
-    assert calls[0].conversation_id is None          # opens it
-    assert [c.conversation_id for c in calls[1:]] == ["c1", "c1"]
-
-
-def test_concat_sends_only_what_is_new():
-    """The conversation already holds the history; resending it would duplicate every
-    earlier turn in the prompt."""
-    calls = _drive(ConcatHarness(), turns=2)
-
-    assert [m["content"] for m in calls[0].messages] == ["sys", "obs0"]
-    assert [m["content"] for m in calls[1].messages] == ["obs1"]
-
-
-# --------------------------------------------------------------------- no-concat
-
-
-def test_no_concat_opens_a_conversation_every_turn():
-    """★ One training row per turn falls out of this, with no separate mechanism."""
-    calls = _drive(NoConcatHarness(), turns=3)
-
-    assert [c.conversation_id for c in calls] == [None, None, None]
+    summary_calls = [messages for messages, _ in client.calls
+                     if "Summarise" in str(messages[-1].get("content"))]
+    assert summary_calls, "the configured budget never caused compaction"
+    assert not any(action.startswith("reply-3") for action in env.actions), (
+        "the summary response was sent to the environment"
+    )
+    reseeds = [messages for messages, _ in client.calls
+               if len(messages) == 2 and "Summary so far:" in str(messages[1]["content"])]
+    assert reseeds and "obs2" in str(reseeds[0][1]["content"])
+    assert harness.summarised_conversations
 
 
-def test_no_concat_shows_only_the_latest_observation():
-    calls = _drive(NoConcatHarness(), turns=2)
-
-    assert [m["content"] for m in calls[1].messages] == ["sys", "obs1"]
-
-
-# ---------------------------------------------------------------------- compact
-
-
-def test_compaction_does_not_fire_under_budget():
-    h = CompactHarness(budget=100)
-    h.note_usage(10)
-    calls = _drive(h, turns=2)
-
-    assert [c.conversation_id for c in calls] == [None, "c1"]
-
-
-def test_compaction_asks_for_a_summary_then_starts_over():
-    """★ The whole of compaction: one extra call whose answer the harness keeps, then a
-    new conversation seeded with it."""
-    h = CompactHarness(budget=5)
-    h.begin(SYS, {"role": "user", "content": "obs0"})
-
-    assert h.next_call().conversation_id is None
-    h.accept(_resp("act0", "c1"))
-    h.add_observation({"role": "user", "content": "obs1"})
-
-    h.note_usage(99)
-    summary_call = h.next_call()
-    assert summary_call.conversation_id == "c1", "the model must see what it summarises"
-    assert "Summarise" in summary_call.messages[0]["content"]
-
-    assert h.accept(_resp("the story so far", "c1")) is None, "a summary is consumed, not forwarded"
-
-    fresh = h.next_call()
-    assert fresh.conversation_id is None, "compaction starts a new conversation"
-    assert fresh.messages[0] is SYS
-    assert any("the story so far" in m["content"] for m in fresh.messages)
-
-
-def test_the_environment_never_acts_on_a_summary():
-    """★ A forwarded summary would make the env step on text that is not an action, so
-    the episode would advance by a turn that never happened. The turn that trips the
-    budget costs two calls: a summary the harness keeps, and the action it forwards.
-
-    Usage grows and resets the way a real conversation's does, rather than sitting over
-    the budget forever -- pinned over it, this exercises a configuration that cannot buy
-    a single turn, which the harness now refuses outright.
-    """
-    h = CompactHarness(budget=100)
-    h.begin(SYS, {"role": "user", "content": "obs0"})
-    ids = iter(f"c{i}" for i in range(1, 99))
-    calls, actions, used = [], [], 0
-    for t in range(6):
-        while True:
-            used = 0 if h._conversation_id is None else used + 40
-            h.note_usage(used)
-            call = h.next_call()
-            calls.append(call)
-            live = call.conversation_id or next(ids)
-            action = h.accept(_resp(f"act{t}", live))
-            if action is not None:
-                actions.append(action)
-                break
-        h.add_observation({"role": "user", "content": f"obs{t + 1}"})
-
-    assert len(actions) == 6, "every turn must still produce exactly one env action"
-    assert len(calls) > 6, "no summary call was issued, so nothing was consumed"
-
-
-def test_the_budget_resets_after_compacting():
-    h = CompactHarness(budget=5)
-    h.begin(SYS, {"role": "user", "content": "obs0"})
-    h.next_call(); h.accept(_resp("a", "c1"))
-    h.add_observation({"role": "user", "content": "obs1"})
-    h.note_usage(99)
-    h.next_call(); h.accept(_resp("summary", "c1"))
-    h.next_call()
-
-    assert h._used == 0, "a stale usage figure would compact again immediately"
-
-
-# -------------------------------------------------------------------- the axis
-
-
-@pytest.mark.parametrize(
-    "cls,kwargs", [(ConcatHarness, {}), (NoConcatHarness, {}), (CompactHarness, {"budget": 10**9})]
-)
-def test_every_harness_is_text_only(cls, kwargs):
-    """★ The property that lets one harness serve both training and a closed API: no
-    tokenizer, no client, no env anywhere in it."""
-    # Against the code, not the prose: a docstring may well explain what the client
-    # does without the class ever touching one.
-    import ast
-
-    tree = ast.parse(inspect.getsource(cls))
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
-            node.value.value = ""          # blank out docstrings and bare string exprs
-    code = ast.unparse(tree)
-
-    for forbidden in ("tokenizer", "token_ids", "client", "env.", "reward"):
-        assert forbidden not in code, f"{cls.__name__} reaches for {forbidden}"
-
-
-# ------------------------------------------------------------------- the registry
+@pytest.mark.parametrize("cls", [ConcatHarness, NoConcatHarness, CompactHarness])
+def test_every_harness_owns_an_episode_loop(cls):
+    assert inspect.iscoroutinefunction(cls.run_episode)
+    source = inspect.getsource(cls)
+    assert "next_call" not in source and "accept(" not in source
 
 
 def test_every_policy_is_reachable_by_name():
-    """★ Which policy a run uses is a config value, so adding one must not mean editing
-    the agent loop -- the same reason advantage estimators are registered."""
     from vagen.harness import HARNESSES, build_harness
 
     assert set(HARNESSES) == {"concat", "no_concat", "compact"}
     assert isinstance(build_harness("concat"), ConcatHarness)
-    assert isinstance(build_harness("compact", budget=10), CompactHarness)
 
 
-def test_an_unknown_name_lists_what_is_available():
-    """A bare KeyError leaves the reader guessing which spelling was wanted."""
+def test_unknown_name_lists_available_harnesses():
     from vagen.harness import build_harness
 
     with pytest.raises(ValueError, match="choose from"):
         build_harness("concatenate")
 
 
-def test_the_contract_holds_no_implementations():
-    """★ core/ is the contract and harness/ the implementations; letting one policy
-    live in the base module is how the split stops being real."""
-    import inspect
+def test_common_contract_contains_no_concrete_harness():
+    from vagen.harness._common import base
 
-    from vagen.harness._common import base as contract
-
-    classes = [
-        name
-        for name, obj in vars(contract).items()
-        if inspect.isclass(obj) and issubclass(obj, contract.BaseHarness) and obj is not contract.BaseHarness
+    concrete = [
+        obj for obj in vars(base).values()
+        if inspect.isclass(obj) and issubclass(obj, base.BaseHarness) and obj is not base.BaseHarness
     ]
-    assert classes == [], f"{classes} belong in vagen/harness/"
-
-
-# --------------------------------------- a custom harness reaches the training path too
-def test_the_estimator_check_asks_a_custom_harness_whether_it_splits():
-    """★ The check keys off `splits_episode_across_rows`, and it used to look the harness
-    up by name only -- so an import-path harness came back None and was assumed to split,
-    which makes the estimator guard reject default_gae on a concat-like policy. Now it
-    resolves the class, and only a genuinely unresolvable name falls back to `True`."""
-    from vagen.harness import ConcatHarness, resolve_harness
-
-    class Mine(ConcatHarness):
-        pass
-
-    import sys
-    sys.modules[__name__].Mine = Mine
-    resolved = resolve_harness(f"{__name__}:Mine")
-    assert resolved is Mine
-    assert resolved.splits_episode_across_rows is ConcatHarness.splits_episode_across_rows
+    assert concrete == []

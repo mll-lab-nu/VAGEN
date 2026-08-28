@@ -3,7 +3,7 @@ import os
 from typing import Any, Dict, Iterable, List, Tuple
 from openai import AsyncAzureOpenAI, AsyncOpenAI
 from PIL import Image
-from vagen.evaluation.backends._common.base import ModelAdapter
+from vagen.evaluation.backends._common.base import EvaluationBackend
 from vagen.evaluation.backends._common.rendering import pil_to_dataurl_png, compile_text_images_for_order
 from vagen.evaluation.backends._common.registry import register_adapter, register_client
 
@@ -25,7 +25,7 @@ def build_client_azure(cfg: Dict[str, Any]) -> AsyncAzureOpenAI:
     return AsyncAzureOpenAI(api_version=api_version, azure_endpoint=endpoint, api_key=api_key)
 
 @register_adapter("openai", "azure")
-class OpenAIAdapter(ModelAdapter):
+class OpenAIAdapter(EvaluationBackend):
     """
     OpenAI-compatible multimodal adapter:
     - messages use content parts with {"type": "text"} and {"type": "image_url"}.

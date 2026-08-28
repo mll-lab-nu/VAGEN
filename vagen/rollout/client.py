@@ -1,13 +1,9 @@
-"""Inference client — the only layer that knows about tokens.
+"""Inference client: message routing and all token-level work.
 
-The harness works in text and the env works in text; everything token-level is here, and
-it is written once. What varies between experiments is the harness and the env, and
-neither can reach a token through this interface.
-
-A conversation id is the whole protocol. Passing one continues that conversation; passing
-``None`` starts a new one. Concat keeps the same id for an episode, no-concat drops it
-every turn, and compaction drops it when a budget is hit — three points on one axis
-rather than three mechanisms. One conversation becomes one training row.
+Harnesses call ``create(messages)`` with the context they want the model to see. The
+client finds the longest already-recorded prefix, renders only the new edge, invokes the
+backend, and records the sampled tokens. Concrete harnesses never manipulate conversation
+ids or token arrays.
 """
 
 from __future__ import annotations
@@ -22,10 +18,27 @@ from vagen.rollout.trajectory import Conversation, Row
 
 logger = logging.getLogger(__name__)
 
+MAX_CALLS_PER_EPISODE = 200
+
+
+class EpisodeBudgetExceeded(RuntimeError):
+    """A harness kept generating without finishing its episode."""
+
+
+@dataclass
+class Usage:
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    response_tokens: int = 0
+
+    @property
+    def total_tokens(self) -> int:
+        return self.prompt_tokens + self.completion_tokens
+
 
 @dataclass
 class Response:
-    """What the harness gets back. Text plus the id needed to continue."""
+    """Text for the harness plus accounting for budgeting and reward attribution."""
 
     text: str
     conversation_id: str
@@ -33,6 +46,9 @@ class Response:
     logprobs: Optional[list[float]] = None
     stop_reason: Optional[str] = None
     weights_version: Optional[tuple[int, int]] = None
+    usage: Usage = field(default_factory=Usage)
+    call_id: int = 0
+    tokenizer: Any = field(default=None, repr=False, compare=False)
 
 
 @dataclass
@@ -95,9 +111,13 @@ class InferenceClient(ABC):
     opening_limit: int | None = None
     continuation_limit: int | None = None
 
-    def __init__(self):
+    def __init__(self, *, max_calls: int = MAX_CALLS_PER_EPISODE):
         self._conversations: dict[str, Conversation] = {}
         self._counter = 0
+        self._histories: dict[str, list[Any]] = {}
+        self._call_to_conversation: dict[int, str] = {}
+        self._call_counter = 0
+        self._max_calls = int(max_calls)
         #: One warning per client, not per turn -- an environment that overruns the
         #: ceiling overruns it on every episode.
         self._warned_truncating_context = False
@@ -116,15 +136,47 @@ class InferenceClient(ABC):
     async def generate(self, prompt_ids: list[int], **kwargs) -> BackendOutput:
         """Run the model."""
 
-    # -------------------------------------------------------------------- send
+    # ------------------------------------------------------------------- create
+    async def create(self, messages: list[Any], **kwargs) -> Response:
+        """Generate from a complete message list, continuing its longest known prefix."""
+        conversation_id, delta = self._route(messages)
+        response = await self.send(delta, conversation_id, **kwargs)
+        self._histories[response.conversation_id] = [
+            *messages,
+            {"role": "assistant", "content": response.text},
+        ]
+        return response
+
+    def size(self, messages: list[Any]) -> int:
+        """How many tokens these messages add, without recording them."""
+        return self.measure(messages)
+
+    def _route(self, messages: list[Any]) -> tuple[str | None, list[Any]]:
+        best_id: str | None = None
+        best_len = -1
+        for conversation_id, history in self._histories.items():
+            if len(history) > len(messages) or len(history) <= best_len:
+                continue
+            if all(_messages_equal(left, right) for left, right in zip(history, messages)):
+                best_id, best_len = conversation_id, len(history)
+        return best_id, list(messages[best_len:] if best_id is not None else messages)
+
+    # ``send`` remains the backend-facing primitive and compatibility surface for callers
+    # that already hold explicit conversation ids. New orchestration uses ``create``.
     async def send(self, messages: list[Any], conversation_id: str | None = None, **kwargs) -> Response:
+        if self._call_counter >= self._max_calls:
+            raise EpisodeBudgetExceeded(
+                f"episode exceeded {self._max_calls} model calls; the harness is likely "
+                "generating without reaching an environment terminal state"
+            )
         conversation_id = self._open(conversation_id)
         conversation = self._conversations[conversation_id]
+        call_id = self._call_counter
+        self._call_counter += 1
+        self._call_to_conversation[call_id] = conversation_id
 
-        # Encode exactly what the harness handed over. The harness already sends only
-        # what is new -- deduplicating again here silently dropped every observation
-        # after the first, since it sliced a one-message delta against a count of the
-        # messages already sent.
+        # ``create`` has already routed the full message list and reduced it to the new
+        # edge. Explicit-id compatibility callers also pass an edge directly.
         #
         # Measured on this encode rather than a second one: encoding runs the processor,
         # which is expensive, and it records the message's images against the
@@ -174,6 +226,13 @@ class InferenceClient(ABC):
             logprobs=output.logprobs,
             stop_reason=output.stop_reason,
             weights_version=output.weights_version,
+            usage=Usage(
+                prompt_tokens=len(conversation.token_ids) - len(output.token_ids),
+                completion_tokens=len(output.token_ids),
+                response_tokens=conversation.response_len,
+            ),
+            call_id=call_id,
+            tokenizer=self.tokenizer,
         )
 
     #: How many times to re-ask when a generation comes back with no tokens. See
@@ -360,6 +419,14 @@ class InferenceClient(ABC):
         """Credit the turn that just happened in this conversation."""
         self._conversations[conversation_id].add_reward(value)
 
+    def reward_call(self, call_id: int, value: float | list[float]) -> None:
+        """Credit the sampled call that the environment acted on."""
+        try:
+            conversation_id = self._call_to_conversation[call_id]
+        except KeyError as exc:
+            raise KeyError(f"unknown model call {call_id}") from exc
+        self.reward(conversation_id, value)
+
     def rows(self) -> list[Row]:
         """One row per conversation the model spoke in.
 
@@ -458,3 +525,33 @@ def _drop_one_image_placeholder(content):
             del parts[i]
             break
     return parts
+
+
+def _messages_equal(left, right) -> bool:
+    """Structural equality that treats reused image objects safely."""
+    if left is right:
+        return True
+    if not isinstance(left, dict) or not isinstance(right, dict):
+        return _safe_equal(left, right)
+    if set(left) != set(right):
+        return False
+    for key in left:
+        a, b = left[key], right[key]
+        if key == "images":
+            if len(a or []) != len(b or []):
+                return False
+            if not all(x is y or _safe_equal(x, y) for x, y in zip(a or [], b or [])):
+                return False
+        elif not _safe_equal(a, b):
+            return False
+    return True
+
+
+def _safe_equal(left, right) -> bool:
+    if left is right:
+        return True
+    try:
+        result = left == right
+        return bool(result) if isinstance(result, (bool, int)) else False
+    except Exception:
+        return False

@@ -40,8 +40,13 @@ vagen/
 │   ├── _common/
 │   └── <harness>/
 ├── models/
-│   └── _common/
-├── rollout/                 # framework-independent episode execution
+│   ├── _common/
+│   └── <model_family>/
+├── rollout/                 # framework-independent recording and lifecycle seams
+│   ├── client.py
+│   ├── runner.py
+│   ├── scoring.py
+│   └── trajectory.py
 ├── evaluation/
 │   └── backends/
 │       ├── _common/
@@ -58,10 +63,12 @@ The responsibilities are:
 
 - `algorithms`: advantage estimators and their declared training capabilities.
 - `envs`: environment contracts, shared wrappers, remote protocol, and implementations.
-- `harness`: context-policy contract, budgeting, registry, and implementations.
-- `models`: model-family adaptation and multimodal token handling.
-- `rollout`: the generic client, episode loop, and trajectory records used by both
-  training and evaluation.
+- `harness`: complete reusable agent loops. Each implementation owns
+  `run_episode(client, env)` and is shared unchanged by training and evaluation.
+- `models`: model-family rendering and multimodal token handling. Chat-template details
+  belong here, never in a VERL or evaluation transport.
+- `rollout`: backend-neutral message routing, token/trajectory recording, reward
+  attribution, and environment lifetime management.
 - `evaluation`: configuration, execution, recording, summaries, and backend plugins.
 - `training`: integration with VERL workers, datasets, trainers, losses, filters, and
   training-only metrics.
@@ -83,19 +90,29 @@ training -----> rollout <----- evaluation
 
 - Training-only packages must not be imported by standalone evaluation.
 - Environment implementations may import `envs._common`, not another environment.
-- Harness implementations may import `harness._common`, not training or evaluation.
+- Harness implementations may import `harness._common` and stable rollout contracts,
+  not training or evaluation. They use `client.create(messages)` and `client.size(...)`;
+  they do not manipulate conversation ids or training rows.
 - Rollout orchestration selects environments, harnesses, and models through their
   facades or registries.
 - Configuration should use registered names. Dynamic Python paths are supported only
   where they are an intentional public extension mechanism.
 
-## Compatibility packages
+## Runtime boundaries
+
+- `training/agent_loop/verl_client.py` is a VERL transport only. Model-family rendering
+  is selected through `vagen.models`.
+- `evaluation/backends/` contains hosted-provider transports. Its contract is named
+  `EvaluationBackend` so it cannot be confused with `vagen.models.ModelAdapter`.
+- `envs/_common/adapter.py` is the compatibility boundary for existing text-oriented gym
+  environments. Harnesses pass a complete response object; the adapter unwraps text and
+  token metadata for legacy implementations.
+- `rollout/scoring.py` is the mandatory reward seam. It associates a reward with the
+  exact model `call_id`, so a harness cannot accidentally omit or misfile credit.
 
 The former `core`, `agent_loop`, `trainer`, `custom_advantage`, `custom_filter`,
-`custom_metric`, `custom_loss`, `evaluate`, and `envs_remote` paths are compatibility
-boundaries. They must contain aliases only; new code must use the canonical packages.
-Compatibility aliases should be removed in a separately announced API migration rather
-than mixed into structural refactors.
+`custom_metric`, `custom_loss`, `evaluate`, and `envs_remote` package trees have been
+removed. Do not recreate them as compatibility mirrors.
 
 ## Repository-level content
 

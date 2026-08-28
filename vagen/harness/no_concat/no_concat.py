@@ -1,22 +1,35 @@
-"""A conversation per turn: one training row per turn."""
+"""A fresh conversation for every environment turn."""
 
 from __future__ import annotations
 
-from vagen.harness._common import BaseHarness, Call
+from vagen.harness._common import BaseHarness, obs_to_message
 
 
 class NoConcatHarness(BaseHarness):
-    """A conversation per turn: the model sees the system prompt and the latest
-    observation, never the history."""
+    """Show the model only the system prompt and latest observation."""
 
-    #: One row per turn.
     splits_episode_across_rows = True
 
-    def continues_conversation(self) -> bool:
-        """Never. Every turn opens a new conversation, so the room is always a whole one."""
-        return False
+    def __init__(self, response_len: int | None = None, floor: int = 1, **_cfg):
+        self.response_len = response_len
+        self.floor = max(1, floor)
+        self.summarised_conversations: set[str] = set()
 
-    def next_call(self) -> Call:
-        limit = self.max_new_tokens()
-        return Call([self._system, self._msgs[-1]], None,
-                    sampling_params={"max_new_tokens": limit} if limit is not None else None)
+    async def run_episode(self, client, env) -> None:
+        observation, _info = await env.reset()
+        observation = obs_to_message(observation)
+        system = await env.system_prompt()
+
+        while True:
+            limit = self.generation_limit(self.response_len, self.floor, 0)
+            if limit == 0:
+                env.truncate("no_room")
+                return
+            response = await client.create([system, observation], **self.sampling(limit))
+            if self.empty(response):
+                env.truncate("empty_generation")
+                return
+            observation, _reward, terminated, truncated, _info = await env.step(response)
+            if terminated or truncated:
+                return
+            observation = obs_to_message(observation)

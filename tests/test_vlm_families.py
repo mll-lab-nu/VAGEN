@@ -92,15 +92,15 @@ def test_the_client_forwards_mm_processor_kwargs_both_ways(repo, expects_mrope, 
     import ast
     import inspect
 
+    from vagen.models.qwen import QwenModelAdapter
     from vagen.training.agent_loop.verl_client import VerlClient
 
-    source = inspect.getsource(VerlClient)
-    tree = ast.parse(source)
+    render_tree = ast.parse(inspect.getsource(QwenModelAdapter))
 
     # tokenizing side: every processor call carries them
     processor_calls = [
         node
-        for node in ast.walk(tree)
+        for node in ast.walk(render_tree)
         if isinstance(node, ast.Call)
         and isinstance(node.func, ast.Attribute)
         and node.func.attr in {"apply_chat_template"}
@@ -110,9 +110,10 @@ def test_the_client_forwards_mm_processor_kwargs_both_ways(repo, expects_mrope, 
         assert any(kw.arg is None for kw in call.keywords), "a template call drops the kwargs"
 
     # engine side: the generate call names them
+    transport_tree = ast.parse(inspect.getsource(VerlClient))
     generates = [
         node
-        for node in ast.walk(tree)
+        for node in ast.walk(transport_tree)
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "generate"
     ]
     assert generates, "no generate() call found"

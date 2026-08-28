@@ -1,7 +1,7 @@
 # Evaluation
 
-Evaluation runs the **same episode loop and the same context policies as training**
-(`vagen/rollout/runner.py`), against any supported backend. So an eval number and a
+Evaluation runs the **same harness-owned episode loop as training**, against any supported
+backend. `vagen/rollout/runner.py` only wires lifecycle and reward recording. So an eval number and a
 training `val-core` number are comparable — provided the configs agree, which is what
 `tests/test_eval_matches_val.py` checks for the shipped pairs.
 

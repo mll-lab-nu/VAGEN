@@ -7,7 +7,7 @@ import asyncio
 import uuid
 import logging
 
-from vagen.evaluation.backends import ModelAdapter
+from vagen.evaluation.backends import EvaluationBackend
 from vagen.evaluation.backends._common.rendering import _now_tag
 from vagen.evaluation.serialization import sanitize_for_json
 from vagen.envs import GymEnvAdapter
@@ -24,12 +24,12 @@ logger = logging.getLogger(__name__)
 
 class GenericVisionInferenceWorkflow:
     """
-    Drive a Gym-like vision environment with a ModelAdapter.
+    Drive a Gym-like vision environment with an EvaluationBackend.
     """
 
     def __init__(
         self,
-        adapter: ModelAdapter,
+        adapter: EvaluationBackend,
         dump_dir: Optional[str] = None,
         dump_enabled: bool = True,  # kept for API compatibility; ignored in logic below
         success_keys: Optional[List[str]] = None,

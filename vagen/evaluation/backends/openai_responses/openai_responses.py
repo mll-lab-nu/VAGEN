@@ -1,13 +1,13 @@
 from __future__ import annotations
 from typing import Any, Dict, List, Tuple
 from PIL import Image
-from vagen.evaluation.backends._common.base import ModelAdapter
+from vagen.evaluation.backends._common.base import EvaluationBackend
 from vagen.evaluation.backends._common.rendering import pil_to_dataurl_png, compile_text_images_for_order
 from vagen.evaluation.backends._common.registry import register_adapter
 
 
 @register_adapter("openai_responses", "azure_responses")
-class OpenAIResponsesAdapter(ModelAdapter):
+class OpenAIResponsesAdapter(EvaluationBackend):
     """
     Adapter for OpenAI Responses API (client.responses.create).
     Required for models like gpt-5.4-pro that only support the Responses API.

@@ -160,11 +160,11 @@ python -m vagen.evaluation \
 
 ## 3. Custom Adapters
 
-To add a new backend, implement `ModelAdapter` and register it:
+To add a new backend, implement `EvaluationBackend` and register it:
 
 ```python
 # my_adapter.py
-from vagen.evaluation.backends import ModelAdapter, register_adapter, register_client
+from vagen.evaluation.backends import EvaluationBackend, register_adapter, register_client
 
 # Step 1: Register client factory
 @register_client("my_backend")
@@ -173,7 +173,7 @@ def build_my_client(cfg):
 
 # Step 2: Implement and register adapter
 @register_adapter("my_backend")
-class MyAdapter(ModelAdapter):
+class MyAdapter(EvaluationBackend):
 
     def __init__(self, client, model: str):
         self.client = client

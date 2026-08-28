@@ -32,25 +32,24 @@ def tok():
     return transformers.AutoTokenizer.from_pretrained(MODEL, trust_remote_code=True)
 
 
-class _Started:
-    """A conversation that has already had a model output, so the next span is a delta."""
-
-    prompt_len = 7
-
-
 def _client(tok, *, mid_conversation=True):
-    from vagen.training.agent_loop.verl_client import VerlClient
+    from vagen.models.qwen import QwenModelAdapter
 
-    c = VerlClient.__new__(VerlClient)
-    c.tokenizer, c.processor = tok, None
-    c.apply_chat_template_kwargs, c.mm_processor_kwargs = {}, {}
-    c._prefix_cache = None
-    c._images = {}
-    if mid_conversation:
-        c._active, c._conversations = "c1", {"c1": _Started()}
-    else:
-        c._active, c._conversations = None, {}
-    return c
+    adapter = QwenModelAdapter(tok)
+
+    class _Render:
+        def encode(self, messages):
+            return adapter.render(messages, opening=not mid_conversation)[0]
+
+        def _message_separator(self):
+            return adapter.message_separator()
+
+        def _template_prefix(self):
+            return adapter._template_prefix()
+
+    out = _Render()
+    out.model = adapter
+    return out
 
 
 def test_the_template_really_does_inject_a_system_block(tok):
@@ -108,7 +107,7 @@ def test_the_placeholder_used_to_strip_is_the_one_prepended():
     """
     import pathlib
 
-    module = verl_client_module()
+    module = model_adapter_module()
     root = pathlib.Path(module.__file__).parent
 
     # Scoped to the package, not one module: the duplicate this guards against lived in
@@ -116,21 +115,21 @@ def test_the_placeholder_used_to_strip_is_the_one_prepended():
     elsewhere = {
         p.name: n
         for p in root.glob("*.py")
-        if p.name != "verl_client.py" and (n := p.read_text().count('"content": "placeholder"'))
+        if p.name != "qwen.py" and (n := p.read_text().count('"content": "placeholder"'))
     }
     assert not elsewhere, f"the placeholder turn is restated outside verl_client: {elsewhere}"
 
-    src = (root / "verl_client.py").read_text()
+    src = (root / "qwen.py").read_text()
     assert src.count("_PLACEHOLDER_TURNS = [") == 1, "more than one placeholder definition"
     # Tied to the constant rather than to a fixed number, so adding or dropping a turn
     # keeps this honest instead of quietly permitting a restated copy alongside it.
     assert src.count('"content": "placeholder"') == len(module._PLACEHOLDER_TURNS)
 
 
-def verl_client_module():
-    from vagen.training.agent_loop import verl_client
+def model_adapter_module():
+    from vagen.models.qwen import qwen
 
-    return verl_client
+    return qwen
 
 
 def test_the_prefix_is_rendered_the_same_way_it_is_prepended(tok):
@@ -145,7 +144,7 @@ def test_the_prefix_is_rendered_the_same_way_it_is_prepended(tok):
 
 def test_the_guard_refuses_to_strip_a_span_that_does_not_start_with_the_prefix(tok, monkeypatch):
     c = _client(tok)
-    monkeypatch.setattr(c, "_template_prefix", lambda: [999999, 999998])
+    monkeypatch.setattr(c.model, "_template_prefix", lambda: [999999, 999998])
     with pytest.raises(ValueError, match="did not begin the continuation"):
         c.encode([{"role": "user", "content": "OBS"}])
 

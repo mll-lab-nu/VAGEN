@@ -134,6 +134,7 @@ class GymLoop(VagenGymAgentLoopBase):
             self.server_manager,
             self.tokenizer,
             self.processor,
+            model_adapter_name=self.config.trainer.get("model_adapter", "qwen"),
             apply_chat_template_kwargs=self.apply_chat_template_kwargs,
             mm_processor_kwargs=self._get_mm_processor_kwargs(),
             sampling_params=sampling_params,

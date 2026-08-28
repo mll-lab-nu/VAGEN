@@ -299,15 +299,15 @@ implementation directories under [`vagen/algorithms`](vagen/algorithms/) for exa
 
 ## Custom Harness
 
-A **harness** decides what the model sees on each turn: whether the next call continues the
-conversation so far, or starts a fresh one, and what that fresh one begins with. `concat`,
-`no_concat` and `compact` are three different answers to that.
+A **harness** is the reusable agent loop. It owns the message list, calls
+`client.create(messages)`, steps the environment with the returned response, and stops
+when the environment terminates or truncates. `concat`, `no_concat`, and `compact` differ
+only in how they build that message list.
 
 **Anything that subclasses `BaseEnv` or `BaseHarness` works in both training and evaluation
-without changing either.** That is possible because a harness is deliberately small: it has
-no tokenizer, no client and no environment, and it never touches tokens, masks or rewards.
-All it does is decide what goes into the next call. So the same harness can drive a training
-rollout and an evaluation run against a closed API.
+without changing either.** A harness uses the small `create`/`size` client surface and the
+environment step contract. It never builds token masks, VERL rows, or reward mappings:
+those belong to the inference client and rollout scoring seam.
 
 A harness also doesn't assume the conversation is kept on the client side. That leaves room
 to add a backend that keeps it on the server instead (OpenAI's `previous_response_id`, an
@@ -315,7 +315,7 @@ SGLang session, a vLLM prefix cache) without rewriting any harness. No backend s
 does that — they all re-send the whole message list every turn.
 
 ```python
-from vagen.harness import BaseHarness, Call, register_harness
+from vagen.harness import BaseHarness, register_harness
 
 @register_harness("mine")
 class MyHarness(BaseHarness):
@@ -323,7 +323,18 @@ class MyHarness(BaseHarness):
     #: rather than keeping a list of the ones it knows, and pairs the estimator accordingly.
     splits_episode_across_rows = True
 
-    def next_call(self) -> Call: ...       # the only required method
+    async def run_episode(self, client, env):
+        observation, _ = await env.reset()
+        messages = [await env.system_prompt(), observation]
+        while True:
+            response = await client.create(messages)
+            observation, reward, terminated, truncated, info = await env.step(response)
+            if terminated or truncated:
+                return
+            messages.extend([
+                {"role": "assistant", "content": response.text},
+                observation,
+            ])
 ```
 
 Training and evaluation both read a `harness` key, and both accept either a registered name
@@ -377,6 +388,7 @@ refer to `vagen/configs/vagen_multiturn.yaml`
 # Enable no concat mode: input is system prompt + current step observation
 trainer:
   harness: no_concat        # concat | no_concat | compact
+  model_adapter: qwen       # model-family rendering; VERL remains the transport
 
 # no_concat and compact put one episode in several rows, so the advantage estimator has
 # to be one that stitches them back together. verl's own `gae`/`grpo` score a row at a

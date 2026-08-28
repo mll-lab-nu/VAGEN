@@ -15,8 +15,8 @@
 ``S``, the system prompt, comes from the environment, so it is measured rather than
 configured and nothing here can see it.
 
-Most of what this module used to compute is gone, and the reason is in
-``core/harness.py``: a conversation is now generated against the room it has left. Every
+Most of what this module used to compute is gone: a conversation is now generated against
+the room it has left. Every
 call asks how much of ``n_r`` has been spent and how big the observation about to be sent
 is, bounds the generation by what remains, and -- when a turn no longer fits -- compacts,
 or stops. Accumulation is bounded by the region itself, so the arithmetic that used to
@@ -42,7 +42,7 @@ It is deliberately absent from everything that sizes ``max_response_length`` or
 ``max_model_len`` -- a quantity that only bounds a worst case has no business inflating a
 requirement, and when it did, a generous ceiling made the episode warning fire on
 configurations that were fine. What an episode actually costs in observations is measured
-at runtime by the harness (``note_room`` reads ``client.measure`` of the real observation),
+at runtime by the harness (``client.size`` measures the real pending observation),
 not predicted from ``E`` here.
 
 The distinction matters. Refusing on a worst case rules out any long episode on the

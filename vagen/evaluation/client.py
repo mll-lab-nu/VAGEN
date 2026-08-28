@@ -58,7 +58,7 @@ DEFAULT_TOKENS_PER_IMAGE = 800
 
 
 class ChatClient(InferenceClient):
-    """Talks to an OpenAI-compatible endpoint through a ``ModelAdapter``.
+    """Talks to a hosted endpoint through an ``EvaluationBackend``.
 
     ★ One per episode. ``generate`` writes the reply back to ``_api_messages[_active]``
     *after* awaiting the endpoint, so a client shared between two concurrent episodes would

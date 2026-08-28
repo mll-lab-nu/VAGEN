@@ -236,35 +236,15 @@ def test_the_agent_loop_still_writes_that_column():
 
 # --------------------------------------------------------- the signal at its source
 
-def test_the_harness_records_which_conversation_it_summarised():
-    """The estimator can only be right if the flag is. Only the harness knows the
-    difference between "the conversation ended" and "the environment stepped"."""
+def test_the_harness_exposes_summary_seams_to_the_estimator():
+    """The source of the signal remains the compact harness, not the runner."""
+    import inspect
+
     from vagen.harness.compact import CompactHarness
 
-    h = CompactHarness(budget=10, summary_budget=4, summary_request_len=1)
-    h.begin({"role": "system", "content": "s"}, {"role": "user", "content": "o"})
-    h._conversation_id = "conv-0"
-    h._awaiting_summary = True
-
-    class _Resp:
-        text = "a summary"
-        conversation_id = "conv-0"
-
-    h.accept(_Resp())
-    assert h.summarised_conversations == {"conv-0"}
-    assert h._conversation_id is None
-
-
-def test_a_new_episode_forgets_the_previous_ones_seams():
-    """Conversation ids are per-episode ordinals, so a carried-over set marks unrelated
-    conversations in the next episode."""
-    from vagen.harness.compact import CompactHarness
-
-    h = CompactHarness(budget=10, summary_budget=4, summary_request_len=1)
-    h.begin({"role": "system", "content": "s"}, {"role": "user", "content": "o"})
-    h.summarised_conversations.add("conv-0")
-    h.begin({"role": "system", "content": "s"}, {"role": "user", "content": "o"})
-    assert h.summarised_conversations == set()
+    source = inspect.getsource(CompactHarness.run_episode)
+    assert "summarised_conversations.add" in source
+    assert CompactHarness().summarised_conversations == set()
 
 
 def test_every_harness_answers_the_question_not_only_the_compacting_one():

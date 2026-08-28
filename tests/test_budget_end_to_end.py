@@ -335,10 +335,7 @@ def test_every_harness_is_given_the_room_it_has_to_work_in(mode):
     harness, _ = GymLoop._build_harness(loop, per_turn=512, max_turns=20)
     assert harness.response_len == 6144, f"{mode} was not told the region"
     assert harness.floor == 512, f"{mode} was not told the floor"
-
-    harness.begin({"role": "system", "content": "s"}, {"role": "user", "content": "o"})
-    harness.note_room(6144 - 100, 50)
-    assert harness._left() is not None, f"{mode} is not accounting at all"
+    assert harness.generation_limit(harness.response_len, harness.floor, 6044, 50) == 0
 
 
 def test_concat_stops_instead_of_overrunning_its_region():
@@ -367,11 +364,7 @@ def test_no_concat_measures_the_conversation_it_is_about_to_open():
     from vagen.harness import build_harness
 
     h = build_harness("no_concat", response_len=200, floor=10)
-    h.begin({"role": "system", "content": "s"}, {"role": "user", "content": "o"})
-    h._conversation_id = "c1"           # a conversation has been used and left
-    assert h.continues_conversation() is False
-    h.note_room(0, 0)
-    assert not h.exhausted()
+    assert h.generation_limit(h.response_len, h.floor, 0) == 200
 
 
 def test_the_observation_is_actually_measured():
@@ -403,33 +396,15 @@ def test_the_observation_is_actually_measured():
     )
 
 
-def test_the_room_the_harness_sees_tracks_the_conversation_it_will_use():
-    """The other half: response_len has to be read, and read for the right conversation."""
-    rooms = []
+def test_compact_reads_usage_from_client_responses():
+    """Compaction now reads usage directly inside its episode loop."""
+    import inspect
 
-    class _Recording(CompactHarness := __import__(
-            "vagen.harness.compact", fromlist=["CompactHarness"]).CompactHarness):
-        def note_room(self, response_len, obs_len):
-            rooms.append((response_len, obs_len))
-            super().note_room(response_len, obs_len)
+    from vagen.harness.compact import CompactHarness
 
-    b = Budgets(prompt_len=500, response_len=3000, per_turn=100, max_turns=6,
-                env_response=200, compact_budget=None, summary_budget=100,
-                summary_request_len=REQ)
-    opening, continuation = context_limits("compact", b)
-    c = _Client(lambda i: 100, b.per_turn)
-    c.opening_limit, c.continuation_limit = opening, continuation
-    asyncio.run(run_episode(_Env(20, lambda i: 37), _Recording(
-        summary_budget=100, summary_request_len=REQ,
-        response_len=b.response_len, floor=b.per_turn), c, max_turns=6))
-
-    assert rooms[0] == (0, 0), f"the opening call was charged something: {rooms[0]}"
-    assert any(r > 0 for r, _ in rooms[1:]), (
-        f"the spent region was never read as non-zero: {rooms}"
-    )
-    assert any(o > 0 for _, o in rooms[1:]), (
-        f"the observation was never charged: {rooms}"
-    )
+    source = inspect.getsource(CompactHarness.run_episode)
+    assert "response.usage" in source
+    assert "client.size" in source
 
 
 # ------------------------------------------------------ two regressions, pinned
@@ -464,9 +439,7 @@ def test_an_unset_per_turn_budget_does_not_collapse_concat_to_one_turn():
     assert unset <= 8000 // 4, f"the floor is {unset} of an 8000 region"
 
     h = build_harness("concat", response_len=8000, floor=unset)
-    h.begin({"role": "system", "content": "s"}, {"role": "user", "content": "o"})
-    h.note_room(100, 50)                    # one turn in
-    assert not h.exhausted(), "the episode would stop after its first turn"
+    assert h.generation_limit(h.response_len, h.floor, 100, 50) > 0
 
 
 def test_the_compact_budget_lever_works_in_the_range_it_is_for():

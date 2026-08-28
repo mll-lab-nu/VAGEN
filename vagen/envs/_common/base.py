@@ -3,9 +3,9 @@
 Until now this existed only at the runner's call site and in prose, which meant an
 environment could satisfy it by accident and fail in the one case nobody wrote down.
 
-An environment scores actions and decides when an episode is over. It works in text: the
-agent's action arrives as text and observations go back as text, so the same environment
-serves any model. What it must *not* do is re-encode that text -- see ``step``.
+An environment scores actions and decides when an episode is over. The framework-facing
+adapter receives a response object; legacy gym implementations may continue to consume
+its text plus optional token metadata behind that adapter.
 """
 
 from __future__ import annotations
@@ -31,9 +31,7 @@ class BaseEnv(ABC):
     @abstractmethod
     async def step(
         self,
-        action: str,
-        response_token_ids: Optional[list[int]] = None,
-        tokenizer: Any = None,
+        response: Any,
     ) -> tuple[Obs, Reward, bool, bool, dict]:
         """Apply one action.
 
@@ -45,11 +43,11 @@ class BaseEnv(ABC):
         limit as termination biases every episode that hits the cap.
 
         ``reward`` may be a scalar, which lands on the last token the model produced, or
-        a vector aligned to ``response_token_ids``, which lets an environment say *which
+        a vector aligned to ``response.token_ids``, which lets an environment say *which
         part* of a response earned what. Its length is checked against the response.
 
-        ★ ``response_token_ids`` and ``tokenizer`` are both supplied so an environment
-        that scores per token has what it needs. Decoding the ids is safe; re-encoding
+        ★ The response carries token ids and the inference client's tokenizer so an
+        environment that scores per token has what it needs. Decoding the ids is safe; re-encoding
         the text is not. BPE is not compositional, so a re-encoded response can split
         differently from how it was generated, and a reward vector built on that is
         misaligned against the sequence being trained -- silently, since both are
