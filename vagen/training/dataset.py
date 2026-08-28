@@ -262,6 +262,13 @@ class AgenticDataset(Dataset):
                     }
                 )
 
+        # ``create_rl_dataset`` passes the public VERL sampling limit to custom
+        # datasets too.  Honour it here so local smoke runs and bounded validation do
+        # not silently expand the complete environment seed range.
+        max_samples = int(kwargs.get("max_samples", -1))
+        if 0 < max_samples < len(self.items):
+            self.items = self.items[:max_samples]
+
     def __len__(self):
         return len(self.items)
 

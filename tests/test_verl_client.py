@@ -49,7 +49,7 @@ class Server:
 
 
 def _client(server=None, **kw):
-    return VerlClient(server or Server(), Tok(), Proc(), **kw)
+    return VerlClient(server or Server(), Tok(), Proc(), model_adapter_name="qwen", **kw)
 
 
 def _msg(text, images=()):
@@ -150,7 +150,7 @@ class TextTok(Tok):
 
 
 def _text_client(server=None, **kw):
-    return VerlClient(server or Server(), TextTok(), None, **kw)
+    return VerlClient(server or Server(), TextTok(), None, model_adapter_name="qwen", **kw)
 
 
 @pytest.mark.asyncio

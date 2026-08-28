@@ -14,7 +14,7 @@ import pytest
 
 from model_path import local_snapshot
 
-from vagen.envs._common.state_reward import state_reward_spec_of
+from vagen.envs._common.rewards import state_reward_spec_of
 
 def _state_reward_specs() -> dict:
     """Every environment that declares a state-reward spec, keyed by registry name.
@@ -24,7 +24,7 @@ def _state_reward_specs() -> dict:
     central has to be edited to agree with it.
     """
     import vagen.envs.registry as R
-    from vagen.envs._common.state_reward import state_reward_spec_of
+    from vagen.envs._common.rewards import state_reward_spec_of
 
     R._load_registry()
     out = {}
@@ -73,7 +73,7 @@ def test_the_judge_prompt_is_the_thing_that_knows_the_schema():
 # --------------------------------------- the wrapper must not re-teach what the env asks
 import pytest as _pytest
 
-from vagen.rewards.state_reward import StateRewardWrapper
+from vagen.envs import StateRewardWrapper
 
 
 class _Env:
@@ -147,7 +147,7 @@ def test_offsets_are_measured_the_way_the_action_text_was_decoded():
                     out.append(chr(ord("a") + int(i)))
             return "".join(out)
 
-    from vagen.rewards.spans import token_offsets, tokens_covering
+    from vagen.envs._common.rewards.spans import token_offsets, tokens_covering
 
     ids = [0, _Tok.SPECIAL, 1, 2]           # "a" <|special|> "b" "c"
     offsets = token_offsets(ids, _Tok())

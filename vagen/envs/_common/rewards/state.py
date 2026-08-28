@@ -30,9 +30,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
-from vagen.rewards.judge import NullJudge
-from vagen.rewards.spans import tagged_span, token_offsets, tokens_covering
-from vagen.rewards.spatial import grouped_f1
+from vagen.envs._common.rewards.judge import NullJudge
+from vagen.envs._common.rewards.spans import tagged_span, token_offsets, tokens_covering
+from vagen.envs._common.rewards.spatial import grouped_f1
 
 #: reward name -> the tag the agent writes it in
 TAGS = {"state_estimation": "observation", "transition_prediction": "prediction"}

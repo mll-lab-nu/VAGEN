@@ -1,4 +1,4 @@
-"""Locating a piece of the response text among the tokens the model produced.
+"""Locate a rewarded response span among the tokens the model produced.
 
 A reward computed on ``<observation>...</observation>`` should land on the tokens that
 carry it, not on the end of the turn. That needs a map from character offsets to token

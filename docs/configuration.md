@@ -123,10 +123,18 @@ owns reward attribution. Training and evaluation therefore execute the same harn
 
 ```yaml
 trainer:
-  model_adapter: qwen
+  model_adapter: auto
 ```
 
 This selects chat-template and multimodal rendering under `vagen/models/<family>/`.
+`auto` detects the shipped Qwen, InternVL, and GLM families from the processor class;
+the family name can be set explicitly when using a custom wrapper.
+
+| value | supported checkpoints |
+|---|---|
+| `qwen` | Qwen2.5-VL, Qwen3-VL, Qwen3.5 and text Qwen variants |
+| `internvl` | InternVL3 and InternVL3.5 Hugging Face checkpoints |
+| `glm` | GLM-4.6V checkpoints |
 It is independent of the inference transport: training still uses VERL, while evaluation
 uses a configured `EvaluationBackend`.
 

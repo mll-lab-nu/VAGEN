@@ -23,7 +23,7 @@ class VerlClient(InferenceClient):
         processor,
         *,
         model_adapter: ModelAdapter | None = None,
-        model_adapter_name: str = "qwen",
+        model_adapter_name: str = "auto",
         apply_chat_template_kwargs=None,
         mm_processor_kwargs=None,
         sampling_params=None,

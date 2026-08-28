@@ -35,13 +35,16 @@ vagen/
 │   └── <algorithm>/
 ├── envs/
 │   ├── _common/
+│   │   └── rewards/         # shared env-owned reward contracts and helpers
 │   └── <environment>/
 ├── harness/
 │   ├── _common/
 │   └── <harness>/
 ├── models/
 │   ├── _common/
-│   └── <model_family>/
+│   ├── qwen/
+│   ├── internvl/
+│   └── glm/
 ├── rollout/                 # framework-independent recording and lifecycle seams
 │   ├── client.py
 │   ├── runner.py

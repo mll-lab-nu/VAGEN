@@ -80,6 +80,36 @@ def test_image_token_is_discovered_per_family(repo, expects_mrope, expected_toke
     assert replace_image_tokens_for_logging(f"a {token}{token}{token} b", processor) == "a <image> b"
 
 
+def test_model_adapter_is_detected_per_supported_family(repo, expects_mrope, expected_token):
+    from vagen.models import build_model_adapter, detect_model_adapter
+
+    if "llava" in repo.lower():
+        pytest.skip("LLaVA has no shipped training script/model adapter")
+    processor = _processor(repo)
+    expected = "internvl" if "InternVL" in repo else "glm" if "GLM" in repo else "qwen"
+    assert detect_model_adapter(processor.tokenizer, processor) == expected
+    assert type(build_model_adapter("auto", processor.tokenizer, processor)).__name__.lower().startswith(expected)
+
+
+def test_supported_family_can_render_opening_and_continuation(repo, expects_mrope, expected_token):
+    from vagen.models import build_model_adapter
+
+    if "llava" in repo.lower():
+        pytest.skip("LLaVA has no shipped training script/model adapter")
+    processor = _processor(repo)
+    adapter = build_model_adapter("auto", processor.tokenizer, processor)
+    opening, _ = adapter.render(
+        [{"role": "system", "content": "system"},
+         {"role": "user", "content": "first"}],
+        opening=True,
+    )
+    continuation, _ = adapter.render(
+        [{"role": "user", "content": "second"}],
+        opening=False,
+    )
+    assert opening and continuation
+
+
 def test_the_client_forwards_mm_processor_kwargs_both_ways(repo, expects_mrope, expected_token):
     """★ The prompt is tokenized on one side and the images are re-processed by the
     engine on the other, and the two must agree on how an image is tiled. Setting the

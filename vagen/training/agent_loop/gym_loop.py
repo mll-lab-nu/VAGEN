@@ -40,7 +40,7 @@ logger = logging.getLogger(__file__)
 logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
 
 # Which environments can have their reasoning scored is no longer a table here: each
-# environment declares its own `STATE_REWARD_SPEC`. See `vagen/envs/state_reward.py`.
+# environment declares its own `STATE_REWARD_SPEC`. See `envs/_common/rewards/factory.py`.
 
 
 class SampledVisionToken(EpisodeUnusable, ValueError):
@@ -134,7 +134,7 @@ class GymLoop(VagenGymAgentLoopBase):
             self.server_manager,
             self.tokenizer,
             self.processor,
-            model_adapter_name=self.config.trainer.get("model_adapter", "qwen"),
+            model_adapter_name=self.config.trainer.get("model_adapter", "auto"),
             apply_chat_template_kwargs=self.apply_chat_template_kwargs,
             mm_processor_kwargs=self._get_mm_processor_kwargs(),
             sampling_params=sampling_params,
