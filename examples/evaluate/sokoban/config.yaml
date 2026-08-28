@@ -45,20 +45,19 @@ envs:
       max_actions_per_step: 3
       action_sep: ","
       use_example_in_sys_prompt: true
-      # prompt_format wm is right here: the model under test is a Qwen2.5-VL, which emits
-      # <think> as ordinary text. The InternVL and GLM launchers use the simpler
-      # action-only protocol after their base-model preflights repeated under free_wm:
+      # prompt_format wm is right here: the model under test is a Qwen2.5-VL.
+      # Native-thinking models should use wm_think so their optional thinking prefix is
+      # followed by the same structured suffix. InternVL and GLM can still use the
+      # simpler action-only protocol:
       #   bash run_eval.sh config.yaml envs.0.config.prompt_format=answer \
       #     backends.openai.model=OpenGVLab/InternVL3_5-2B-hf
-      # GLM's launcher uses prompt_format=answer because it reasons in its native channel
-      # and only the action needs machine-readable markup. Qwen3/Qwen3.5/GLM reserve the
-      # think delimiters and cannot use wm; see docs/issues.md.
+      # GLM's launcher may use prompt_format=answer when only the action needs markup.
       prompt_format: wm
       # ★ Not the training default (True), and deliberately so -- this is the one field
       # here that is allowed to differ from val_sokoban_vision.yaml.
       #
       # Served through an OpenAI-compatible endpoint, this model does not open with
-      # `<observation>`; it writes the same sentence untagged and goes straight to
+      # `<perception>`; it writes the same sentence untagged and goes straight to
       # `<think>`. Measured on Qwen2.5-VL-3B: 0 of 240 turns well-formed, against 1.0 in
       # training validation on the SAME seeds, the SAME byte-identical system prompt, the
       # SAME 625-token prompt and the same greedy settings. It is not the seeds, the
@@ -72,9 +71,8 @@ envs:
       # the policy plays. False keeps the salvaged action, so this measures whether the
       # model can solve Sokoban rather than whether the endpoint emits angle brackets.
       #
-      # The price, and it is real: with this off the environment's format_reward is paid
-      # for any runnable action, so `reward` here is worth ~0.02/turn more than the val
-      # curve pays. Read traj_success, not reward, when comparing the two.
+      # Malformed but salvageable actions still receive no format reward, so disabling
+      # strict execution changes task continuity without weakening format scoring.
       strict_format: false
       # ★ Both must match val_sokoban_vision.yaml or the eval number is not comparable
       # with the val curve it will be read against. Absent, format_reward falls back to

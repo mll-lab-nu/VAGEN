@@ -139,7 +139,7 @@ class SpatialGym(GymImageEnv):
         self.current_turn_number += 1
 
         if self.awaiting_cogmap_output:
-            _, cogmap_answer, _ = parse_llm_response(
+            _, cogmap_answer, format_correct = parse_llm_response(
                 action_str, enable_think=bool(self.config.prompt_config.get('enable_think', True))
             )
             cogmap_str = cogmap_answer if cogmap_answer else action_str
@@ -155,12 +155,15 @@ class SpatialGym(GymImageEnv):
             _, reward, info = CognitiveMapManager.compute_cogmap_reward(
                 cogmap_scores, exploration_coverage, forced_term=self.forced_term_occurred,
             )
+            info["format_correct"] = format_correct
+            if format_correct:
+                reward += float(self.config.format_reward)
             obs = {'obs_str': self.prompter.task_finished_message()}
             self.render_cache = obs
             self.awaiting_cogmap_output = False
             return obs, reward, True, info
 
-        _, action, _ = parse_llm_response(
+        _, action, format_correct = parse_llm_response(
             action_str, enable_think=bool(self.config.prompt_config.get('enable_think', True))
         )
 
@@ -176,6 +179,9 @@ class SpatialGym(GymImageEnv):
                 seed=self.current_seed,
             )
         )
+        info["format_correct"] = format_correct
+        if format_correct and info.get("is_valid_action"):
+            reward += float(self.config.format_reward)
 
         if info.get('forced_term'):
             self.forced_term_occurred = True

@@ -3,7 +3,7 @@
 Two rewards, independently switchable:
 
 * **state estimation** -- the agent says where things are before acting
-  (``<observation>``), scored against the state it acted *from*.
+  (``<perception>``), scored against the state it acted *from*.
 * **transition prediction** -- it says where they will be after
   (``<prediction>``), scored against the state it acted *into*.
 
@@ -19,10 +19,9 @@ This used to be a ``placement`` setting resolved from ``algorithm.adv_estimator`
 put the estimator's business inside the environment and made the two a single choice
 spread across two configs.
 
-Whichever rewards are on decide the response format the agent is asked for. Every section
-that was asked for has to be present for any of them to pay -- see ``_score`` -- so asking
-for a section nobody scores, or scoring one nobody asked for, are both ways to get silent
-zeros.
+Enabling either reward requires the complete canonical WM response. The switches decide
+which descriptions the judge scores, while the protocol remains stable across runs. A
+partial or legacy-shaped response earns no auxiliary reward -- see ``_score``.
 """
 
 from __future__ import annotations
@@ -33,9 +32,10 @@ from typing import Any, Callable, Optional
 from vagen.envs._common.rewards.judge import NullJudge
 from vagen.envs._common.rewards.spans import tagged_span, token_offsets, tokens_covering
 from vagen.envs._common.rewards.spatial import grouped_f1
+from vagen.envs._common.response_format import WM_FORMAT, parse_wm_sections
 
 #: reward name -> the tag the agent writes it in
-TAGS = {"state_estimation": "observation", "transition_prediction": "prediction"}
+TAGS = {"state_estimation": "perception", "transition_prediction": "prediction"}
 
 #: What a description that looked at nothing already scores. Subtracted before paying.
 #:
@@ -111,29 +111,18 @@ class StateRewardWrapper:
         return {**prompt, "obs_str": joined} if isinstance(prompt, dict) else joined
 
     def instructions(self, existing: str = "") -> str:
-        """The response format, for whichever rewards are on and the env has not asked for.
-
-        Sections the environment's own prompt already requests are skipped. Sokoban's
-        "wm" format asks for <observation> and <prediction> in natural language, with
-        worked examples; appending a second set of instructions for the same tags does
-        not reinforce them, it competes with them. Adding a JSON example that way made
-        the agent emit the schema and the judge a re-parser of its own output; replacing
-        it with prose left two differently-worded blocks asking for one thing, and six
-        of eight episodes stopped producing a usable action at all.
-
-        Built rather than selected from a table of combinations: with two independent
-        switches a table has four entries that drift apart, and asking for a section
-        that nothing scores trains the agent to write text for no reason.
-        """
-        sections = [
-            self.spec.examples[name]
-            for name, tag in TAGS.items()
-            if name in self.enabled and name in self.spec.examples and f"<{tag}>" not in existing
-        ]
-        if not sections:
+        """Request canonical WM once when the environment has not already done so."""
+        if not self.enabled:
             return ""
+        required = ("perception", "reasoning", "prediction", "answer")
+        if all(f"<{tag}>" in existing for tag in required):
+            return ""
+        sections = [self.spec.examples[name] for name in self.enabled if name in self.spec.examples]
         body = "\n".join(sections)
-        return f"{body}\n{self.spec.axes}".strip()
+        return (
+            "Use the complete response format below; the order is required:\n"
+            f"{WM_FORMAT}\n{body}\n{self.spec.axes}"
+        ).strip()
 
     # ------------------------------------------------------------------- stepping
     async def step(self, action: str, response_token_ids=None, tokenizer=None):
@@ -167,6 +156,12 @@ class StateRewardWrapper:
         scores: dict[str, Any] = {"spans": spans}
         for name in self.enabled:
             scores[name] = 0.0
+
+        # Auxiliary supervision follows the same canonical ordering as the environment
+        # format reward. Old tags or reordered fields may still be useful for diagnostics,
+        # but they must not earn reward-model credit.
+        if not parse_wm_sections(action, allow_native_thinking=True).format_correct:
+            return scores
 
         # Format is a gate, not a line item: a turn that did not write every section it
         # was asked for scores nothing for the ones it did write. Paying per-section

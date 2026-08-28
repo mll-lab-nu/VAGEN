@@ -3,7 +3,7 @@ Prompt templates for the primitive_skill (ManiSkill robot manipulation) environm
 
 Supports 2 prompt formats:
   - free_think: <think>...</think><answer>...</answer>
-  - wm: <observation>...</observation><think>...</think><answer>...</answer><prediction>...</prediction>
+  - wm: <perception>...</perception><reasoning>...</reasoning><prediction>...</prediction><answer>...</answer>
 """
 
 from __future__ import annotations
@@ -21,10 +21,10 @@ _FORMAT_INSTRUCTIONS = {
         "<think>...</think><answer>{action_example}</answer>"
     ),
     "wm": (
-        "You need to describe your observation, think, give your answer, then predict "
-        "what you will see next. Respond in this format:\n"
-        "<observation>...</observation><think>...</think>"
-        "<answer>{action_example}</answer><prediction>...</prediction>"
+        "Describe your perception, explain your reasoning, predict the next state, and "
+        "then give the action. Respond in this exact order:\n"
+        "<perception>...</perception><reasoning>...</reasoning>"
+        "<prediction>...</prediction><answer>{action_example}</answer>"
     ),
 }
 
@@ -61,6 +61,8 @@ def system_prompt(
     """Return full system prompt = robot description + format instruction."""
     parts = [_ROBOT_DESCRIPTION]
     parts.append(get_format_instruction(format_name, max_actions_per_step, action_sep))
+    if add_example:
+        parts.append(_format_example(format_name, action_sep))
     return "\n\n".join(parts)
 
 
@@ -78,26 +80,32 @@ Hints:
 1. The coordinates (x, y, z) are in millimeters and are all integers.
 2. Please ensure that the coordinates are within the workspace limits.
 3. The position is the center of the object, when you place, please consider the volume of the object. It's always fine to set z much higher when placing an item.
-4. We will provide the object positions to you, but you need to match them to the object in the image by yourself. You're facing toward the negative x-axis, and the negative y-axis is to your left, the positive y-axis is to your right, and the positive z-axis is up.
+4. We will provide the object positions to you, but you need to match them to the object in the image by yourself. You're facing toward the negative x-axis, and the negative y-axis is to your left, the positive y-axis is to your right, and the positive z-axis is up."""
 
-Examples:
-round1:
-image1
-Human Instruction: Put red cube on green cube and yellow cube on left target
-Object positions:
-[(62,-55,20),(75,33,20),(-44,100,20),(100,-43,0),(100,43,0)]
-Reasoning: I can see from the picture that the red cube is on my left and green cube is on my right and near me.
-Since I'm looking toward the negative x axis, and negative y-axis is to my left, (62,-55,20) would be the position of the red cube, (75,33,20) would be the position of the green cube and (-44,100,20) is the position of the yellow cube.
-Also the (100,-43,0) would be the position of the left target, and (100,43,0) would be the porition of the right target.
-I need to pick up red cube first and place it on the green cube, when placing, I should set z much higher.
-Anwer: pick(62,-55,20)|place(75,33,50)
-round2:
-image2
-Human Instruction: Put red cube on green cube and yellow cube on left target
-Object positions:
-[(75,33,50),(75,33,20),(-44,100,20),(100,-43,0),(100,43,0)]
-Reasoning: Now the red cube is on the green cube, so I need to pick up the yellow cube and place it on the left target.
-Anwer: pick(-44,100,20)|place(100,-43,50)"""
+
+def _format_example(format_name: str, action_sep: str) -> str:
+    action = f"pick(62,-55,20){action_sep}place(75,33,50)"
+    perception = (
+        "The red cube is at (62,-55,20), the green cube is at (75,33,20), "
+        "and the red cube is not yet on the green cube."
+    )
+    reasoning = "Pick up the red cube and place it above the green cube."
+    prediction = "The red cube will be resting on the green cube after these actions."
+    if format_name == "wm":
+        response = (
+            f"<perception>{perception}</perception>"
+            f"<reasoning>{reasoning}</reasoning>"
+            f"<prediction>{prediction}</prediction>"
+            f"<answer>{action}</answer>"
+        )
+    else:
+        response = f"<think>{reasoning}</think><answer>{action}</answer>"
+    return (
+        "Example:\n"
+        "Human Instruction: Put the red cube on the green cube.\n"
+        "Object positions: [(62,-55,20),(75,33,20)]\n"
+        f"{response}"
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -12,8 +12,6 @@ Contains all concrete action classes and the ActionSequence parser.
 """
 
 
-from ..utils.utils import ANSWER_LABEL
-
 ACTION_INSTRUCTION = """\
 You can jump to objects within and across rooms, turn, and observe.
 When you are at a door, you can see objects from both connected rooms (within FOV).

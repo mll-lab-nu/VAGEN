@@ -79,7 +79,7 @@ trainer:
   # are for looking at something specific while chasing it.
   val_log_select: balanced
   val_log_success_ratio: 0.5
-  # Reward the reasoning as well as the outcome: the agent's <observation> and
+  # Reward the reasoning as well as the outcome: the agent's <perception> and
   # <prediction> are scored against the real layout and the scores are paid to the
   # tokens that carry them. Needs a judge endpoint; see scripts/launch_judge.sh.
   # Keep a copy of the actor from the best-validating step, selected on
@@ -94,7 +94,7 @@ trainer:
   # weights, so selection mildly prefers writing tags over solving. Select on
   # val-aux/<env>/traj_success/mean@1 instead if that matters more.
   save_best_actor: True
-  # ★ There is no state_reward here, deliberately. Scoring the agent's <observation> and
+  # ★ There is no state_reward here, deliberately. Scoring the agent's <perception> and
   # <prediction> is configured in the ENVIRONMENT's own block -- envs[].config.state_reward
   # in the train/val yaml -- alongside the judge endpoint that answers for it. Whether an
   # environment scores descriptions, what one turn pays for one, and which judge to ask are

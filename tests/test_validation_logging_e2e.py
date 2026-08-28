@@ -85,7 +85,7 @@ def _merged_validation_batch(mode, n_episodes=4):
                           "n_conversations", "conversations")}
     for e in range(n_episodes):
         inputs.append("system prompt")
-        outputs.append(f"<observation>ep{e}</observation><answer>Up</answer>")
+        outputs.append(f"<perception>ep{e}</perception><answer>Up</answer>")
         scores.append(1.0 + e)
         images.append([PIL.new("RGB", (16, 16), (e, e, e)) for _ in range(n_turns)])
         ex["episode_id"].append(f"EP{e}")

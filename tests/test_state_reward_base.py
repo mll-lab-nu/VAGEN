@@ -18,7 +18,7 @@ import pytest
 
 from vagen.envs import StateRewardWrapper
 from vagen.envs._common.rewards import DEFAULT_SCORE_BASE
-from test_state_reward import BOX, CharTokenizer, Env, Judge, _spec
+from test_state_reward import BOX, CharTokenizer, Env, Judge, _spec, _wm
 
 
 def _w(base=DEFAULT_SCORE_BASE, **kw):
@@ -66,7 +66,7 @@ def test_base_zero_is_the_legacy_reward():
 async def test_it_reaches_the_paid_score_end_to_end():
     """The base has to be applied where the reward is computed, not just be a method
     nothing calls."""
-    action = "<observation>A</observation>"
+    action = _wm()
     ids = [ord(c) for c in action]
 
     full = StateRewardWrapper(env=Env(BOX, BOX, reward=0.0), spec=_spec(), judge=Judge(BOX),

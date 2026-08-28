@@ -1,6 +1,6 @@
 """Locate a rewarded response span among the tokens the model produced.
 
-A reward computed on ``<observation>...</observation>`` should land on the tokens that
+A reward computed on ``<perception>...</perception>`` should land on the tokens that
 carry it, not on the end of the turn. That needs a map from character offsets to token
 positions.
 
@@ -23,7 +23,7 @@ def token_offsets(token_ids: list[int], tokenizer) -> list[int]:
     with special tokens skipped; measuring offsets with them rendered shifts every
     position after the first special token by that token's printed length. One
     ``<|box_start|>`` before the description was enough to move a reward off
-    ``box left of player`` and onto ``<observation>box left``.
+    ``box left of player`` and onto ``<perception>box left``.
 
     Monotone by construction. O(n) decodes; at a few hundred response tokens that is
     negligible next to the rollout itself.

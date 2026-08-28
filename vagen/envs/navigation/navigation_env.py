@@ -329,8 +329,8 @@ if __name__ == "__main__":
             if raw.strip().lower() in ("quit", "q", ""):
                 break
             # Auto-wrap if user didn't use tags
-            if "<action>" not in raw:
-                raw = f"<think>exploring</think><action>{raw}</action>"
+            if "<answer>" not in raw:
+                raw = f"<think>exploring</think><answer>{raw}</answer>"
 
             obs, reward, done, info = await env.step(raw)
             print(f"  reward={reward:.2f}  done={done}  success={info.get('success')}")

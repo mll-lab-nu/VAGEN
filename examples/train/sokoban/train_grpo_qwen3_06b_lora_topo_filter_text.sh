@@ -57,8 +57,8 @@ PYTHONUNBUFFERED=1 python3 -m vagen.training.main \
     hydra.searchpath="[file://$VERL/verl/trainer/config]" \
     data.custom_cls.path="$V/vagen/training/dataset.py" \
     "${BASE[@]}" \
-    data.train_files="$SCRIPTDIR/train_sokoban_free_wm_text.yaml" \
-    data.val_files="$SCRIPTDIR/val_sokoban_free_wm_text.yaml" \
+    data.train_files="$SCRIPTDIR/train_sokoban_wm_think_text.yaml" \
+    data.val_files="$SCRIPTDIR/val_sokoban_wm_think_text.yaml" \
     actor_rollout_ref.model.path="$MODEL" \
     critic.model.path="$MODEL" \
     algorithm.adv_estimator=grpo \

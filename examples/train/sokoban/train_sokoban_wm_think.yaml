@@ -5,16 +5,15 @@ envs:
     seed: [1,10000,1] # sample n_env seeds from seed[0] to seed[1] with each seed repeat at most seed[2] times
     max_turns: 5 # max number of interaction turns per episode
     response_length_per_turn: 512 # max response length per turn
-    # The largest one observation may be. Measured with the Qwen2.5-VL processor:
-    # sokoban vision is 80 tokens opening, 96 mid-episode. 256 leaves room for a larger frame without letting a
-    # runaway observation eat the response region. Undeclared this falls back to
+    # The largest one observation may be. InternVL3.5 expands the same continuation to
+    # 278-292 tokens, while Qwen2.5-VL needs only 80-96. 320 covers both families. Undeclared this falls back to
     # DEFAULT_MAX_ENV_RESPONSE=2048, which is not a bound on anything this env does
     # and makes the episode-size warning fire on every run until nobody reads it.
-    max_env_response_per_turn: 256
+    max_env_response_per_turn: 320
     config: # env-specific config
-      render_mode: text
+      render_mode: vision
       min_solution_steps: [1,5]
-      prompt_format: free_wm
+      prompt_format: wm_think
       # 0.02 a turn, not the 0.1 default: at max_turns=5 the default pays 0.5 for
       # formatting alone, half of what solving the level is worth. Every other
       # sokoban yaml sets this; these two inherited the default silently, so the

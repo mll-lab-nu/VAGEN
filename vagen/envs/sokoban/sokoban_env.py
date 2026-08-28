@@ -44,29 +44,20 @@ class SokobanEnvConfig:
     prompt_format: str = "wm"  # "free_think" or "wm"
     format_reward: float = 0.1  # Reward for following the format correctly
     success_reward: float = 1.0
-    # ★ Whether the world-modeling format is enforced. One switch, governing both halves,
-    # so that "the environment before/after the 2026-08-10 fix" is a single knob rather
-    # than two that can be set inconsistently:
+    # Whether malformed responses may still execute a salvaged action.
     #
-    #   True  (default) -- a response failing `format_correct` has its salvaged action
-    #                      discarded AND earns no format reward.
-    #   False           -- the pre-fix behaviour exactly: the salvaged action runs, and
-    #                      the format reward is paid for any runnable action.
-    #
-    # Reproducing a pre-2026-08-10 sokoban run therefore needs `strict_format: false`
-    # *and* `format_reward: 0.1` (the dataclass default those runs used, since the train
-    # yaml did not override it until 95ad6da).
+    #   True  (default) -- discard it.
+    #   False           -- execute it, but never pay format reward for malformed text.
     #
     # The salvage half in detail: asking for the world-modeling format
     # and then executing a bare `<answer>` teaches the policy that the other three
     # sections are optional, which is exactly what happened -- sokoban rollouts collapsed
     # to `<answer>Left, Left</answer>`. frozenlake has always been strict this way.
     #
-    # Set False to restore the salvage path. The argument for it is real and measured: on
+    # Set False to enable the salvage path. The argument for it is real and measured: on
     # the base model, half of all episodes reached zero usable actions when a malformed
     # turn was dropped, which discards half the batch over punctuation. The argument
-    # against is that it makes the format unenforceable, since the format reward is the
-    # only remaining pressure and it is worth 0.02 against a 1.0 success reward.
+    # against is that task reward can then be earned before the model learns the protocol.
     strict_format: bool = True
 
     # State reward is intentionally not a dataclass field. The shared environment factory
@@ -178,7 +169,7 @@ class Sokoban(GymImageEnv, HasStateReward):
         if getattr(self.config, "strict_format", True) and not parsed.get("format_correct", False):
             # The turn still happens and still costs a step; it simply does nothing. That
             # is the point -- a malformed turn has to be worse than a well-formed one, and
-            # under `wm` "malformed" means the observation/think/prediction sections the
+            # under `wm` "malformed" means the perception/reasoning/prediction sections the
             # prompt asked for are missing, not merely that the action was unparseable.
             action_list = []
         # Copy current player position (read-only)
@@ -220,14 +211,12 @@ class Sokoban(GymImageEnv, HasStateReward):
         # write the tags at all.
         #
         # Under `prompt_format=wm` the policy is asked for
-        # <observation>/<think>/<answer>/<prediction>; writing them costs ~100 tokens and,
+        # <perception>/<reasoning>/<prediction>/<answer>; writing them costs ~100 tokens and,
         # with this bug, earned exactly what emitting `<answer>Left, Left</answer>` alone
         # earned. Sokoban rollouts duly collapsed to that. frozenlake, navigation and
         # primitive_skill all gate on `format_correct`; sokoban was the only one that did
         # not, and it computes the flag ~25 lines above for `action_is_valid`.
-        if self.valid_actions and (
-            parsed.get("format_correct", False) or not getattr(self.config, "strict_format", True)
-        ):
+        if self.valid_actions and parsed.get("format_correct", False):
             reward += self.config.format_reward
 
         # Effective action: detect player position change

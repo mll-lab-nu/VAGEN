@@ -552,7 +552,7 @@ class GymLoop(VagenGymAgentLoopBase):
                         # two collide when the batch is converted for the critic.
                         # verl otherwise places one scalar at the final token, which
                         # erases which span earned what -- the whole point of scoring
-                        # <observation> and <prediction> where they are written.
+                        # <perception> and <prediction> where they are written.
                         "per_token_reward": scores,
                         # True when this conversation ended because the context filled
                         # up and the model was asked to summarise -- not because the

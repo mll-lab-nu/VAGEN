@@ -35,6 +35,7 @@ vagen/
 │   └── <algorithm>/
 ├── envs/
 │   ├── _common/
+│   │   ├── response_format.py # repository-wide response protocol and parsers
 │   │   └── rewards/         # shared env-owned reward contracts and helpers
 │   └── <environment>/
 ├── harness/
@@ -110,6 +111,9 @@ training -----> rollout <----- evaluation
 - `envs/_common/adapter.py` is the compatibility boundary for existing text-oriented gym
   environments. Harnesses pass a complete response object; the adapter unwraps text and
   token metadata for legacy implementations.
+- `envs/_common/response_format.py` owns response tags, ordering, strict validation, and
+  legacy extraction. Concrete environments own only their action vocabulary and reward
+  semantics; they must not reimplement the protocol with local regular expressions.
 - `rollout/scoring.py` is the mandatory reward seam. It associates a reward with the
   exact model `call_id`, so a harness cannot accidentally omit or misfile credit.
 

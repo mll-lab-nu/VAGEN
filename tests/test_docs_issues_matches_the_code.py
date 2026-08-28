@@ -1,14 +1,4 @@
-"""`docs/issues.md` tells a user which prompt format to set. Pin it to the dataclasses.
-
-The table there is load-bearing: on Qwen3-VL, Qwen3.5 and GLM, `<think>` is a single
-reserved control token the model will not emit as text, so sokoban's `wm` format -- which
-requires it -- scores exactly zero while every other metric looks healthy. Measured on
-Qwen3-VL-4B: `wm` gave format 0.000 / score 0.000 against `free_wm`'s 0.969 / 0.602.
-
-Two environments *default* to `wm`. A reader who trusts a stale table there loses a run and
-has nothing in the logs pointing at the cause, so the table has to track the code rather
-than the other way round.
-"""
+"""The documented response protocols must track environment capabilities and defaults."""
 
 from __future__ import annotations
 
@@ -22,10 +12,13 @@ _DOC = os.path.join(_ROOT, "docs/issues.md")
 
 #: env -> (config dataclass module path, attribute holding the default)
 ENVS = {
-    "sokoban": "vagen.envs.sokoban.sokoban_env",
-    "frozenlake": "vagen.envs.frozenlake.frozenlake_env",
-    "primitive_skill": "vagen.envs.primitive_skill.primitive_skill_env",
-    "navigation": "vagen.envs.navigation.navigation_env",
+    "sokoban": ("vagen.envs.sokoban.sokoban_env", "vagen.envs.sokoban.utils.utils"),
+    "frozenlake": ("vagen.envs.frozenlake.frozenlake_env", "vagen.envs.frozenlake.utils.utils"),
+    "primitive_skill": (
+        "vagen.envs.primitive_skill.primitive_skill_env",
+        "vagen.envs.primitive_skill.utils.parse",
+    ),
+    "navigation": ("vagen.envs.navigation.navigation_env", "vagen.envs.navigation.utils.parse"),
 }
 
 
@@ -63,8 +56,9 @@ def test_the_table_covers_every_environment_that_has_a_prompt_format():
         f"on a model that reserves <think>")
 
 
-@pytest.mark.parametrize("env,module_path", sorted(ENVS.items()))
-def test_the_documented_default_is_the_dataclass_default(env, module_path):
+@pytest.mark.parametrize("env,modules", sorted(ENVS.items()))
+def test_the_documented_default_is_the_dataclass_default(env, modules):
+    module_path, _ = modules
     documented = _documented_table()
     assert env in documented, env
     assert documented[env][1] == _config_default(module_path), (
@@ -74,18 +68,12 @@ def test_the_documented_default_is_the_dataclass_default(env, module_path):
 
 @pytest.mark.parametrize("env", sorted(ENVS))
 def test_the_documented_formats_are_the_ones_the_env_implements(env):
-    """★ Not a superset check. A format listed but unimplemented sends a user to a value
-    the env ignores or rejects, which is the failure this whole section exists to prevent
-    -- and `free_wm`/`answer` really are sokoban-only, so the table must not level them up
-    to every environment."""
-    import glob
+    """Compatibility aliases are intentionally excluded from the public format set."""
+    import importlib
 
+    _, parser_module = ENVS[env]
     documented = _documented_table()[env][0]
-    sources = glob.glob(os.path.join(_ROOT, f"vagen/envs/{env}/**/*.py"), recursive=True)
-    text = "".join(open(p, encoding="utf-8").read() for p in sources)
-    # The formats are dict keys in the env's prompt module and its parser.
-    implemented = set(re.findall(r'"(wm|free_wm|free_think|answer|no_think|eval_mode)"\s*:',
-                                 text))
+    implemented = set(importlib.import_module(parser_module).PROMPT_FORMATS)
     assert documented == implemented, (
         f"docs/issues.md lists {sorted(documented)} for {env}; the code implements "
         f"{sorted(implemented)}")

@@ -94,10 +94,13 @@ def _wrapper(env, **kw):
 
 @_pytest.mark.asyncio
 async def test_nothing_is_appended_when_the_env_already_asks_for_the_tags():
-    """Sokoban's wm format already requests <observation> and <prediction> with worked
+    """Sokoban's wm format already requests the canonical fields with worked
     examples. A second block does not reinforce them, it competes: that is how six of
     eight episodes stopped emitting a usable action."""
-    env_prompt = "... <observation>The box is above the player</observation> <prediction>x</prediction> ..."
+    env_prompt = (
+        "... <perception>p</perception><reasoning>r</reasoning>"
+        "<prediction>x</prediction><answer>Up</answer> ..."
+    )
     w = _wrapper(_Env(env_prompt))
     assert w.instructions(env_prompt) == ""
     assert (await w.system_prompt())["obs_str"] == env_prompt
@@ -109,16 +112,17 @@ async def test_instructions_are_added_when_the_env_says_nothing():
     env_prompt = "Push the boxes onto the targets. Reply with <answer>Up</answer>."
     w = _wrapper(_Env(env_prompt))
     block = w.instructions(env_prompt)
-    assert "<observation>" in block and "<prediction>" in block
+    assert "<perception>" in block and "<prediction>" in block
+    assert "<reasoning>" in block and "<answer>" in block
     assert (await w.system_prompt())["obs_str"].startswith(env_prompt)
 
 
 @_pytest.mark.asyncio
-async def test_only_the_missing_section_is_added():
-    env_prompt = "... <observation>already asked for</observation> ..."
+async def test_a_partial_protocol_gets_one_complete_instruction_block():
+    env_prompt = "... <perception>already asked for</perception> ..."
     block = _wrapper(_Env(env_prompt)).instructions(env_prompt)
     assert "<prediction>" in block
-    assert "Before acting" not in block, "re-taught a section the env already requests"
+    assert "<reasoning>" in block and "<answer>" in block
 
 
 # ------------------------------------------- offsets must match the text that was searched

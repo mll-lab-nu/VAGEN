@@ -104,6 +104,19 @@ backends:
 
 **`default_chat_config`** — Top-level fallback: applied to any env that doesn't define its own `chat_config`.
 
+For a native-thinking vLLM model, the request-side `thinking_token_budget` also requires
+the server-side reasoning delimiters. The local launchers accept them through
+`VLLM_REASONING_CONFIG`, for example:
+
+```bash
+VLLM_REASONING_CONFIG='{"reasoning_start_str":"<think>","reasoning_end_str":"</think>"}' \
+  MODEL_PATH=Qwen/Qwen3.5-4B \
+  bash examples/evaluate/sokoban/vllm/eval_qwen25_vl_3b.sh \
+  envs.0.config.prompt_format=wm_think \
+  envs.0.chat_config.extra_body.chat_template_kwargs.enable_thinking=true \
+  envs.0.chat_config.extra_body.thinking_token_budget=128
+```
+
 **`experiment`**:
 - `dump_dir` — Root directory for rollout outputs
 - `default_max_turns` — Fallback max_turns if env doesn't specify one

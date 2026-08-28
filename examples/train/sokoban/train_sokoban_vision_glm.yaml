@@ -1,5 +1,6 @@
-# GLM's native response is reasoning followed by boxed action tokens. The free-think
-# parser treats that native box as the model-family equivalent of <answer>.
+# Canonical free-think is <think>...</think><answer>...</answer>. GLM may initially use
+# its native boxed answer; that action is salvaged for rollout continuity but receives no
+# format reward until the model adopts the shared tags.
 envs:
   - name: Sokoban
     n_envs: 10000
@@ -8,9 +9,10 @@ envs:
     max_turns: 5
     response_length_per_turn: 512
     max_env_response_per_turn: 320
+    stop_strings: ["</answer>", "<|end_of_box|>"]
     config:
       render_mode: vision
       prompt_format: free_think
-      strict_format: true
+      strict_format: false
       format_reward: 0.02
       min_solution_steps: [1,5]

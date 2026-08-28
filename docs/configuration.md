@@ -295,26 +295,24 @@ FrozenLake's defaults are **not** the same — `prompt_format` defaults to `free
 
 | format | shape | available on |
 |---|---|---|
-| `wm` | `<observation><think><answer><prediction>` | sokoban, frozenlake, primitive_skill |
-| `free_think` | free reasoning closed by `</think>`, then an accepted action marker | sokoban, frozenlake, primitive_skill |
-| `free_wm` | observation / answer / prediction, free prose between | **sokoban only** |
+| `wm` | `<perception><reasoning><prediction><answer>` | sokoban, frozenlake, primitive_skill, navigation |
+| `wm_think` | optional native `<think>...</think>` prefix, then canonical `wm` | **sokoban only** |
+| `free_think` | `<think>...</think><answer>...</answer>`; a chat template may supply the opening think tag | sokoban, frozenlake, primitive_skill, navigation |
 | `answer` | `<answer>` only | **sokoban only** |
-| `wm`, `free_think`, `no_think`, `eval_mode` | navigation's own set, and it tags the action `<action>`, not `<answer>` | **navigation only** |
+| `no_think`, `eval_mode` | strict or lenient answer-only output | **navigation only** |
 
-`SpatialGym` has no `prompt_format`: the field is `init=False` and it parses `THINK:` /
-`FINAL ANSWER:` labels with a whole-text fallback.
+`free_wm` remains a compatibility alias for Sokoban's `wm_think`, but new configs should
+not use it. `SpatialGym` has no `prompt_format`: `prompt_config.enable_think` selects
+`free_think` or answer-only parsing.
 
 !!! danger "Thinking delimiters are model-family specific"
-    Qwen2.5-VL and InternVL3/3.5 can emit a literal `<think>` string. On **Qwen3-VL,
-    Qwen3.5 and GLM**, thinking delimiters are reserved control tokens and the chat template
-    may open the reasoning channel before generation. A strict `wm` prompt that demands a
-    newly generated literal `<think>` can therefore score zero even when actions are sound.
+    Qwen3-VL, Qwen3.5 and GLM may have the chat template open the reasoning channel before
+    generation. `wm_think` and `free_think` therefore accept a response whose first
+    delimiter is `</think>`; neither requires the model to generate a second opening tag.
 
-    `free_think` permits either opening convention, but still requires reasoning to close
-    with `</think>` before the action. For GLM, the parser also accepts its native
-    `<|begin_of_box|>…<|end_of_box|>` action marker. This is parser equivalence only: VAGEN
-    does not replace or rewrite the sampled text, token IDs, or rollout logprobs into
-    `<answer>`. Note that `primitive_skill` *defaults* to `wm`.
+    GLM's native `<|begin_of_box|>…<|end_of_box|>` answer can be salvaged for action
+    execution, but it is not canonical and receives no format reward. VAGEN never rewrites
+    sampled token IDs or rollout logprobs into `<answer>`.
 
 ### Model-family compatibility
 
@@ -338,7 +336,7 @@ parser, vision inputs and harness together.
 ## State reward
 
 An optional extra reward for what the agent *says* about the world, alongside what it does.
-A judge model reads the `<observation>` and `<prediction>` sections, turns them into
+A judge model reads the `<perception>` and `<prediction>` sections, turns them into
 structured relations, and compares those with the environment's real state. Off by default.
 
 ★ It is configured under **`envs[].config.state_reward`**, not under `trainer`. Training and
@@ -377,10 +375,10 @@ environment: `JUDGE_URL=http://127.0.0.1:8123/v1 python tools/judge_eval.py` sco
 against hand-labelled cases. A judge that reads the descriptions wrong pays a reward
 signal that looks like learning.
 
-**`state_estimation`** scores the `<observation>`, i.e. the state the agent acted *from*.
+**`state_estimation`** scores the `<perception>`, i.e. the state the agent acted *from*.
 **`transition_prediction`** scores the `<prediction>`, the state it acted *into*. They switch
-on independently, and whichever are on decide the response format the agent is asked for —
-there is no separate prompt setting to keep in step.
+on independently. Enabling either requires the complete canonical WM response; the switches
+control which description receives judge supervision, not which fields exist.
 
 **`reward` is absolute and per turn.** The number in the yaml is exactly what a perfect
 description of that section pays on one turn; it is not divided by `max_turns` and there is
@@ -396,9 +394,10 @@ about a third is free: naming any relation at all gets you there. Measured over 
 Sokoban starts, uniform random scores 0.334 and the best constant answer — "same, same",
 which looks at nothing — scores 0.391. Set `0.0` to restore the old behaviour.
 
-There is no state-reward `format_reward`. A turn that omits any enabled section earns no
-state reward for that turn; writing the sections is the gate that makes them scoreable, not
-a separate line item. The environment's own `format_reward` remains the single format knob.
+There is no state-reward `format_reward`. A malformed, legacy-tagged, reordered, or partial
+turn earns no state reward; canonical formatting is the gate that makes descriptions
+scoreable, not a separate line item. The environment's own `format_reward` remains the
+single format knob.
 
 There is also no `placement`. The environment pays each score on the final token of the span
 that earned it. An estimator that requires one reward slot per turn performs that reduction

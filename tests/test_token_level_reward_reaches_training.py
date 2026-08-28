@@ -1,6 +1,6 @@
 """A per-token reward must survive the trip into the training batch.
 
-The state reward exists to pay <observation> and <prediction> on the tokens that carry
+The state reward exists to pay <perception> and <prediction> on the tokens that carry
 them. verl's AgentLoopOutput has one `reward_score: float`, written at the final token --
 so a vector handed to it is summed away and every span-level score becomes a single
 number at the end of the response. Nothing fails; turn- and token-level credit

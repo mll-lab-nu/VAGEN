@@ -16,10 +16,10 @@ import pytest
 from vagen.envs.sokoban.utils.utils import parse_wm
 
 CANONICAL = (
-    "<observation>A box is below me</observation>"
-    "<think>I should move down</think>"
-    "<answer>Down</answer>"
+    "<perception>A box is below me</perception>"
+    "<reasoning>I should move down</reasoning>"
     "<prediction>The box will move</prediction>"
+    "<answer>Down</answer>"
 )
 
 
@@ -27,7 +27,7 @@ def test_the_canonical_form_is_still_the_correct_one():
     p = parse_wm(CANONICAL)
     assert p["format_correct"] is True
     assert p["actions"] == ["down"]
-    assert p["observation_content"] == "A box is below me"
+    assert p["perception_content"] == "A box is below me"
 
 
 def test_react_labels_still_yield_their_action():
@@ -39,19 +39,19 @@ def test_react_labels_still_yield_their_action():
     )
     assert p["actions"] == ["up", "left"], "a usable action was thrown away"
     assert p["format_correct"] is False, "labels must not count as the requested format"
-    assert p["observation_content"].startswith("The box is below")
+    assert p["perception_content"].startswith("The box is below")
 
 
 def test_action_is_accepted_as_a_tag_alias():
     """Observed drift: the model reaches for <action> where the env wants <answer>."""
-    p = parse_wm("<observation>x</observation><action>Right</action>")
+    p = parse_wm("<perception>x</perception><action>Right</action>")
     assert p["actions"] == ["right"]
     assert p["format_correct"] is False
 
 
 def test_a_missing_section_no_longer_costs_the_whole_turn():
     """All four or nothing was the rule; three of four now still steps the env."""
-    p = parse_wm("<observation>A box is below</observation><answer>Down</answer>")
+    p = parse_wm("<perception>A box is below</perception><answer>Down</answer>")
     assert p["actions"] == ["down"]
     assert p["prediction_content"] == ""
     assert p["format_correct"] is False
@@ -59,10 +59,10 @@ def test_a_missing_section_no_longer_costs_the_whole_turn():
 
 def test_out_of_order_sections_are_still_read():
     p = parse_wm(
-        "<answer>Up</answer><observation>the box</observation><prediction>it moves</prediction>"
+        "<answer>Up</answer><perception>the box</perception><prediction>it moves</prediction>"
     )
     assert p["actions"] == ["up"]
-    assert p["observation_content"] == "the box"
+    assert p["perception_content"] == "the box"
 
 
 def test_max_actions_holds_on_the_lenient_path_too():
@@ -84,7 +84,7 @@ def test_the_descriptions_survive_for_the_judge_to_score():
         "Action: Up\n"
         "Prediction: The box will be pushed one square up.\n"
     )
-    assert "box sits directly above" in p["observation_content"]
+    assert "box sits directly above" in p["perception_content"]
     assert "pushed one square up" in p["prediction_content"]
 
 
@@ -120,7 +120,30 @@ def test_answer_format_does_not_demand_the_tags_a_thinking_model_cannot_write():
     assert parse_response(native, prompt_format="answer")["format_correct"] is True
     # the same response fails the tag-based formats
     assert parse_response(native, prompt_format="wm")["format_correct"] is False
-    assert parse_response(native, prompt_format="free_wm")["format_correct"] is False
+    assert parse_response(native, prompt_format="wm_think")["format_correct"] is False
+
+
+def test_wm_think_accepts_native_reasoning_before_the_canonical_suffix():
+    from vagen.envs.sokoban.utils.utils import parse_response
+
+    native = "native reasoning\n</think>\n" + CANONICAL
+    parsed = parse_response(native, prompt_format="wm_think")
+    assert parsed["format_correct"] is True
+    assert parsed["actions"] == ["down"]
+
+
+def test_wm_think_uses_the_final_native_close_before_the_structured_suffix():
+    from vagen.envs.sokoban.utils.utils import parse_response
+
+    native = "forced mid-thought</think>)\n</think>\n" + CANONICAL
+    assert parse_response(native, prompt_format="wm_think")["format_correct"] is True
+
+
+def test_legacy_free_wm_name_is_only_a_compatibility_alias():
+    from vagen.envs.sokoban.utils.utils import PROMPT_FORMATS, parse_response
+
+    assert "free_wm" not in PROMPT_FORMATS
+    assert parse_response(CANONICAL, prompt_format="free_wm")["format_correct"] is True
 
 
 def test_answer_format_still_salvages_an_action_when_the_tag_is_missing():
@@ -168,7 +191,7 @@ def test_free_think_accepts_the_classic_both_tags_form():
     )
     assert p["format_correct"] is True
     assert p["actions"] == ["down"]
-    assert p["think_content"] == "The box is below me."
+    assert p["reasoning_content"] == "The box is below me."
 
 
 def test_free_think_accepts_a_think_block_the_chat_template_opened():
@@ -178,31 +201,26 @@ def test_free_think_accepts_a_think_block_the_chat_template_opened():
     from vagen.envs.sokoban.utils.utils import parse_response
 
     p = parse_response(
-        "The box is below me, so I push down.\n</think>\n\n"
-        "I will move down to push the box onto the target.\n\n<answer>Down</answer>",
+        "The box is below me, so I push down.\n</think>\n\n<answer>Down</answer>",
         prompt_format="free_think",
     )
     assert p["format_correct"] is True
     assert p["actions"] == ["down"]
-    assert "push down" in p["think_content"]
+    assert "push down" in p["reasoning_content"]
 
 
-def test_free_think_allows_visible_prose_between_the_close_and_the_answer():
-    """A thinking model writes a visible summary after `</think>`; that is the normal
-    shape of its response, not a format violation."""
+def test_free_think_rejects_visible_prose_between_the_close_and_the_answer():
     from vagen.envs.sokoban.utils.utils import parse_response
 
     p = parse_response(
         "<think>reasoning</think>\nHere is my plan, at some length.\n<answer>Up,Left</answer>",
         prompt_format="free_think",
     )
-    assert p["format_correct"] is True
+    assert p["format_correct"] is False
     assert p["actions"] == ["up", "left"]
 
 
-def test_free_think_accepts_glm_native_box_as_answer():
-    """GLM-4.6V is post-trained to close reasoning and answer between native box
-    tokens.  It is the same semantic contract as <answer>, not malformed prose."""
+def test_free_think_salvages_glm_native_box_without_format_credit():
     from vagen.envs.sokoban.utils.utils import parse_response
 
     raw = (
@@ -210,13 +228,11 @@ def test_free_think_accepts_glm_native_box_as_answer():
         "<|begin_of_box|>Down<|end_of_box|>"
     )
     p = parse_response(raw, prompt_format="free_think")
-    assert p["format_correct"] is True
+    assert p["format_correct"] is False
     assert p["actions"] == ["down"]
-    assert p["llm_raw_response"] == raw
-    assert p["llm_response"] == raw
 
 
-def test_free_think_prefers_answer_nested_inside_glm_native_box():
+def test_free_think_salvages_answer_nested_inside_glm_native_box():
     from vagen.envs.sokoban.utils.utils import parse_response
 
     p = parse_response(
@@ -224,7 +240,7 @@ def test_free_think_prefers_answer_nested_inside_glm_native_box():
         "<|begin_of_box|><answer>Left</answer><|end_of_box|>",
         prompt_format="free_think",
     )
-    assert p["format_correct"] is True
+    assert p["format_correct"] is False
     assert p["actions"] == ["left"]
 
 
@@ -238,8 +254,7 @@ def test_free_think_rejects_a_trace_that_never_closed_its_thinking():
     ramble = "wait, let me reconsider. " * 50 + "<answer>Up</answer>" + " hmm, but actually "
     p = parse_response(ramble, prompt_format="free_think")
     assert p["format_correct"] is False
-    # the same text passes the format that only looks for the tag
-    assert parse_response(ramble, prompt_format="answer")["format_correct"] is True
+    assert parse_response(ramble, prompt_format="answer")["format_correct"] is False
 
 
 def test_free_think_takes_the_answer_after_the_close_not_a_draft_inside_it():
@@ -249,7 +264,7 @@ def test_free_think_takes_the_answer_after_the_close_not_a_draft_inside_it():
         "maybe <answer>Up</answer> no wait </think> On reflection: <answer>Down</answer>",
         prompt_format="free_think",
     )
-    assert p["format_correct"] is True
+    assert p["format_correct"] is False
     assert p["actions"] == ["down"]
 
 

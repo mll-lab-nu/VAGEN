@@ -30,8 +30,8 @@ def format_prompt(max_actions_per_step, action_sep, add_example=True, prompt_for
         return free_think_format_prompt(max_actions_per_step, action_sep, add_example)
     elif prompt_format == "wm":
         return wm_format_prompt(max_actions_per_step, action_sep, add_example)
-    elif prompt_format == "free_wm":
-        return free_wm_format_prompt(max_actions_per_step, action_sep, add_example)
+    elif prompt_format in {"free_wm", "wm_think"}:
+        return wm_think_format_prompt(max_actions_per_step, action_sep, add_example)
     elif prompt_format == "answer":
         return answer_format_prompt(max_actions_per_step, action_sep, add_example)
     else:
@@ -44,7 +44,7 @@ def free_think_format_prompt(max_actions_per_step, action_sep, add_example=True)
     one that types `<think>` as text, and one whose chat template has already opened the
     block for it, so that the response begins inside the reasoning and its first tag is
     `</think>`. Hence "close it with `</think>`" rather than "emit `<think>`": the latter
-    is unsatisfiable on the families that reserve the token (see the wm/free_wm split).
+    is unsatisfiable on the families that reserve the token.
 
     The requirement that the answer follow `</think>` is the load-bearing part for a
     native-thinking model. It is the only thing in the format that says *stop reasoning*.
@@ -82,12 +82,12 @@ Example 3:
 
 
 def wm_format_prompt(max_actions_per_step, action_sep, add_example=True):
-    """Generate format prompt for wm_new format with explicit row/column distinction"""
+    """Generate the repository-wide structured world-model format."""
     base_prompt = f"""You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}.
 Your response must be in the format of:
-<observation>...</observation><think>...</think><answer>...</answer><prediction>...</prediction>.
+<perception>...</perception><reasoning>...</reasoning><prediction>...</prediction><answer>...</answer>.
 
-Rules for <observation> and <prediction>:
+Rules for <perception> and <prediction>:
 - You must strictly describe the relative position of the `target` and any visible `box` objects **relative to the player**.
 - For each object, you MUST include:
   - exactly ONE vertical relationship: `above`, `below`, or `same row`
@@ -107,22 +107,22 @@ Rules for <answer>:
     if add_example:
         examples = f"""
 Example 1:
-<observation>The box is below and right of the player, and the target is below and right of the player</observation>
-<think>I should move right to align my column with the box and the target</think>
-<answer>Right</answer>
+<perception>The box is below and right of the player, and the target is below and right of the player</perception>
+<reasoning>I should move right to align my column with the box and the target</reasoning>
 <prediction>The box will be below and same column of the player, and the target will be below and same column of the player</prediction>
+<answer>Right</answer>
 
 Example 2:
-<observation>The box is above and left of the player, and the target is above and same column of the player</observation>
-<think>I should move up to align my row with the box and reach the target's row position</think>
-<answer>Up</answer>
+<perception>The box is above and left of the player, and the target is above and same column of the player</perception>
+<reasoning>I should move up to align my row with the box and reach the target's row position</reasoning>
 <prediction>The box will be same row and left of the player, and the target will be same row and same column of the player</prediction>
+<answer>Up</answer>
 
 Example 3:
-<observation>The box is same row and right of the player, and the target is same row and left of the player</observation>
-<think>I should move right to push the box right while keeping the target on my left</think>
-<answer>Right</answer>
+<perception>The box is same row and right of the player, and the target is same row and left of the player</perception>
+<reasoning>I should move right to push the box right while keeping the target on my left</reasoning>
 <prediction>The box will be same row and right of the player, and the target will be same row and left of the player</prediction>
+<answer>Right</answer>
 """
         return base_prompt + "\n" + examples
 
@@ -134,10 +134,10 @@ def answer_format_prompt(max_actions_per_step, action_sep, add_example=True):
 
     Qwen3.5 and friends open a `<think>` block in the generation prompt and reason inside
     it before the visible response begins. Asking such a model *also* to narrate its
-    reasoning into `<observation>`/`<think>`/`<prediction>` tags makes it do the work
+    reasoning into `<perception>`/`<reasoning>`/`<prediction>` tags makes it do the work
     twice: once natively and once for the parser. It also collides outright -- `<think>`
     is a reserved control token on those families, so the tag can never be produced as
-    text (see the wm/free_wm split).
+    text. Use ``wm_think`` when native reasoning should precede structured WM output.
 
     So this format marks up only what has to be machine-read: the action. Everything
     before `<answer>` is the model's own reasoning and is left alone.
@@ -161,15 +161,14 @@ Example:
     return base_prompt
 
 
-def free_wm_format_prompt(max_actions_per_step, action_sep, add_example=True):
-    """Generate format prompt for free_wm format: observation, answer, prediction with free reasoning between tags."""
+def wm_think_format_prompt(max_actions_per_step, action_sep, add_example=True):
+    """Structured WM after an optional model-native thinking block."""
     base_prompt = f"""You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}.
-Your response must be in the format of:
-<observation>...</observation> your reasoning <answer>...</answer> your reasoning <prediction>...</prediction>.
+If the chat template opens a native `<think>` block, finish it first with `</think>`.
+After that, your response must use exactly this order:
+<perception>...</perception><reasoning>...</reasoning><prediction>...</prediction><answer>...</answer>.
 
-You may include free-form reasoning text between the tags.
-
-Rules for <observation> and <prediction>:
+Rules for <perception> and <prediction>:
 - You must strictly describe the relative position of the `target` and any visible `box` objects **relative to the player**.
 - For each object, you MUST include:
   - exactly ONE vertical relationship: `above`, `below`, or `same row`
@@ -189,25 +188,22 @@ Rules for <answer>:
     if add_example:
         examples = f"""
 Example 1:
-<observation>The box is below and right of the player, and the target is below and right of the player</observation>
-I should move right to align my column with the box and the target.
-<answer>Right</answer>
-After moving right, the box and target should still be below me but now in the same column.
+<perception>The box is below and right of the player, and the target is below and right of the player</perception>
+<reasoning>I should move right to align my column with the box and the target.</reasoning>
 <prediction>The box will be below and same column of the player, and the target will be below and same column of the player</prediction>
+<answer>Right</answer>
 
 Example 2:
-<observation>The box is above and left of the player, and the target is above and same column of the player</observation>
-I should move up to align my row with the box and reach the target's row position.
-<answer>Up</answer>
-After moving up, the box should be on the same row to my left, and the target on the same row in the same column.
+<perception>The box is above and left of the player, and the target is above and same column of the player</perception>
+<reasoning>I should move up to align my row with the box and reach the target's row position.</reasoning>
 <prediction>The box will be same row and left of the player, and the target will be same row and same column of the player</prediction>
+<answer>Up</answer>
 
 Example 3:
-<observation>The box is same row and right of the player, and the target is same row and left of the player</observation>
-I should move right to push the box right while keeping the target on my left.
-<answer>Right</answer>
-After pushing right, the box stays to my right and the target stays to my left.
+<perception>The box is same row and right of the player, and the target is same row and left of the player</perception>
+<reasoning>I should move right to push the box right while keeping the target on my left.</reasoning>
 <prediction>The box will be same row and right of the player, and the target will be same row and left of the player</prediction>
+<answer>Right</answer>
 """
         return base_prompt + "\n" + examples
 

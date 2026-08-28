@@ -6,7 +6,6 @@ from ..actions.actions import ActionSequence
 
 from ..utils.room_utils import get_room_description
 from .cogmap_prompts import GLOBAL_COGMAP_PROMPT
-from ..utils.utils import THINK_LABEL, ANSWER_LABEL
 
 
 _VISION_EXAMPLE = """\
@@ -78,17 +77,17 @@ class PromptManager:
 
         if self.enable_think:
             format_instructions = (
-                f"Always output:\n"
-                f"{THINK_LABEL}\n[Your reasoning]\n"
-                f"{ANSWER_LABEL}\n[Your answer]\n\n"
-                "`FINAL ANSWER` must be `Actions: [ ... ]`.\n\n"
+                "Always output:\n"
+                "<think>[Your reasoning]</think>\n"
+                "<answer>[Your answer]</answer>\n\n"
+                "`<answer>` must contain `Actions: [ ... ]`.\n\n"
                 "**Keep your response brief and concise. Avoid unnecessary verbosity.**"
             )
         else:
             format_instructions = (
-                f"Always output:\n"
-                f"{ANSWER_LABEL}\n[Your answer]\n\n"
-                "`FINAL ANSWER` must be `Actions: [ ... ]`.\n\n"
+                "Always output:\n"
+                "<answer>[Your answer]</answer>\n\n"
+                "`<answer>` must contain `Actions: [ ... ]`.\n\n"
                 "**Keep your response brief and concise. Avoid unnecessary verbosity.**"
             )
 
@@ -192,9 +191,9 @@ class PromptManager:
         cogmap_hint = "  (or Actions: [Term()] to finish)" if is_exploration else ""
         if self.enable_think:
             think = "[Your thoughts on next step actions]" if is_exploration else "[Your thoughts on the question]"
-            return f"Strictly follow this format:\n{THINK_LABEL}\n{think}\n{ANSWER_LABEL}\n{answer_hint}{cogmap_hint}"
+            return f"Strictly follow this format:\n<think>{think}</think>\n<answer>{answer_hint}{cogmap_hint}</answer>"
         else:
-            return f"Strictly follow this format:\n{ANSWER_LABEL}\n{answer_hint}{cogmap_hint}"
+            return f"Strictly follow this format:\n<answer>{answer_hint}{cogmap_hint}</answer>"
 
     def get_cogmap_output_prompt(self) -> str:
         """Full cogmap prompt including schema, given to the agent after Term()."""
@@ -209,12 +208,12 @@ class PromptManager:
         )
         if self.enable_think:
             prompt += (
-                f"\nStrictly follow this format:\n{THINK_LABEL}\n"
-                "[Your thoughts on the global cognitive map]\n"
-                f"{ANSWER_LABEL}\n[JSON cognitive map only]"
+                "\nStrictly follow this format:\n"
+                "<think>[Your thoughts on the global cognitive map]</think>\n"
+                "<answer>[JSON cognitive map only]</answer>"
             )
         else:
-            prompt += f"\nStrictly follow this format:\n{ANSWER_LABEL}\n[JSON cognitive map only]"
+            prompt += "\nStrictly follow this format:\n<answer>[JSON cognitive map only]</answer>"
         return prompt
 
     # ------------------------------------------------------------------

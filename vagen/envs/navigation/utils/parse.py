@@ -2,34 +2,28 @@
 Response parsing and reward utilities for the navigation environment.
 
 Formats:
-  - free_think: <think>...</think><action>...</action>
-  - wm: <observation>...</observation><think>...</think><action>...</action><prediction>...</prediction>
-  - no_think: <action>...</action>
-  - eval_mode: only requires <action>...</action> (everything else optional, lenient)
+  - free_think: <think>...</think><answer>...</answer>
+  - wm: <perception>...</perception><reasoning>...</reasoning><prediction>...</prediction><answer>...</answer>
+  - no_think: <answer>...</answer>
+  - eval_mode: only requires <answer>...</answer> (everything else optional, lenient)
 """
 
 from __future__ import annotations
 
-import re
 from typing import Any, Dict, List
 
+from vagen.envs._common.response_format import (
+    parse_answer_sections,
+    parse_free_think_sections,
+    parse_wm_sections,
+    split_actions,
+)
+
+PROMPT_FORMATS = frozenset({"wm", "free_think", "no_think", "eval_mode"})
 
 # ---------------------------------------------------------------------------
 # Parse patterns
 # ---------------------------------------------------------------------------
-
-_PARSE_PATTERNS = {
-    "free_think": r"<think>(.*?)</think>\s*<action>(.*?)</action>",
-    "wm": (
-        r"<observation>(.*?)</observation>\s*"
-        r"<think>(.*?)</think>\s*"
-        r"<action>(.*?)</action>\s*"
-        r"<prediction>(.*?)</prediction>"
-    ),
-    "no_think": r"^\s*<action>(.*?)</action>\s*$",  # strict: entire response must be <action>...</action>
-    "eval_mode": r"<action>(.*?)</action>",  # lenient: first <action> anywhere
-}
-
 
 def parse_response(
     response: str,
@@ -45,29 +39,25 @@ def parse_response(
     """
     result: Dict[str, Any] = {"llm_raw_response": response, "actions": [], "format_correct": False}
 
-    pattern = _PARSE_PATTERNS.get(prompt_format)
-    if pattern is None:
-        raise ValueError(f"Unknown prompt_format: {prompt_format}")
-    match = re.search(pattern, response, re.DOTALL)
-    if not match:
-        return result
-
-    # Extract named sections based on format
     if prompt_format == "free_think":
-        result["think"] = match.group(1).strip()
-        action_text = match.group(2).strip()
+        sections = parse_free_think_sections(response)
     elif prompt_format == "wm":
-        result["observation"] = match.group(1).strip()
-        result["think"] = match.group(2).strip()
-        action_text = match.group(3).strip()
-        result["prediction"] = match.group(4).strip()
+        sections = parse_wm_sections(response)
+    elif prompt_format == "no_think":
+        sections = parse_answer_sections(response)
+    elif prompt_format == "eval_mode":
+        sections = parse_answer_sections(response, lenient=True)
     else:
-        # no_think / eval — single capture group
-        action_text = match.group(1).strip()
+        raise ValueError(f"Unknown prompt_format: {prompt_format}")
 
-    result["format_correct"] = True
-    actions = [a.strip().lower() for a in action_text.split(action_sep) if a.strip()][:max_actions]
-    result["actions"] = actions
+    result.update(
+        perception_content=sections.perception,
+        reasoning_content=sections.reasoning,
+        prediction_content=sections.prediction,
+        action_content=sections.answer,
+        format_correct=sections.format_correct,
+        actions=split_actions(sections.answer, action_sep, max_actions),
+    )
     return result
 
 

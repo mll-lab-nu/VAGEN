@@ -64,8 +64,8 @@ JSON:"""
 EXAMPLES = {
     "state_estimation": (
         "Before acting, say in plain words what you see:\n"
-        "<observation>A box is directly below me in my column, and the target is also "
-        "below me, in that same column.</observation>"
+        "<perception>A box is directly below me in my column, and the target is also "
+        "below me, in that same column.</perception>"
     ),
     "transition_prediction": (
         "After choosing, say in plain words what will follow:\n"

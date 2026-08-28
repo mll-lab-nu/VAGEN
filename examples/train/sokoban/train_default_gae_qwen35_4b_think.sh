@@ -2,7 +2,7 @@
 # sokoban - default_gae - concat - Qwen/Qwen3.5-4B, with its NATIVE THINKING CHANNEL ON.
 #
 # The sibling script `train_default_gae_qwen35_4b.sh` runs the same model with thinking
-# off, under `free_wm`. That arm is the baseline this one is measured against, and it is a
+# off, under `wm_think`. That arm is the baseline this one is measured against, and it is a
 # strong one: it converges to 0.97 success at ~250 tokens a turn. Read any result here
 # against that, not against zero.
 #
@@ -14,9 +14,8 @@
 #    True leaves the block OPEN at the end of the generation prompt, so the reasoning is
 #    generated as part of the response.
 #
-# 2. `prompt_format: free_think` (in the yaml). `wm` is unreachable on this family --
-#    `<think>`/`</think>` are single reserved control tokens (248068/248069), so the model
-#    cannot emit them as text and every action is discarded. free_think asks for
+# 2. `prompt_format: free_think` (in the yaml). This experiment intentionally trains the
+#    compact think/answer protocol instead of full WM. free_think asks for
 #    `</think>` and then `<answer>`, and its opening tag is optional precisely because the
 #    template already wrote one.
 #

@@ -9,27 +9,25 @@
 # whole episode fit inside one conversation means compaction never fires and that arm
 # silently measures concat instead. See train_default_gae_compact_qwen25vl3b.sh.
 envs:
-  - name: Sokoban
-    n_envs: 256
-    data_source: sokoban
-    seed: [10001,10256,1]
-    max_turns: 5
-    response_length_per_turn: 512
-    # Match training: InternVL3.5 needs 278-292 tokens for a continuation, while
-    # Qwen2.5-VL needs only 80-96. 320 covers both and keeps the five-turn worst case
-    # inside the launchers' 4000-token response region.
-    # Undeclared this falls back to
+  - name: Sokoban # registered env name
+    n_envs: 10000
+    data_source: sokoban # nickname for logging
+    seed: [1,10000,1] # sample n_env seeds from seed[0] to seed[1] with each seed repeat at most seed[2] times
+    max_turns: 5 # max number of interaction turns per episode
+    response_length_per_turn: 512 # max response length per turn
+    # The largest one observation may be. InternVL3.5 expands the same continuation to
+    # 278-292 tokens, while Qwen2.5-VL needs only 80-96. 320 covers both families without
+    # letting a runaway observation eat the response region. Undeclared this falls back to
     # DEFAULT_MAX_ENV_RESPONSE=2048, which is not a bound on anything this env does
     # and makes the episode-size warning fire on every run until nobody reads it.
+    # At max_turns=5, 5*512 + 4*320 = 3840, still inside the launchers' 4000-token
+    # response region.
     max_env_response_per_turn: 320
-    config:
+    config: # env-specific config
       render_mode: vision
-      prompt_format: free_wm
-      # ★ Must match the train yaml. Absent, this falls back to SokobanEnvConfig's default
-      # of 0.1 a turn -- so validation was scoring 1.0 + 5*0.1 = 1.50 for a solved episode
-      # where training scored 1.0 + 5*0.02 = 1.10, and val reward stopped being comparable
-      # to train reward at all. Worse, formatting was then worth 0.5 against 1.0 for
-      # solving, so a run that never solved anything but wrote clean tags scored half a
-      # success. tests/test_train_and_val_agree_on_rewards.py pins the two together.
+      prompt_format: wm_think
+      # 0.02 a turn, not the 0.1 default: at max_turns=5 the default pays 0.5 for
+      # formatting alone, half of what solving the level is worth. 0.02 pays 0.10 over
+      # the episode, matching what the two state rewards pay together.
       format_reward: 0.02
       min_solution_steps: [1,5]
