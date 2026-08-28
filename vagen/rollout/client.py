@@ -316,13 +316,13 @@ class InferenceClient(ABC):
         size = self.measure(messages)
         if size <= limit:
             return messages
-        if opening:
-            # The part that cannot be cut. If it alone is over, no trimming helps.
-            fixed = [m for m in messages if m.get("role") == "system"]
-            if fixed and self.measure(fixed) > limit:
-                self._check_context([0] * size, opening=True)
 
-        trimmed, final = self._shrink(messages, limit)
+        try:
+            trimmed, final = self._shrink(messages, limit)
+        except ContextTooLarge:
+            if opening:
+                self._check_context([0] * size, opening=True)
+            raise
         if not self._warned_truncating_context:
             self._warned_truncating_context = True
             logger.warning(

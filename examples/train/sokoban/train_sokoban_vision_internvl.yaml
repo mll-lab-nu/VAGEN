@@ -6,7 +6,14 @@ envs:
     data_source: sokoban
     seed: [1,10000,1]
     max_turns: 5
-    response_length_per_turn: 512
+    # InternVL3.5 often spends 500+ tokens reasoning before it reaches </think> and
+    # <answer>. A 512-token cap truncates otherwise valid turns mid-format.
+    response_length_per_turn: 1024
+    # Close a runaway reasoning block while leaving another 512 tokens for the answer.
+    thinking_token_budget: 512
+    # InternVL may keep reasoning after a valid action. End the turn at the protocol
+    # boundary, retaining the delimiter so the strict parser sees a complete answer.
+    stop_strings: ["</answer>"]
     max_env_response_per_turn: 320
     config:
       render_mode: vision

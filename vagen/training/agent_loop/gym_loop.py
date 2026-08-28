@@ -130,6 +130,12 @@ class GymLoop(VagenGymAgentLoopBase):
         if kwargs.get("thinking_token_budget"):
             sampling_params = {**sampling_params,
                                "thinking_token_budget": int(kwargs["thinking_token_budget"])}
+        if kwargs.get("stop_strings"):
+            sampling_params = {
+                **sampling_params,
+                "stop": list(kwargs["stop_strings"]),
+                "include_stop_str_in_output": True,
+            }
         client = VerlClient(
             self.server_manager,
             self.tokenizer,

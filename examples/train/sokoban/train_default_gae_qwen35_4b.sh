@@ -1,5 +1,5 @@
 #!/bin/bash
-# sokoban - default_gae - concat - Qwen/Qwen3.5-4B
+# sokoban - default_gae - Qwen/Qwen3.5-4B
 #
 # Qwen3.5 is natively multimodal: there is no `-VL` variant to look for. The
 # `Qwen3.5-VL-*` repos on the Hub are third-party derivatives.
@@ -13,16 +13,22 @@
 #   transformers >= 5.2.0   4.57 has qwen3_vl but not this
 #   vllm                    the text stack interleaves linear_attention with
 #                           full_attention, so the engine has to know the architecture
-# Both are satisfied by the pinned versions. The config resolves there; no training run
-# has been done on this model.
+# Both are satisfied by the pinned versions.
 set -eo pipefail
 
 V=$(cd "$(dirname "$0")/../../.." && pwd)
 SCRIPTDIR=$(cd "$(dirname "$0")" && pwd)
+HARNESS=${HARNESS:-concat}
+case "$HARNESS" in
+    concat|no_concat|compact) ;;
+    *) echo "HARNESS must be concat, no_concat, or compact (got: $HARNESS)" >&2; exit 2 ;;
+esac
 PROJECT_NAME=${PROJECT_NAME:-vagen_experiments}
-EXPERIMENT_NAME=${EXPERIMENT_NAME:-sokoban_default_gae_qwen35_4b}
+EXPERIMENT_NAME=${EXPERIMENT_NAME:-sokoban_default_gae_qwen35_4b_${HARNESS}}
 EXPERIMENT_DIR=${EXPERIMENT_DIR:-$V/exps/$PROJECT_NAME/$EXPERIMENT_NAME}
 MODEL=${MODEL:-Qwen/Qwen3.5-4B}
+COMPACT_BUDGET=${COMPACT_BUDGET:-2000}
+COMPACT_SUMMARY_BUDGET=${COMPACT_SUMMARY_BUDGET:-300}
 mkdir -p "$EXPERIMENT_DIR"
 
 # verl is not imported as an installed package; it is a checkout, and it has to come
@@ -63,12 +69,16 @@ PYTHONUNBUFFERED=1 python3 -m vagen.training.main \
     critic.model.path="$MODEL" \
     critic.enable=True \
     algorithm.adv_estimator=default_gae \
-    trainer.harness=concat \
+    trainer.harness="$HARNESS" \
+    trainer.compact_budget="$COMPACT_BUDGET" \
+    trainer.compact_summary_budget="$COMPACT_SUMMARY_BUDGET" \
     data.train_batch_size=128 \
+    data.max_prompt_length=2000 \
     data.max_response_length=4000 \
     actor_rollout_ref.actor.ppo_mini_batch_size=32 \
     actor_rollout_ref.rollout.n=1 \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
+    actor_rollout_ref.rollout.max_model_len=6000 \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
     actor_rollout_ref.rollout.max_num_batched_tokens=10000 \
     actor_rollout_ref.rollout.enforce_eager=True \
