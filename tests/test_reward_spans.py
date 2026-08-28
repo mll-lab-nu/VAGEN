@@ -6,7 +6,7 @@ the same total and the loss stays finite, so it can only be caught by checking p
 
 import pytest
 
-from vagen.rewards.spans import spread, tagged_span, token_offsets, tokens_covering
+from vagen.envs._common.rewards import spread, tagged_span, token_offsets, tokens_covering
 
 
 class CharTokenizer:
@@ -72,7 +72,7 @@ def test_offsets_come_from_the_emitted_ids_not_a_re_encoding():
     a reward vector built on that is misaligned against the sequence being trained."""
     import inspect
 
-    from vagen.rewards import spans
+    from vagen.envs._common.rewards import spans
 
     source = inspect.getsource(spans)
     for encoder in ("encode(", "apply_chat_template", "__call__"):

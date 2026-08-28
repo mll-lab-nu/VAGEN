@@ -1,4 +1,4 @@
-"""Turning the agent's free-form description into structured items.
+"""Turn an agent's free-form environment description into structured items.
 
 The agent says "the box is just below me and the target is two to the left"; scoring that
 needs it as a list of ``{"object_id", "vertical_relation", "horizontal_relation"}``. A

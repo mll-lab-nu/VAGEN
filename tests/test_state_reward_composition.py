@@ -15,9 +15,9 @@ from __future__ import annotations
 import pytest
 
 from vagen.training.agent_loop.gym_loop import GymEnvAdapter, _accepts_response
-from vagen.envs._common.state_reward import build_env, state_reward_names
+from vagen.envs._common.rewards import build_env, state_reward_names
 from vagen.envs import TurnLimit
-from vagen.rewards.state_reward import StateRewardSpec, StateRewardWrapper
+from vagen.envs import StateRewardSpec, StateRewardWrapper
 
 
 class _Env:

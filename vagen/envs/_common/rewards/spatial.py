@@ -1,4 +1,4 @@
-"""F1 between a predicted set of spatial relations and the ground truth.
+"""Score predicted spatial relations against environment ground truth.
 
 The agent describes where things are in natural language; a judge turns that into a list
 of ``{"object_id", "vertical_relation", "horizontal_relation"}`` items, and this scores

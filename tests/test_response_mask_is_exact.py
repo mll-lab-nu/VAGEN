@@ -79,7 +79,7 @@ async def test_the_mask_marks_the_generations_and_only_the_generations():
     """★ Three turns in one conversation (the concat layout). The model wrote AAA, BB and
     C; everything else in the response region is observation text the environment
     supplied. If an observation were marked 1 it would train as an action."""
-    client = VerlClient(Server(["AAA", "BB", "C"]), Tok(), Proc())
+    client = VerlClient(Server(["AAA", "BB", "C"]), Tok(), Proc(), model_adapter_name="qwen")
 
     r = await client.send([_msg("obs1")])
     await client.send([_msg("obs2")], r.conversation_id)
@@ -97,7 +97,7 @@ async def test_the_mask_marks_the_generations_and_only_the_generations():
 async def test_the_opening_observation_is_not_in_the_response_region_at_all():
     """It is prompt, not masked-out response: `prompt_len` is set at the first
     `add_response`, so everything before that is outside the trainable region."""
-    client = VerlClient(Server(["AAA"]), Tok(), Proc())
+    client = VerlClient(Server(["AAA"]), Tok(), Proc(), model_adapter_name="qwen")
     await client.send([_msg("obs1")])
 
     row = client.rows()[0]
@@ -109,7 +109,7 @@ async def test_the_opening_observation_is_not_in_the_response_region_at_all():
 async def test_every_vector_stays_the_same_length_as_the_mask():
     """The mask, the ids, the logprobs and the scores are sliced in parallel everywhere
     downstream; a length drift turns into a silent off-by-one in the advantage."""
-    client = VerlClient(Server(["AAA", "BB"]), Tok(), Proc())
+    client = VerlClient(Server(["AAA", "BB"]), Tok(), Proc(), model_adapter_name="qwen")
     r = await client.send([_msg("obs1")])
     await client.send([_msg("obs2")], r.conversation_id)
 
@@ -127,7 +127,7 @@ async def test_every_vector_stays_the_same_length_as_the_mask():
 async def test_a_summary_is_masked_in_and_its_request_is_masked_out():
     """★ The compaction seam, in mask terms. The summary is a model emission and is an
     action; the request that provoked it is a user message and is not."""
-    client = VerlClient(Server(["AAA", "SUMMARY"]), Tok(), Proc())
+    client = VerlClient(Server(["AAA", "SUMMARY"]), Tok(), Proc(), model_adapter_name="qwen")
 
     r = await client.send([_msg("obs1")])
     await client.send([_msg("Summarise")], r.conversation_id)
@@ -141,7 +141,9 @@ async def test_a_summary_is_masked_in_and_its_request_is_masked_out():
 async def test_a_new_conversation_puts_the_summary_in_its_prompt_not_its_response():
     """The same text appears twice -- as an action in the closing conversation and as
     context in the next one. Only the first may carry gradient."""
-    client = VerlClient(Server(["AAA", "SUMMARY", "BB"]), Tok(), Proc())
+    client = VerlClient(
+        Server(["AAA", "SUMMARY", "BB"]), Tok(), Proc(), model_adapter_name="qwen"
+    )
 
     r = await client.send([_msg("obs1")])
     await client.send([_msg("Summarise")], r.conversation_id)

@@ -16,7 +16,8 @@ from __future__ import annotations
 
 import pytest
 
-from vagen.rewards.state_reward import DEFAULT_SCORE_BASE, StateRewardWrapper
+from vagen.envs import StateRewardWrapper
+from vagen.envs._common.rewards import DEFAULT_SCORE_BASE
 from test_state_reward import BOX, CharTokenizer, Env, Judge, _spec
 
 

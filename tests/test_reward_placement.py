@@ -12,7 +12,7 @@ import pytest
 
 import vagen.algorithms  # noqa: F401  register estimator metadata
 from vagen.algorithms import wants_turn_lumped_reward
-from vagen.rewards.state_reward import StateRewardWrapper
+from vagen.envs import StateRewardWrapper
 from test_state_reward import BOX, CharTokenizer, Env, Judge, _spec
 
 

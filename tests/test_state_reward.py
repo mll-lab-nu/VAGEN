@@ -13,7 +13,8 @@ import types
 import pytest
 
 from vagen.envs.sokoban.state_reward_spec import relations
-from vagen.rewards.state_reward import TAGS, StateRewardSpec, StateRewardWrapper
+from vagen.envs import StateRewardSpec, StateRewardWrapper
+from vagen.envs._common.rewards import TAGS
 
 
 class Judge:
@@ -241,7 +242,7 @@ def test_one_judge_is_shared_per_endpoint():
     """★ A fresh judge per rollout makes its concurrency limit per rollout: with
     hundreds in flight the endpoint sees hundreds of times the intended load, and the
     timeouts read as the process reward quietly going to zero."""
-    from vagen.rewards.judge import shared_judge
+    from vagen.envs._common.rewards import shared_judge
 
     a = shared_judge("http://x/v1", "m")
     b = shared_judge("http://x/v1", "m")
@@ -280,7 +281,7 @@ WEIGHTS = {"target": 0.5, "box": 0.5}
 def test_describing_extra_items_of_a_real_type_costs_precision():
     """★ Inventing things has to be worse than not inventing them, or the cheapest way
     to raise recall is to list every relation the grid could contain."""
-    from vagen.rewards.spatial import grouped_f1
+    from vagen.envs._common.rewards import grouped_f1
 
     gold = [_box(), _target()]
     exact = grouped_f1(gold, gold, WEIGHTS)
@@ -294,7 +295,7 @@ def test_describing_extra_items_of_a_real_type_costs_precision():
 def test_inventing_a_type_that_is_not_there_costs_more_than_silence():
     """★ The 'absent from both' rule only skips a type when neither side mentions it.
     Once the description mentions it, it counts -- with nothing to match against."""
-    from vagen.rewards.spatial import grouped_f1
+    from vagen.envs._common.rewards import grouped_f1
 
     gold = [_box()]                                   # no targets in this scene
 

@@ -12,17 +12,22 @@ duck-types, so a class does not have to change its bases to gain the capability.
 
 The spec itself is env-specific and belongs next to the environment: what its objects
 are, how to read their positions out of its internal state, and what to ask the judge.
-``vagen/rewards/`` keeps only the parts that are not -- the judge client, the F1 scorer,
-the span helpers and the wrapper that ties them together.
+``envs/_common/rewards/`` keeps only the parts that are shared across environment
+implementations -- the judge client, F1 scorer, span helpers, and wrapper.
 """
 
 from __future__ import annotations
 
 from typing import Any, Optional
 
+from vagen.envs._common.rewards.judge import shared_judge
+from vagen.envs._common.rewards.state import (
+    DEFAULT_SCORE_BASE,
+    TAGS,
+    StateRewardSpec,
+    StateRewardWrapper,
+)
 from vagen.envs._common.turn_limit import TurnLimit
-from vagen.rewards.judge import shared_judge
-from vagen.rewards.state_reward import DEFAULT_SCORE_BASE, TAGS, StateRewardSpec, StateRewardWrapper
 
 #: The key an environment's own config uses to ask for a state reward.
 #:

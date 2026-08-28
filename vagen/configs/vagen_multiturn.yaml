@@ -108,7 +108,7 @@ trainer:
   # works, including one added outside this repo.
   harness: concat                  # concat | no_concat | compact
   # Model-family rendering is a separate extension axis from the VERL transport.
-  model_adapter: qwen
+  model_adapter: auto
   # The largest a conversation may become before CompactHarness summarises and restarts.
   # It has to hold the system prompt, which is re-sent every time a conversation opens,
   # plus a summary and more than one turn -- on Sokoban the system prompt alone is 589

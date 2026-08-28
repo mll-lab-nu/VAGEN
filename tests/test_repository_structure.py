@@ -61,6 +61,12 @@ def test_legacy_compatibility_paths_are_removed():
     assert not remaining, f"legacy compatibility paths remain: {remaining}"
 
 
+def test_reward_sources_live_under_the_environment_axis():
+    legacy = PACKAGE / "rewards"
+    assert not list(legacy.glob("*.py"))
+    assert (PACKAGE / "envs" / "_common" / "rewards" / "state.py").is_file()
+
+
 def test_canonical_code_does_not_import_legacy_packages():
     legacy = (
         "vagen.core",

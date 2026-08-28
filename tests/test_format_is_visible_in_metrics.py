@@ -20,7 +20,7 @@ import pytest
 
 
 def test_state_reward_metrics_name_only_enabled_description_scores():
-    from vagen.envs._common.state_reward import state_reward_names
+    from vagen.envs._common.rewards import state_reward_names
 
     cfg = {"state_reward": {
         "state_estimation": {"enable": True, "reward": 0.01},
@@ -31,7 +31,7 @@ def test_state_reward_metrics_name_only_enabled_description_scores():
 
 
 def test_nothing_is_published_when_state_reward_is_off():
-    from vagen.envs._common.state_reward import state_reward_names
+    from vagen.envs._common.rewards import state_reward_names
 
     assert state_reward_names({}) == ()
     assert state_reward_names({"state_reward": {

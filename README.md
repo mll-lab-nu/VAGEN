@@ -228,6 +228,8 @@ Extension axes use `axis/_common/` for shared contracts and one directory per co
 implementation. Import shared APIs from the axis facade, such as `vagen.envs`,
 `vagen.harness`, or `vagen.algorithms`. Training-only integration lives under
 `vagen.training`; framework-independent rollout code lives under `vagen.rollout`.
+Shared environment reward machinery lives under `vagen/envs/_common/rewards/`, while
+an environment-specific reward specification stays beside that environment.
 
 See [Repository structure rules](docs/common/repository_structure.md) for dependency and
 naming requirements.
@@ -388,7 +390,7 @@ refer to `vagen/configs/vagen_multiturn.yaml`
 # Enable no concat mode: input is system prompt + current step observation
 trainer:
   harness: no_concat        # concat | no_concat | compact
-  model_adapter: qwen       # model-family rendering; VERL remains the transport
+  model_adapter: auto       # detects qwen | internvl | glm; VERL remains the transport
 
 # no_concat and compact put one episode in several rows, so the advantage estimator has
 # to be one that stitches them back together. verl's own `gae`/`grpo` score a row at a

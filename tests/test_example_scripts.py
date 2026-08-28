@@ -109,7 +109,7 @@ def test_estimators_with_a_required_hyperparameter_set_it(path):
 def test_state_reward_is_only_switched_on_where_a_spec_exists(path):
     """Every dataset that enables state reward must name a capable environment."""
     import vagen.envs.registry as R
-    from vagen.envs._common.state_reward import state_reward_spec_of
+    from vagen.envs._common.rewards import state_reward_spec_of
     import yaml
 
     R._load_registry()
@@ -166,8 +166,8 @@ def test_the_capability_lives_on_the_environment_not_in_a_table():
     import inspect
 
     from vagen.envs.sokoban.sokoban_env import Sokoban
-    import vagen.envs._common.state_reward as state_reward
-    from vagen.envs._common.state_reward import state_reward_spec_of, supports_state_reward
+    import vagen.envs._common.rewards.factory as state_reward
+    from vagen.envs._common.rewards import state_reward_spec_of, supports_state_reward
 
     assert supports_state_reward(Sokoban), "Sokoban no longer declares its spec"
     assert state_reward_spec_of(Sokoban).object_weights, "the declared spec is empty"
@@ -180,16 +180,20 @@ def test_the_capability_lives_on_the_environment_not_in_a_table():
 
 
 def test_env_specific_reward_code_is_not_in_the_generic_package():
-    """`vagen/rewards/` is the machinery -- judge client, F1, spans, wrapper. Anything
-    that knows what a *box* is belongs next to the environment that has boxes."""
+    """The env axis owns shared reward machinery; implementations own their specs."""
     import os
 
-    generic = set(os.listdir("vagen/rewards"))
+    generic_dir = "vagen/envs/_common/rewards"
+    generic = set(os.listdir(generic_dir))
     for env_name in ("sokoban", "frozenlake", "navigation", "primitive_skill", "spatial_gym"):
         assert f"{env_name}.py" not in generic, (
-            f"vagen/rewards/{env_name}.py is environment-specific; move it under "
+            f"{generic_dir}/{env_name}.py is environment-specific; move it under "
             f"vagen/envs/{env_name}/"
         )
+    legacy_dir = "vagen/rewards"
+    assert not os.path.isdir(legacy_dir) or not any(
+        name.endswith(".py") for name in os.listdir(legacy_dir)
+    )
     assert os.path.exists("vagen/envs/sokoban/state_reward_spec.py")
 
 

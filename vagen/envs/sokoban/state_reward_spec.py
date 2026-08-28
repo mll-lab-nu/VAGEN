@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from vagen.rewards.state_reward import StateRewardSpec
+from vagen.envs._common.rewards import StateRewardSpec
 
 VERTICAL = {-1: "above", 0: "same", 1: "below"}
 HORIZONTAL = {-1: "left", 0: "same", 1: "right"}
