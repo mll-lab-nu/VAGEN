@@ -24,6 +24,23 @@ Any extra argument is a hydra override:
 bash examples/evaluate/sokoban/vllm/eval_qwen25_vl_3b.sh 'envs.0.harness=no_concat'
 ```
 
+For a native-thinking model such as Qwen3.5, use `wm_think`, configure the server's
+reasoning delimiters, and bound thinking so the model still has room for the canonical WM
+suffix and final answer:
+
+```bash
+VLLM_REASONING_CONFIG='{"reasoning_start_str":"<think>","reasoning_end_str":"</think>"}' \
+  MODEL_PATH=Qwen/Qwen3.5-4B \
+  bash examples/evaluate/sokoban/vllm/eval_qwen25_vl_3b.sh \
+  envs.0.config.prompt_format=wm_think \
+  envs.0.chat_config.extra_body.chat_template_kwargs.enable_thinking=true \
+  envs.0.chat_config.extra_body.thinking_token_budget=128
+```
+
+Without `--reasoning-config`, vLLM rejects `thinking_token_budget`. Without a thinking
+budget, a model may spend the complete per-turn response allowance before emitting
+`<perception>` or `<answer>`.
+
 ## Evaluating a checkpoint you trained
 
 Training writes to `trainer.default_local_dir`, which every shipped script sets to

@@ -7,7 +7,7 @@ confusion:
 |---|---|---|
 | **The training script** | model, GPUs, batch sizes, budgets — as hydra overrides | `examples/train/<env>/*.sh` |
 | **The dataset yaml** | which environments, how many, how many turns, per-turn budgets | `data.train_files` / `data.val_files` |
-| **The base config** | everything else, with defaults | [`vagen/configs/vagen_multiturn.yaml`](../vagen/configs/vagen_multiturn.yaml) |
+| **The base config** | everything else, with defaults | [`vagen/configs/vagen_multiturn.yaml`](https://github.com/mll-lab-nu/VAGEN/blob/main/vagen/configs/vagen_multiturn.yaml) |
 
 !!! warning "`baseline_vllm.flags` overrides the base config"
     Every shipped script sources `vagen/configs/baseline_vllm.flags`, and it wins over
@@ -350,7 +350,7 @@ There are two halves to it:
 2. **The environment's own spec**, a `STATE_REWARD_SPEC` attribute on the environment class.
    This is what reads the true state and phrases the question for the judge, so it has to be
    written per environment. Sokoban's is
-   [`vagen/envs/sokoban/state_reward_spec.py`](../vagen/envs/sokoban/state_reward_spec.py),
+   [`vagen/envs/sokoban/state_reward_spec.py`](https://github.com/mll-lab-nu/VAGEN/blob/main/vagen/envs/sokoban/state_reward_spec.py),
    set on the class in `sokoban_env.py`. Turning the reward on for an environment that has
    no spec raises an error rather than quietly scoring zero.
 

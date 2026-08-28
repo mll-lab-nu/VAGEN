@@ -235,9 +235,9 @@ implementation. Import shared APIs from the axis facade, such as `vagen.envs`,
 `vagen.training`; framework-independent rollout code lives under `vagen.rollout`.
 Shared environment reward machinery lives under `vagen/envs/_common/rewards/`, while
 an environment-specific reward specification stays beside that environment.
-
-See [Repository structure rules](docs/common/repository_structure.md) for dependency and
-naming requirements.
+Keep `_common` limited to contracts and helpers genuinely reused by multiple
+implementations. A selectable implementation owns its actual control flow in its own
+directory, and cross-package consumers import through the axis facade.
 
 ## Custom Environment
 
