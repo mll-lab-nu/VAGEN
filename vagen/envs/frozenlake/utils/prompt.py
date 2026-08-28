@@ -63,12 +63,12 @@ Example 3:
 
 
 def wm_format_prompt(max_actions_per_step, action_sep, add_example=True):
-    """Generate format prompt for wm format with explicit row/column distinction"""
+    """Generate the repository-wide structured world-model format."""
     base_prompt = f"""You can take up to {max_actions_per_step} action(s) at a time, separated by {action_sep}.
 Your response must be in the format of:
-<observation>...</observation><think>...</think><answer>...</answer><prediction>...</prediction>.
+<perception>...</perception><reasoning>...</reasoning><prediction>...</prediction><answer>...</answer>.
 
-Rules for <observation> and <prediction>:
+Rules for <perception> and <prediction>:
 - You must strictly describe the relative position of the `goal` and any visible `hole` objects **relative to the player**.
 - For each object, you MUST include:
   - exactly ONE vertical relationship: `above`, `below`, or `same row`
@@ -87,22 +87,22 @@ Rules for <answer>:
     if add_example:
         examples = f"""
 Example 1:
-<observation>The goal is below and right of the player, and there is a hole below and same column of the player</observation>
-<think>I should move right to avoid the hole and get closer to the goal</think>
-<answer>Right</answer>
+<perception>The goal is below and right of the player, and there is a hole below and same column of the player</perception>
+<reasoning>I should move right to avoid the hole and get closer to the goal</reasoning>
 <prediction>The goal will be below and same column of the player, and the hole will be below and left of the player</prediction>
+<answer>Right</answer>
 
 Example 2:
-<observation>The goal is above and left of the player</observation>
-<think>I should move up to get closer to the goal</think>
-<answer>Up</answer>
+<perception>The goal is above and left of the player</perception>
+<reasoning>I should move up to get closer to the goal</reasoning>
 <prediction>The goal will be same row and left of the player</prediction>
+<answer>Up</answer>
 
 Example 3:
-<observation>The goal is same row and right of the player, and there is a hole above and right of the player</observation>
-<think>I should move right to reach the goal</think>
-<answer>Right</answer>
+<perception>The goal is same row and right of the player, and there is a hole above and right of the player</perception>
+<reasoning>I should move right to reach the goal</reasoning>
 <prediction>The player will reach the goal</prediction>
+<answer>Right</answer>
 """
         return base_prompt + "\n" + examples
 

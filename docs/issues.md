@@ -9,33 +9,34 @@ When running on NVIDIA B200 or RTX 6000 Pro GPUs with sglang, the default attent
 +actor_rollout_ref.rollout.engine_kwargs.sglang.mm_attention_backend=triton_attn
 ```
 
-## 2. `<think>` is a reserved token on some families — do not use `prompt_format: wm` there
+## 2. Native-thinking models use `wm_think`, not a different WM schema
 
-On Qwen2.5-VL and InternVL3, `<think>` is three ordinary text tokens. On **Qwen3-VL,
-Qwen3.5 and GLM** it is a single reserved control token tied to the model's own thinking
-channel, and the model will not emit it as text. Sokoban's `wm` format requires all four of
-`<observation><think><answer><prediction>`, and a response missing any of them has its
-whole action list discarded (`strict_format`, deliberate). So on those families `wm` scores
-zero while every other metric looks healthy.
+Every environment now shares the same structured world-model suffix:
+`<perception>...</perception><reasoning>...</reasoning><prediction>...</prediction><answer>...</answer>`.
+The action is last, so `</answer>` can stop generation without cutting off prediction.
 
-Measured on Qwen3-VL-4B: `wm` → format 0.000 / score 0.000; `free_wm` → format 0.969 /
-score 0.602.
+Qwen3-VL, Qwen3.5 and GLM may begin generation inside a chat-template-owned thinking
+channel. For Sokoban, select `wm_think`: it accepts either an explicit
+`<think>...</think>` prefix or response text that begins inside the native block and emits
+only `</think>`, then requires the canonical WM suffix. The historical `free_wm` value is
+accepted as a compatibility alias but is no longer the documented name.
 
-Use `free_wm` (observation/answer/prediction, free prose between) or `free_think`
-(`</think>` then `<answer>`) on those families.
+Malformed or legacy output can be mined for an action so a rollout can continue when
+`strict_format: false`, but it always has `format_correct: false` and receives neither
+format reward nor state-reward supervision.
 
-**Sokoban and primitive_skill both *default* to `wm`**, so a `<think>`-reserving model needs
-`prompt_format` set explicitly in the dataset yaml on either. frozenlake and navigation
-default to `free_think` and are unaffected. What each environment offers:
+What each environment offers:
 
 | env | formats | default |
 |---|---|---|
-| sokoban | `wm`, `free_wm`, `free_think`, `answer` | `wm` |
+| sokoban | `wm`, `wm_think`, `free_think`, `answer` | `wm` |
 | primitive_skill | `wm`, `free_think` | `wm` |
 | frozenlake | `wm`, `free_think` | `free_think` |
 | navigation | `wm`, `free_think`, `no_think`, `eval_mode` | `free_think` |
 
-`free_wm` and `answer` exist only for sokoban.
+`wm_think` and `answer` exist only for sokoban. SpatialGym does not expose a
+`prompt_format` field; `prompt_config.enable_think` selects the shared `free_think` or
+answer-only protocol.
 
 ## 3. `thinking_token_budget` bounds the think block, not the response — and not the cost
 
@@ -55,9 +56,9 @@ treat that as having finished reasoning — it carries on in the same register i
 longer response**: 1413 total tokens at budget 128 against 641 at budget 512, because what it
 still wanted to say moved past the tag.
 
-So the budget buys a well-formed `</think>` and a scoreable turn, not brevity. For brevity,
-change the prompt format — `free_think` is the only sokoban format whose instructions tell
-the model to stop reasoning, and it is what the shipped Qwen3.5 thinking config uses.
+So the budget buys a well-formed `</think>` and a scoreable native-thinking prefix, not
+brevity. Both `free_think` and `wm_think` tell the model to close native reasoning before
+the machine-readable answer; the shipped Qwen3.5 thinking experiment uses `free_think`.
 
 vLLM refuses the request if the budget is set and `reasoning_config` is not; see
 `examples/train/sokoban/train_default_gae_qwen35_4b_think.sh` for the delimiters, which are

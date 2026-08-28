@@ -148,6 +148,12 @@ registry drops the environment and you get `KeyError: Unknown env name: SpatialG
 [navigation](vagen/envs/navigation/README.md) (AI2-THOR),
 [primitive_skill](vagen/envs/primitive_skill/README.md) (ManiSkill).
 
+Environment responses use one shared protocol. Structured world-model output is
+`<perception>...</perception><reasoning>...</reasoning><prediction>...</prediction><answer>...</answer>`;
+the compact reasoning form is `<think>...</think><answer>...</answer>`. Native-thinking
+models can use Sokoban's `wm_think` mode, which permits their model-owned thinking block
+before the same structured suffix. See [Configuration](docs/configuration.md#prompt_format).
+
 
 ## Quick Start
 

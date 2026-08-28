@@ -17,21 +17,21 @@ from __future__ import annotations
 _FORMAT_INSTRUCTIONS = {
     "free_think": (
         "You need to think first, then give your action. Respond in this format:\n"
-        "<think>...</think><action>{action_example}</action>"
+        "<think>...</think><answer>{action_example}</answer>"
     ),
     "wm": (
-        "You need to describe your observation, think, give your action, then predict "
-        "what you will see next. Respond in this format:\n"
-        "<observation>...</observation><think>...</think>"
-        "<action>{action_example}</action><prediction>...</prediction>"
+        "Describe your perception, explain your reasoning, predict the next state, and "
+        "then give your action. Respond in this exact order:\n"
+        "<perception>...</perception><reasoning>...</reasoning>"
+        "<prediction>...</prediction><answer>{action_example}</answer>"
     ),
     "no_think": (
         "You need to only give your action. Respond in this format:\n"
-        "<action>{action_example}</action>"
+        "<answer>{action_example}</answer>"
     ),
     "eval_mode": (
         "You can optionally think first, then give your action. Respond in this format:\n"
-        "<think>...</think><action>{action_example}</action>"
+        "<think>...</think><answer>{action_example}</answer>"
     ),
 }
 
@@ -71,30 +71,55 @@ Hints:
 1. You can take multiple actions at a time, in most cases, if you find the target object is far away from you, you can call move_forward, move_left and move_right multiple times.
 2. If you find yourself seems to be stuck, you can look_down to see if there's any object above or below you, you can also rotate to see if there's any object behind you."""
 
-_EXAMPLES = [
-    """\
-Example 1:
-Round 1:
-image_1
-I can see the garbage can in the upper left corner of the image, next to the kitchen sink. \
-To move there, we can go forward-left, but since there's a kitchen counter directly ahead, \
-we should go left first.
-<action>move_left{sep} move_left</action>
-Round 2:
-Env_feedback: Last action is executed successfully.
-image_2
-By moving leftward, we are getting closer to the garbage can. \
-Now, the garbage can is in front of me, slightly to the left. There's a large area ahead.
-<action>move_forward{sep} move_forward{sep} move_forward{sep} move_left</action>
-Round 3:
-Env_feedback: Last action is executed successfully.
-image_3
-The garbage can is very close, still to our front-left. \
-There is still space in front of me to get closer.
-<action>move_forward{sep} move_forward{sep} move_left</action>
-Round 4:
-Env_feedback: Success""",
-]
+_EXAMPLE_STEPS = (
+    (
+        "image_1",
+        "The garbage can is upper-left, next to the sink, and a counter blocks forward motion.",
+        "Move left first to clear the counter.",
+        "The garbage can should become more centered and reachable.",
+        "move_left{sep} move_left",
+    ),
+    (
+        "image_2",
+        "The garbage can is now in front and slightly left, with open space ahead.",
+        "Move forward several times and then left.",
+        "The robot should end close to the garbage can.",
+        "move_forward{sep} move_forward{sep} move_forward{sep} move_left",
+    ),
+)
+
+
+def _example_response(format_name: str, perception: str, reasoning: str, prediction: str, answer: str) -> str:
+    if format_name == "wm":
+        return (
+            f"<perception>{perception}</perception>"
+            f"<reasoning>{reasoning}</reasoning>"
+            f"<prediction>{prediction}</prediction>"
+            f"<answer>{answer}</answer>"
+        )
+    if format_name in {"free_think", "eval_mode"}:
+        return f"<think>{reasoning}</think><answer>{answer}</answer>"
+    return f"<answer>{answer}</answer>"
+
+
+def _format_example(format_name: str, sep: str) -> str:
+    rounds = ["Example 1:"]
+    for index, (image, perception, reasoning, prediction, answer) in enumerate(_EXAMPLE_STEPS, 1):
+        rounds.extend(
+            [
+                f"Round {index}:",
+                image,
+                _example_response(
+                    format_name,
+                    perception,
+                    reasoning,
+                    prediction,
+                    answer.format(sep=sep),
+                ),
+            ]
+        )
+    rounds.extend(["Round 3:", "Env_feedback: Success"])
+    return "\n".join(rounds)
 
 
 def system_prompt(
@@ -110,8 +135,8 @@ def system_prompt(
     """
     parts = [_BASE_SYSTEM_PROMPT]
     parts.append(get_format_instruction(format_name, max_actions_per_step, action_sep))
-    for ex in _EXAMPLES[:example_count]:
-        parts.append(ex.format(sep=action_sep))
+    if example_count:
+        parts.append(_format_example(format_name, action_sep))
     return "\n\n".join(parts)
 
 

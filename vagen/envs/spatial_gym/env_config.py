@@ -26,7 +26,7 @@ class SpatialGymConfig:
     prompt_format: str = field(default="free_think", init=False)
     action_sep: str = field(default="|", init=False)
     image_size: Tuple[int, int] = field(default=(384, 384), init=False)
-    format_reward: bool = True  # Added default
+    format_reward: float = 0.0
     special_token_list: List[str] = field(default_factory=list) # Added default
     image_placeholder: str = "<image>" # Added default
     

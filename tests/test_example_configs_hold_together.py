@@ -139,7 +139,10 @@ def test_new_vlm_compact_configs_match_measured_prompt_sizes(
         for yaml_path in _script_yamls(text, script):
             for spec in OmegaConf.load(yaml_path).envs:
                 assert spec.config.prompt_format == "free_think"
-                assert spec.config.strict_format is True
+                # Native boxed actions keep rollouts moving while the shared tagged
+                # protocol is learned; they remain format-incorrect and earn no bonus.
+                assert spec.config.strict_format is False
+                assert list(spec.stop_strings) == ["</answer>", "<|end_of_box|>"]
 
     for yaml_path in _script_yamls(text, script):
         for spec in OmegaConf.load(yaml_path).envs:

@@ -1,8 +1,9 @@
 #!/bin/bash
 # sokoban - default_gae - GLM-4.6V-Flash
 #
-# Select the row layout with HARNESS=concat|no_concat|compact. GLM-4.6V uses strict
-# free-think parsing; its native boxed action tokens are parsed without being rewritten.
+# Select the row layout with HARNESS=concat|no_concat|compact. GLM-4.6V is prompted for
+# canonical free-think. Native boxed actions remain executable during migration, but are
+# marked malformed and receive no format reward.
 set -eo pipefail
 
 V=$(cd "$(dirname "$0")/../../.." && pwd)

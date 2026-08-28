@@ -3,29 +3,24 @@ Response parsing and reward utilities for the primitive_skill environment.
 
 Formats:
   - free_think: <think>...</think><answer>...</answer>
-  - wm: <observation>...</observation><think>...</think><answer>...</answer><prediction>...</prediction>
+  - wm: <perception>...</perception><reasoning>...</reasoning><prediction>...</prediction><answer>...</answer>
 """
 
 from __future__ import annotations
 
-import re
 from typing import Any, Dict, List
 
+from vagen.envs._common.response_format import (
+    parse_free_think_sections,
+    parse_wm_sections,
+    split_actions,
+)
+
+PROMPT_FORMATS = frozenset({"wm", "free_think"})
 
 # ---------------------------------------------------------------------------
 # Parse patterns (same structure as navigation)
 # ---------------------------------------------------------------------------
-
-_PARSE_PATTERNS = {
-    "free_think": r"<think>(.*?)</think>\s*<answer>(.*?)</answer>",
-    "wm": (
-        r"<observation>(.*?)</observation>\s*"
-        r"<think>(.*?)</think>\s*"
-        r"<answer>(.*?)</answer>\s*"
-        r"<prediction>(.*?)</prediction>"
-    ),
-}
-
 
 def parse_response(
     response: str,
@@ -45,26 +40,21 @@ def parse_response(
         "format_correct": False,
     }
 
-    pattern = _PARSE_PATTERNS.get(prompt_format)
-    if pattern is None:
+    if prompt_format == "free_think":
+        sections = parse_free_think_sections(response)
+    elif prompt_format == "wm":
+        sections = parse_wm_sections(response)
+    else:
         raise ValueError(f"Unknown prompt_format: {prompt_format}")
 
-    match = re.search(pattern, response, re.DOTALL)
-    if not match:
-        return result
-
-    if prompt_format == "free_think":
-        result["think"] = match.group(1).strip()
-        action_text = match.group(2).strip()
-    elif prompt_format == "wm":
-        result["observation"] = match.group(1).strip()
-        result["think"] = match.group(2).strip()
-        action_text = match.group(3).strip()
-        result["prediction"] = match.group(4).strip()
-
-    result["format_correct"] = True
-    actions = [a.strip() for a in action_text.split(action_sep) if a.strip()][:max_actions]
-    result["actions"] = actions
+    result.update(
+        perception_content=sections.perception,
+        reasoning_content=sections.reasoning,
+        prediction_content=sections.prediction,
+        action_content=sections.answer,
+        format_correct=sections.format_correct,
+        actions=split_actions(sections.answer, action_sep, max_actions, lower=False),
+    )
     return result
 
 

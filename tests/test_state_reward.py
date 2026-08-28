@@ -59,12 +59,21 @@ BOX = [{"object_id": "box", "vertical_relation": "below", "horizontal_relation":
 TGT = [{"object_id": "target", "vertical_relation": "above", "horizontal_relation": "same"}]
 
 
+def _wm(perception="A", prediction="B", reasoning="R", answer="Up"):
+    return (
+        f"<perception>{perception}</perception>"
+        f"<reasoning>{reasoning}</reasoning>"
+        f"<prediction>{prediction}</prediction>"
+        f"<answer>{answer}</answer>"
+    )
+
+
 def _spec(**kw):
     return StateRewardSpec(
         relations=lambda env: env.state,
         judge_prompt="{content}",
         object_weights={"box": 1.0},
-        examples={"state_estimation": "<observation>...</observation>",
+        examples={"state_estimation": "<perception>...</perception>",
                   "transition_prediction": "<prediction>...</prediction>"},
         axes="relations are relative to you",
         **kw,
@@ -84,20 +93,26 @@ def _wrapper(env, judge, enabled=None, **kw):
 @pytest.mark.parametrize(
     "enabled,asked",
     [
-        ({"state_estimation": 0.5}, ["observation"]),
+        ({"state_estimation": 0.5}, ["perception"]),
         ({"transition_prediction": 0.5}, ["prediction"]),
-        ({"state_estimation": 0.5, "transition_prediction": 0.5}, ["observation", "prediction"]),
+        ({"state_estimation": 0.5, "transition_prediction": 0.5}, ["perception", "prediction"]),
         ({}, []),
     ],
 )
 def test_the_prompt_asks_for_exactly_what_is_scored(enabled, asked):
-    """★ Derived, not configured separately. Asking for a section nothing scores trains
-    the agent to write text for no reason; scoring one it was never asked for gives a
-    silent zero every turn."""
+    """The response protocol stays complete while examples track enabled rewards."""
     w = StateRewardWrapper(env=None, spec=_spec(), enabled=enabled)
     text = w.instructions()
 
-    assert [tag for tag in TAGS.values() if f"<{tag}>" in text] == asked
+    if not enabled:
+        assert text == ""
+        return
+    for tag in ("perception", "reasoning", "prediction", "answer"):
+        assert f"<{tag}>" in text
+    for name, tag in TAGS.items():
+        example = _spec().examples[name]
+        expected_count = 2 if tag in asked else 1
+        assert text.count(example) == expected_count
 
 
 def test_an_unknown_reward_name_is_rejected():
@@ -108,7 +123,7 @@ def test_an_unknown_reward_name_is_rejected():
 @pytest.mark.asyncio
 async def test_only_the_enabled_reward_is_scored():
     """Turning one off must stop paying for it, not merely stop asking."""
-    action = "<observation>A</observation><prediction>B</prediction>"
+    action = _wm()
     w = _wrapper(Env(BOX, BOX, reward=0.0), Judge(BOX, BOX),
                  enabled={"state_estimation": 1.0})
 
@@ -126,7 +141,7 @@ async def test_only_the_enabled_reward_is_scored():
 @pytest.mark.asyncio
 async def test_each_description_is_paid_on_the_span_that_earned_it():
     """The environment preserves within-turn credit; estimators may reduce it later."""
-    action = "<observation>A</observation>zz<prediction>B</prediction>"
+    action = _wm()
     moved = [{"object_id": "box", "vertical_relation": "above", "horizontal_relation": "same"}]
     w = _wrapper(
         Env(before=BOX, after=moved), Judge(BOX, moved),
@@ -147,7 +162,7 @@ async def test_each_description_is_paid_on_the_span_that_earned_it():
 async def test_prediction_is_scored_against_the_state_after_the_step():
     """★ Estimation describes what the agent acted from, prediction what it acted into.
     Scoring both against the same state would make one of them free."""
-    action = "<prediction>A</prediction>"
+    action = _wm(prediction="A")
     moved = [{"object_id": "box", "vertical_relation": "above", "horizontal_relation": "same"}]
     on = {"transition_prediction": 1.0}
 
@@ -163,7 +178,7 @@ async def test_prediction_is_scored_against_the_state_after_the_step():
 
 @pytest.mark.asyncio
 async def test_a_wrong_description_earns_nothing_but_does_not_go_negative():
-    action = "<observation>A</observation>"
+    action = _wm()
     wrong = [{"object_id": "box", "vertical_relation": "above", "horizontal_relation": "left"}]
     w = _wrapper(Env(BOX, BOX, reward=0.0), Judge(wrong))
 
@@ -176,7 +191,7 @@ async def test_a_wrong_description_earns_nothing_but_does_not_go_negative():
 async def test_a_judge_outage_costs_the_process_reward_not_the_rollout():
     """★ The judge is a parser, not part of training. Losing it should cost one turn's
     shaping, not raise into the rollout."""
-    action = "<observation>A</observation>"
+    action = _wm()
     w = _wrapper(Env(BOX, BOX, reward=2.0), Judge(None))
 
     _, vector, _, _ = await w.step(action, [ord(c) for c in action], CharTokenizer())
@@ -187,7 +202,7 @@ async def test_a_judge_outage_costs_the_process_reward_not_the_rollout():
 @pytest.mark.asyncio
 async def test_the_outcome_reward_stays_on_the_last_token():
     """The turn outcome stays at the end while description credit stays on its span."""
-    action = "<observation>A</observation>zz"
+    action = _wm()
     w = _wrapper(Env(BOX, BOX, reward=3.0), Judge(BOX))
 
     _, vector, _, _ = await w.step(action, [ord(c) for c in action], CharTokenizer())
@@ -201,8 +216,8 @@ async def test_the_outcome_reward_stays_on_the_last_token():
 async def test_every_enabled_section_is_required_before_any_description_pays():
     """A partial response must not farm the section it happened to include."""
     both_on = {"state_estimation": 1.0, "transition_prediction": 1.0}
-    one = "<observation>A</observation>"
-    both = "<observation>A</observation><prediction>B</prediction>"
+    one = "<perception>A</perception><answer>Up</answer>"
+    both = _wm()
 
     w1 = _wrapper(Env(BOX, BOX, reward=0.0), Judge(BOX), enabled=both_on)
     _, v1, _, _ = await w1.step(one, [ord(c) for c in one], CharTokenizer())
@@ -215,10 +230,29 @@ async def test_every_enabled_section_is_required_before_any_description_pays():
 
 
 @pytest.mark.asyncio
+async def test_legacy_or_reordered_wm_never_reaches_the_judge():
+    legacy = (
+        "<observation>A</observation><think>R</think>"
+        "<answer>Up</answer><prediction>B</prediction>"
+    )
+    judge = Judge(BOX, BOX)
+    w = _wrapper(
+        Env(BOX, BOX, reward=0.0),
+        judge,
+        enabled={"state_estimation": 1.0, "transition_prediction": 1.0},
+    )
+
+    _, vector, _, _ = await w.step(legacy, [ord(c) for c in legacy], CharTokenizer())
+
+    assert sum(vector) == 0.0
+    assert judge.calls == 0
+
+
+@pytest.mark.asyncio
 async def test_both_descriptions_of_a_turn_go_out_in_one_batch():
     """★ Two round trips per turn would double the judge's latency on the critical path
     of every rollout."""
-    action = "<observation>A</observation><prediction>B</prediction>"
+    action = _wm()
     judge = Judge(BOX, BOX)
     w = _wrapper(Env(BOX, BOX), judge, enabled={"state_estimation": 1.0, "transition_prediction": 1.0})
 
@@ -230,7 +264,7 @@ async def test_both_descriptions_of_a_turn_go_out_in_one_batch():
 @pytest.mark.asyncio
 async def test_without_tokens_the_wrapper_degrades_to_a_scalar():
     """An env used outside the token-aware loop should still work, just coarsely."""
-    action = "<observation>A</observation>"
+    action = _wm()
     w = _wrapper(Env(BOX, BOX, reward=1.0), Judge(BOX))
 
     _, reward, _, _ = await w.step(action)

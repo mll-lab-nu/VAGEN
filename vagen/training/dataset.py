@@ -64,7 +64,7 @@ class EnvSpec:
     thinking_token_budget: Optional[int] = None
     # Optional protocol delimiters that end one model turn. Keep the matched text in
     # the response because environment parsers normally need the closing delimiter.
-    stop_strings: List[str] = field(default_factory=list)
+    stop_strings: List[str] = field(default_factory=lambda: ["</answer>"])
 
     def __post_init__(self):
         if self.max_env_response_per_turn is None:

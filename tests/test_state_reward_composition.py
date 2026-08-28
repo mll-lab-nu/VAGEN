@@ -62,7 +62,7 @@ def _spec():
         judge_prompt="structure this: {content}",
         object_weights={"box": 1.0},
         axes="axes",
-        examples={"state_estimation": "<observation>...</observation>"},
+        examples={"state_estimation": "<perception>...</perception>"},
     )
 
 
@@ -87,7 +87,10 @@ def _stack():
 @pytest.mark.asyncio
 async def test_a_step_through_the_real_stack_does_not_blow_up():
     inner, _, adapter = _stack()
-    result = await adapter.step("<observation>[]</observation><answer>Up</answer>")
+    result = await adapter.step(
+        "<perception>[]</perception><reasoning>r</reasoning>"
+        "<prediction>[]</prediction><answer>Up</answer>"
+    )
 
     assert len(result) == 5, "adapter must still return BaseEnv's five values"
     assert inner.steps == 1, "the inner env never ran"
@@ -120,7 +123,9 @@ async def test_the_response_reaches_the_wrapper_so_scores_land_on_tokens():
     _, _, adapter = _stack()
     ids = list(range(40))
     _obs, reward, *_ = await adapter.step(
-        "<observation>[]</observation><answer>Up</answer>", response_token_ids=ids, tokenizer=_Tok()
+        "<perception>[]</perception><reasoning>r</reasoning>"
+        "<prediction>[]</prediction><answer>Up</answer>",
+        response_token_ids=ids, tokenizer=_Tok()
     )
     assert isinstance(reward, list), "reward came back scalar; the response was not forwarded"
     assert len(reward) == len(ids), "reward vector does not line up with the response"

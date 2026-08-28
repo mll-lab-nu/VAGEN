@@ -68,7 +68,7 @@ bash examples/train/primitive_skill/train_default_gae_qwen25vl3b.sh
 | Format | Structure |
 |--------|-----------|
 | `free_think` | `<think>...</think><answer>...</answer>` |
-| `wm` | `<observation>...</observation><think>...</think><answer>...</answer><prediction>...</prediction>` |
+| `wm` | `<perception>...</perception><reasoning>...</reasoning><prediction>...</prediction><answer>...</answer>` |
 
 ## Action Space
 

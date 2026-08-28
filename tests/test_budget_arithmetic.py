@@ -380,8 +380,8 @@ def test_protocol_stop_strings_are_isolated_and_keep_the_delimiter():
 
     first = EnvSpec(name="Sokoban", n_envs=1)
     second = EnvSpec(name="Sokoban", n_envs=1)
-    first.stop_strings.append("</answer>")
-    assert second.stop_strings == []
+    first.stop_strings.append("<custom-stop>")
+    assert second.stop_strings == ["</answer>"]
 
     sampling = {"temperature": 0.6}
     kwargs = {"stop_strings": first.stop_strings}
@@ -391,11 +391,11 @@ def test_protocol_stop_strings_are_isolated_and_keep_the_delimiter():
             "stop": list(kwargs["stop_strings"]),
             "include_stop_str_in_output": True,
         }
-    assert sampling["stop"] == ["</answer>"]
+    assert sampling["stop"] == ["</answer>", "<custom-stop>"]
     assert sampling["include_stop_str_in_output"] is True
     from vllm import SamplingParams
     params = SamplingParams(max_tokens=1024, **sampling)
-    assert params.stop == ["</answer>"]
+    assert params.stop == ["</answer>", "<custom-stop>"]
     assert params.include_stop_str_in_output is True
 
 

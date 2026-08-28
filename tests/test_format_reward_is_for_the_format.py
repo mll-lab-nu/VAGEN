@@ -20,10 +20,10 @@ from __future__ import annotations
 import pytest
 
 WM_FULL = (
-    "<observation>The box is below and right of the player</observation>"
-    "<think>I should move right</think>"
-    "<answer>Right</answer>"
+    "<perception>The box is below and right of the player</perception>"
+    "<reasoning>I should move right</reasoning>"
     "<prediction>The box will be below and same column of the player</prediction>"
+    "<answer>Right</answer>"
 )
 #: What the collapsed sokoban policy actually emitted, `<th` and all.
 ANSWER_ONLY = "<answer>Right</answer><th"
@@ -49,28 +49,68 @@ def test_answer_only_is_not_format_correct(module, fmt):
     assert parse(ANSWER_ONLY, prompt_format=fmt)["format_correct"] is False
 
 
-def test_the_two_parsers_differ_on_salvage_and_that_is_recorded():
-    """★ The envs disagree, and the disagreement is the finding.
-
-    sokoban's `parse_wm` salvages -- it returns the action even when `format_correct` is
-    False, on the measured grounds that strict extraction sent half of all base-model
-    episodes to zero usable actions. frozenlake's returns nothing at all. Neither is
-    obviously wrong, but they cannot both be the intended policy, and the difference was
-    invisible: it is enforced nowhere and stated nowhere.
-
-    Sokoban's salvaged action is now discarded by the *env* under `strict_format`, which
-    leaves the parser's two tiers intact for anyone who wants them.
-    """
+def test_all_environment_parsers_share_the_same_salvage_policy():
     from vagen.envs.frozenlake.utils.utils import parse_response as fl_parse
     from vagen.envs.sokoban.utils.utils import parse_response as sk_parse
 
     assert [a.lower() for a in sk_parse(ANSWER_ONLY, prompt_format="wm")["actions"]] == ["right"]
-    assert fl_parse(ANSWER_ONLY, prompt_format="wm")["actions"] == []
+    assert fl_parse(ANSWER_ONLY, prompt_format="wm")["actions"] == ["right"]
+    assert fl_parse(ANSWER_ONLY, prompt_format="wm")["format_correct"] is False
+
+
+@pytest.mark.parametrize(
+    "module,separator",
+    [
+        ("vagen.envs.sokoban.utils.utils", ","),
+        ("vagen.envs.frozenlake.utils.utils", ","),
+        ("vagen.envs.primitive_skill.utils.parse", "|"),
+        ("vagen.envs.navigation.utils.parse", "|"),
+    ],
+)
+def test_every_wm_environment_accepts_the_same_canonical_order(module, separator):
+    import importlib
+
+    parse = importlib.import_module(module).parse_response
+    response = WM_FULL.replace("Right", f"Right{separator}Left")
+    parsed = parse(response, prompt_format="wm", action_sep=separator)
+    assert parsed["format_correct"] is True
+    assert [action.lower() for action in parsed["actions"]] == ["right", "left"]
+
+
+def test_spatial_gym_uses_the_shared_free_think_protocol():
+    from vagen.envs.spatial_gym.utils.utils import parse_llm_response
+
+    reasoning, answer, correct = parse_llm_response(
+        "<think>Map the room.</think><answer>Actions: [Rotate(90), Observe()]</answer>"
+    )
+    assert (reasoning, answer, correct) == (
+        "Map the room.",
+        "Actions: [Rotate(90), Observe()]",
+        True,
+    )
+    assert parse_llm_response("THINK: map\nFINAL ANSWER: Actions: [Observe()]")[2] is False
+
+
+def test_every_wm_prompt_prints_the_same_order():
+    from vagen.envs.frozenlake.utils.prompt import format_prompt as frozenlake_prompt
+    from vagen.envs.navigation.utils.prompt import get_format_instruction as navigation_prompt
+    from vagen.envs.primitive_skill.utils.prompt import get_format_instruction as primitive_prompt
+    from vagen.envs.sokoban.utils.prompt import format_prompt as sokoban_prompt
+
+    prompts = [
+        sokoban_prompt(3, ",", add_example=False, prompt_format="wm"),
+        frozenlake_prompt(3, ",", add_example=False, prompt_format="wm"),
+        primitive_prompt("wm", 2, "|"),
+        navigation_prompt("wm", 5, "|"),
+    ]
+    for prompt in prompts:
+        positions = [prompt.index(f"<{tag}>") for tag in ("perception", "reasoning", "prediction", "answer")]
+        assert positions == sorted(positions)
 
 
 def test_sokoban_strict_format_discards_the_salvaged_action():
     """The env-level gate: with `strict_format` the salvaged action must not be executed,
-    so a turn that skipped <observation>/<think>/<prediction> does nothing at all."""
+    so a turn that skipped <perception>/<reasoning>/<prediction> does nothing at all."""
     import inspect
 
     from vagen.envs.sokoban.sokoban_env import Sokoban, SokobanEnvConfig
@@ -103,6 +143,7 @@ def _gate_source(env_module: str, fn: str = "step") -> str:
     [
         "vagen.envs.sokoban.sokoban_env",
         "vagen.envs.frozenlake.frozenlake_env",
+        "vagen.envs.spatial_gym.spatial_gym_env",
     ],
 )
 def test_the_format_reward_is_gated_on_format_correct(env_module):
@@ -124,7 +165,12 @@ def test_the_format_reward_is_gated_on_format_correct(env_module):
     tree = ast.parse(textwrap.dedent(_gate_source(env_module)))
     guards = [
         node for node in ast.walk(tree)
-        if isinstance(node, ast.If) and "format_reward" in ast.unparse(node.body)
+        if isinstance(node, ast.If)
+        and any(
+            not isinstance(statement, ast.If)
+            and "format_reward" in ast.unparse(statement)
+            for statement in node.body
+        )
     ]
     assert guards, f"{env_module} no longer pays a format reward; update this test"
     for node in guards:
@@ -135,14 +181,25 @@ def test_the_format_reward_is_gated_on_format_correct(env_module):
         )
 
 
-def test_strict_format_is_one_switch_for_the_whole_environment():
-    """★ Reproducing a pre-fix run must be one knob, not two kept in step by hand.
+def test_primitive_skill_format_reward_requires_canonical_format():
+    from vagen.envs.primitive_skill.utils.parse import compute_reward
 
-    `strict_format=False` has to restore *both* halves -- run the salvaged action and pay
-    the format reward for it -- or "the old environment" is not a thing anyone can
-    actually configure, and the old/new comparison quietly comes from a third environment
-    that never existed.
-    """
+    good = {"format_correct": True, "actions": ["MoveForward"]}
+    bad = {"format_correct": False, "actions": ["MoveForward"]}
+    assert compute_reward(good, ["MoveForward"], False, 0.0, format_reward=0.2) == 0.2
+    assert compute_reward(bad, ["MoveForward"], False, 0.0, format_reward=0.2) == 0.0
+
+
+def test_navigation_format_rewards_require_canonical_format():
+    from vagen.envs.navigation.utils.parse import compute_reward
+
+    good = {"format_correct": True}
+    bad = {"format_correct": False}
+    assert compute_reward(good, ["MoveAhead"], True, 0.2, 0.1, 1.0, True) == 1.3
+    assert compute_reward(bad, ["MoveAhead"], True, 0.2, 0.1, 1.0, True) == 1.0
+
+
+def test_strict_format_never_turns_off_the_format_reward_gate():
     import ast
     import inspect
 
@@ -154,10 +211,8 @@ def test_strict_format_is_one_switch_for_the_whole_environment():
 
     pay = next(n for n in ast.walk(tree)
                if isinstance(n, ast.If) and "format_reward" in ast.unparse(n.body))
-    assert "strict_format" in ast.unparse(pay.test), (
-        "the format-reward gate ignores strict_format, so strict_format=False cannot "
-        "reproduce the pre-fix environment"
-    )
+    assert "format_correct" in ast.unparse(pay.test)
+    assert "strict_format" not in ast.unparse(pay.test)
     drop = next(n for n in ast.walk(tree)
                 if isinstance(n, ast.If) and "action_list = []" in ast.unparse(n.body))
     assert "strict_format" in ast.unparse(drop.test)

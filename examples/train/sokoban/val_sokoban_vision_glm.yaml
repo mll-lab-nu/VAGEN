@@ -1,5 +1,5 @@
-# Validation half of train_sokoban_vision_glm.yaml. Keep strict free-think parsing and
-# reward settings identical; only the held-out seeds and environment count differ.
+# Validation half of train_sokoban_vision_glm.yaml. Native boxed answers are executable
+# compatibility output, but only the canonical free-think tags receive format reward.
 envs:
   - name: Sokoban
     n_envs: 256
@@ -8,9 +8,10 @@ envs:
     max_turns: 5
     response_length_per_turn: 512
     max_env_response_per_turn: 320
+    stop_strings: ["</answer>", "<|end_of_box|>"]
     config:
       render_mode: vision
       prompt_format: free_think
-      strict_format: true
+      strict_format: false
       format_reward: 0.02
       min_solution_steps: [1,5]

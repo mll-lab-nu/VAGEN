@@ -27,9 +27,9 @@ def test_offsets_are_monotone_prefix_lengths():
 
 
 def test_a_span_maps_to_the_tokens_that_spell_it():
-    text = "xx<observation>hi</observation>yy"
+    text = "xx<perception>hi</perception>yy"
     offsets = token_offsets(_ids(text), CharTokenizer())
-    span = tagged_span(text, "observation")
+    span = tagged_span(text, "perception")
 
     covering = tokens_covering(span, offsets)
 
@@ -51,7 +51,7 @@ def test_a_token_straddling_the_boundary_is_included():
 def test_an_absent_tag_is_none_not_an_empty_span():
     """None means 'the agent did not describe anything', which earns no reward; an empty
     span would silently credit token zero."""
-    assert tagged_span("no tags here", "observation") is None
+    assert tagged_span("no tags here", "perception") is None
 
 
 def test_reward_is_split_across_the_span_not_repeated():

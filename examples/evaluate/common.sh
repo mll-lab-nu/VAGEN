@@ -54,6 +54,10 @@ vagen_model_name() {
 # with the environment the policy is meant to be acting in.
 vagen_serve_vllm() {
   local model="$1" port="$2" tp="$3" mem="$4" max_len="$5" max_images="$6" log="$7"
+  local -a reasoning_args=()
+  if [ -n "${VLLM_REASONING_CONFIG:-}" ]; then
+    reasoning_args=(--reasoning-config "$VLLM_REASONING_CONFIG")
+  fi
 
   # ★ vLLM builds custom kernels through ninja even under --enforce-eager. Without it the
   # server dies at engine startup with a bare `FileNotFoundError: 'ninja'`, several frames
@@ -69,6 +73,7 @@ vagen_serve_vllm() {
     --max-model-len "$max_len" \
     --enforce-eager \
     --limit-mm-per-prompt "{\"image\":${max_images}}" \
+    "${reasoning_args[@]}" \
     > "$log" 2>&1 &
   SERVER_PID=$!
 

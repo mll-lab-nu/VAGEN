@@ -402,10 +402,10 @@ if __name__ == "__main__":
             if "<answer>" not in raw:
                 if env.cfg.prompt_format == "wm":
                     raw = (
-                        f"<observation>I see objects on the table.</observation>"
-                        f"<think>exploring</think>"
-                        f"<answer>{raw}</answer>"
+                        f"<perception>I see objects on the table.</perception>"
+                        f"<reasoning>exploring</reasoning>"
                         f"<prediction>The object will move.</prediction>"
+                        f"<answer>{raw}</answer>"
                     )
                 else:
                     raw = f"<think>exploring</think><answer>{raw}</answer>"

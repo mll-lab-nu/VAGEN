@@ -13,7 +13,7 @@ import pytest
 import vagen.algorithms  # noqa: F401  register estimator metadata
 from vagen.algorithms import wants_turn_lumped_reward
 from vagen.envs import StateRewardWrapper
-from test_state_reward import BOX, CharTokenizer, Env, Judge, _spec
+from test_state_reward import BOX, CharTokenizer, Env, Judge, _spec, _wm
 
 
 def _wrapper():
@@ -41,7 +41,7 @@ def test_the_old_placement_knob_is_hard_deleted():
 
 @pytest.mark.asyncio
 async def test_description_credit_is_per_span_and_outcome_credit_is_per_turn():
-    action = "<observation>A</observation>zz"
+    action = _wm()
     ids = [ord(c) for c in action]
     _, rewards, _, info = await _wrapper().step(action, ids, CharTokenizer())
 

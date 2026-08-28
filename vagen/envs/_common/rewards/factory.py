@@ -89,6 +89,13 @@ def build_env(env_cls: Any, env_config: Optional[dict], max_turns: Optional[int]
     """
     config = dict(env_config or {})
     settings = config.pop(STATE_REWARD_KEY, None) or {}
+    if any((settings.get(name) or {}).get("enable", False) for name in TAGS):
+        prompt_format = config.get("prompt_format", "wm")
+        if prompt_format not in {"wm", "free_wm", "wm_think"}:
+            raise ValueError(
+                "state_reward requires the canonical WM response format; set "
+                "prompt_format=wm (or wm_think for a native-thinking model)"
+            )
     env = _with_state_reward(env_cls, env_cls(env_config=config), settings)
     return TurnLimit(env, int(max_turns)) if max_turns else env
 
