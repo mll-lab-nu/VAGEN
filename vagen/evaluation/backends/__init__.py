@@ -1,6 +1,11 @@
 """Evaluation backend facade; importing it registers all built-in backends."""
 
-from vagen.evaluation.backends._common import ModelAdapter, REGISTRY, register_adapter, register_client
+from vagen.evaluation.backends._common import (
+    EvaluationBackend,
+    REGISTRY,
+    register_adapter,
+    register_client,
+)
 from vagen.evaluation.backends.claude import ClaudeAdapter, build_client_claude
 from vagen.evaluation.backends.gemini import GeminiAdapter, build_client_gemini
 from vagen.evaluation.backends.openai import OpenAIAdapter, build_client_azure, build_client_openai
@@ -11,8 +16,8 @@ from vagen.evaluation.backends.vllm import VLLMAdapter, build_client_vllm
 
 __all__ = [
     "ClaudeAdapter",
+    "EvaluationBackend",
     "GeminiAdapter",
-    "ModelAdapter",
     "OpenAIAdapter",
     "OpenAIResponsesAdapter",
     "REGISTRY",

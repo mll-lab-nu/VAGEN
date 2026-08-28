@@ -3,7 +3,7 @@ import os
 from typing import Any, Dict, List, Tuple, Optional
 import asyncio
 from PIL import Image
-from vagen.evaluation.backends._common.base import ModelAdapter
+from vagen.evaluation.backends._common.base import EvaluationBackend
 from vagen.evaluation.backends._common.rendering import pil_to_dataurl_png, compile_text_images_for_order, parse_data_url
 from vagen.evaluation.backends._common.registry import register_adapter, register_client
 
@@ -25,7 +25,7 @@ def build_client_gemini(cfg: Dict[str, Any]) -> _GeminiClient:
 
 
 @register_adapter("gemini")
-class GeminiAdapter(ModelAdapter):
+class GeminiAdapter(EvaluationBackend):
     def __init__(self, client, model: str):
         self.client = client
         self.model = model

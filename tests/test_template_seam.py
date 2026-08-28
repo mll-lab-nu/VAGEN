@@ -20,13 +20,9 @@ MODEL = "Qwen/Qwen2.5-VL-3B-Instruct"
 
 
 def _client(tok):
-    from vagen.training.agent_loop.verl_client import VerlClient
+    from vagen.models.qwen import QwenModelAdapter
 
-    c = VerlClient.__new__(VerlClient)
-    c.tokenizer, c.processor = tok, None
-    c.apply_chat_template_kwargs, c.mm_processor_kwargs = {}, {}
-    c._images, c._active, c._prefix_cache, c._conversations = {}, None, None, {}
-    return c
+    return QwenModelAdapter(tok)
 
 
 def test_an_incrementally_built_conversation_matches_the_canonical_render():
@@ -39,15 +35,12 @@ def test_an_incrementally_built_conversation_matches_the_canonical_render():
     tok = transformers.AutoTokenizer.from_pretrained(MODEL)
     c = _client(tok)
 
-    opening = c.encode([{"role": "system", "content": "S"}, {"role": "user", "content": "U1"}])
-
-    class _Conv:
-        prompt_len = 1                       # so the next encode reads as a continuation
-
-    c._conversations["x"] = _Conv()
-    c._active = "x"
+    opening, _ = c.render(
+        [{"role": "system", "content": "S"}, {"role": "user", "content": "U1"}],
+        opening=True,
+    )
     response = tok.encode("A1<|im_end|>", add_special_tokens=False)
-    continuation = c.encode([{"role": "user", "content": "U2"}])
+    continuation, _ = c.render([{"role": "user", "content": "U2"}], opening=False)
 
     incremental = tok.decode(opening + response + continuation)
     canonical = tok.apply_chat_template(
@@ -67,15 +60,14 @@ def test_a_family_whose_separator_cannot_be_derived_falls_back_rather_than_guess
     transformers = pytest.importorskip("transformers")
     tok = transformers.AutoTokenizer.from_pretrained(MODEL)
     c = _client(tok)
-    assert c._message_separator(), "the separator should be derivable for Qwen2.5-VL"
+    assert c.message_separator(), "the separator should be derivable for Qwen2.5-VL"
 
     c2 = _client(tok)
-    c2._sep_cache = None
     # A terminator the template does not actually use.
     class _Wrong:
         def __getattr__(self, k): return getattr(tok, k)
         eos_token_id = 999999
     c2.tokenizer = _Wrong()
-    assert c2._message_separator() == [], (
+    assert c2.message_separator() == [], (
         "a terminator the template does not use produced a separator anyway"
     )

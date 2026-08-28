@@ -23,7 +23,7 @@ from __future__ import annotations
 import importlib
 from typing import Callable
 
-from vagen.harness._common import BaseHarness, Call
+from vagen.harness._common import BaseHarness
 from vagen.harness.compact import CompactHarness
 from vagen.harness.concat import ConcatHarness
 from vagen.harness.no_concat import NoConcatHarness
@@ -61,7 +61,7 @@ def resolve_harness(name: str) -> type[BaseHarness]:
 
     An import path is ``module:Class`` or ``module.Class``. It is checked against
     ``BaseHarness`` before it is returned, so a path naming some other class fails here
-    rather than at the first ``next_call`` with an AttributeError.
+    rather than at the first ``run_episode`` with an AttributeError.
     """
     if name in HARNESSES:
         return HARNESSES[name]
@@ -83,8 +83,7 @@ def _require_harness(cls, name: str) -> None:
     if not (isinstance(cls, type) and issubclass(cls, BaseHarness)):
         raise TypeError(
             f"{name} resolved to {cls!r}, which does not subclass BaseHarness -- so the "
-            f"runner's contract (begin / next_call / accept / add_observation, and the "
-            f"optional note_room / note_usage / exhausted) is not guaranteed."
+            "harness run_episode(client, env) contract is not guaranteed."
         )
 
 
@@ -110,6 +109,6 @@ def build_harness(name: str, **kwargs) -> BaseHarness:
     return resolve_harness(name)(**kwargs)
 
 
-__all__ = ["BaseHarness", "Call", "ConcatHarness", "NoConcatHarness", "CompactHarness",
+__all__ = ["BaseHarness", "ConcatHarness", "NoConcatHarness", "CompactHarness",
            "HARNESSES", "build_harness", "budget_mode", "register_harness",
            "resolve_harness"]

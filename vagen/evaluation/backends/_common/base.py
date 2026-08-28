@@ -5,8 +5,8 @@ from typing import Any, Dict, List, Optional
 from abc import ABC, abstractmethod
 from PIL import Image
 
-class ModelAdapter(ABC):
-    """Abstract adapter for chat.completions-like multimodal models."""
+class EvaluationBackend(ABC):
+    """Transport contract for a hosted multimodal inference API."""
 
     @abstractmethod
     def format_system(self, text: str, images: List[Image.Image]) -> Dict[str, Any]:
@@ -43,3 +43,6 @@ class ModelAdapter(ABC):
                 return None  # Use default for other errors
         """
         return None  # By default, use ThrottledAdapter's default logic
+
+
+__all__ = ["EvaluationBackend"]

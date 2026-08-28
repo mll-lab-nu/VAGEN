@@ -103,6 +103,33 @@ there is no `external_lib` setting there — so a registered name on its own fai
 unknown harness 'mine'; choose from ['compact', 'concat', 'no_concat']
 ```
 
+The harness implementation is an ordinary async loop:
+
+```python
+async def run_episode(self, client, env):
+    observation, _ = await env.reset()
+    messages = [await env.system_prompt(), observation]
+    while True:
+        response = await client.create(messages)
+        observation, reward, terminated, truncated, info = await env.step(response)
+        if terminated or truncated:
+            return
+```
+
+`client.create` owns message-to-conversation routing and token recording. The scoring seam
+owns reward attribution. Training and evaluation therefore execute the same harness code.
+
+## Model family — `trainer.model_adapter`
+
+```yaml
+trainer:
+  model_adapter: qwen
+```
+
+This selects chat-template and multimodal rendering under `vagen/models/<family>/`.
+It is independent of the inference transport: training still uses VERL, while evaluation
+uses a configured `EvaluationBackend`.
+
 ---
 
 ## Advantage estimator — `algorithm.adv_estimator`

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import inspect
 import logging
+from types import SimpleNamespace
 
 from vagen.envs._common.observations import (
     _normalize_images,
@@ -69,7 +70,19 @@ class GymEnvAdapter:
     async def system_prompt(self):
         return self._message(await self.env.system_prompt(), role="system")
 
-    async def step(self, action: str, response_token_ids=None, tokenizer=None):
+    async def step(self, response, response_token_ids=None, tokenizer=None):
+        """Apply a client response through the legacy text-oriented gym boundary.
+
+        The optional arguments keep direct adapter callers source-compatible; harnesses
+        always pass the response object.
+        """
+        if isinstance(response, str):
+            response = SimpleNamespace(
+                text=response,
+                token_ids=response_token_ids,
+                tokenizer=tokenizer,
+            )
+        action = response.text
         try:
             # The response and tokenizer go through when the wrapped env asks for them.
             # A plain gym env does not, and a reward wrapper that scores spans of the
@@ -78,7 +91,10 @@ class GymEnvAdapter:
             # score on the tokens that earned it.
             kwargs = {}
             if _accepts_response(self.env.step):
-                kwargs = {"response_token_ids": response_token_ids, "tokenizer": tokenizer}
+                kwargs = {
+                    "response_token_ids": response.token_ids,
+                    "tokenizer": response.tokenizer,
+                }
             obs, reward, done, info = await self.env.step(action, **kwargs)
         except Exception as exc:  # noqa: BLE001 - one bad action must not kill the batch
             logger.error("environment %r failed on action %r: %s", self.env_name, action, exc)

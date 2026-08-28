@@ -4,7 +4,7 @@ import random
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 from PIL import Image
-from vagen.evaluation.backends._common.base import ModelAdapter
+from vagen.evaluation.backends._common.base import EvaluationBackend
 
 @dataclass
 class ThrottleRetryPolicy:
@@ -119,10 +119,10 @@ def _is_retryable(exc: BaseException, retryable_codes: Tuple[int, ...]) -> bool:
     del retryable_codes
     return not _is_non_retryable(exc)
 
-class ThrottledAdapter(ModelAdapter):
-    """Thin wrapper adding concurrency gate and retry backoff to any ModelAdapter."""
+class ThrottledAdapter(EvaluationBackend):
+    """Thin wrapper adding concurrency gate and retry backoff to any backend."""
 
-    def __init__(self, inner: ModelAdapter, policy: Optional[ThrottleRetryPolicy] = None):
+    def __init__(self, inner: EvaluationBackend, policy: Optional[ThrottleRetryPolicy] = None):
         self.inner = inner
         self.policy = policy or ThrottleRetryPolicy()
         self._gate = self.policy.shared_gate or asyncio.BoundedSemaphore(self.policy.max_concurrency)

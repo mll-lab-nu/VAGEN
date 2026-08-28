@@ -1,7 +1,7 @@
 from __future__ import annotations
 import os
 from typing import Any, Dict, List, Tuple
-from vagen.evaluation.backends._common.base import ModelAdapter
+from vagen.evaluation.backends._common.base import EvaluationBackend
 from vagen.evaluation.backends._common.rendering import pil_to_dataurl_png, compile_text_images_for_order, parse_data_url
 from vagen.evaluation.backends._common.options import filter_chat_kwargs
 from vagen.evaluation.backends._common.registry import register_adapter, register_client
@@ -19,7 +19,7 @@ def build_client_claude(cfg: Dict[str, Any]):
     return AsyncAnthropic(api_key=api_key, base_url=base_url) if base_url else AsyncAnthropic(api_key=api_key)
 
 @register_adapter("claude")
-class ClaudeAdapter(ModelAdapter):
+class ClaudeAdapter(EvaluationBackend):
     """
     Anthropic Claude Messages API adapter.
     - Convert our OpenAI-like message list into Anthropic's schema.

@@ -1,5 +1,6 @@
 """Shared model contracts and multimodal token helpers."""
 
+from vagen.models._common.base import ModelAdapter
 from vagen.models._common.image_tokens import (
     IMAGE_TOKEN_ADAPTERS,
     ImagePlaceholderMismatch,
@@ -18,6 +19,7 @@ from vagen.models._common.image_tokens import (
 __all__ = [
     "IMAGE_TOKEN_ADAPTERS",
     "ImagePlaceholderMismatch",
+    "ModelAdapter",
     "NoValidTruncation",
     "count_placeholder_runs",
     "get_image_token",
