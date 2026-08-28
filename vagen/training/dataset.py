@@ -62,6 +62,9 @@ class EnvSpec:
     # per-family knowledge belongs. vLLM refuses the request if this is set and that is
     # not configured.
     thinking_token_budget: Optional[int] = None
+    # Optional protocol delimiters that end one model turn. Keep the matched text in
+    # the response because environment parsers normally need the closing delimiter.
+    stop_strings: List[str] = field(default_factory=list)
 
     def __post_init__(self):
         if self.max_env_response_per_turn is None:
@@ -248,6 +251,7 @@ class AgenticDataset(Dataset):
                         "response_length_per_turn": spec.response_length_per_turn,
                         "max_env_response_per_turn": spec.max_env_response_per_turn,
                         "thinking_token_budget": spec.thinking_token_budget,
+                        "stop_strings": list(spec.stop_strings),
                         "data_source": data_source,
                         "agent_name":"gym_agent",
                         # verl's agent loop stores raw_prompt on every output and reads

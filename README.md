@@ -168,11 +168,10 @@ bash examples/train/sokoban/train_ppo_no_concat_qwen25vl3b.sh
 bash examples/train/sokoban/train_default_gae_compact_qwen25vl3b.sh
 
 
-# Qwen3-VL and Qwen3.5
-bash examples/train/sokoban/train_default_gae_qwen3vl4b.sh
-bash examples/train/sokoban/train_default_gae_qwen35_4b.sh
-
-# InternVL3.5 and GLM-4.6V-Flash; HARNESS=concat|no_concat|compact
+# Qwen3-VL, Qwen3.5, InternVL3.5 and GLM-4.6V-Flash all accept
+# HARNESS=concat|no_concat|compact (concat is the default).
+HARNESS=concat bash examples/train/sokoban/train_default_gae_qwen3vl4b.sh
+HARNESS=concat bash examples/train/sokoban/train_default_gae_qwen35_4b.sh
 HARNESS=concat bash examples/train/sokoban/train_default_gae_internvl35_2b.sh
 HARNESS=concat bash examples/train/sokoban/train_default_gae_glm46v_flash.sh
 

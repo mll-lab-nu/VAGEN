@@ -201,6 +201,31 @@ def test_an_oversized_opening_is_trimmed_but_the_system_prompt_is_never_cut():
     assert len(out[1]["content"]) < 1200 and out[1]["content"], "the observation was not trimmed"
 
 
+def test_opening_trim_does_not_render_a_system_only_prompt():
+    """Some templates, including Qwen3.5, reject a history with no user turn."""
+    from vagen.rollout.client import InferenceClient
+
+    class _Strict(InferenceClient):
+        def encode(self, messages):
+            if not any(message.get("role") == "user" for message in messages):
+                raise RuntimeError("No user query found in messages")
+            return [0] * sum(len(message["content"]) for message in messages)
+
+        async def generate(self, prompt_ids, **kw):
+            raise AssertionError("not reached")
+
+    client = _Strict()
+    client.opening_limit, client.continuation_limit = 100, 100
+    trimmed = client._fit_messages(
+        [{"role": "system", "content": "s" * 40},
+         {"role": "user", "content": "o" * 100}],
+        opening=True,
+    )
+
+    assert trimmed[0]["content"] == "s" * 40
+    assert 0 < len(trimmed[1]["content"]) < 100
+
+
 def test_an_opening_whose_system_prompt_alone_does_not_fit_still_refuses():
     """No cut repairs a prompt region too small to hold the instructions."""
     from vagen.rollout.client import ContextTooLarge
@@ -348,6 +373,30 @@ def test_the_spec_carries_the_budget_and_defaults_to_off():
 
     assert EnvSpec(name="Sokoban", n_envs=1).thinking_token_budget is None
     assert EnvSpec(name="Sokoban", n_envs=1, thinking_token_budget=512).thinking_token_budget == 512
+
+
+def test_protocol_stop_strings_are_isolated_and_keep_the_delimiter():
+    from vagen.training.dataset import EnvSpec
+
+    first = EnvSpec(name="Sokoban", n_envs=1)
+    second = EnvSpec(name="Sokoban", n_envs=1)
+    first.stop_strings.append("</answer>")
+    assert second.stop_strings == []
+
+    sampling = {"temperature": 0.6}
+    kwargs = {"stop_strings": first.stop_strings}
+    if kwargs.get("stop_strings"):
+        sampling = {
+            **sampling,
+            "stop": list(kwargs["stop_strings"]),
+            "include_stop_str_in_output": True,
+        }
+    assert sampling["stop"] == ["</answer>"]
+    assert sampling["include_stop_str_in_output"] is True
+    from vllm import SamplingParams
+    params = SamplingParams(max_tokens=1024, **sampling)
+    assert params.stop == ["</answer>"]
+    assert params.include_stop_str_in_output is True
 
 
 def test_the_budget_reaches_the_client_sampling_params():

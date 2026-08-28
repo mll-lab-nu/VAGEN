@@ -247,6 +247,10 @@ Two independent caps that do different things:
 - **`thinking_token_budget`** makes the engine *force the closing tag* when a reasoning
   block runs long, so the turn is bounded rather than truncated and still produces an
   answer.
+- **`stop_strings`** ends a turn at an environment protocol boundary while retaining the
+  delimiter in the sampled response. For example, InternVL Sokoban uses
+  `stop_strings: ["</answer>"]` so post-answer rambling does not consume the rest of the
+  per-turn budget.
 
 The second needs the engine to know where a reasoning block begins and ends. That is
 per-model, so it lives in the training script rather than here:

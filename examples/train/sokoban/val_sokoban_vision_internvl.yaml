@@ -6,7 +6,10 @@ envs:
     data_source: sokoban
     seed: [10001,10256,1]
     max_turns: 5
-    response_length_per_turn: 512
+    # Match training: 512 truncates InternVL3.5 before its closing tags.
+    response_length_per_turn: 1024
+    thinking_token_budget: 512
+    stop_strings: ["</answer>"]
     max_env_response_per_turn: 320
     config:
       render_mode: vision

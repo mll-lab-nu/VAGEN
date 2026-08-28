@@ -22,10 +22,10 @@ MODEL=${MODEL:-zai-org/GLM-4.6V-Flash}
 # compatibility hook is loaded in spawned engine processes through verl/sitecustomize.py;
 # it is version-detected and does not touch Qwen or an upstream-fixed vLLM.
 export VERL_ENABLE_VLLM_GPTJ_MROPE_PATCH=1
-# A normal five-turn GLM Sokoban conversation is about 1138 tokens, so 1600 never
-# compacted and silently measured concat. 1000 crosses during a real episode; a shorter
-# summary leaves enough room for a useful continuation after the reopen.
-COMPACT_BUDGET=${COMPACT_BUDGET:-1000}
+# A normal five-turn GLM Sokoban conversation is about 1138 tokens, while sampled
+# responses can make the first turn exceed 1000 by itself. 1400 leaves room for at
+# least two turns and still triggers compaction on longer five-turn episodes.
+COMPACT_BUDGET=${COMPACT_BUDGET:-1400}
 COMPACT_SUMMARY_BUDGET=${COMPACT_SUMMARY_BUDGET:-128}
 mkdir -p "$EXPERIMENT_DIR"
 

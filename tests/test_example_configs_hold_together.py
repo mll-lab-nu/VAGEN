@@ -91,8 +91,10 @@ def test_the_context_window_covers_both_regions(script):
 @pytest.mark.parametrize(
     "name,min_prompt,compact_budget,summary_budget",
     [
+        ("train_default_gae_qwen35_4b.sh", 2000, 2000, 300),
+        ("train_default_gae_qwen3vl4b.sh", 1400, 1400, 300),
         ("train_default_gae_internvl35_2b.sh", 1600, 2000, 300),
-        ("train_default_gae_glm46v_flash.sh", 1400, 1000, 128),
+        ("train_default_gae_glm46v_flash.sh", 1400, 1400, 128),
     ],
 )
 def test_new_vlm_compact_configs_match_measured_prompt_sizes(
@@ -103,8 +105,9 @@ def test_new_vlm_compact_configs_match_measured_prompt_sizes(
     Measured Sokoban openings are 938 tokens for InternVL and 686 for GLM. Reopening
     from the old 300-token summary takes them to 1244 and 992 respectively, so inheriting
     the shared prompt size either crashes at the first compaction or leaves no useful
-    margin. GLM's old 1600-token compact trigger also held a normal five-turn episode and
-    silently ran concat. Pin the family-specific numbers that were tested instead.
+    margin. GLM needs 1400 so a long first response does not immediately close every
+    conversation, while longer five-turn episodes still cross the trigger. Pin the
+    family-specific numbers that were tested instead.
     """
     script = os.path.join(_ROOT, "examples/train/sokoban", name)
     text = open(script).read()
@@ -119,10 +122,14 @@ def test_new_vlm_compact_configs_match_measured_prompt_sizes(
             "tie_word_embeddings=false"
         ) in text
         assert "actor_rollout_ref.rollout.val_kwargs.do_sample=True" in text
+        assert "reasoning_config.reasoning_start_str" in text
+        assert "reasoning_config.reasoning_end_str" in text
         for yaml_path in _script_yamls(text, script):
             for spec in OmegaConf.load(yaml_path).envs:
                 assert spec.config.prompt_format == "free_think"
                 assert spec.config.strict_format is True
+                assert spec.thinking_token_budget == 512
+                assert list(spec.stop_strings) == ["</answer>"]
     if "glm46v" in name:
         assert "data.apply_chat_template_kwargs.enable_thinking=True" in text
         # Sampling may still use top-k/top-p/repetition penalty, but PPO must compare
