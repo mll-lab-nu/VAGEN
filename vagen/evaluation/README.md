@@ -37,14 +37,14 @@ envs:
     config:                               # passed to the env constructor
       render_mode: vision
       size: 4
-    chat_config:                          # ★ per-env sampling. Pin the temperature:
-      temperature: 0                      # unset, the provider's default applies (1.0),
-      max_tokens: 1024                    # so two checkpoints are not compared on equal
-      top_p: 1.0                          # terms and a rerun does not reproduce
       p: 0.8
       is_slippery: false
       slip_prob: 0.0
       max_actions_per_step: 5
+    chat_config:                          # ★ per-env sampling. Pin the temperature:
+      temperature: 0                      # unset, the provider's default applies (1.0),
+      max_tokens: 1024                    # so two checkpoints are not compared on equal
+      top_p: 1.0                          # terms and a rerun does not reproduce
 
 experiment:
   dump_dir: ${fileroot}/rollouts/eval_frozenlake   # rollout output root
