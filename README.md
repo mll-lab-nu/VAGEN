@@ -431,8 +431,8 @@ trainer:
 huggingface_hub:
   hf_save_freq: null   # upload every N steps (must be a multiple of trainer.save_freq); null = disabled
   repo_id: vagen-training   # the shipped default; enabling upload with it unchanged
-                          # pushes to a repo of that name under your account        
-  private: false        
+                          # pushes to a repo of that name under your account
+  private: false
 ```
 
 ### Training Data Filtering
