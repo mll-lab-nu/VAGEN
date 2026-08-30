@@ -275,12 +275,6 @@ def test_token_gae_runs_without_a_turn_column():
     assert ret[0].tolist() == pytest.approx([1.0, 1.0])
 
 
-# (lam_low == lam is token-level GAE; lam_low == 1 is turn-level) and its refusal to run
-# without lam_low. That estimator is gone. Its layout-independence and value-mask
-# properties were never specific to it -- test_estimator_contract.py asserts both for
-# every registered estimator.
-
-
 def test_turn_boundaries_are_found_under_both_layouts():
     import torch
 
@@ -436,11 +430,7 @@ def _bwd(rewards, values, valid, gamma, lam):
 
 
 def test_a_constant_lambda_tensor_is_the_scalar_it_equals():
-    """★ The branch `lam_t = lam if torch.is_tensor(lam) else None` had exactly one caller
-    -- `removed_estimator_gae_varlam` -- and lost its only coverage when that estimator was removed.
-    Nothing in the tree passes a tensor now, but the docstring advertises it as what a
-    per-turn lambda would use, so it is an extension point, and an unexercised one is one
-    that breaks for whoever reaches for it first.
+    """A tensor lambda remains a supported extension point even without a built-in caller.
 
     A tensor of a single repeated value must reproduce the scalar path exactly: that pins
     the indexing (`lam_t[:, t]`) against an off-by-one or a transposed read, which is the

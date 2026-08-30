@@ -56,7 +56,3 @@ PPO training -- `default_gae` with a critic, which is what PPO is here
 bash examples/train/spatial_gym/train_default_gae_qwen25vl3b.sh
 bash examples/train/spatial_gym/train_default_gae_qwen25vl7b.sh
 ```
-
-
-```bash
-```

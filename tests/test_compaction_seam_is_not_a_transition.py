@@ -11,10 +11,8 @@ happens is set by how often the policy compacts, which is set by how much it wri
 effective horizon then moves as the policy's verbosity moves, which is not a hyperparameter
 anybody chose.
 
-★ No estimator in the tree consults the seam today: the one that did,
-``removed_estimator_gae_varlam``, has been removed, and the remaining ones either run at ``lam = 1``
-where the question is moot or deliberately treat every boundary alike. What is tested here
-is that the flag is *computed correctly and reaches the estimator inputs* -- the harness
+No estimator in the tree consults the seam today. What is tested here is that the flag is
+*computed correctly and reaches the estimator inputs* -- the harness
 knows which conversation it summarised, that reaches ``AdvantageInputs.ends_with_summary``,
 and ``TrajectoryView.seam`` turns it into a per-position mask. That is the contract a custom
 estimator picks up, and it is the half that cannot be re-derived downstream.

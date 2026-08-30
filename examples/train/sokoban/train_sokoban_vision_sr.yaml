@@ -11,10 +11,6 @@ envs:
     max_env_response_per_turn: 256
     config:
       render_mode: vision
-      # Three independent per-turn rewards are each capped at 0.03: format,
-      # state estimation, and transition prediction. Across five turns the total
-      # shaping cap is 3 * 0.03 * 5 = 0.45; with success_reward=1.0 the episode
-      # reward cap is 1.45.
       format_reward: 0.03
       min_solution_steps: [1,5]
       state_reward:

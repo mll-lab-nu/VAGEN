@@ -9,7 +9,6 @@ from vagen.algorithms.turn_level_gae import SPEC as TURN_LEVEL_GAE
 __all__ = [
     "ALGORITHMS",
     "AlgorithmSpec",
-    "removed_estimator_GAE",
     "DEFAULT_GAE",
     "TOKEN_LEVEL_GAE",
     "TRAJECTORY_GRPO",
@@ -20,7 +19,6 @@ __all__ = [
     "PUBLISHES_TURN_ID",
     "SENTINEL_RETURN_ESTIMATORS",
     "TRAJECTORY_ESTIMATORS",
-    "TURN_LUMPED_REWARD_ESTIMATORS",
     "UNDISCOUNTED_ESTIMATORS",
     "advantage_estimator",
     "needs_critic",
@@ -33,5 +31,4 @@ __all__ = [
     "requires_undiscounted",
     "resolve_algorithm",
     "spans_rows",
-    "wants_turn_lumped_reward",
 ]

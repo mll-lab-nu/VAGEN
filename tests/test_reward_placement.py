@@ -1,17 +1,14 @@
-"""Reward placement belongs to the producer; reductions belong to estimators.
+"""Reward placement belongs to the producer.
 
 The environment always pays a description on the span that earned it. The old
-``placement`` switch is intentionally gone: it coupled rollout construction to the
-advantage estimator and allowed two configs to disagree silently. Estimators that need
-one reward slot per turn declare that fact and perform the reduction themselves.
+``placement`` switch is intentionally gone because it coupled rollout construction to
+the advantage estimator and allowed two configs to disagree silently.
 """
 
 from __future__ import annotations
 
 import pytest
 
-import vagen.algorithms  # noqa: F401  register estimator metadata
-from vagen.algorithms import wants_turn_lumped_reward
 from vagen.envs import StateRewardWrapper
 from test_state_reward import BOX, CharTokenizer, Env, Judge, _spec, _wm
 
@@ -23,12 +20,6 @@ def _wrapper():
         judge=Judge(BOX),
         enabled={"state_estimation": 1.0},
     )
-
-
-def test_only_the_estimator_that_needs_turn_slots_declares_it():
-    assert wants_turn_lumped_reward("removed_estimator_gae")
-    for name in ("token_level_gae", "turn_level_gae", "default_gae", "trajectory_grpo", "gae"):
-        assert not wants_turn_lumped_reward(name), name
 
 
 def test_the_old_placement_knob_is_hard_deleted():

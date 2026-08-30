@@ -10,7 +10,6 @@ from vagen.algorithms._common.registry import (
     PUBLISHES_TURN_ID,
     SENTINEL_RETURN_ESTIMATORS,
     TRAJECTORY_ESTIMATORS,
-    TURN_LUMPED_REWARD_ESTIMATORS,
     UNDISCOUNTED_ESTIMATORS,
     needs_critic,
     needs_value_mask,
@@ -19,7 +18,6 @@ from vagen.algorithms._common.registry import (
     register_trajectory_adv_est,
     requires_undiscounted,
     spans_rows,
-    wants_turn_lumped_reward,
 )
 from vagen.algorithms._common.spec import (
     ALGORITHMS,
@@ -38,7 +36,6 @@ __all__ = [
     "PUBLISHES_TURN_ID",
     "SENTINEL_RETURN_ESTIMATORS",
     "TRAJECTORY_ESTIMATORS",
-    "TURN_LUMPED_REWARD_ESTIMATORS",
     "UNDISCOUNTED_ESTIMATORS",
     "advantage_estimator",
     "needs_critic",
@@ -51,5 +48,4 @@ __all__ = [
     "registered_algorithms",
     "resolve_algorithm",
     "spans_rows",
-    "wants_turn_lumped_reward",
 ]

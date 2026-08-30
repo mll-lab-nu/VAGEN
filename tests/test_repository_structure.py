@@ -16,7 +16,6 @@ def test_extension_axes_have_facades_common_code_and_implementation_directories(
             "default_gae",
             "token_level_gae",
             "trajectory_grpo",
-            "removed_estimator_gae",
             "turn_level_gae",
         ],
         "harness": ["concat", "no_concat", "compact"],
@@ -109,7 +108,6 @@ def test_algorithm_registry_points_to_implementation_packages():
     from vagen.algorithms import ALGORITHMS, registered_algorithms
 
     expected = {
-        "removed_estimator_gae",
         "default_gae",
         "token_level_gae",
         "trajectory_grpo",

@@ -28,13 +28,9 @@ VERL_OWN = {"gae", "grpo", "reinforce_plus_plus", "rloo", "remax"}
 def _flag(text, name):
     """The value a script actually passes for `name`, ignoring anything commented out.
 
-    Comment lines are stripped first because these scripts document their flags. The
-    compact script explains that `algorithm.adv_estimator=removed_estimator_gae` can be swapped in
-    from the command line, and a plain search over the whole file found that sentence
-    before the real flag -- capturing the trailing backtick along with it, so the script
-    was reported as naming an estimator that does not exist. Reading a comment as
-    configuration fails in the noisier direction too: a flag someone commented out to
-    disable would still be seen as set.
+    Comment lines are stripped first because these scripts document their flags. Reading
+    a comment as configuration can report a documented alternative as the live value, or
+    treat a flag someone commented out as still enabled.
     """
     live = "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith("#"))
     m = re.search(rf"{re.escape(name)}=([^\s\\]+)", live)
@@ -79,29 +75,13 @@ def test_examples_do_not_reference_removed_packages():
 
 @pytest.mark.parametrize("path", SCRIPTS, ids=lambda p: "/".join(p.split("/")[-2:]))
 def test_the_estimator_exists(path):
-    """★ A renamed estimator turns every script that used it into a run that dies at
-    startup. episode_gae -> default_gae and removed_estimator_gae_paper -> removed_estimator_gae both
-    happened; this is what would have caught a missed one."""
+    """A renamed estimator turns every script that used it into a startup failure."""
     est = _flag(open(path).read(), "algorithm.adv_estimator")
     if est is None:
         pytest.skip("script sets no estimator")
     assert est in TRAJECTORY_ESTIMATORS or est in VERL_OWN, (
         f"{path} selects adv_estimator={est!r}, which is neither registered by VAGEN "
         f"{sorted(TRAJECTORY_ESTIMATORS)} nor one of verl's own"
-    )
-
-
-@pytest.mark.parametrize("path", SCRIPTS, ids=lambda p: "/".join(p.split("/")[-2:]))
-def test_estimators_with_a_required_hyperparameter_set_it(path):
-    """`removed_estimator_gae` reads `removed_estimator`, and at removed_estimator == gamma the two
-    passes telescope and it *is* token_level_gae. A script that omits it reproduces the
-    wrong algorithm silently, so the scripts state it."""
-    text = open(path).read()
-    if _flag(text, "algorithm.adv_estimator") != "removed_estimator_gae":
-        return
-    assert "removed_estimator" in text, (
-        f"{path} runs removed_estimator_gae without removed_estimator; it degenerates to "
-        "token_level_gae when the two clocks agree"
     )
 
 
@@ -198,7 +178,7 @@ def test_env_specific_reward_code_is_not_in_the_generic_package():
 
 
 def test_the_state_reward_example_owns_the_judge_lifecycle():
-    text = open("examples/train/sokoban/train_removed_estimator_gae_sr_qwen25vl3b.sh").read()
+    text = open("examples/train/sokoban/train_default_gae_sr_qwen25vl3b.sh").read()
     assert "scripts/launch_judge.sh" in text
     assert "/health" in text
     assert "trap cleanup_judge EXIT" in text
@@ -206,24 +186,27 @@ def test_the_state_reward_example_owns_the_judge_lifecycle():
     assert "val_sokoban_vision_sr.yaml" in text
 
 
-def test_sokoban_state_reward_example_has_the_declared_145_cap():
-    """Format + two judge rewards pay 0.03 each for at most five turns."""
+def test_sokoban_state_reward_example_uses_the_small_shaping_budget():
+    """State and format shaping stay small relative to the success reward."""
     import yaml
 
     for name in ("train_sokoban_vision_sr.yaml", "val_sokoban_vision_sr.yaml"):
         path = os.path.join("examples/train/sokoban", name)
         config = yaml.safe_load(open(path))["envs"][0]
         env = config["config"]
+        assert config["max_turns"] == 5
+        assert config["response_length_per_turn"] == 512
+        assert "reward_mode" not in env
         assert env["format_reward"] == pytest.approx(0.03)
         assert env["state_reward"]["state_estimation"]["reward"] == pytest.approx(0.03)
         assert env["state_reward"]["transition_prediction"]["reward"] == pytest.approx(0.03)
+        assert env["state_reward"]["score_base"] == pytest.approx(0.334)
         shaping_cap = config["max_turns"] * (
             env["format_reward"]
             + env["state_reward"]["state_estimation"]["reward"]
             + env["state_reward"]["transition_prediction"]["reward"]
         )
         assert shaping_cap == pytest.approx(0.45)
-        assert 1.0 + shaping_cap == pytest.approx(1.45)
 
 
 def test_the_judge_launcher_uses_a_toolkit_that_really_has_nvcc():

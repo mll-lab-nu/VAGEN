@@ -12,7 +12,6 @@ from vagen.algorithms._common.registry import (
     publishes_turn_id,
     requires_undiscounted,
     spans_rows,
-    wants_turn_lumped_reward,
 )
 
 
@@ -42,11 +41,6 @@ class AlgorithmSpec:
     @property
     def publishes_turn_id(self) -> bool:
         return publishes_turn_id(self.name)
-
-    @property
-    def wants_turn_lumped_reward(self) -> bool:
-        return wants_turn_lumped_reward(self.name)
-
 
 ALGORITHMS: dict[str, AlgorithmSpec] = {}
 
