@@ -173,4 +173,3 @@ def test_traj_idx_rejects_a_ragged_batch():
 def test_traj_idx_rejects_nonpositive_repeat():
     with pytest.raises(ValueError):
         traj_idx_for_interleaved_repeat(6, 0)
-
