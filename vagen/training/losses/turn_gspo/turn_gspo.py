@@ -223,7 +223,7 @@ def _turn_level_policy_loss(
         raise ValueError(
             f"{name} needs a `turn_id` column and the batch has none. It is published by "
             "the trajectory advantage estimators (default_gae, token_level_gae, "
-            "turn_level_gae, removed_estimator_gae); with verl's own gae or grpo there is nothing "
+            "turn_level_gae); with verl's own gae or grpo there is nothing "
             "that says "
             "where a turn starts. Without it this loss cannot tell a turn from a row, "
             "which is exactly the bug it exists to fix -- so it refuses rather than "

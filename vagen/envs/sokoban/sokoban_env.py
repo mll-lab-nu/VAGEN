@@ -189,8 +189,7 @@ class Sokoban(GymImageEnv, HasStateReward):
             if action in self.ACTION_LOOKUP:
                 action_int = self.ACTION_LOOKUP[action]
                 # Offload the blocking gym step to a thread
-                _obs, step_reward, step_done, _ = await asyncio.to_thread(self.env.step, action_int)
-                # reward += float(step_reward) # ignore sokoban reward
+                _obs, _step_reward, step_done, _ = await asyncio.to_thread(self.env.step, action_int)
                 self.valid_actions.append(action)
                 # Early success check
                 if self._is_success():

@@ -21,6 +21,7 @@
   <a href="https://vagen-ai.github.io/"><img src="https://img.shields.io/badge/🌐_Website-00C851?style=for-the-badge&logoColor=white" alt="Website"></a>
 </p>
 
+**VAGEN** is a **reinforcement learning (RL) framework that trains multi-turn VLM agents** (vision-language model agents) to build an internal **world model** through explicit visual state reasoning. In addition to task success, VAGEN can reinforce **StateEstimation** ("what is the current state?") and **TransitionModeling** ("what comes next?") with an LLM-as-Judge world-modeling reward. The reusable harness, environment, model, rollout, and evaluation boundaries keep those signals independent from the selected training algorithm.
 
 <div style="width:100%; overflow-x:auto;">
   <table style="width:100%;">
@@ -173,6 +174,8 @@ bash examples/train/sokoban/train_default_gae_qwen25vl3b.sh
 bash examples/train/sokoban/train_ppo_no_concat_qwen25vl3b.sh
 bash examples/train/sokoban/train_default_gae_compact_qwen25vl3b.sh
 
+# Qwen2.5-VL: default GAE with state reward
+bash examples/train/sokoban/train_default_gae_sr_qwen25vl3b.sh
 
 # Qwen3-VL, Qwen3.5, InternVL3.5 and GLM-4.6V-Flash all accept
 # HARNESS=concat|no_concat|compact (concat is the default).
@@ -402,6 +405,7 @@ trainer:
 # time and would drop every turn's credit at the row boundary; the trainer refuses that
 # pairing at startup rather than training on it.
 algorithm:
+  adv_estimator: default_gae       # or turn_level_gae | token_level_gae
                                    #    | trajectory_grpo
   # default_gae is the vanilla baseline: the episode's whole reward lumped onto its
   # last token, which is what single-turn RLHF does. It stitches rows like the others,

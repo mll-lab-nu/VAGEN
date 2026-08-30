@@ -18,6 +18,7 @@ import numpy as np
 import torch
 
 # Sentinel written into `returns` at positions that carry no value supervision.
+# Turn-level GAE writes a real return at one anchor token per turn and
 # leaves everything else at this value; mirrors CrossEntropyLoss's ignore_index.
 IGNORE_RETURN = -100.0
 

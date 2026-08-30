@@ -8,12 +8,8 @@ Two rewards, independently switchable:
   (``<prediction>``), scored against the state it acted *into*.
 
 ★ Each score is paid **per span** -- on the last token of the section that earned it. The
-environment decides where a reward belongs; it does not know, and must not know, which
-advantage estimator will read it. An estimator that wants a turn's reward lumped onto the
-turn's final token does that lumping itself: ``removed_estimator_gae`` segment-sums each turn onto
-its own boundary, which it already computes. That direction is the only one that works --
-per-span can always be reduced to turn-end, while a turn-end scalar cannot be split back
-into the spans that earned it.
+environment decides where a reward belongs and remains independent of the downstream
+advantage estimator.
 
 This used to be a ``placement`` setting resolved from ``algorithm.adv_estimator``, which
 put the estimator's business inside the environment and made the two a single choice
@@ -213,14 +209,8 @@ class StateRewardWrapper:
         On the *last* token because a span's score is a property of the whole span, so it
         is only determined at the token that completes it.
 
-        ★ This environment does not ask what the advantage estimator is, and the answer
-        would not change what it does here. A reward belongs where it was earned; turning
-        that into whatever shape an estimator needs is the estimator's job.
-        ``removed_estimator_gae`` reads a turn's reward only at the turn's final token, so it
-        segment-sums each turn onto its own boundary before its outer pass -- see
-        ``vagen/algorithms/removed_estimator_gae/removed_estimator_gae.py``. The reduction only runs in that
-        direction: per-span carries strictly more information than a turn-end scalar, and
-        a scalar cannot be split back into the spans that earned it.
+        This environment does not ask what the advantage estimator is. A reward belongs
+        where it was earned, and per-span placement preserves that information.
 
         The outcome reward is different in kind -- it is the environment's verdict on the
         whole turn, not on any span of text -- so it goes on the turn's last token.

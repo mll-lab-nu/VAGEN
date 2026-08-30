@@ -10,11 +10,10 @@ and the measured relative error against an exact policy gradient is 1.06% at 0.9
 at 0.95 -- large enough to matter and small enough to look like noise. So the estimator
 declares ``undiscounted=True`` at registration and the trainer refuses the run at startup.
 
-★ No estimator in the tree declares it today -- ``removed_estimator_gae_varlam``, which did, has been
-removed, and ``removed_estimator_gae`` takes its two gammas separately so it is well-defined away
-from 1.0. The flag stays because it is part of the registration contract a custom estimator
-uses, and an extension point with no test is one that breaks the first time someone reaches
-for it. Hence a throwaway estimator registered here rather than a real one borrowed.
+No estimator in the tree declares it today. The flag stays because it is part of the
+registration contract a custom estimator uses, and an extension point with no test is one
+that breaks the first time someone reaches for it. Hence a throwaway estimator registered
+here rather than a real one borrowed.
 """
 
 from __future__ import annotations
@@ -69,10 +68,9 @@ class _Trainer(VagenLogicMixin):
 def test_the_flag_is_a_declaration_and_not_a_list_that_can_drift():
     assert requires_undiscounted(TWO_CLOCK)
     # token_level_gae has one clock; turn_level_gae is a self-consistent turn MDP where
-    # mixes granularities on one gamma, so all are fine at gamma < 1.
+    # gamma means "per turn". Neither mixes granularities on one gamma.
     assert not requires_undiscounted("token_level_gae")
     assert not requires_undiscounted("turn_level_gae")
-    assert not requires_undiscounted("removed_estimator_gae")
     assert not requires_undiscounted("trajectory_grpo")
 
 

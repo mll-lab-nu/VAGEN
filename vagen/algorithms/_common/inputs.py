@@ -133,6 +133,21 @@ class AdvantageInputs:
         return self.batch["token_level_scores"] if rewards is None else rewards
 
     @property
+    def task_rewards(self) -> torch.Tensor:
+        """Environment/reward-model rewards before the per-token KL penalty."""
+        return self.scores
+
+    @property
+    def kl_rewards(self) -> torch.Tensor:
+        """The already-scaled ``-beta * KL`` contribution at each response token.
+
+        The trainer stores only the combined reward, so subtraction is the exact way to
+        recover the term without duplicating the KL controller's coefficient or state.
+        It is zero when in-reward KL is disabled.
+        """
+        return self.rewards - self.scores
+
+    @property
     def values(self) -> torch.Tensor:
         """Critic output, already aligned so that ``values[:, i]`` is ``V(s_i)`` -- the
         value of the state the token at ``i`` was emitted from. verl does the shift in
@@ -317,7 +332,6 @@ def advantage_estimator(
     needs_critic: bool = False,
     sentinel_returns: bool = False,
     undiscounted: bool = False,
-    turn_lumped_reward: bool = False,
     publishes_turn_id: bool = True,
 ) -> Callable:
     """Register a function of :class:`AdvantageInputs` as an advantage estimator.
@@ -340,10 +354,6 @@ def advantage_estimator(
             one, which is only defined at ``gamma == 1`` -- see
             ``registry.requires_undiscounted`` for why, and for the measured error at
             gamma < 1. The trainer refuses the pairing at startup.
-        turn_lumped_reward: set when the estimator reads a turn's reward only at the
-            turn's last token, so the reward wrapper must lump it there rather than pay
-            it where it was earned -- see ``registry.wants_turn_lumped_reward``.
-
     The estimator may return an :class:`AdvantageOutputs` or a plain
     ``(advantages, returns)`` tuple.
     """
@@ -372,7 +382,6 @@ def advantage_estimator(
             name,
             needs_critic=needs_critic,
             undiscounted=undiscounted,
-            turn_lumped_reward=turn_lumped_reward,
             publishes_turn_id=publishes_turn_id,
         )(adapter)
         return fn

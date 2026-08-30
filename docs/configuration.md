@@ -154,12 +154,6 @@ wrong when it is merely one turn of a longer trajectory.
 | `trajectory_grpo` | group-relative, over trajectories | — |
 | verl's `gae`, `grpo`, … | one row — **`concat` only** | — |
 
-code can fall back to `algorithm.gamma`, but that is not the published/shipped experiment:
-GAE. Set it explicitly for reproduction.
-
-```bash
-```
-
 !!! danger "One more startup refusal"
     All but `trajectory_grpo` need a critic and refuse without `critic.enable=True` — a
     `ValueError` at startup, the same class of trap as the harness rule above.
@@ -282,7 +276,7 @@ and builds `TurnLimit`. Sokoban
 |---|---|---|
 | `render_mode` | `text` | `text` or `vision` |
 | `prompt_format` | **`wm`** | see below |
-| `format_reward` | **`0.1`** | ordinary shipped yamls set `0.02`; the state-reward yamls set `0.03` |
+| `format_reward` | **`0.1`** | ordinary shipped yamls set `0.02`; the Sokoban state-reward recipe sets `0.03` |
 | `success_reward` | `1.0` | |
 | `strict_format` | `true` | a malformed turn has its actions discarded |
 | `use_example_in_sys_prompt` | `true` | |
@@ -355,6 +349,7 @@ There are two halves to it:
    no spec raises an error rather than quietly scoring zero.
 
 Sokoban already ships a spec. A complete working example is
+[`examples/train/sokoban/train_default_gae_sr_qwen25vl3b.sh`](https://github.com/mll-lab-nu/VAGEN/blob/main/examples/train/sokoban/train_default_gae_sr_qwen25vl3b.sh)
 — the `sr` in the name. It starts the judge, waits for `/health`, and reaps it on exit; its
 train/validation yaml files contain:
 
@@ -380,13 +375,10 @@ signal that looks like learning.
 on independently. Enabling either requires the complete canonical WM response; the switches
 control which description receives judge supervision, not which fields exist.
 
-**`reward` is absolute and per turn.** The number in the yaml is exactly what a perfect
-description of that section pays on one turn; it is not divided by `max_turns` and there is
-no `weight` or episode `budget`. In the example above, both judged sections over five
-perfect turns pay `2 × 0.03 × 5 = 0.30`; format pays up to `0.03 × 5 = 0.15`. The shaping
-cap is therefore `0.45`, and including Sokoban's `1.0` success reward the episode cap is
-`1.45`. Raising `max_turns` changes that maximum explicitly rather than silently shrinking
-every turn's learning signal.
+**`reward` is absolute and per turn.** The Sokoban state-reward recipe uses `0.03` for
+state estimation and `0.03` for transition prediction, with `score_base: 0.334` and an
+environment `format_reward` of `0.03`. Across five turns, auxiliary and format shaping is
+capped at `0.45`, while solving the task pays `1.0`.
 
 **`score_base`** is subtracted from each description's F1 before it is paid, then the rest is
 rescaled so a perfect description still earns the configured per-turn reward. It exists because scoring
@@ -400,9 +392,7 @@ scoreable, not a separate line item. The environment's own `format_reward` remai
 single format knob.
 
 There is also no `placement`. The environment pays each score on the final token of the span
-that earned it. An estimator that requires one reward slot per turn performs that reduction
-the environment independent of the estimator and preserves the richer per-span signal for
-estimators that can use it.
+that earned it, keeping reward production independent of the selected estimator.
 
 ---
 

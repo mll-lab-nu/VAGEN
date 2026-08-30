@@ -48,10 +48,6 @@ CRITIC_ESTIMATORS: set[str] = set()
 # defined at gamma == 1. See `requires_undiscounted`.
 UNDISCOUNTED_ESTIMATORS: set[str] = set()
 
-# Estimator names whose outer chain has exactly one reward slot per turn, and which
-# therefore require a turn's reward to sit on the turn's last token.
-TURN_LUMPED_REWARD_ESTIMATORS: set[str] = set()
-
 # Estimator names that publish a `turn_id` column alongside the advantage.
 #
 # ★ Not the same set as TRAJECTORY_ESTIMATORS, though it was assumed to be. Stitching an
@@ -68,7 +64,6 @@ def register_trajectory_adv_est(
     *,
     needs_critic: bool = False,
     undiscounted: bool = False,
-    turn_lumped_reward: bool = False,
     publishes_turn_id: bool = True,
 ) -> Callable:
     """Register an estimator that scores a whole episode, however its rows are laid out.
@@ -86,8 +81,6 @@ def register_trajectory_adv_est(
             CRITIC_ESTIMATORS.add(name)
         if undiscounted:
             UNDISCOUNTED_ESTIMATORS.add(name)
-        if turn_lumped_reward:
-            TURN_LUMPED_REWARD_ESTIMATORS.add(name)
         return register_adv_est(name)(fn)
 
     return decorator
@@ -98,7 +91,6 @@ def register_sentinel_adv_est(
     *,
     needs_critic: bool = False,
     undiscounted: bool = False,
-    turn_lumped_reward: bool = False,
     publishes_turn_id: bool = True,
 ) -> Callable:
     """Register a trajectory estimator that additionally writes sentinel returns.
@@ -113,7 +105,7 @@ def register_sentinel_adv_est(
             name,
             needs_critic=needs_critic,
             undiscounted=undiscounted,
-            turn_lumped_reward=turn_lumped_reward,
+            publishes_turn_id=publishes_turn_id,
         )(fn)
 
     return decorator
@@ -163,26 +155,6 @@ def requires_undiscounted(adv_estimator) -> bool:
     its shape.
     """
     return _name_of(adv_estimator) in UNDISCOUNTED_ESTIMATORS
-
-
-def wants_turn_lumped_reward(adv_estimator) -> bool:
-    """Whether this estimator reads a turn's reward only at the turn's last token.
-
-    ★ Declarative, not a lever. An estimator whose outer chain has a single reward slot
-    per turn -- ``removed_estimator_gae`` reads the reward only at each turn-final token -- would
-    otherwise credit a mid-turn reward once through the inner token chain and again
-    through the outer turn chain: measured bias 0.177 against an exact policy gradient,
-    and a critic fixed-point error of exactly the misplaced weight. The estimators with a
-    reward slot per *token* want the opposite, because a lumped score has to be remembered
-    by ``V`` for the rest of the turn (measured -28% variance at lam 0.9 from per-span,
-    -45% at 0.8).
-
-    Neither failure raises. An estimator that needs the lumped shape therefore builds it
-    itself, from the per-span rewards the environment paid -- see
-    ``vagen.algorithms.removed_estimator_gae.removed_estimator_gae._lump_rewards_at_turn_end``.
-    Environments do not know which estimator will read them, and nothing asks them to.
-    """
-    return _name_of(adv_estimator) in TURN_LUMPED_REWARD_ESTIMATORS
 
 
 def publishes_turn_id(adv_estimator) -> bool:
