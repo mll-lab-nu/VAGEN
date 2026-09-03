@@ -66,6 +66,33 @@ def main(config):
     run_ppo(config)
 
 
+def _propagate_determinism_env(config) -> None:
+    """Export deterministic settings before Ray snapshots the driver environment."""
+    rollout_cfg = config.actor_rollout_ref.rollout
+    rm_rollout_cfg = config.reward.reward_model.rollout
+    if rollout_cfg.full_determinism or (
+        config.reward.reward_model.enable and rm_rollout_cfg.full_determinism
+    ):
+        os.environ["VERL_FULL_DETERMINISM"] = "1"
+        os.environ["VLLM_BATCH_INVARIANT"] = "1"
+        os.environ["PYTHONHASHSEED"] = str(rollout_cfg.seed)
+
+
+def _configure_backend_determinism(config) -> None:
+    """Turn the rollout's determinism contract into backend engine settings."""
+    rollout_cfg = config.actor_rollout_ref.rollout
+    if not rollout_cfg.full_determinism:
+        return
+    if str(rollout_cfg.get("name", "")) == "sglang":
+        OmegaConf.update(
+            config,
+            "actor_rollout_ref.rollout.engine_kwargs.sglang.enable_deterministic_inference",
+            True,
+            merge=True,
+            force_add=True,
+        )
+
+
 # Define a function to run the PPO-like training process
 def run_ppo(config, task_runner_class=None) -> None:
     """Initialize Ray cluster and run distributed PPO training process.
@@ -76,13 +103,19 @@ def run_ppo(config, task_runner_class=None) -> None:
                 model paths, and training hyperparameters.
         task_runner_class: For recipe to change TaskRunner.
     """
+    # Match verl's entrypoint: determinism has to be exported before ray.init(),
+    # otherwise the driver sees the configured seed while every Ray worker inherits
+    # VERL_FULL_DETERMINISM=0 and may route or sample requests nondeterministically.
+    _propagate_determinism_env(config)
+    _configure_backend_determinism(config)
+
     # Check if Ray is not initialized
     if not ray.is_initialized():
         # Initialize Ray with a local cluster configuration
         # Set environment variables in the runtime environment to control tokenizer parallelism,
         # NCCL debug level, VLLM logging level, and allow runtime LoRA updating
         # `num_cpus` specifies the number of CPU cores Ray can use, obtained from the configuration
-        default_runtime_env = get_ppo_ray_runtime_env()
+        default_runtime_env = get_ppo_ray_runtime_env(config)
         ray_init_kwargs = config.ray_kwargs.get("ray_init", {})
         runtime_env_kwargs = ray_init_kwargs.get("runtime_env", {})
 
