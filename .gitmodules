@@ -10,4 +10,4 @@
 	# four VAGEN patches. The current pin adds the InternVL/GLM integration fixes. Rebasing
 	# onto the next release means replaying this patch stack onto the new tag; keep it that
 	# shape rather than letting upstream main creep in underneath.
-	branch = vagen-260814
+	branch = dev/viewagent
