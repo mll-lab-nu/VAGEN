@@ -11,6 +11,7 @@ contract, and turn the client's rows into ``AgentLoopOutput``.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 from typing import Any
@@ -39,6 +40,8 @@ from vagen.envs._common.adapter import GymEnvAdapter, _accepts_response
 logger = logging.getLogger(__file__)
 logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
 
+_ROLLOUT_SOURCE = "__vagen_rollout_index__"
+
 # Which environments can have their reasoning scored is no longer a table here: each
 # environment declares its own `STATE_REWARD_SPEC`. See `envs/_common/rewards/factory.py`.
 
@@ -46,6 +49,18 @@ logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
 class SampledVisionToken(EpisodeUnusable, ValueError):
     """The policy emitted an image placeholder of its own accord. See
     ``GymLoop._refuse_sampled_vision_tokens``."""
+
+
+def _stable_rollout_id(kwargs: dict[str, Any]) -> str:
+    """Identify one repeated rollout without process-random UUIDs or hashes."""
+    fields = (
+        kwargs.get("env_name"),
+        kwargs.get("seed"),
+        kwargs.get(_ROLLOUT_SOURCE),
+        kwargs.get("traj_idx"),
+    )
+    payload = "\x1f".join("" if value is None else str(value) for value in fields)
+    return "vagen-" + hashlib.blake2b(payload.encode("utf-8"), digest_size=16).hexdigest()
 
 
 def _spans_within(spans, keep: int) -> tuple[list[tuple[int, int]], int]:
@@ -102,7 +117,10 @@ class GymLoop(VagenGymAgentLoopBase):
         # axis, not ours -- measured at validation it was unique per row, so every row
         # grouped as its own one-turn episode. Minted here, alongside conversation_id
         # and turn_idx, so the three cannot disagree about what they identify.
-        episode_id = uuid4().hex
+        full_determinism = bool(
+            self.config.actor_rollout_ref.rollout.get("full_determinism", False)
+        )
+        episode_id = _stable_rollout_id(kwargs) if full_determinism else uuid4().hex
 
         env_cls = self.resolve_env_class(kwargs["env_name"])
         # Whether descriptions are scored, and by which judge, is read from the
@@ -144,8 +162,11 @@ class GymLoop(VagenGymAgentLoopBase):
             apply_chat_template_kwargs=self.apply_chat_template_kwargs,
             mm_processor_kwargs=self._get_mm_processor_kwargs(),
             sampling_params=sampling_params,
-            request_id=uuid4().hex,
+            request_id=episode_id if full_determinism else uuid4().hex,
             response_limit=per_turn,
+            backend=str(self.config.actor_rollout_ref.rollout.get("name", "vllm")),
+            full_determinism=full_determinism,
+            rollout_seed=int(self.config.actor_rollout_ref.rollout.get("seed", 0)),
         )
         # What one call may hand the model that it did not generate. Enforced here rather
         # than left to the end of the episode, where an observation that did not fit shows
