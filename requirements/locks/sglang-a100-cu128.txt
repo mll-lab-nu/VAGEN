@@ -1,0 +1,62 @@
+# Verified training stack: SGLang 0.5.8 on A100-SXM4-80GB, CUDA 12.8.
+#
+# This is the set a full VAGEN + verl + SGLang run was observed to complete on.
+# It is NOT the default: `scripts/install.sh` without STACK installs the newer
+# stack from setup.py's extras (torch 2.11 / sglang 0.5.15 / transformers 5.12.1),
+# which is what the Qwen3.5 path needs. The two are alternatives, not an upgrade
+# path -- transformers 4.57.1 here does not carry Qwen3.5.
+#
+#   BACKEND=sglang STACK=aws-a100 bash scripts/install.sh
+#
+# Why the versions are what they are, where it is not obvious:
+#
+#   torch 2.9.1        what sglang 0.5.8 pins. setup.py's note ("sglang 0.5.15,
+#                      not the 0.5.8 verl main declares: 0.5.8 pins torch==2.9.1")
+#                      records the trade the other way round.
+#   transformers 4.57  the decisive one. sglang 0.5.15 pins 5.12.1, whose VL
+#                      module tree and multimodal processor sglang's *runtime*
+#                      paths have not caught up with; rollout dies inside
+#                      processing_utils with `coroutine raised StopIteration`.
+#   nvidia-cudnn 9.16  sglang refuses to start below 9.15 on torch 2.9.1 --
+#                      pytorch/pytorch#168167, a Conv3d bug. torch itself pins
+#                      9.10.2.21, so pip will warn about the conflict; the warning
+#                      is expected and the newer cuDNN is the supported answer.
+#   trl 0.9.6          verl's critic loads AutoModelForCausalLMWithValueHead from
+#                      trl. Newer trl (>=0.27) is required *only* on the 5.x
+#                      stack, where its __init__ hard-imports vllm.
+#   flashinfer 0.6.1   the pair sglang 0.5.8 was built against. flashinfer-python
+#                      and flashinfer-cubin must match exactly or the import
+#                      refuses. Take care: a bare `pip install flashinfer-python`
+#                      pulls a cu130 torch over a cu128 one.
+
+--extra-index-url https://download.pytorch.org/whl/cu128
+
+torch==2.9.1+cu128
+torchvision==0.24.1+cu128
+torchaudio==2.9.1+cu128
+nvidia-cudnn-cu12==9.16.0.29
+
+sglang[srt,openai]==0.5.8
+sgl-kernel==0.3.21
+flashinfer-python==0.6.1
+flash-attn==2.8.3
+torch-memory-saver==0.0.9
+
+transformers==4.57.1
+tokenizers==0.22.2
+accelerate==1.14.0
+peft==0.19.1
+trl==0.9.6
+safetensors==0.8.0
+sentencepiece==0.2.1
+qwen-vl-utils==0.0.14
+datasets==5.0.0
+
+ray==2.55.1
+tensordict==0.10.0
+torchdata==0.11.0
+numpy==2.2.6
+pyarrow==24.0.0
+hydra-core==1.3.3
+omegaconf==2.3.1
+wandb==0.27.2
