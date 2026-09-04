@@ -1,9 +1,7 @@
 #!/bin/bash
 # Evaluate on SpatialGym against a local vLLM server.
 #
-# setup.py calls vLLM "the verified default" and the two engines are mutually exclusive
-# extras, but spatial_gym shipped no launcher at all -- so following the install instructions and then the
-# evaluation instructions left you with an engine no example here could drive.
+# vLLM is an explicit alternative to the default SGLang backend.
 #
 #   MODEL_PATH=/path/to/model bash examples/evaluate/spatial_gym/vllm/eval_qwen25_vl_3b.sh
 #

@@ -32,7 +32,7 @@ if [ "$TP" -gt "$_gpus" ]; then
   exit 1
 fi
 MEM=${MEM:-0.10}
-BACKEND=${BACKEND:-vllm}
+BACKEND=${BACKEND:-sglang}
 SEED=${SEED:-42}
 ATTENTION_BACKEND=${ATTENTION_BACKEND:-flashinfer}
 

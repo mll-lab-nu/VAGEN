@@ -13,7 +13,7 @@ JUDGE_MODEL=${JUDGE_MODEL:-Qwen/Qwen3-4B-Instruct-2507}
 JUDGE_PORT=${JUDGE_PORT:-8123}
 JUDGE_TP=${JUDGE_TP:-4}
 JUDGE_MEM=${JUDGE_MEM:-0.10}
-JUDGE_BACKEND=${JUDGE_BACKEND:-vllm}
+JUDGE_BACKEND=${JUDGE_BACKEND:-sglang}
 JUDGE_SEED=${JUDGE_SEED:-42}
 JUDGE_ATTENTION_BACKEND=${JUDGE_ATTENTION_BACKEND:-flashinfer}
 JUDGE_BASE_URL=${JUDGE_BASE_URL:-http://127.0.0.1:${JUDGE_PORT}/v1}
@@ -49,7 +49,7 @@ if [ -z "$VERL" ]; then
     exit 1
 fi
 export PYTHONPATH=${VERL:+$VERL:}$V${PYTHONPATH:+:$PYTHONPATH}
-mapfile -t BASE < <(grep -vE '^\s*(#|$)' "$V/vagen/configs/baseline_vllm.flags" | sed "s|\$V|$V|g")
+mapfile -t BASE < <(grep -vE '^\s*(#|$)' "$V/vagen/configs/training_defaults.flags" | sed "s|\$V|$V|g")
 
 export JUDGE_BASE_URL JUDGE_MODEL STATE_REWARD_CREDIT_SITE STATE_REWARD_SCORE_BASE
 export STATE_REWARD_AGGREGATION

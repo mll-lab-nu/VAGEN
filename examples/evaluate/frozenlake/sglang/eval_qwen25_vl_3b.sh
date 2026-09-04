@@ -39,6 +39,8 @@ if [ $((DP_SIZE * TP_SIZE)) -gt "$_gpus" ]; then
 fi
 
 MEM_FRACTION="${QWEN25_VL_3B_MEM:-0.80}"
+MAX_MODEL_LEN="${MAX_MODEL_LEN:-8192}"
+SEED="${SEED:-42}"
 
 # The env name belongs in the path: rollouts are keyed on (env, seed, tag, model)
 # and resume skips on a match, so two envs sharing a directory skip each other.
@@ -58,6 +60,9 @@ python3 -m sglang.launch_server \
   --tp "${TP_SIZE}" \
   --trust-remote-code \
   --mem-fraction-static "${MEM_FRACTION}" \
+  --context-length "${MAX_MODEL_LEN}" \
+  --random-seed "${SEED}" \
+  --enable-deterministic-inference \
   >"${SERVER_LOG}" 2>&1 &
 SERVER_PID=$!
 

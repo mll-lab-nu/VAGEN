@@ -7,13 +7,9 @@
 #   conda create -p /path/to/env python=3.12 -y && conda activate /path/to/env
 #   bash scripts/install_sglang.sh
 #
-# Separate from scripts/install.sh on purpose. That one installs the current stack
-# from setup.py's extras (torch 2.11 / sglang 0.5.15 / transformers 5.12.1), which
-# is what the Qwen3.5 path needs. This one installs torch 2.9.1 / sglang 0.5.8 /
-# transformers 4.57.1, which is the set a full VAGEN + verl + SGLang run was
-# observed to complete on. They are alternatives, not an upgrade path:
-# transformers 4.57.1 has no Qwen3.5, while the newer stack requires the matching
-# SGLang and verl compatibility path. Pick by the model you are training.
+# This is also the default SGLang path selected by scripts/install.sh. It installs
+# torch 2.9.1 / SGLang 0.5.8 / transformers 5.10.4. That Transformers version is
+# pinned inside verl's supported range: >=5.5.3, !=5.6.0, <5.11.
 #
 # Versions live in requirements/locks/, not here, so there is one place to change
 # them and this file stays a procedure.

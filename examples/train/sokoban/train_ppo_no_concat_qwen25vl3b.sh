@@ -2,7 +2,7 @@
 # sokoban - default_gae - no_concat - Qwen/Qwen2.5-VL-3B-Instruct
 #
 # Per-experiment settings only. Everything that makes a VAGEN run work at all lives in
-# vagen/configs/baseline_vllm.flags and is read below -- in particular the two flags that
+# vagen/configs/training_defaults.flags and is read below -- in particular the two flags that
 # select VAGEN's agent loop. Without them verl runs its own, and the job comes up looking
 # healthy while none of this repo's rollout code executes -- so the shared flags file is
 # the single place those live, and this script holds only what makes it this experiment.
@@ -44,7 +44,7 @@ if [ -z "$VERL" ]; then
     exit 1
 fi
 export PYTHONPATH=${VERL:+$VERL:}$V${PYTHONPATH:+:$PYTHONPATH}
-mapfile -t BASE < <(grep -vE '^\s*(#|$)' "$V/vagen/configs/baseline_vllm.flags" | sed "s|\$V|$V|g")
+mapfile -t BASE < <(grep -vE '^\s*(#|$)' "$V/vagen/configs/training_defaults.flags" | sed "s|\$V|$V|g")
 
 PYTHONUNBUFFERED=1 python3 -m vagen.training.main \
     --config-path="$V/vagen/configs" --config-name=vagen_multiturn \
@@ -66,7 +66,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.training.main \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
     actor_rollout_ref.rollout.max_num_batched_tokens=10000 \
     actor_rollout_ref.rollout.enforce_eager=True \
-    actor_rollout_ref.rollout.free_cache_engine=True \
+    actor_rollout_ref.rollout.free_cache_engine=False \
     actor_rollout_ref.rollout.enable_chunked_prefill=True \
     trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \

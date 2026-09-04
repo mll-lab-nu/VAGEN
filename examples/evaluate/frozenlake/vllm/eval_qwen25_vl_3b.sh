@@ -1,9 +1,7 @@
 #!/bin/bash
 # Evaluate on FrozenLake against a local vLLM server.
 #
-# setup.py calls vLLM "the verified default" and the two engines are mutually exclusive
-# extras, but frozenlake shipped only an sglang launcher -- so following the install instructions and then the
-# evaluation instructions left you with an engine no example here could drive.
+# vLLM is an explicit alternative to the default SGLang backend.
 #
 #   MODEL_PATH=/path/to/model bash examples/evaluate/frozenlake/vllm/eval_qwen25_vl_3b.sh
 #

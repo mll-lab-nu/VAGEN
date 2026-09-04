@@ -1,8 +1,8 @@
 #!/bin/bash
 # One-command install for VAGEN.
 #
-#   bash scripts/install.sh                  vLLM   (default, and the verified path)
-#   BACKEND=sglang bash scripts/install.sh   SGLang
+#   bash scripts/install.sh                SGLang 0.5.8 (default)
+#   BACKEND=vllm bash scripts/install.sh   vLLM
 #
 # Assumes you are already in the conda env you want to install into. Safe to re-run.
 #
@@ -28,15 +28,14 @@ V=$(cd "$(dirname "$0")/.." && pwd)
 cd "$V"
 
 say()  { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
-warn() { printf '\033[1;33m[!] %s\033[0m\n' "$*" >&2; }
 die()  { printf '\033[1;31m[error] %s\033[0m\n' "$*" >&2; exit 1; }
 
-export BACKEND=${BACKEND:-vllm}
+export BACKEND=${BACKEND:-sglang}
 export SKIP_ENGINE=${SKIP_ENGINE:-0}   # 1 = engine already installed; exported for the check below
 
 case "$BACKEND" in
     vllm)   ;;
-    sglang) warn "the sglang extra is not the verified path; the example scripts are tested on vLLM" ;;
+    sglang) ;;
     *)      die "BACKEND must be 'vllm' or 'sglang', got '$BACKEND'" ;;
 esac
 
@@ -44,6 +43,13 @@ command -v python3 >/dev/null || die "no python3 on PATH"
 python3 - <<'PY' || die "VAGEN needs Python 3.12"
 import sys; sys.exit(0 if sys.version_info[:2] == (3, 12) else 1)
 PY
+
+# The verified SGLang stack needs a lock plus a second installation pass for cuDNN,
+# flash-attn and trl. A setuptools extra cannot express that ordering, so keep the
+# canonical procedure in one place.
+if [ "$BACKEND" = "sglang" ] && [ "$SKIP_ENGINE" != "1" ]; then
+    exec bash "$V/scripts/install_sglang.sh"
+fi
 
 # ---------------------------------------------------------------------- 1. verl source
 say "verl submodule"
@@ -82,7 +88,7 @@ say "checking the install"
 python3 - <<'PY'
 import importlib, importlib.util, os, sys
 
-backend = os.environ.get("BACKEND", "vllm")
+backend = os.environ.get("BACKEND", "sglang")
 skipped = os.environ.get("SKIP_ENGINE") == "1"
 
 mods = ["torch", "transformers", "trl", "verl", "vagen"]
@@ -120,7 +126,7 @@ except Exception as exc:
 # prebuilt kernels-community/flash-attn2 from the Hub instead. With neither, the run dies
 # several minutes in, at model load, saying only that flash-attn is not installed.
 if not importlib.util.find_spec("flash_attn") and not importlib.util.find_spec("kernels"):
-    problems.append("no flash attention: install `kernels` (pip install -e '.[vllm]' does) "
+    problems.append("no flash attention: install `kernels` (either engine extra does) "
                     "so transformers can use kernels-community/flash-attn2, or build flash-attn")
 
 if not skipped:

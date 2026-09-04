@@ -19,7 +19,7 @@ from omegaconf import OmegaConf
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPTS = sorted(glob.glob(os.path.join(_ROOT, "examples/train/*/*.sh")))
 assert SCRIPTS, "no training scripts found; the glob is wrong, not the repo empty"
-BASE_FLAGS = open(os.path.join(_ROOT, "vagen/configs/baseline_vllm.flags")).read()
+BASE_FLAGS = open(os.path.join(_ROOT, "vagen/configs/training_defaults.flags")).read()
 
 #: Kept out of the "every yaml is reachable" check, with the reason.
 UNREFERENCED_BY_DESIGN = {
@@ -64,7 +64,7 @@ def test_a_concat_episode_fits_the_response_region(script):
     n_r = _flag(text, "data.max_response_length") or _flag(BASE_FLAGS, "data.max_response_length")
     if n_r is None:
         pytest.fail(f"{script} sets no data.max_response_length and neither does "
-                    f"baseline_vllm.flags; verl's default is 512, which none of these fit")
+                    f"training_defaults.flags; verl's default is 512, which none of these fit")
     for path in _script_yamls(text, script):
         for spec in OmegaConf.to_container(OmegaConf.load(path)).get("envs", []):
             g = spec.get("response_length_per_turn")

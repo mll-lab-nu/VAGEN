@@ -88,80 +88,36 @@ We frame multi-turn VLM agentic tasks as a Partially Observable Markov Decision 
 ```bash
 conda create -n vagen python=3.12 -y
 conda activate vagen
-
 git clone --recursive --branch release-ready https://github.com/JamesKrW/VAGEN.git
 cd VAGEN
-bash scripts/install.sh
+bash scripts/install.sh  # SGLang 0.5.8 (default)
 ```
 
-`scripts/install.sh` fetches the pinned verl submodule, installs VAGEN with a rollout
-engine, then verl, and checks the result. It is idempotent, so it is safe to re-run.
-`SKIP_ENGINE=1` installs VAGEN without an engine if you already have one.
+This initializes the repository's pinned `verl` submodule when needed and installs the
+default SGLang stack. The script is safe to re-run; set `SKIP_ENGINE=1` to keep an existing
+rollout engine.
 
-vLLM is the default. For the newer SGLang extra used by model families such as Qwen3.5:
+Use vLLM instead with:
 
 ```bash
-BACKEND=sglang bash scripts/install.sh
+BACKEND=vllm bash scripts/install.sh    # vLLM 0.22.0
 ```
 
-For the separately verified training stack based on Torch 2.9.1, SGLang 0.5.8, and
-Transformers 4.57.1, create a dedicated environment and run:
+Do not install vLLM and SGLang in the same environment: they require incompatible
+`flashinfer` builds. Training examples default to SGLang; select vLLM explicitly when
+needed.
 
-```bash
-bash scripts/install_sglang.sh
-```
-
-These are different dependency stacks; do not install one over the other.
-
-Installing the SGLang extra does **not** switch the shipped training launchers: they source
-`baseline_vllm.flags` and still select vLLM. Use the SGLang evaluation launchers where one
-is provided; a training launcher needs explicit SGLang rollout configuration and its own
-model-level validation.
-
-**Use one engine per environment.** They are mutually exclusive, and not by preference:
-each pins a different `flashinfer` patch version, so pip refuses to install them together.
-Use two conda environments if you want both.
-
-<details>
-<summary>Doing it by hand</summary>
-
-```bash
-git submodule update --init --recursive   # verl, pinned; the scripts will not run without it
-
-pip install -e ".[vllm]"                  # or ".[sglang]" -- pick one, never both
-pip install --no-deps -e ./verl           # --no-deps: verl's pins would undo the line above
-pip install accelerate codetiming datasets dill hydra-core numpy pandas peft pyarrow \
-            pybind11 pylatexenc ray tensordict torchdata wandb
-```
-
-The engine, `torch` and `transformers` versions all live in `setup.py`'s
-`extras_require`, so there is one place that says which versions go together.
-
-No `flash-attn` step: it publishes no wheel past torch 2.9, so on a newer torch installing
-it means a source build. `transformers[kernels]`, which the extras pull in, instead fetches
-a prebuilt `kernels-community/flash-attn2` from the Hub on first use.
-
-verl is imported from the checkout rather than from PyPI, and the training scripts find
-it at `VAGEN/verl` (the submodule) or `../verl` (a sibling checkout), in that order. Set
-`VERL=/path/to/verl` to override.
-</details>
-
-**Environments in this repository** — `vagen/configs/env_registry.yaml` is the list that
-matters: `Sokoban`, `FrozenLake`, `SpatialGym`, `PrimitiveSkill` (ManiSkill), and
-`RemoteEnv`, which is how `Navigation` runs. The five benchmarks pictured above are the
-paper's; SVG is not part of this release.
+Supported environments are listed in `vagen/configs/env_registry.yaml`: `Sokoban`,
+`FrozenLake`, `SpatialGym`, `PrimitiveSkill`, and `RemoteEnv` (used by Navigation).
 
 Some need their own setup: [spatial_gym](vagen/envs/spatial_gym/README.md) (dataset
-download, plus `matplotlib` and `scipy` from its requirements.txt — without them the
-registry drops the environment and you get `KeyError: Unknown env name: SpatialGym`),
-[navigation](vagen/envs/navigation/README.md) (AI2-THOR),
+download), [navigation](vagen/envs/navigation/README.md) (AI2-THOR), and
 [primitive_skill](vagen/envs/primitive_skill/README.md) (ManiSkill).
 
-Environment responses use one shared protocol. Structured world-model output is
+Environment responses share one protocol. Structured world-model output is
 `<perception>...</perception><reasoning>...</reasoning><prediction>...</prediction><answer>...</answer>`;
-the compact reasoning form is `<think>...</think><answer>...</answer>`. Native-thinking
-models can use Sokoban's `wm_think` mode, which permits their model-owned thinking block
-before the same structured suffix. See [Configuration](docs/configuration.md#prompt_format).
+the compact form is `<think>...</think><answer>...</answer>`. See
+[Configuration](docs/configuration.md#prompt_format).
 
 
 ## Quick Start
@@ -205,25 +161,16 @@ and state-reward settings.
 ```bash
 cd VAGEN
 
-# Local vLLM
+# SGLang (default)
 MODEL_PATH=Qwen/Qwen2.5-VL-3B-Instruct \
-  bash examples/evaluate/sokoban/vllm/eval_qwen25_vl_3b.sh
+  bash examples/evaluate/sokoban/sglang/eval_qwen25_vl_3b.sh
 
 # OpenAI-compatible endpoint
 bash examples/evaluate/sokoban/run_eval.sh
 ```
 
-See [Evaluation](vagen/evaluation/README.md) for other environments and backends.
-
-<details>
-<summary>With sglang instead</summary>
-
-Requires the sglang extra, which is mutually exclusive with vLLM — see Installation.
-
-```bash
-bash examples/evaluate/frozenlake/sglang/eval_qwen25_vl_3b.sh
-```
-</details>
+Each environment provides `sglang/` and `vllm/` launchers. See
+[Evaluation](vagen/evaluation/README.md) for configuration details.
 
 ## Repository Layout
 

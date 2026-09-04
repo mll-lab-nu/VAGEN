@@ -41,6 +41,42 @@ def test_there_are_scripts_to_check():
     assert SCRIPTS, "found no example scripts; this test is silently vacuous"
 
 
+def test_sglang_is_the_default_rollout_engine():
+    defaults = open("vagen/configs/training_defaults.flags").read()
+    installer = open("scripts/install.sh").read()
+    assert "actor_rollout_ref.rollout.name=sglang" in defaults
+    assert "actor_rollout_ref.rollout.free_cache_engine=False" in defaults
+    assert 'export BACKEND=${BACKEND:-sglang}' in installer
+    for path in SCRIPTS:
+        text = open(path).read()
+        assert "vagen/configs/training_defaults.flags" in text
+        assert "actor_rollout_ref.rollout.free_cache_engine=True" not in text
+
+
+@pytest.mark.parametrize(
+    "environment,launcher",
+    [
+        ("frozenlake", "eval_qwen25_vl_3b.sh"),
+        ("navigation", "eval_qwen25_vl_7b.sh"),
+        ("primitive_skill", "eval_qwen25_vl_3b.sh"),
+        ("sokoban", "eval_qwen25_vl_3b.sh"),
+        ("spatial_gym", "eval_qwen25_vl_3b.sh"),
+    ],
+)
+def test_each_environment_has_both_local_engine_launchers(environment, launcher):
+    for backend in ("sglang", "vllm"):
+        assert os.path.isfile(f"examples/evaluate/{environment}/{backend}/{launcher}")
+
+
+def test_sglang_eval_launchers_are_seeded_and_deterministic():
+    launchers = glob.glob("examples/evaluate/*/sglang/eval_*.sh")
+    assert len(launchers) == 5
+    for path in launchers:
+        text = open(path).read()
+        assert "--random-seed" in text, path
+        assert "--enable-deterministic-inference" in text, path
+
+
 @pytest.mark.parametrize("path", ALL_SHELL_SCRIPTS)
 def test_every_example_shell_script_parses(path):
     subprocess.run(["bash", "-n", path], check=True)

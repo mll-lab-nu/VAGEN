@@ -23,19 +23,17 @@ cd VAGEN
 bash scripts/install.sh
 ```
 
-`scripts/install.sh` is idempotent and verifies the result. It installs vLLM by default;
-`BACKEND=sglang bash scripts/install.sh` selects the newer SGLang stack, and
-`SKIP_ENGINE=1` skips the engine if you already have one. The separately verified
-Torch 2.9.1 / SGLang 0.5.8 / Transformers 4.57.1 training stack is installed with
-`bash scripts/install_sglang.sh` in its own environment. Install **one** engine stack per
-environment — each pins a different `flashinfer` version.
+`scripts/install.sh` is idempotent and installs Torch 2.9.1 / SGLang 0.5.8 /
+Transformers 5.10.4 by default. `BACKEND=vllm bash scripts/install.sh` selects vLLM,
+and `SKIP_ENGINE=1` keeps an existing engine. Install **one** engine per environment because
+the two backends require different `flashinfer` builds.
 
 To do it by hand, the order matters — VAGEN with its engine first, then verl:
 
 ```bash
 git submodule update --init --recursive
 
-pip install -e ".[vllm]"           # or ".[sglang]" -- pick one, never both
+pip install -e ".[sglang]"         # or ".[vllm]" -- pick one, never both
 pip install --no-deps -e ./verl    # --no-deps: verl's pins would undo the line above
 pip install accelerate codetiming datasets dill hydra-core numpy pandas peft pyarrow \
             pybind11 pylatexenc ray tensordict torchdata wandb
