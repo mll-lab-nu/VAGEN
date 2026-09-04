@@ -24,9 +24,11 @@ bash scripts/install.sh
 ```
 
 `scripts/install.sh` is idempotent and verifies the result. It installs vLLM by default;
-`BACKEND=sglang bash scripts/install.sh` picks SGLang instead, and `SKIP_ENGINE=1` skips
-the engine if you already have one. Install **one** engine per environment — each pins a
-different `flashinfer` patch version, so pip refuses the two together.
+`BACKEND=sglang bash scripts/install.sh` selects the newer SGLang stack, and
+`SKIP_ENGINE=1` skips the engine if you already have one. The separately verified
+Torch 2.9.1 / SGLang 0.5.8 / Transformers 4.57.1 training stack is installed with
+`bash scripts/install_sglang.sh` in its own environment. Install **one** engine stack per
+environment — each pins a different `flashinfer` version.
 
 To do it by hand, the order matters — VAGEN with its engine first, then verl:
 

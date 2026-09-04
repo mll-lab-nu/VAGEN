@@ -11,11 +11,18 @@ envs:
     max_env_response_per_turn: 256
     config:
       render_mode: vision
-      format_reward: 0.03
+      strict_format: true
+      format_reward: ${oc.env:SOKOBAN_FORMAT_REWARD,0.03}
       min_solution_steps: [1,5]
+      map_partition: train
+      map_partition_modulus: 4
+      map_partition_eval_bucket: 0
       state_reward:
-        state_estimation:      {enable: true, reward: 0.03}
-        transition_prediction: {enable: true, reward: 0.03}
-        score_base: 0.334
+        state_estimation:      {enable: true, reward: '${oc.env:STATE_ESTIMATION_REWARD,0.03}'}
+        transition_prediction: {enable: true, reward: '${oc.env:TRANSITION_PREDICTION_REWARD,0.03}'}
+        score_base: ${oc.env:STATE_REWARD_SCORE_BASE,0.334}
+        credit_site: ${oc.env:STATE_REWARD_CREDIT_SITE,section_end}
+        aggregation: ${oc.env:STATE_REWARD_AGGREGATION,per_turn}
+        scorer: ${oc.env:STATE_REWARD_SCORER,judge}
         judge_base_url: ${oc.env:JUDGE_BASE_URL,http://127.0.0.1:8123/v1}
         judge_model: ${oc.env:JUDGE_MODEL,Qwen/Qwen3-4B-Instruct-2507}

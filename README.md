@@ -98,12 +98,20 @@ bash scripts/install.sh
 engine, then verl, and checks the result. It is idempotent, so it is safe to re-run.
 `SKIP_ENGINE=1` installs VAGEN without an engine if you already have one.
 
-vLLM is the default and the verified training path. For SGLang evaluation and local
-serving:
+vLLM is the default. For the newer SGLang extra used by model families such as Qwen3.5:
 
 ```bash
 BACKEND=sglang bash scripts/install.sh
 ```
+
+For the separately verified training stack based on Torch 2.9.1, SGLang 0.5.8, and
+Transformers 4.57.1, create a dedicated environment and run:
+
+```bash
+bash scripts/install_sglang.sh
+```
+
+These are different dependency stacks; do not install one over the other.
 
 Installing the SGLang extra does **not** switch the shipped training launchers: they source
 `baseline_vllm.flags` and still select vLLM. Use the SGLang evaluation launchers where one

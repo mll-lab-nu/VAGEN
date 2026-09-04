@@ -3,6 +3,7 @@ from typing import Dict, List, Optional
 from PIL import Image
 
 from vagen.envs._common.response_format import (
+    action_count_within_limit,
     canonical_free_think,
     canonical_wm,
     parse_free_think_sections,
@@ -26,7 +27,8 @@ def parse_free_think(response: str, action_sep: str = ",", max_actions: int = 3)
         "prediction_content": "",
         "action_content": action_content,
         "actions": actions,
-        "format_correct": sections.format_correct,
+        "format_correct": sections.format_correct
+        and action_count_within_limit(sections.answer, action_sep, max_actions),
     }
 
 
@@ -43,7 +45,8 @@ def parse_wm(response: str, action_sep: str = ",", max_actions: int = 3) -> Dict
         "prediction_content": sections.prediction,
         "action_content": action_content,
         "actions": actions,
-        "format_correct": sections.format_correct,
+        "format_correct": sections.format_correct
+        and action_count_within_limit(sections.answer, action_sep, max_actions),
     }
 
 

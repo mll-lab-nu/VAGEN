@@ -1,6 +1,7 @@
 """Training-algorithm facade and registry."""
 
 from vagen.algorithms._common import *  # noqa: F401,F403
+from vagen.algorithms.bi_level_gae import SPEC as BI_LEVEL_GAE
 from vagen.algorithms.default_gae import SPEC as DEFAULT_GAE
 from vagen.algorithms.token_level_gae import SPEC as TOKEN_LEVEL_GAE
 from vagen.algorithms.trajectory_grpo import SPEC as TRAJECTORY_GRPO
@@ -9,6 +10,7 @@ from vagen.algorithms.turn_level_gae import SPEC as TURN_LEVEL_GAE
 __all__ = [
     "ALGORITHMS",
     "AlgorithmSpec",
+    "BI_LEVEL_GAE",
     "DEFAULT_GAE",
     "TOKEN_LEVEL_GAE",
     "TRAJECTORY_GRPO",
