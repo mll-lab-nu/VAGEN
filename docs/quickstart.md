@@ -23,8 +23,8 @@ cd VAGEN
 bash scripts/install.sh
 ```
 
-`scripts/install.sh` is idempotent and installs Torch 2.9.1 / SGLang 0.5.8 /
-Transformers 5.10.4 by default. `BACKEND=vllm bash scripts/install.sh` selects vLLM,
+`scripts/install.sh` is idempotent and installs Torch 2.11.0 / SGLang 0.5.13 /
+Transformers 5.8.1 by default. `BACKEND=vllm bash scripts/install.sh` selects vLLM,
 and `SKIP_ENGINE=1` keeps an existing engine. Install **one** engine per environment because
 the two backends require different `flashinfer` builds.
 

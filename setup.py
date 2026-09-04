@@ -45,7 +45,7 @@ setup(
     # this torch tier pins a different flashinfer patch version, so pip refuses the two
     # together:
     #     vllm   0.22.0  -> flashinfer 0.6.11.post2
-    #     sglang 0.5.8   -> flashinfer 0.6.1
+    #     sglang 0.5.13  -> flashinfer 0.6.12
     # verl models them the same way, as separate extras. Installing both into one
     # environment is not a supported configuration; use two environments.
     #
@@ -63,10 +63,10 @@ setup(
         # this extra directly: cuDNN, flash-attn and trl require the ordered second pass
         # encoded in scripts/install_sglang.sh.
         "sglang": [
-            "torch==2.9.1",
-            "sglang[srt,openai]==0.5.8",
-            "transformers>=5.5.3,!=5.6.0,<5.11",
-            "flashinfer-python==0.6.1",
+            "torch==2.11.0",
+            "sglang[srt,openai]==0.5.13",
+            "transformers==5.8.1",
+            "flashinfer-python[cu13]==0.6.12",
             "peft==0.19.1",
         ],
     },

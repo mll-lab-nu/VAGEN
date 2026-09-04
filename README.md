@@ -90,7 +90,7 @@ conda create -n vagen python=3.12 -y
 conda activate vagen
 git clone --recursive --branch release-ready https://github.com/JamesKrW/VAGEN.git
 cd VAGEN
-bash scripts/install.sh  # SGLang 0.5.8 (default)
+bash scripts/install.sh  # SGLang 0.5.13 (default)
 ```
 
 This initializes the repository's pinned `verl` submodule when needed and installs the

@@ -1,0 +1,15 @@
+# Installed AFTER sglang-cu130.txt with --no-deps.
+#
+# trl 0.9.6 declares
+#                      numpy<2.0.0 while verl 0.9.0 declares numpy>=2.0.0, so the
+#                      two cannot share a resolution at all -- pip reports
+#                      ResolutionImpossible naming numpy. The reference deployment
+#                      runs trl 0.9.6 against numpy 2.2.6, so the bound is stale
+#                      rather than real; installing it after lets pip warn and
+#                      keep numpy 2.x.
+#
+#                      Only the critic's value head needs trl
+#                      (AutoModelForCausalLMWithValueHead), which is why a stale
+#                      bound in it can be overridden without touching training.
+
+trl==0.9.6

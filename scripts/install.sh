@@ -1,7 +1,7 @@
 #!/bin/bash
 # One-command install for VAGEN.
 #
-#   bash scripts/install.sh                SGLang 0.5.8 (default)
+#   bash scripts/install.sh                SGLang 0.5.13 (default)
 #   BACKEND=vllm bash scripts/install.sh   vLLM
 #
 # Assumes you are already in the conda env you want to install into. Safe to re-run.
@@ -15,7 +15,7 @@
 # versions go together. This script does not call verl's
 # scripts/install_vllm_sglang_mcore.sh, which was the previous approach and had three
 # problems:
-#   - it installs sglang 0.5.2, while verl requires 0.5.8+. verl's sglang rollout imports
+#   - it installs sglang 0.5.2, while verl requires a newer API. verl's rollout imports
 #     `ContinueGenerationReqInput`, absent before 0.5.6, so `rollout.name=sglang` died
 #     with an ImportError naming neither sglang nor a version.
 #   - it sets no `set -e` and ends in an unconditional success echo, so any pip failure

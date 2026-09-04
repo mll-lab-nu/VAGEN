@@ -1,23 +1,20 @@
 #!/usr/bin/env bash
-# Install the pinned SGLang stack verified end to end for VAGEN + verl.
-#
-# Verified end to end on A100-SXM4-80GB with CUDA 12.8. H200 may require disabling
-# SGLang's memory-saver integration; that runtime workaround is not encoded here.
+# Install the pinned SGLang candidate stack for VAGEN + verl.
 #
 #   conda create -p /path/to/env python=3.12 -y && conda activate /path/to/env
 #   bash scripts/install_sglang.sh
 #
 # This is also the default SGLang path selected by scripts/install.sh. It installs
-# torch 2.9.1 / SGLang 0.5.8 / transformers 5.10.4. That Transformers version is
-# pinned inside verl's supported range: >=5.5.3, !=5.6.0, <5.11.
+# torch 2.11.0 / SGLang 0.5.13 / transformers 5.8.1. That Transformers version
+# is pinned inside verl's supported range: >=5.5.3, !=5.6.0, <5.11.
 #
 # Versions live in requirements/locks/, not here, so there is one place to change
 # them and this file stays a procedure.
 set -euo pipefail
 
 V=$(cd "$(dirname "$0")/.." && pwd)
-LOCK="$V/requirements/locks/sglang-cu128.txt"
-POST="$V/requirements/locks/sglang-cu128-post.txt"
+LOCK="$V/requirements/locks/sglang-cu130.txt"
+POST="$V/requirements/locks/sglang-cu130-post.txt"
 
 say()  { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
 die()  { printf '\033[1;31m[error] %s\033[0m\n' "$*" >&2; exit 1; }
@@ -45,20 +42,10 @@ fi
 say "pinned stack -- this is the long one"
 $PIP -r "$LOCK" || die "the pinned stack did not resolve; see $LOCK"
 
-# Second pass. Two different reasons live here, both explained in the file: a
-# version override pip would call ResolutionImpossible inside one resolution
-# (cuDNN), and a source build that needs the torch installed above to compile
-# against (flash-attn), which is what --no-build-isolation is for. pip will warn
-# about torch's cuDNN pin; that warning is the expected outcome.
-say "second pass: overrides and source builds (a cuDNN pin warning is expected)"
-# --no-deps is load-bearing, not tidiness. Without it pip re-resolves these three
-# freely and walks the pinned stack backwards: trl 0.9.6's stale numpy<2 bound
-# downgrades numpy to 1.26.4, and flash-attn declares an unbounded `torch`, so pip
-# helpfully installs the newest one -- observed replacing torch 2.9.1+cu128 with
-# 2.14.0+cu130, after which torchvision and sglang both stop importing. Their
-# dependencies are already satisfied by the lock; all that is wanted here is the
-# three packages themselves.
-$PIP --no-deps --no-build-isolation -r "$POST" || die "the second pass failed; see $POST"
+# trl's numpy upper bound is stale relative to verl, so install only the package
+# after the resolved runtime stack is in place.
+say "second pass: critic value-head package"
+$PIP --no-deps -r "$POST" || die "the second pass failed; see $POST"
 
 # ------------------------------------------------------------ 3. vagen and verl
 say "vagen and verl (--no-deps, so the pins above stand)"
@@ -100,13 +87,13 @@ try:
 except Exception as exc:
     problems.append(f"torch cuda check failed: {exc}")
 
-# libcudart.so.12 must be loadable, not merely present -- SGLang's compiled
+# libcudart.so.13 must be loadable, not merely present -- SGLang's compiled
 # extensions link it.
 try:
-    ctypes.CDLL("libcudart.so.12")
-    report("libcudart.so.12", "loadable")
+    ctypes.CDLL("libcudart.so.13")
+    report("libcudart.so.13", "loadable")
 except OSError as exc:
-    problems.append(f"libcudart.so.12 is not loadable: {exc}")
+    problems.append(f"libcudart.so.13 is not loadable: {exc}")
 
 # flashinfer-python and flashinfer-cubin must match exactly; a mismatch raises
 # from flashinfer/jit/env.py at import, naming both versions.
@@ -115,16 +102,10 @@ try:
 except Exception as exc:
     problems.append(f"flashinfer import failed (python/cubin mismatch?): {exc}")
 
-# The cuDNN floor SGLang enforces on torch 2.9.x (pytorch/pytorch#168167). torch
-# pins 9.10, which is why the override above exists and why pip warned.
 try:
     import torch
-    from packaging.version import parse
-
     cudnn = torch.backends.cudnn.version()
     report("cudnn", cudnn)
-    if parse(torch.__version__.split("+")[0]) < parse("2.10") and cudnn < 91500:
-        problems.append(f"cuDNN {cudnn} < 9.15 with torch {torch.__version__}; SGLang refuses to start")
 except Exception as exc:
     problems.append(f"cudnn check failed: {exc}")
 
@@ -155,4 +136,4 @@ print("\n\033[1;32mok\033[0m")
 PY
 
 say "done"
-echo "This environment is ready for the pinned VAGEN SGLang 0.5.8 stack."
+echo "This environment is ready for the pinned VAGEN SGLang 0.5.13 candidate stack."
