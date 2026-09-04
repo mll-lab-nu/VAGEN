@@ -25,7 +25,13 @@ ESTIMATORS = sorted(TRAJECTORY_ESTIMATORS)
 #: registered estimator runs on the shared defaults -- but the contract below is written
 #: against this rather than against "no estimator needs anything", so adding one that does
 #: means adding a line here rather than special-casing it.
-PARAMS: dict[str, dict] = {}
+PARAMS: dict[str, dict] = {
+    "bi_level_gae": {
+        "gamma_turn": 0.95,
+        "lambda_turn": 0.95,
+        "lambda_token": 1.0,
+    },
+}
 
 
 class _Cfg(dict):

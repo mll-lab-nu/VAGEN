@@ -19,6 +19,7 @@ class ScoringSeam:
         self.result = result
         self.seed = seed
         self.max_turns = int(max_turns) if max_turns else None
+        self._deferred_rewards = []
 
     def __getattr__(self, name):
         return getattr(self.env, name)
@@ -33,7 +34,13 @@ class ScoringSeam:
 
     async def step(self, response):
         observation, reward, terminated, truncated, info = await self.env.step(response)
-        self.client.reward_call(response.call_id, reward)
+        finalize = getattr(reward, "finalize_episode", None)
+        if callable(finalize):
+            self._deferred_rewards.append(
+                (response.call_id, reward, len(self.result.rewards))
+            )
+        else:
+            self.client.reward_call(response.call_id, reward)
 
         value = float(reward) if isinstance(reward, Real) else float(sum(reward))
         self.result.rewards.append(value)
@@ -51,7 +58,20 @@ class ScoringSeam:
         self.result.info["rollout_stop_reason"] = reason
 
     async def close(self):
-        await self.env.close()
+        try:
+            turns = max(1, self.result.turns)
+            for call_id, reward, result_index in self._deferred_rewards:
+                finalized = reward.finalize_episode(turns)
+                self.client.reward_call(call_id, finalized)
+                value = (
+                    float(finalized)
+                    if isinstance(finalized, Real)
+                    else float(sum(finalized))
+                )
+                self.result.rewards[result_index] = value
+            self._deferred_rewards.clear()
+        finally:
+            await self.env.close()
 
 
 __all__ = ["ScoringSeam"]

@@ -108,6 +108,7 @@ def test_algorithm_registry_points_to_implementation_packages():
     from vagen.algorithms import ALGORITHMS, registered_algorithms
 
     expected = {
+        "bi_level_gae",
         "default_gae",
         "token_level_gae",
         "trajectory_grpo",
