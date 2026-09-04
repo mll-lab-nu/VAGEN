@@ -8,7 +8,7 @@
 # which is what the Qwen3.5 path needs. The two are alternatives, not an upgrade
 # path -- transformers 4.57.1 here does not carry Qwen3.5.
 #
-#   BACKEND=sglang STACK=aws-a100 bash scripts/install.sh
+#   bash scripts/install_sglang.sh
 #
 # Why the versions are what they are, where it is not obvious:
 #
