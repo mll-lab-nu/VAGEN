@@ -414,6 +414,12 @@ class GymLoop(VagenGymAgentLoopBase):
                  harness) -> list[AgentLoopOutput]:
         rows = client.rows()
         outputs = []
+        finalize_state_scores = getattr(env, "finalized_state_scores", None)
+        state_scores = (
+            finalize_state_scores(result.turns)
+            if callable(finalize_state_scores)
+            else dict(getattr(env, "state_scores", {}))
+        )
         # One row is one conversation. Ordered from 0 in the order they were opened --
         # group / episode ids only identify, but conversations and turns are a sequence,
         # so they read as 0,1,2. Enumerating rows as "turn_idx" was the old bug: it
@@ -510,9 +516,24 @@ class GymLoop(VagenGymAgentLoopBase):
                     extra_fields={
                         "reward_extra_info": {
                             "traj_success": float(env.success),
+                            # Persist the dataset seed so validation trajectories can be
+                            # replayed against the exact generated map. This is essential
+                            # for proving that an apparent policy improvement is visual
+                            # adaptation rather than a fixed macro exploiting map priors.
+                            "env_seed": int(kwargs.get("seed", -1)),
+                            "state_reward_episode_mean": float(
+                                getattr(env, "state_reward_aggregation", "per_turn")
+                                == "episode_mean"
+                            ),
+                            "state_reward_horizon": float(
+                                getattr(env, "state_reward_horizon", 1)
+                            ),
                             # Always present, so the metric exists even in runs where the
                             # agent never described anything.
-                            **{f"{k}_reward": v for k, v in env.state_scores.items()},
+                            **{
+                                f"{k}_reward": v
+                                for k, v in state_scores.items()
+                            },
                             # Fraction of the episode's turns the environment judged
                             # well-formed. NaN, not absent, when the environment does not
                             # report one -- see the note on a stable key set below.

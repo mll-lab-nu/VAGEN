@@ -1,12 +1,4 @@
 [submodule "verl"]
 	path = verl
 	url = https://github.com/JamesKrW/verl.git
-	# Keep this branch and its archival predecessors on the remote. A submodule pins a
-	# SHA, but GitHub can only serve that SHA while a branch or tag still reaches it.
-	# `verl0.9.0base` carries the current VAGEN compatibility patches, rebased onto
-	# verl v0.9.0 (483b8a009ba3a97563edee3a19887e4862b8094a, "[misc] chore: bump version
-	# to 0.9.0 (#7411)"), so the base this fork diverges from is named in the branch and
-	# not only in the log. It supersedes `dev/viewagent`, which stays on the remote --
-	# along with the archive refs -- because earlier VAGEN commits still pin SHAs that
-	# only those branches reach.
 	branch = verl0.9.0base

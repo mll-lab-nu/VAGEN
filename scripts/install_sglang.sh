@@ -159,8 +159,4 @@ print("\n\033[1;32mok\033[0m")
 PY
 
 say "done"
-cat <<'NEXT'
-This environment runs the SGLang 0.5.8 stack. Select it from ViewAgent with:
-
-  VAGEN_PYTHON=/path/to/env/bin/python bash examples/viewsuite/.../run_smoke.sh
-NEXT
+echo "This environment is ready for the pinned VAGEN SGLang 0.5.8 stack."

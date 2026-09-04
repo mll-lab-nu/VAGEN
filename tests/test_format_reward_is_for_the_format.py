@@ -77,6 +77,34 @@ def test_every_wm_environment_accepts_the_same_canonical_order(module, separator
     assert [action.lower() for action in parsed["actions"]] == ["right", "left"]
 
 
+@pytest.mark.parametrize(
+    "module,separator,maximum",
+    [
+        ("vagen.envs.sokoban.utils.utils", ",", 3),
+        ("vagen.envs.frozenlake.utils.utils", ",", 3),
+        ("vagen.envs.primitive_skill.utils.parse", "|", 2),
+        ("vagen.envs.navigation.utils.parse", "|", 5),
+    ],
+)
+def test_over_budget_answers_are_salvaged_but_not_format_correct(
+    module, separator, maximum
+):
+    """Execution may inspect the bounded prefix, but reward cannot bless a violation."""
+    import importlib
+
+    parse = importlib.import_module(module).parse_response
+    answer = separator.join(["Right"] * (maximum + 1))
+    parsed = parse(
+        WM_FULL.replace("<answer>Right</answer>", f"<answer>{answer}</answer>"),
+        prompt_format="wm",
+        action_sep=separator,
+        max_actions=maximum,
+    )
+
+    assert len(parsed["actions"]) == maximum
+    assert parsed["format_correct"] is False
+
+
 def test_spatial_gym_uses_the_shared_free_think_protocol():
     from vagen.envs.spatial_gym.utils.utils import parse_llm_response
 

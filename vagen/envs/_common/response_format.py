@@ -185,6 +185,17 @@ def split_actions(text: str, separator: str, maximum: int, *, lower: bool = True
     return [action.lower() for action in actions] if lower else actions
 
 
+def action_count_within_limit(text: str, separator: str, maximum: int) -> bool:
+    """Whether an answer contains a non-empty action list within the advertised budget.
+
+    ``split_actions`` remains deliberately forgiving and truncates for diagnostics.  This
+    predicate is the strict protocol bit used for format reward and execution: silently
+    truncating an over-budget answer must not make that answer format-correct.
+    """
+    actions = [part.strip() for part in text.split(separator) if part.strip()]
+    return 1 <= len(actions) <= maximum
+
+
 __all__ = [
     "ANSWER",
     "ANSWER_FORMAT",
@@ -195,6 +206,7 @@ __all__ = [
     "ResponseSections",
     "THINK",
     "WM_FORMAT",
+    "action_count_within_limit",
     "canonical_free_think",
     "canonical_wm",
     "loose_section",

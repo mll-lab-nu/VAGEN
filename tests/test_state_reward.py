@@ -8,11 +8,13 @@ advantage estimator that needs a coarser shape reduces it itself; the environmen
 not know which estimator will consume the reward.
 """
 
+import re
 import types
 
 import pytest
 
-from vagen.envs.sokoban.state_reward_spec import relations
+from vagen.envs.sokoban.state_reward_spec import SPEC as SOKOBAN_SPEC
+from vagen.envs.sokoban.state_reward_spec import exact_relations, relations
 from vagen.envs import StateRewardSpec, StateRewardWrapper
 from vagen.envs._common.rewards import TAGS
 
@@ -55,8 +57,12 @@ class CharTokenizer:
         return "".join(chr(i) for i in ids)
 
 
-BOX = [{"object_id": "box", "vertical_relation": "below", "horizontal_relation": "same"}]
-TGT = [{"object_id": "target", "vertical_relation": "above", "horizontal_relation": "same"}]
+BOX = [
+    {"object_id": "box", "vertical_relation": "below", "horizontal_relation": "same"}
+]
+TGT = [
+    {"object_id": "target", "vertical_relation": "above", "horizontal_relation": "same"}
+]
 
 
 def _wm(perception="A", prediction="B", reasoning="R", answer="Up"):
@@ -73,8 +79,10 @@ def _spec(**kw):
         relations=lambda env: env.state,
         judge_prompt="{content}",
         object_weights={"box": 1.0},
-        examples={"state_estimation": "<perception>...</perception>",
-                  "transition_prediction": "<prediction>...</prediction>"},
+        examples={
+            "state_estimation": "<perception>...</perception>",
+            "transition_prediction": "<prediction>...</prediction>",
+        },
         axes="relations are relative to you",
         **kw,
     )
@@ -82,8 +90,11 @@ def _spec(**kw):
 
 def _wrapper(env, judge, enabled=None, **kw):
     return StateRewardWrapper(
-        env=env, spec=_spec(), judge=judge,
-        enabled={"state_estimation": 1.0} if enabled is None else enabled, **kw,
+        env=env,
+        spec=_spec(),
+        judge=judge,
+        enabled={"state_estimation": 1.0} if enabled is None else enabled,
+        **kw,
     )
 
 
@@ -95,7 +106,10 @@ def _wrapper(env, judge, enabled=None, **kw):
     [
         ({"state_estimation": 0.5}, ["perception"]),
         ({"transition_prediction": 0.5}, ["prediction"]),
-        ({"state_estimation": 0.5, "transition_prediction": 0.5}, ["perception", "prediction"]),
+        (
+            {"state_estimation": 0.5, "transition_prediction": 0.5},
+            ["perception", "prediction"],
+        ),
         ({}, []),
     ],
 )
@@ -124,8 +138,9 @@ def test_an_unknown_reward_name_is_rejected():
 async def test_only_the_enabled_reward_is_scored():
     """Turning one off must stop paying for it, not merely stop asking."""
     action = _wm()
-    w = _wrapper(Env(BOX, BOX, reward=0.0), Judge(BOX, BOX),
-                 enabled={"state_estimation": 1.0})
+    w = _wrapper(
+        Env(BOX, BOX, reward=0.0), Judge(BOX, BOX), enabled={"state_estimation": 1.0}
+    )
 
     _, _, _, info = await w.step(action, [ord(c) for c in action], CharTokenizer())
 
@@ -135,6 +150,112 @@ async def test_only_the_enabled_reward_is_scored():
     assert "state_reward/transition_prediction" not in info
 
 
+def test_sokoban_exact_parser_reads_the_prompted_axes_conservatively():
+    assert exact_relations(
+        "The box is below and same column as the player, and the target is "
+        "same row and right of the player."
+    ) == [
+        {
+            "object_id": "box",
+            "vertical_relation": "below",
+            "horizontal_relation": "same",
+        },
+        {
+            "object_id": "target",
+            "vertical_relation": "same",
+            "horizontal_relation": "right",
+        },
+    ]
+    assert exact_relations("I think the puzzle looks good") == []
+    contradictory = exact_relations(
+        "The box is above and below and left of the player, and the target is "
+        "same row and same column of the player"
+    )
+    assert contradictory[0]["vertical_relation"] is None
+
+
+def test_sokoban_exact_parser_returns_every_numbered_object_clause():
+    parsed = exact_relations(
+        "Box 1 is above and left of the player, and box2 is below and right of "
+        "the player, and target 1 is in the same row and left of the player, and "
+        "target2 is above and in the same column as the player."
+    )
+    assert parsed == [
+        {
+            "object_id": "box",
+            "vertical_relation": "above",
+            "horizontal_relation": "left",
+        },
+        {
+            "object_id": "box",
+            "vertical_relation": "below",
+            "horizontal_relation": "right",
+        },
+        {
+            "object_id": "target",
+            "vertical_relation": "same",
+            "horizontal_relation": "left",
+        },
+        {
+            "object_id": "target",
+            "vertical_relation": "above",
+            "horizontal_relation": "same",
+        },
+    ]
+
+    from vagen.envs._common.rewards import grouped_f1
+
+    assert grouped_f1(parsed, parsed, SOKOBAN_SPEC.object_weights) == pytest.approx(1.0)
+
+
+def test_sokoban_exact_parser_accepts_its_own_prompt_examples():
+    for tag, example in (
+        ("perception", SOKOBAN_SPEC.examples["state_estimation"]),
+        ("prediction", SOKOBAN_SPEC.examples["transition_prediction"]),
+    ):
+        body = re.search(rf"<{tag}>(.*?)</{tag}>", example, re.DOTALL).group(1)
+        parsed = {item["object_id"]: item for item in exact_relations(body)}
+        assert set(parsed) == {"box", "target"}
+        assert all(
+            item["vertical_relation"] is not None
+            and item["horizontal_relation"] is not None
+            for item in parsed.values()
+        )
+
+
+@pytest.mark.asyncio
+async def test_exact_scorer_bypasses_the_model_judge():
+    action = _wm(perception="box below same column", prediction="box below same column")
+    judge = Judge(BOX, BOX)
+    spec = _spec(exact_parser=lambda _text: BOX)
+    w = StateRewardWrapper(
+        env=Env(BOX, BOX, reward=0.0),
+        spec=spec,
+        judge=judge,
+        enabled={"state_estimation": 1.0, "transition_prediction": 1.0},
+        scorer="exact",
+    )
+
+    _, vector, _, info = await w.step(action, [ord(c) for c in action], CharTokenizer())
+
+    assert sum(vector) == pytest.approx(2.0)
+    assert info["state_reward/state_estimation"] == pytest.approx(1.0)
+    assert info["state_reward/transition_prediction"] == pytest.approx(1.0)
+    assert judge.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_environment_protocol_failure_gates_state_reward():
+    """A structurally valid WM block cannot farm state reward with an invalid answer."""
+    judge = Judge(BOX)
+    w = _wrapper(Env(BOX, BOX, reward=0.0), judge)
+
+    scored = await w._score(_wm(), {"state_estimation": BOX}, protocol_correct=False)
+
+    assert scored["state_estimation"] == 0.0
+    assert judge.calls == 0
+
+
 # ------------------------------------------------------------------- placement
 
 
@@ -142,9 +263,16 @@ async def test_only_the_enabled_reward_is_scored():
 async def test_each_description_is_paid_on_the_span_that_earned_it():
     """The environment preserves within-turn credit; estimators may reduce it later."""
     action = _wm()
-    moved = [{"object_id": "box", "vertical_relation": "above", "horizontal_relation": "same"}]
+    moved = [
+        {
+            "object_id": "box",
+            "vertical_relation": "above",
+            "horizontal_relation": "same",
+        }
+    ]
     w = _wrapper(
-        Env(before=BOX, after=moved), Judge(BOX, moved),
+        Env(before=BOX, after=moved),
+        Judge(BOX, moved),
         enabled={"state_estimation": 1.0, "transition_prediction": 1.0},
     )
 
@@ -152,10 +280,106 @@ async def test_each_description_is_paid_on_the_span_that_earned_it():
 
     assert vector[action.index("A")] == pytest.approx(1.0)
     assert vector[action.index("B")] == pytest.approx(1.0)
-    assert vector[-1] == pytest.approx(1.0), "the environment outcome belongs to the turn"
+    assert vector[-1] == pytest.approx(
+        1.0
+    ), "the environment outcome belongs to the turn"
     assert sum(vector) == pytest.approx(3.0)
     assert info["state_reward/state_estimation"] == pytest.approx(1.0)
     assert info["state_reward/transition_prediction"] == pytest.approx(1.0)
+
+
+@pytest.mark.asyncio
+async def test_turn_end_placement_lumps_auxiliary_credit_at_the_action_boundary():
+    action = _wm()
+    w = _wrapper(
+        Env(before=BOX, after=BOX, reward=2.0),
+        Judge(BOX, BOX),
+        enabled={"state_estimation": 1.0, "transition_prediction": 1.0},
+        credit_site="turn_end",
+    )
+
+    _, vector, _, _ = await w.step(action, [ord(c) for c in action], CharTokenizer())
+
+    assert sum(vector[:-1]) == 0.0
+    assert vector[-1] == pytest.approx(4.0)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("credit_site", "prompt"),
+        ("aggregation", "sum"),
+        ("scorer", "oracle-ish"),
+    ],
+)
+def test_unknown_state_reward_research_modes_are_rejected(field, value):
+    with pytest.raises(ValueError, match=f"unknown state-reward {field}"):
+        _wrapper(Env(BOX, BOX), Judge(BOX), **{field: value})
+
+
+@pytest.mark.asyncio
+async def test_episode_mean_changes_only_auxiliary_reward_after_length_is_known():
+    action = _wm()
+    w = _wrapper(
+        Env(before=BOX, after=BOX, reward=1.0),
+        Judge(BOX, BOX),
+        enabled={"state_estimation": 1.0, "transition_prediction": 1.0},
+        aggregation="episode_mean",
+        episode_horizon=5,
+    )
+
+    _, vector, _, _ = await w.step(
+        action, [ord(c) for c in action], CharTokenizer()
+    )
+
+    assert isinstance(vector, list)
+    assert sum(vector) == pytest.approx(3.0), "the online value remains inspectable"
+    finalized = vector.finalize_episode(2)
+    assert sum(finalized) == pytest.approx(6.0)
+    assert finalized[-1] == pytest.approx(1.0), "the task outcome is not divided"
+
+
+@pytest.mark.asyncio
+async def test_episode_mean_also_finalizes_scalar_evaluation_rewards():
+    action = _wm()
+    w = _wrapper(
+        Env(before=BOX, after=BOX, reward=1.0),
+        Judge(BOX, BOX),
+        enabled={"state_estimation": 1.0, "transition_prediction": 1.0},
+        aggregation="episode_mean",
+        episode_horizon=5,
+    )
+
+    _, reward, _, _ = await w.step(action)
+
+    assert float(reward) == pytest.approx(3.0)
+    assert reward.finalize_episode(2) == pytest.approx(6.0)
+
+
+@pytest.mark.asyncio
+async def test_episode_mean_and_turn_end_compose_on_the_action_boundary():
+    action = _wm()
+    w = _wrapper(
+        Env(before=BOX, after=BOX, reward=1.0),
+        Judge(BOX, BOX),
+        enabled={"state_estimation": 1.0, "transition_prediction": 1.0},
+        credit_site="turn_end",
+        aggregation="episode_mean",
+        episode_horizon=5,
+    )
+
+    _, vector, _, _ = await w.step(
+        action, [ord(c) for c in action], CharTokenizer()
+    )
+    finalized = vector.finalize_episode(2)
+
+    assert sum(finalized[:-1]) == 0.0
+    assert finalized[-1] == pytest.approx(6.0)
+
+
+def test_exact_scorer_requires_an_environment_parser():
+    with pytest.raises(ValueError, match="exact_parser"):
+        _wrapper(Env(BOX, BOX), Judge(BOX), scorer="exact")
 
 
 @pytest.mark.asyncio
@@ -163,7 +387,13 @@ async def test_prediction_is_scored_against_the_state_after_the_step():
     """★ Estimation describes what the agent acted from, prediction what it acted into.
     Scoring both against the same state would make one of them free."""
     action = _wm(prediction="A")
-    moved = [{"object_id": "box", "vertical_relation": "above", "horizontal_relation": "same"}]
+    moved = [
+        {
+            "object_id": "box",
+            "vertical_relation": "above",
+            "horizontal_relation": "same",
+        }
+    ]
     on = {"transition_prediction": 1.0}
 
     w = _wrapper(Env(before=BOX, after=moved), Judge(moved), enabled=on)
@@ -173,13 +403,22 @@ async def test_prediction_is_scored_against_the_state_after_the_step():
     _, _, _, before = await w2.step(action, [ord(c) for c in action], CharTokenizer())
 
     assert after["state_reward/transition_prediction"] == pytest.approx(1.0)
-    assert before["state_reward/transition_prediction"] < after["state_reward/transition_prediction"]
+    assert (
+        before["state_reward/transition_prediction"]
+        < after["state_reward/transition_prediction"]
+    )
 
 
 @pytest.mark.asyncio
 async def test_a_wrong_description_earns_nothing_but_does_not_go_negative():
     action = _wm()
-    wrong = [{"object_id": "box", "vertical_relation": "above", "horizontal_relation": "left"}]
+    wrong = [
+        {
+            "object_id": "box",
+            "vertical_relation": "above",
+            "horizontal_relation": "left",
+        }
+    ]
     w = _wrapper(Env(BOX, BOX, reward=0.0), Judge(wrong))
 
     _, vector, _, _ = await w.step(action, [ord(c) for c in action], CharTokenizer())
@@ -196,7 +435,9 @@ async def test_a_judge_outage_costs_the_process_reward_not_the_rollout():
 
     _, vector, _, _ = await w.step(action, [ord(c) for c in action], CharTokenizer())
 
-    assert sum(vector) == pytest.approx(2.0), "the environment's own reward must survive"
+    assert sum(vector) == pytest.approx(
+        2.0
+    ), "the environment's own reward must survive"
 
 
 @pytest.mark.asyncio
@@ -254,7 +495,11 @@ async def test_both_descriptions_of_a_turn_go_out_in_one_batch():
     of every rollout."""
     action = _wm()
     judge = Judge(BOX, BOX)
-    w = _wrapper(Env(BOX, BOX), judge, enabled={"state_estimation": 1.0, "transition_prediction": 1.0})
+    w = _wrapper(
+        Env(BOX, BOX),
+        judge,
+        enabled={"state_estimation": 1.0, "transition_prediction": 1.0},
+    )
 
     await w.step(action, [ord(c) for c in action], CharTokenizer())
 
@@ -286,16 +531,26 @@ def test_one_judge_is_shared_per_endpoint():
 
 
 def test_sokoban_relations_are_relative_to_the_player():
-    room = [[0, 0, 0], [0, 5, 0], [0, 4, 0]]      # player at (1,1), box below it
-    fixed = [[0, 0, 0], [0, 0, 0], [0, 2, 0]]      # target at (2,1)
+    room = [[0, 0, 0], [0, 5, 0], [0, 4, 0]]  # player at (1,1), box below it
+    fixed = [[0, 0, 0], [0, 0, 0], [0, 2, 0]]  # target at (2,1)
 
     import numpy as np
 
-    env = types.SimpleNamespace(env=types.SimpleNamespace(room_state=np.array(room), room_fixed=np.array(fixed)))
+    env = types.SimpleNamespace(
+        env=types.SimpleNamespace(room_state=np.array(room), room_fixed=np.array(fixed))
+    )
     items = relations(env)
 
-    assert {"object_id": "box", "vertical_relation": "below", "horizontal_relation": "same"} in items
-    assert {"object_id": "target", "vertical_relation": "below", "horizontal_relation": "same"} in items
+    assert {
+        "object_id": "box",
+        "vertical_relation": "below",
+        "horizontal_relation": "same",
+    } in items
+    assert {
+        "object_id": "target",
+        "vertical_relation": "below",
+        "horizontal_relation": "same",
+    } in items
 
 
 # ------------------------------------------------------- hallucination must cost
@@ -320,7 +575,9 @@ def test_describing_extra_items_of_a_real_type_costs_precision():
     gold = [_box(), _target()]
     exact = grouped_f1(gold, gold, WEIGHTS)
     one_extra = grouped_f1(gold + [_box("above", "left")], gold, WEIGHTS)
-    two_extra = grouped_f1(gold + [_box("above", "left"), _box("same", "right")], gold, WEIGHTS)
+    two_extra = grouped_f1(
+        gold + [_box("above", "left"), _box("same", "right")], gold, WEIGHTS
+    )
 
     assert exact == pytest.approx(1.0)
     assert two_extra < one_extra < exact, f"{two_extra} < {one_extra} < {exact}"
@@ -331,7 +588,7 @@ def test_inventing_a_type_that_is_not_there_costs_more_than_silence():
     Once the description mentions it, it counts -- with nothing to match against."""
     from vagen.envs._common.rewards import grouped_f1
 
-    gold = [_box()]                                   # no targets in this scene
+    gold = [_box()]  # no targets in this scene
 
     silent_about_targets = grouped_f1([_box()], gold, WEIGHTS)
     invented_a_target = grouped_f1([_box(), _target()], gold, WEIGHTS)
