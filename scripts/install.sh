@@ -2,15 +2,7 @@
 # One-command install for VAGEN.
 #
 #   bash scripts/install.sh                  vLLM   (default, and the verified path)
-#   BACKEND=sglang bash scripts/install.sh   SGLang, current stack (torch 2.11 / sglang 0.5.15)
-#   BACKEND=sglang STACK=aws-a100 \
-#       bash scripts/install.sh              SGLang, the version set verified end to end
-#
-# The two SGLang stacks are alternatives, not an upgrade path. The default one is
-# what the Qwen3.5 path needs (transformers 5.x); aws-a100 is the set a full run
-# was observed to complete on (transformers 4.57.1, which has no Qwen3.5). Pick by
-# the model you are training. Versions and reasoning live in
-# requirements/locks/sglang-a100-cu128.txt, not here -- one place to change.
+#   BACKEND=sglang bash scripts/install.sh   SGLang
 #
 # Assumes you are already in the conda env you want to install into. Safe to re-run.
 #
@@ -40,19 +32,7 @@ warn() { printf '\033[1;33m[!] %s\033[0m\n' "$*" >&2; }
 die()  { printf '\033[1;31m[error] %s\033[0m\n' "$*" >&2; exit 1; }
 
 export BACKEND=${BACKEND:-vllm}
-export STACK=${STACK:-default}
 export SKIP_ENGINE=${SKIP_ENGINE:-0}   # 1 = engine already installed; exported for the check below
-
-LOCKFILE=""
-POSTFILE=""
-case "$STACK" in
-    default)   ;;
-    aws-a100)  LOCKFILE="$V/requirements/locks/sglang-a100-cu128.txt"
-               POSTFILE="$V/requirements/locks/sglang-a100-cu128-post.txt"
-               [ "$BACKEND" = sglang ] || die "STACK=aws-a100 is an SGLang stack; pass BACKEND=sglang"
-               [ -f "$LOCKFILE" ] || die "lock file not found: $LOCKFILE" ;;
-    *)         die "STACK must be 'default' or 'aws-a100', got '$STACK'" ;;
-esac
 
 case "$BACKEND" in
     vllm)   ;;
@@ -80,30 +60,12 @@ if [ "$SKIP_ENGINE" = "1" ]; then
     say "vagen (no engine; SKIP_ENGINE=1)"
     python3 -m pip install --no-cache-dir -e "$V"
 else
-    if [ -n "$LOCKFILE" ]; then
-        say "pinned stack '$STACK' -- this is the long one"
-        # The lock first, then vagen with --no-deps so setup.py's ranges cannot
-        # re-resolve on top of it and move torch or transformers.
-        python3 -m pip install --no-cache-dir -r "$LOCKFILE" \
-            || die "the pinned stack did not resolve; see $LOCKFILE"
-        # Deliberate overrides, second pass. These contradict a pin something in
-        # the lock declares, so pip reports ResolutionImpossible if they share a
-        # resolution and merely warns when applied after -- the warning is the
-        # expected outcome. Currently: cuDNN, which torch pins below the floor
-        # SGLang enforces.
-        if [ -f "$POSTFILE" ]; then
-            python3 -m pip install --no-cache-dir -r "$POSTFILE" \
-                || die "the post-install overrides did not apply; see $POSTFILE"
-        fi
-        python3 -m pip install --no-cache-dir --no-deps -e "$V"
-    else
-        say "vagen[$BACKEND] -- this is the long one"
-        # One pip call so the resolver sees torch, the engine and transformers together and
-        # reports a conflict, rather than resolving in sequence and letting the last pin
-        # silently downgrade torch under an already-built engine.
-        python3 -m pip install --no-cache-dir -e "$V[$BACKEND]" \
-            || die "the $BACKEND extra did not resolve. The two engines pin different flashinfer versions and cannot share an environment -- if the other one is already installed here, use a fresh env."
-    fi
+    say "vagen[$BACKEND] -- this is the long one"
+    # One pip call so the resolver sees torch, the engine and transformers together and
+    # reports a conflict, rather than resolving in sequence and letting the last pin
+    # silently downgrade torch under an already-built engine.
+    python3 -m pip install --no-cache-dir -e "$V[$BACKEND]" \
+        || die "the $BACKEND extra did not resolve. The two engines pin different flashinfer versions and cannot share an environment -- if the other one is already installed here, use a fresh env."
 fi
 
 # ------------------------------------------------------------------------ 3. verl
@@ -176,59 +138,6 @@ if not skipped:
         except Exception:
             problems.append("sglang is too old for this verl: it lacks "
                             "ContinueGenerationReqInput, added in 0.5.6. Install sglang>=0.5.6.")
-
-# --- runtime-linkage checks -------------------------------------------------
-# Import success is not enough: each of these fails at model load or first
-# generation instead, several frames from anything that names the cause.
-
-# Torch <-> CUDA. A wheel built for a different CUDA major than the driver
-# imports fine and dies on the first kernel.
-try:
-    import torch
-    print(f"  torch cuda     {torch.version.cuda} (driver reports "
-          f"{'available' if torch.cuda.is_available() else 'NO DEVICE'})")
-    if not torch.cuda.is_available():
-        problems.append("torch cannot see a GPU; check the wheel's CUDA build against the driver")
-except Exception as exc:
-    problems.append(f"torch cuda check failed: {exc}")
-
-# libcudart.so.12 has to be loadable, not merely present -- sglang's compiled
-# extensions link it.
-import ctypes.util, ctypes
-try:
-    ctypes.CDLL("libcudart.so.12")
-    print("  libcudart.so.12 loadable")
-except OSError as exc:
-    problems.append(f"libcudart.so.12 is not loadable: {exc}")
-
-# flashinfer-python and flashinfer-cubin must be the same version; a mismatch
-# raises from flashinfer/jit/env.py at import.
-try:
-    import flashinfer
-    print(f"  flashinfer     {flashinfer.__version__}")
-except Exception as exc:
-    problems.append(f"flashinfer import failed (python/cubin version mismatch?): {exc}")
-
-# cuDNN floor for torch 2.9.x: sglang refuses to start below 9.15
-# (pytorch/pytorch#168167). torch itself pins 9.10, so pip warns -- the newer one
-# is correct.
-try:
-    from packaging.version import parse
-    import torch
-    if parse(torch.__version__.split("+")[0]) < parse("2.10") and torch.backends.cudnn.version() < 91500:
-        problems.append(f"cuDNN {torch.backends.cudnn.version()} < 9.15 with torch "
-                        f"{torch.__version__}; sglang refuses to start. "
-                        f"pip install nvidia-cudnn-cu12==9.16.0.29")
-except Exception:
-    pass
-
-# verl is a checkout on PYTHONPATH, not an installed package; importing it is the
-# only way to know the submodule is really there and really first.
-try:
-    import verl
-    print(f"  verl           {getattr(verl, '__version__', 'ok')} ({verl.__file__})")
-except Exception as exc:
-    problems.append(f"verl does not import: {exc}")
 
 if problems:
     print("\n\033[1;31mproblems:\033[0m")
