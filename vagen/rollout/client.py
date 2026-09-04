@@ -115,7 +115,7 @@ class InferenceClient(ABC):
         self._conversations: dict[str, Conversation] = {}
         self._counter = 0
         self._histories: dict[str, list[Any]] = {}
-        self._call_to_conversation: dict[int, str] = {}
+        self._call_to_response: dict[int, tuple[str, tuple[int, int]]] = {}
         self._call_counter = 0
         self._max_calls = int(max_calls)
         #: One warning per client, not per turn -- an environment that overruns the
@@ -173,7 +173,6 @@ class InferenceClient(ABC):
         conversation = self._conversations[conversation_id]
         call_id = self._call_counter
         self._call_counter += 1
-        self._call_to_conversation[call_id] = conversation_id
 
         # ``create`` has already routed the full message list and reduced it to the new
         # edge. Explicit-id compatibility callers also pass an edge directly.
@@ -215,6 +214,10 @@ class InferenceClient(ABC):
                     "multi_modal_inputs is built from ours.", got, expected, got - expected)
             conversation.adopt_prompt(output.prompt_token_ids)
         conversation.add_response(output.token_ids, output.logprobs)
+        self._call_to_response[call_id] = (
+            conversation_id,
+            conversation.response_spans[-1],
+        )
 
         # A backend that returns None -- what a closed API gives for a refusal or a
         # filtered completion -- must not reach the harness as an action. `accept`
@@ -422,10 +425,10 @@ class InferenceClient(ABC):
     def reward_call(self, call_id: int, value: float | list[float]) -> None:
         """Credit the sampled call that the environment acted on."""
         try:
-            conversation_id = self._call_to_conversation[call_id]
+            conversation_id, response_span = self._call_to_response[call_id]
         except KeyError as exc:
             raise KeyError(f"unknown model call {call_id}") from exc
-        self.reward(conversation_id, value)
+        self._conversations[conversation_id].add_reward_at(response_span, value)
 
     def rows(self) -> list[Row]:
         """One row per conversation the model spoke in.

@@ -11,18 +11,20 @@ An environment declares it instead. Either inherit :class:`HasStateReward` and s
 duck-types, so a class does not have to change its bases to gain the capability.
 
 The spec itself is env-specific and belongs next to the environment: what its objects
-are, how to read their positions out of its internal state, and what to ask the judge.
-``envs/_common/rewards/`` keeps only the parts that are shared across environment
-implementations -- the judge client, F1 scorer, span helpers, and wrapper.
+are, how to read their positions out of its internal state, what to ask the judge, and
+optionally how to parse a closed response vocabulary exactly. ``envs/_common/rewards/``
+keeps only the parts shared across environment implementations -- scorer selection, the
+judge client, F1 scorer, span helpers, and wrapper.
 """
 
 from __future__ import annotations
 
 from typing import Any, Optional
 
-from vagen.envs._common.rewards.judge import shared_judge
+from vagen.envs._common.rewards.judge import NullJudge, shared_judge
 from vagen.envs._common.rewards.state import (
     DEFAULT_SCORE_BASE,
+    SCORERS,
     TAGS,
     StateRewardSpec,
     StateRewardWrapper,
@@ -67,11 +69,13 @@ def state_reward_names(env_config: Optional[dict]) -> tuple[str, ...]:
     Read straight from the config so a caller can name the metrics it is about to record
     without building the environment first.
     """
-    cfg = ((env_config or {}).get(STATE_REWARD_KEY) or {})
+    cfg = (env_config or {}).get(STATE_REWARD_KEY) or {}
     return tuple(name for name in TAGS if (cfg.get(name) or {}).get("enable", False))
 
 
-def build_env(env_cls: Any, env_config: Optional[dict], max_turns: Optional[int] = None):
+def build_env(
+    env_cls: Any, env_config: Optional[dict], max_turns: Optional[int] = None
+):
     """Construct an environment from its config, ready to run.
 
     One function for both callers. Training and evaluation build environments from the
@@ -96,11 +100,15 @@ def build_env(env_cls: Any, env_config: Optional[dict], max_turns: Optional[int]
                 "state_reward requires the canonical WM response format; set "
                 "prompt_format=wm (or wm_think for a native-thinking model)"
             )
-    env = _with_state_reward(env_cls, env_cls(env_config=config), settings)
+    env = _with_state_reward(
+        env_cls, env_cls(env_config=config), settings, max_turns=max_turns
+    )
     return TurnLimit(env, int(max_turns)) if max_turns else env
 
 
-def _with_state_reward(env_cls: Any, env: Any, settings: dict):
+def _with_state_reward(
+    env_cls: Any, env: Any, settings: dict, max_turns: Optional[int] = None
+):
     enabled = {
         name: float(settings[name].get("reward", 0.0))
         for name in TAGS
@@ -116,9 +124,14 @@ def _with_state_reward(env_cls: Any, env: Any, settings: dict):
             f"config but declares no STATE_REWARD_SPEC. Write one next to the environment "
             f"(see vagen/envs/sokoban/state_reward_spec.py) and set it on the class."
         )
+    scorer = str(settings.get("scorer", "judge"))
+    if scorer not in SCORERS:
+        raise ValueError(
+            f"unknown state-reward scorer {scorer!r}; choose from {SCORERS}"
+        )
     base_url = settings.get("judge_base_url")
     model = settings.get("judge_model")
-    if not base_url or not model:
+    if scorer == "judge" and (not base_url or not model):
         # Off is a choice; on-but-unreachable is not. A judge that never answers scores
         # every description zero, which reads as a policy that cannot describe anything.
         raise ValueError(
@@ -127,10 +140,26 @@ def _with_state_reward(env_cls: Any, env: Any, settings: dict):
             "point these at it, the way the eval configs point at their model server."
         )
 
+    aggregation = str(settings.get("aggregation", "per_turn"))
+    if aggregation == "episode_mean" and not max_turns:
+        raise ValueError(
+            "state_reward aggregation=episode_mean requires max_turns so its fixed "
+            "episode shaping budget is defined"
+        )
+
+    judge = (
+        shared_judge(str(base_url), str(model))
+        if scorer == "judge"
+        else NullJudge()
+    )
     return StateRewardWrapper(
         env=env,
         spec=spec,
-        judge=shared_judge(str(base_url), str(model)),
+        judge=judge,
         enabled=enabled,
         score_base=float(settings.get("score_base", DEFAULT_SCORE_BASE)),
+        credit_site=str(settings.get("credit_site", "section_end")),
+        aggregation=aggregation,
+        scorer=scorer,
+        episode_horizon=int(max_turns or 1),
     )

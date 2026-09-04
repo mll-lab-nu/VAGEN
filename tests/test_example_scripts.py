@@ -186,6 +186,25 @@ def test_the_state_reward_example_owns_the_judge_lifecycle():
     assert "val_sokoban_vision_sr.yaml" in text
 
 
+def test_sokoban_bi_level_state_reward_script_uses_validated_defaults():
+    text = open("examples/train/sokoban/train_bi_level_gae_sr_qwen25vl3b.sh").read()
+    for setting in (
+        "PROJECT_NAME=${PROJECT_NAME:-vagen-experiments}",
+        "BI_LEVEL_MIX=${BI_LEVEL_MIX:-0.75}",
+        "GAMMA_TURN=${GAMMA_TURN:-0.95}",
+        "LAMBDA_TURN=${LAMBDA_TURN:-0.95}",
+        "LAMBDA_TOKEN=${LAMBDA_TOKEN:-1.0}",
+        "STATE_REWARD_CREDIT_SITE=${STATE_REWARD_CREDIT_SITE:-turn_end}",
+        "STATE_REWARD_SCORE_BASE=${STATE_REWARD_SCORE_BASE:-0.625}",
+        "STATE_REWARD_AGGREGATION=${STATE_REWARD_AGGREGATION:-episode_mean}",
+        "STATE_REWARD_SCORER=${STATE_REWARD_SCORER:-exact}",
+        "STATE_ESTIMATION_REWARD=${STATE_ESTIMATION_REWARD:-0.006}",
+        "TRANSITION_PREDICTION_REWARD=${TRANSITION_PREDICTION_REWARD:-0.006}",
+        "+algorithm.bi_level_mix=\"$BI_LEVEL_MIX\"",
+    ):
+        assert setting in text
+
+
 def test_sokoban_state_reward_example_uses_the_small_shaping_budget():
     """State and format shaping stay small relative to the success reward."""
     import yaml
@@ -197,15 +216,18 @@ def test_sokoban_state_reward_example_uses_the_small_shaping_budget():
         assert config["max_turns"] == 5
         assert config["response_length_per_turn"] == 512
         assert "reward_mode" not in env
-        assert env["format_reward"] == pytest.approx(0.03)
-        assert env["state_reward"]["state_estimation"]["reward"] == pytest.approx(0.03)
-        assert env["state_reward"]["transition_prediction"]["reward"] == pytest.approx(0.03)
-        assert env["state_reward"]["score_base"] == pytest.approx(0.334)
-        shaping_cap = config["max_turns"] * (
-            env["format_reward"]
-            + env["state_reward"]["state_estimation"]["reward"]
-            + env["state_reward"]["transition_prediction"]["reward"]
+        assert env["strict_format"] is True
+        assert env["format_reward"] == "${oc.env:SOKOBAN_FORMAT_REWARD,0.03}"
+        assert env["state_reward"]["state_estimation"]["reward"] == (
+            "${oc.env:STATE_ESTIMATION_REWARD,0.03}"
         )
+        assert env["state_reward"]["transition_prediction"]["reward"] == (
+            "${oc.env:TRANSITION_PREDICTION_REWARD,0.03}"
+        )
+        assert env["state_reward"]["score_base"] == (
+            "${oc.env:STATE_REWARD_SCORE_BASE,0.334}"
+        )
+        shaping_cap = config["max_turns"] * (0.03 + 0.03 + 0.03)
         assert shaping_cap == pytest.approx(0.45)
 
 
@@ -215,6 +237,22 @@ def test_the_judge_launcher_uses_a_toolkit_that_really_has_nvcc():
     assert 'torch.version.cuda' in text
     assert '[ ! -x "$CUDA_HOME/bin/nvcc" ]' in text
     assert 'CUDA toolkit with nvcc not found' in text
+
+
+def test_the_sglang_judge_enables_deterministic_inference():
+    text = open("scripts/launch_judge.sh").read()
+    sglang_branch = text.split("  sglang)", 1)[1].split("    ;;", 1)[0]
+    vllm_branch = text.split("  vllm)", 1)[1].split("    ;;", 1)[0]
+
+    assert '--random-seed "$SEED"' in sglang_branch
+    assert "--enable-deterministic-inference" in sglang_branch
+    assert "--enable-deterministic-inference" not in vllm_branch
+
+
+def test_the_sglang_installer_does_not_reference_downstream_repositories():
+    text = open("scripts/install_sglang.sh").read().lower()
+    assert "viewagent" not in text
+    assert "viewsuite" not in text
 
 
 # ------------------------------------------- a seed that indexes data, not a generator

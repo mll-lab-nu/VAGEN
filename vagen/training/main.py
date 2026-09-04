@@ -109,23 +109,24 @@ def run_ppo(config, task_runner_class=None) -> None:
     _propagate_determinism_env(config)
     _configure_backend_determinism(config)
 
+    # Build the runtime environment even when the caller initialized Ray. Driver
+    # environment changes made above are not retroactively inherited by an existing
+    # Ray job, so the TaskRunner actor must receive them explicitly.
+    default_runtime_env = get_ppo_ray_runtime_env(config)
+    ray_init_kwargs = config.ray_kwargs.get("ray_init", {})
+    runtime_env_kwargs = ray_init_kwargs.get("runtime_env", {})
+
+    if config.transfer_queue.enable:
+        runtime_env_vars = runtime_env_kwargs.get("env_vars", {})
+        runtime_env_vars["TRANSFER_QUEUE_ENABLE"] = "1"
+        runtime_env_kwargs["env_vars"] = runtime_env_vars
+
+    runtime_env = OmegaConf.merge(default_runtime_env, runtime_env_kwargs)
+
     # Check if Ray is not initialized
     if not ray.is_initialized():
-        # Initialize Ray with a local cluster configuration
-        # Set environment variables in the runtime environment to control tokenizer parallelism,
-        # NCCL debug level, VLLM logging level, and allow runtime LoRA updating
-        # `num_cpus` specifies the number of CPU cores Ray can use, obtained from the configuration
-        default_runtime_env = get_ppo_ray_runtime_env(config)
-        ray_init_kwargs = config.ray_kwargs.get("ray_init", {})
-        runtime_env_kwargs = ray_init_kwargs.get("runtime_env", {})
-
-        if config.transfer_queue.enable:
-            # Add runtime environment variables for transfer queue
-            runtime_env_vars = runtime_env_kwargs.get("env_vars", {})
-            runtime_env_vars["TRANSFER_QUEUE_ENABLE"] = "1"
-            runtime_env_kwargs["env_vars"] = runtime_env_vars
-
-        runtime_env = OmegaConf.merge(default_runtime_env, runtime_env_kwargs)
+        # Initialize Ray with a local cluster configuration. `num_cpus` specifies the
+        # number of CPU cores Ray can use, obtained from the configuration.
         ray_init_kwargs = OmegaConf.create({**ray_init_kwargs, "runtime_env": runtime_env})
         print(f"ray init kwargs: {ray_init_kwargs}")
         ray.init(**OmegaConf.to_container(ray_init_kwargs))
@@ -147,9 +148,14 @@ def run_ppo(config, task_runner_class=None) -> None:
         nsight_options = OmegaConf.to_container(
             config.global_profiler.global_tool_config.nsys.controller_nsight_options
         )
-        runner = task_runner_class.options(runtime_env={"nsight": nsight_options}).remote()
+        task_runtime_env = OmegaConf.merge(runtime_env, {"nsight": nsight_options})
+        runner = task_runner_class.options(
+            runtime_env=OmegaConf.to_container(task_runtime_env)
+        ).remote()
     else:
-        runner = task_runner_class.remote()
+        runner = task_runner_class.options(
+            runtime_env=OmegaConf.to_container(runtime_env)
+        ).remote()
     ray.get(runner.run.remote(config))
 
     # [Optional] get the path of the timeline trace file from the configuration, default to None

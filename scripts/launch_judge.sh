@@ -9,7 +9,6 @@
 # Instruct-only on purpose: a thinking model would spend its budget reasoning about a
 # format conversion, on the critical path of every turn of every rollout.
 #
-# vllm, matching the cluster entrypoint. Two engines for one job is two sets of failures.
 set -eo pipefail
 # The conda env the judge runs in. Defaults to the one this shell is already using.
 ENV=${ENV:-$(python3 -c 'import sys, os; print(os.path.dirname(os.path.dirname(sys.executable)))' 2>/dev/null || echo "$CONDA_PREFIX")}
@@ -33,6 +32,9 @@ if [ "$TP" -gt "$_gpus" ]; then
   exit 1
 fi
 MEM=${MEM:-0.10}
+BACKEND=${BACKEND:-vllm}
+SEED=${SEED:-42}
+ATTENTION_BACKEND=${ATTENTION_BACKEND:-flashinfer}
 
 # FlashInfer JITs kernels on first use, so CUDA_HOME must name a real toolkit with nvcc.
 # The conda environment carries Python and CUDA runtime libraries but not necessarily the
@@ -60,13 +62,31 @@ export CPLUS_INCLUDE_PATH="$CUDA_HOME/include:$ENV/targets/x86_64-linux/include:
 export LIBRARY_PATH="$CUDA_HOME/lib64:$ENV/lib:$ENV/targets/x86_64-linux/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
 export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$ENV/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
-exec "$ENV/bin/python" -m vllm.entrypoints.openai.api_server \
-  --model "$MODEL" \
-  --port "$PORT" \
-  --tensor-parallel-size "$TP" \
-  --gpu-memory-utilization "$MEM" \
-  --max-model-len 4096 \
-  # vLLM 0.22 removed --disable-log-requests; quiet is the default and the flag
-  # that exists now is its opposite. Left in as a comment because the failure it
-  # caused -- `error: unrecognized arguments` -- names the flag, not the version.
-  # --enable-log-requests
+case "$BACKEND" in
+  sglang)
+    exec "$ENV/bin/python" -m sglang.launch_server \
+      --host 0.0.0.0 \
+      --model-path "$MODEL" \
+      --port "$PORT" \
+      --tp "$TP" \
+      --mem-fraction-static "$MEM" \
+      --context-length 4096 \
+      --attention-backend "$ATTENTION_BACKEND" \
+      --random-seed "$SEED" \
+      --enable-deterministic-inference \
+      --log-level warning
+    ;;
+  vllm)
+    exec "$ENV/bin/python" -m vllm.entrypoints.openai.api_server \
+      --model "$MODEL" \
+      --port "$PORT" \
+      --tensor-parallel-size "$TP" \
+      --gpu-memory-utilization "$MEM" \
+      --max-model-len 4096 \
+      --seed "$SEED"
+    ;;
+  *)
+    echo "unsupported judge backend: $BACKEND (expected sglang or vllm)" >&2
+    exit 2
+    ;;
+esac

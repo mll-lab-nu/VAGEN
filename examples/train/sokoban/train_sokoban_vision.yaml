@@ -9,6 +9,9 @@ envs:
     max_env_response_per_turn: 256
     config:
       render_mode: vision
-      format_reward: 0.02
+      format_reward: ${oc.env:SOKOBAN_FORMAT_REWARD,0.02}
       min_solution_steps: [1,5]
+      map_partition: train
+      map_partition_modulus: 4
+      map_partition_eval_bucket: 0
       
