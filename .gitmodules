@@ -1,8 +1,3 @@
 [submodule "verl"]
 	path = verl
 	url = https://github.com/JamesKrW/verl.git
-	# Keep this branch and its archival predecessors on the remote. A submodule pins a
-	# SHA, but GitHub can only serve that SHA while a branch or tag still reaches it.
-	# `dev/viewagent` carries the current VAGEN compatibility patches; archive refs retain
-	# superseded intermediate pins that remain present in VAGEN's history.
-	branch = dev/viewagent

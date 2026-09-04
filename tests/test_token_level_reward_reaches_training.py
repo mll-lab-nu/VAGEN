@@ -70,6 +70,7 @@ def test_the_vector_is_published_not_only_its_sum():
         "only the sum survives; span-level credit is erased"
     )
     assert out.reward_score == 3.0, "the scalar is still needed for verl's own metrics"
+    assert out.extra_fields["reward_extra_info"]["env_seed"] == -1
 
 
 def test_the_scalar_is_the_sum_of_the_vector_that_trains():

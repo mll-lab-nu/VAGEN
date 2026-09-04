@@ -227,7 +227,13 @@ class Conversation:
         """
         if self._last_response is None:
             raise MaskMisaligned("no model output to credit; the environment acted on nothing")
-        start, end = self._last_response
+        self.add_reward_at(self._last_response, reward)
+
+    def add_reward_at(
+        self, response_span: tuple[int, int], reward: float | list[float]
+    ) -> None:
+        """Credit one explicitly identified model call, including after later turns."""
+        start, end = response_span
         if end == start:
             # An aborted generation returns no tokens. There is nowhere to put the
             # credit: `end - 1` would land on the observation before it and pay the

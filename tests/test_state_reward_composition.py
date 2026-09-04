@@ -182,6 +182,27 @@ def test_state_reward_lives_in_the_env_config_and_is_removed_before_construction
     assert env.env.enabled == {"state_estimation": 0.01, "transition_prediction": 0.02}
 
 
+def test_state_reward_turn_options_are_passed_to_the_wrapper():
+    env = build_env(
+        _ConfiguredEnv,
+        _config(credit_site="turn_end"),
+        max_turns=5,
+    )
+    assert env.env.credit_site == "turn_end"
+
+    averaged = build_env(
+        _ConfiguredEnv,
+        _config(
+            score_base=0.428,
+            aggregation="episode_mean",
+        ),
+        max_turns=5,
+    )
+    assert averaged.env.score_base == 0.428
+    assert averaged.env.aggregation == "episode_mean"
+    assert averaged.env.episode_horizon == 5
+
+
 def test_per_turn_rewards_do_not_change_when_max_turns_changes():
     five = build_env(_ConfiguredEnv, _config(), max_turns=5)
     ten = build_env(_ConfiguredEnv, _config(), max_turns=10)
@@ -198,11 +219,49 @@ def test_on_without_an_environment_spec_is_rejected():
         build_env(_NoSpecConfiguredEnv, _config(), max_turns=5)
 
 
+def test_episode_mean_requires_the_environment_turn_horizon():
+    with pytest.raises(ValueError, match="episode_mean requires max_turns"):
+        build_env(
+            _ConfiguredEnv,
+            _config(aggregation="episode_mean"),
+            max_turns=None,
+        )
+
+
 def test_on_without_a_judge_is_rejected():
     cfg = _config()
     del cfg["state_reward"]["judge_base_url"]
     with pytest.raises(ValueError, match="judge_base_url/judge_model"):
         build_env(_ConfiguredEnv, cfg, max_turns=5)
+
+
+def test_exact_scorer_does_not_require_a_judge_endpoint():
+    class ExactEnv(_ConfiguredEnv):
+        STATE_REWARD_SPEC = StateRewardSpec(
+            relations=lambda env: [
+                {
+                    "object_id": "box",
+                    "vertical_relation": "below",
+                    "horizontal_relation": "same",
+                }
+            ],
+            judge_prompt="unused: {content}",
+            object_weights={"box": 1.0},
+            exact_parser=lambda _text: [
+                {
+                    "object_id": "box",
+                    "vertical_relation": "below",
+                    "horizontal_relation": "same",
+                }
+            ],
+        )
+
+    cfg = _config(scorer="exact")
+    del cfg["state_reward"]["judge_base_url"]
+    del cfg["state_reward"]["judge_model"]
+    env = build_env(ExactEnv, cfg, max_turns=5)
+
+    assert env.env.scorer == "exact"
 
 
 @pytest.mark.asyncio

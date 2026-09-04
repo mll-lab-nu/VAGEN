@@ -119,6 +119,23 @@ class GymEnvAdapter:
     async def close(self):
         await self.env.close()
 
+    def finalized_state_scores(self, turns: int) -> dict[str, float]:
+        """Return auxiliary metrics under the reward's episode aggregation rule."""
+        finalize = getattr(self.env, "finalize_episode_scores", None)
+        return (
+            finalize(self.state_scores, turns)
+            if callable(finalize)
+            else dict(self.state_scores)
+        )
+
+    @property
+    def state_reward_aggregation(self) -> str:
+        return str(getattr(self.env, "aggregation", "per_turn"))
+
+    @property
+    def state_reward_horizon(self) -> int:
+        return int(getattr(self.env, "episode_horizon", 1))
+
     def _message(self, obs: dict, role: str = "user") -> dict:
         mm = obs.get("multi_modal_input", {}) or {}
         # Only images are carried. A video would count as a picture -- image_token_ids

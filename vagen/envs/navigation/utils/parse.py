@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from vagen.envs._common.response_format import (
+    action_count_within_limit,
     parse_answer_sections,
     parse_free_think_sections,
     parse_wm_sections,
@@ -55,7 +56,8 @@ def parse_response(
         reasoning_content=sections.reasoning,
         prediction_content=sections.prediction,
         action_content=sections.answer,
-        format_correct=sections.format_correct,
+        format_correct=sections.format_correct
+        and action_count_within_limit(sections.answer, action_sep, max_actions),
         actions=split_actions(sections.answer, action_sep, max_actions),
     )
     return result
