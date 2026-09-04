@@ -1,0 +1,16 @@
+# Deliberate overrides, applied AFTER sglang-a100-cu128.txt.
+#
+# Everything here contradicts a pin that some package in the main lock declares,
+# so it cannot live in the same pip resolution -- pip would report
+# ResolutionImpossible rather than let the later pin win. Installing it as a
+# second pass makes pip warn instead, and the warning is the expected outcome,
+# not a problem to fix.
+#
+#   nvidia-cudnn-cu12  torch 2.9.1 pins 9.10.2.21. SGLang refuses to start on
+#                      torch 2.9.x below cuDNN 9.15 and says so itself:
+#                      "CRITICAL WARNING: PyTorch 2.9.1 & CuDNN Compatibility
+#                      Issue Detected" -- a known Conv3d bug,
+#                      https://github.com/pytorch/pytorch/issues/168167.
+#                      The reference A100 deployment runs 9.16.0.29.
+
+nvidia-cudnn-cu12==9.16.0.29

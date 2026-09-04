@@ -44,9 +44,11 @@ export STACK=${STACK:-default}
 export SKIP_ENGINE=${SKIP_ENGINE:-0}   # 1 = engine already installed; exported for the check below
 
 LOCKFILE=""
+POSTFILE=""
 case "$STACK" in
     default)   ;;
     aws-a100)  LOCKFILE="$V/requirements/locks/sglang-a100-cu128.txt"
+               POSTFILE="$V/requirements/locks/sglang-a100-cu128-post.txt"
                [ "$BACKEND" = sglang ] || die "STACK=aws-a100 is an SGLang stack; pass BACKEND=sglang"
                [ -f "$LOCKFILE" ] || die "lock file not found: $LOCKFILE" ;;
     *)         die "STACK must be 'default' or 'aws-a100', got '$STACK'" ;;
@@ -84,6 +86,15 @@ else
         # re-resolve on top of it and move torch or transformers.
         python3 -m pip install --no-cache-dir -r "$LOCKFILE" \
             || die "the pinned stack did not resolve; see $LOCKFILE"
+        # Deliberate overrides, second pass. These contradict a pin something in
+        # the lock declares, so pip reports ResolutionImpossible if they share a
+        # resolution and merely warns when applied after -- the warning is the
+        # expected outcome. Currently: cuDNN, which torch pins below the floor
+        # SGLang enforces.
+        if [ -f "$POSTFILE" ]; then
+            python3 -m pip install --no-cache-dir -r "$POSTFILE" \
+                || die "the post-install overrides did not apply; see $POSTFILE"
+        fi
         python3 -m pip install --no-cache-dir --no-deps -e "$V"
     else
         say "vagen[$BACKEND] -- this is the long one"

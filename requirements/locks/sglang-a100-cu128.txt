@@ -17,10 +17,11 @@
 #                      module tree and multimodal processor sglang's *runtime*
 #                      paths have not caught up with; rollout dies inside
 #                      processing_utils with `coroutine raised StopIteration`.
-#   nvidia-cudnn 9.16  sglang refuses to start below 9.15 on torch 2.9.1 --
-#                      pytorch/pytorch#168167, a Conv3d bug. torch itself pins
-#                      9.10.2.21, so pip will warn about the conflict; the warning
-#                      is expected and the newer cuDNN is the supported answer.
+#   nvidia-cudnn 9.16  in the -post file, applied after this one. sglang refuses
+#                      to start below 9.15 on torch 2.9.1 (pytorch/pytorch#168167,
+#                      a Conv3d bug) while torch pins 9.10.2.21. Installed in the
+#                      same pass that is a hard ResolutionImpossible; installed
+#                      after, pip warns and the newer cuDNN wins, which is correct.
 #   trl 0.9.6          verl's critic loads AutoModelForCausalLMWithValueHead from
 #                      trl. Newer trl (>=0.27) is required *only* on the 5.x
 #                      stack, where its __init__ hard-imports vllm.
@@ -34,7 +35,9 @@
 torch==2.9.1+cu128
 torchvision==0.24.1+cu128
 torchaudio==2.9.1+cu128
-nvidia-cudnn-cu12==9.16.0.29
+# nvidia-cudnn-cu12 is NOT here -- see sglang-a100-cu128-post.txt. torch 2.9.1
+# pins 9.10.2.21 and sglang refuses to start below 9.15, which pip reports as
+# ResolutionImpossible if both are in one pass.
 
 sglang[srt,openai]==0.5.8
 sgl-kernel==0.3.21
