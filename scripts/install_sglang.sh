@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 # Install the pinned SGLang stack verified end to end for VAGEN + verl.
 #
-# Exercised on A100-SXM4-80GB and H200-141GB, CUDA 12.8. Nothing here is
-# card-specific.
+# Verified end to end on A100-SXM4-80GB with CUDA 12.8. H200 may require disabling
+# SGLang's memory-saver integration; that runtime workaround is not encoded here.
 #
 #   conda create -p /path/to/env python=3.12 -y && conda activate /path/to/env
-#   bash scripts/install_sglang_a100.sh
+#   bash scripts/install_sglang.sh
 #
 # Separate from scripts/install.sh on purpose. That one installs the current stack
 # from setup.py's extras (torch 2.11 / sglang 0.5.15 / transformers 5.12.1), which
 # is what the Qwen3.5 path needs. This one installs torch 2.9.1 / sglang 0.5.8 /
 # transformers 4.57.1, which is the set a full VAGEN + verl + SGLang run was
 # observed to complete on. They are alternatives, not an upgrade path:
-# transformers 4.57.1 has no Qwen3.5, and transformers 5.x breaks SGLang's
-# multimodal rollout and weight-sync paths. Pick by the model you are training.
+# transformers 4.57.1 has no Qwen3.5, while the newer stack requires the matching
+# SGLang and verl compatibility path. Pick by the model you are training.
 #
 # Versions live in requirements/locks/, not here, so there is one place to change
 # them and this file stays a procedure.
