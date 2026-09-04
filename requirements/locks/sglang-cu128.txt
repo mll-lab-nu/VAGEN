@@ -1,4 +1,6 @@
-# Verified training stack: SGLang 0.5.8 on A100-SXM4-80GB, CUDA 12.8.
+# Verified training stack: SGLang 0.5.8, CUDA 12.8.
+#
+# Exercised on A100-SXM4-80GB and H200-141GB; nothing here is card-specific.
 #
 # This is the set a full VAGEN + verl + SGLang run was observed to complete on.
 # It is NOT the default: `scripts/install.sh` without STACK installs the newer
@@ -35,21 +37,24 @@
 torch==2.9.1+cu128
 torchvision==0.24.1+cu128
 torchaudio==2.9.1+cu128
-# nvidia-cudnn-cu12 is NOT here -- see sglang-a100-cu128-post.txt. torch 2.9.1
+# nvidia-cudnn-cu12 is NOT here -- see sglang-cu128-post.txt. torch 2.9.1
 # pins 9.10.2.21 and sglang refuses to start below 9.15, which pip reports as
 # ResolutionImpossible if both are in one pass.
 
 sglang[srt,openai]==0.5.8
 sgl-kernel==0.3.21
 flashinfer-python==0.6.1
-flash-attn==2.8.3
+# flash-attn is NOT here -- see sglang-cu128-post.txt. It has no wheel for this
+# torch and builds from source, and pip's build isolation gives that build no
+# torch to compile against.
 torch-memory-saver==0.0.9
 
 transformers==4.57.1
 tokenizers==0.22.2
 accelerate==1.14.0
 peft==0.19.1
-trl==0.9.6
+# trl is NOT here -- see sglang-cu128-post.txt. Its numpy<2 bound contradicts
+# verl's numpy>=2, which pip calls ResolutionImpossible.
 safetensors==0.8.0
 sentencepiece==0.2.1
 qwen-vl-utils==0.0.14
