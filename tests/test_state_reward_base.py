@@ -22,18 +22,19 @@ from test_state_reward import BOX, CharTokenizer, Env, Judge, _spec, _wm
 
 
 def _w(base=DEFAULT_SCORE_BASE, **kw):
-    return StateRewardWrapper(env=None, spec=_spec(), enabled={"state_estimation": 1.0},
-                              score_base=base, **kw)
+    return StateRewardWrapper(
+        env=None, spec=_spec(), enabled={"state_estimation": 1.0}, score_base=base, **kw
+    )
 
 
 @pytest.mark.parametrize(
     "f1,base,expected",
     [
-        (1.0, 0.334, 1.0),        # a perfect description still earns the whole weight...
-        (0.334, 0.334, 0.0),      # ...chance earns nothing...
-        (0.0, 0.334, 0.0),        # ...and worse than chance is worth nothing, not a debt.
-        (0.667, 0.334, 0.5),      # halfway between chance and perfect -> half the weight
-        (0.5, 0.0, 0.5),          # base 0 is the legacy reward, untouched
+        (1.0, 0.334, 1.0),  # a perfect description still earns the whole weight...
+        (0.334, 0.334, 0.0),  # ...chance earns nothing...
+        (0.0, 0.334, 0.0),  # ...and worse than chance is worth nothing, not a debt.
+        (0.667, 0.334, 0.5),  # halfway between chance and perfect -> half the weight
+        (0.5, 0.0, 0.5),  # base 0 is the legacy reward, untouched
         (1.0, 0.0, 1.0),
     ],
 )
@@ -69,10 +70,20 @@ async def test_it_reaches_the_paid_score_end_to_end():
     action = _wm()
     ids = [ord(c) for c in action]
 
-    full = StateRewardWrapper(env=Env(BOX, BOX, reward=0.0), spec=_spec(), judge=Judge(BOX),
-                              enabled={"state_estimation": 1.0}, score_base=0.0)
-    based = StateRewardWrapper(env=Env(BOX, BOX, reward=0.0), spec=_spec(), judge=Judge(BOX),
-                               enabled={"state_estimation": 1.0}, score_base=0.5)
+    full = StateRewardWrapper(
+        env=Env(BOX, BOX, reward=0.0),
+        spec=_spec(),
+        judge=Judge(BOX),
+        enabled={"state_estimation": 1.0},
+        score_base=0.0,
+    )
+    based = StateRewardWrapper(
+        env=Env(BOX, BOX, reward=0.0),
+        spec=_spec(),
+        judge=Judge(BOX),
+        enabled={"state_estimation": 1.0},
+        score_base=0.5,
+    )
     # A *perfect* description is unchanged by the base -- that is the rescale working.
     _, _, _, i_full = await full.step(action, ids, CharTokenizer())
     _, _, _, i_based = await based.step(action, ids, CharTokenizer())
@@ -80,17 +91,33 @@ async def test_it_reaches_the_paid_score_end_to_end():
     assert i_based["state_reward/state_estimation"] == pytest.approx(1.0)
 
     # A half-right one is not.
-    half = [{"object_id": "box", "vertical_relation": "below", "horizontal_relation": "WRONG"}]
-    a = StateRewardWrapper(env=Env(BOX, BOX, reward=0.0), spec=_spec(), judge=Judge(half),
-                           enabled={"state_estimation": 1.0}, score_base=0.0)
-    b = StateRewardWrapper(env=Env(BOX, BOX, reward=0.0), spec=_spec(), judge=Judge(half),
-                           enabled={"state_estimation": 1.0}, score_base=0.5)
+    half = [
+        {
+            "object_id": "box",
+            "vertical_relation": "below",
+            "horizontal_relation": "WRONG",
+        }
+    ]
+    a = StateRewardWrapper(
+        env=Env(BOX, BOX, reward=0.0),
+        spec=_spec(),
+        judge=Judge(half),
+        enabled={"state_estimation": 1.0},
+        score_base=0.0,
+    )
+    b = StateRewardWrapper(
+        env=Env(BOX, BOX, reward=0.0),
+        spec=_spec(),
+        judge=Judge(half),
+        enabled={"state_estimation": 1.0},
+        score_base=0.5,
+    )
     _, _, _, ia = await a.step(action, ids, CharTokenizer())
     _, _, _, ib = await b.step(action, ids, CharTokenizer())
     assert ia["state_reward/state_estimation"] == pytest.approx(0.5)
-    assert ib["state_reward/state_estimation"] == pytest.approx(0.0), (
-        "half-right is exactly chance, so with base=0.5 it must pay nothing"
-    )
+    assert ib["state_reward/state_estimation"] == pytest.approx(
+        0.0
+    ), "half-right is exactly chance, so with base=0.5 it must pay nothing"
 
 
 def test_the_default_is_the_measured_random_floor():

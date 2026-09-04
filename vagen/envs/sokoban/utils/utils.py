@@ -6,6 +6,7 @@ import numpy as np
 from PIL import Image
 
 from vagen.envs._common.response_format import (
+    action_count_within_limit,
     canonical_free_think,
     canonical_wm,
     parse_answer_sections,
@@ -35,7 +36,8 @@ def _result(response: str, sections, action_sep: str, max_actions: int, *, kind:
         "prediction_content": sections.prediction,
         "action_content": action_content,
         "actions": actions,
-        "format_correct": sections.format_correct,
+        "format_correct": sections.format_correct
+        and action_count_within_limit(sections.answer, action_sep, max_actions),
     }
 
 

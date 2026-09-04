@@ -1,3 +1,4 @@
+import hashlib
 from gym_sokoban.envs.sokoban_env import SokobanEnv
 from gym.utils import seeding
 from gym_sokoban.envs.room_utils import generate_room
@@ -6,6 +7,50 @@ import numpy as np
 from collections import deque
 import marshal
 import copy
+
+
+def _next_retry_seed(seed: int | None) -> int | None:
+    """Advance a seed reproducibly when a room misses the difficulty band.
+
+    Python's ``hash(str(seed))`` is salted independently in every interpreter. Ray
+    workers therefore generated different fallback maps for the same dataset seed, and
+    paired validation comparisons silently stopped being paired whenever reset retried.
+    This full-period 32-bit LCG is only a deterministic walk through candidate seeds;
+    ``set_seed`` still owns room-generation randomness.
+    """
+    if seed is None:
+        return None
+    return (1664525 * int(seed) + 1013904223) % (2**32)
+
+
+def _room_partition_bucket(
+    room_fixed: np.ndarray, room_state: np.ndarray, modulus: int
+) -> int:
+    if modulus < 2:
+        raise ValueError("map_partition_modulus must be at least 2")
+    fixed = np.asarray(room_fixed, dtype="<i8", order="C")
+    state = np.asarray(room_state, dtype="<i8", order="C")
+    digest = hashlib.sha256(fixed.tobytes() + state.tobytes()).digest()
+    return int.from_bytes(digest[:8], "big") % modulus
+
+
+def _room_matches_partition(
+    room_fixed: np.ndarray,
+    room_state: np.ndarray,
+    partition: str | None,
+    modulus: int,
+    eval_bucket: int,
+) -> bool:
+    if partition is None:
+        return True
+    if partition not in {"train", "eval"}:
+        raise ValueError("map_partition must be 'train', 'eval', or null")
+    if not 0 <= eval_bucket < modulus:
+        raise ValueError("map_partition_eval_bucket must be within the modulus")
+    held_out = _room_partition_bucket(room_fixed, room_state, modulus) == eval_bucket
+    return held_out if partition == "eval" else not held_out
+
+
 def get_shortest_action_path(room_fixed: np.ndarray, room_state: np.ndarray, MAX_DEPTH: int = 100) -> list[int]:
     """
     BFS shortest solution in action space (up/down/left/right).
@@ -72,9 +117,20 @@ def get_shortest_action_path(room_fixed: np.ndarray, room_state: np.ndarray, MAX
     return []
 
 class PatchedSokobanEnv(SokobanEnv):
-    def reset(self, second_player=False, render_mode='rgb_array',seed=0,min_solution_steps=None,reset_seed_max_tries=10000,min_solution_bfs_max_depth=200):
+    def reset(
+        self,
+        second_player=False,
+        render_mode="rgb_array",
+        seed=0,
+        min_solution_steps=None,
+        reset_seed_max_tries=10000,
+        min_solution_bfs_max_depth=200,
+        map_partition=None,
+        map_partition_modulus=4,
+        map_partition_eval_bucket=0,
+    ):
         
-        find_solution = False if min_solution_steps is not None else True
+        find_solution = False
         action_seq_len = 0
         for _try in range(reset_seed_max_tries):
             try:
@@ -87,14 +143,30 @@ class PatchedSokobanEnv(SokobanEnv):
                     )
                     action_seq=get_shortest_action_path(self.room_fixed,self.room_state,MAX_DEPTH=min_solution_bfs_max_depth)
                     action_seq_len = len(action_seq)
-                    if find_solution or len(action_seq)>=min_solution_steps[0] and len(action_seq)<=min_solution_steps[1]:
+                    difficulty_matches = (
+                        min_solution_steps is None
+                        or min_solution_steps[0] <= action_seq_len <= min_solution_steps[1]
+                    )
+                    partition_matches = _room_matches_partition(
+                        self.room_fixed,
+                        self.room_state,
+                        map_partition,
+                        int(map_partition_modulus),
+                        int(map_partition_eval_bucket),
+                    )
+                    if difficulty_matches and partition_matches:
                         find_solution=True
                         break
             except (RuntimeError, RuntimeWarning) as e:
                 print("[SOKOBAN] Runtime Error/Warning: {}".format(e))
                 print("[SOKOBAN] Retry . . .")
-            seed = abs(hash(str(seed))) % (2 ** 32) if seed is not None else None
+            seed = _next_retry_seed(seed)
         if not find_solution:
+            if map_partition is not None:
+                raise RuntimeError(
+                    f"failed to generate a Sokoban room in map partition {map_partition!r} "
+                    f"after {reset_seed_max_tries} attempts"
+                )
             print(f"Max tries reached: {reset_seed_max_tries}, using map with action seq len {action_seq_len}")
                 
         self.player_position = np.argwhere(self.room_state == 5)[0]

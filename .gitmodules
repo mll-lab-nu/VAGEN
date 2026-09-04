@@ -1,13 +1,3 @@
 [submodule "verl"]
 	path = verl
 	url = https://github.com/JamesKrW/verl.git
-	# A tag, not the branch. A submodule pins a SHA either way, but the SHA is only
-	# fetchable while something references it -- delete or rewrite the branch and every
-	# `git clone --recursive` of this repo breaks, with no warning here. vagen-260814
-	# must point at 8036831, the commit this release was built and tested against.
-	#
-	# Its tagged base f427a60 is upstream verl v0.9.0 (volcengine/verl 483b8a00) plus
-	# four VAGEN patches. The current pin adds the InternVL/GLM integration fixes. Rebasing
-	# onto the next release means replaying this patch stack onto the new tag; keep it that
-	# shape rather than letting upstream main creep in underneath.
-	branch = vagen-260814

@@ -161,6 +161,7 @@ def test_answer_format_caps_the_action_count():
 
     p = parse_response("<answer>Up,Down,Left,Right</answer>", prompt_format="answer", max_actions=3)
     assert p["actions"] == ["up", "down", "left"]
+    assert p["format_correct"] is False
 
 
 def test_the_answer_prompt_can_drop_the_worked_example():

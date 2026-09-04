@@ -177,6 +177,19 @@ async def test_reward_lands_on_the_conversation_it_belongs_to():
 
 
 @pytest.mark.asyncio
+async def test_delayed_call_reward_still_lands_on_its_original_turn():
+    """Episode-level normalization finalizes after later concat turns already exist."""
+    c = FakeClient()
+    first = await c.send(["ab"])
+    second = await c.send(["cd"], first.conversation_id)
+
+    c.reward_call(first.call_id, [0.25, 0.75])
+    c.reward_call(second.call_id, 2.0)
+
+    assert c.rows()[0].scores == [0.25, 0.75, 0.0, 0.0, 0.0, 2.0]
+
+
+@pytest.mark.asyncio
 async def test_a_misaligned_reward_vector_raises():
     c = FakeClient()
     r = await c.send(["ab"])

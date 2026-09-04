@@ -41,6 +41,9 @@ class SokobanEnvConfig:
     min_solution_steps: Optional[Tuple[int, int]] = None  # (min, max) range for solution steps
     reset_seed_max_tries: int = 10000  # Max tries to find a valid seed
     min_solution_bfs_max_depth: int = 200  # Max BFS depth for solution
+    map_partition: Optional[str] = None
+    map_partition_modulus: int = 4
+    map_partition_eval_bucket: int = 0
     prompt_format: str = "wm"  # "free_think" or "wm"
     format_reward: float = 0.1  # Reward for following the format correctly
     success_reward: float = 1.0
@@ -59,6 +62,29 @@ class SokobanEnvConfig:
     # turn was dropped, which discards half the batch over punctuation. The argument
     # against is that task reward can then be earned before the model learns the protocol.
     strict_format: bool = True
+
+    def __post_init__(self) -> None:
+        """Normalize numeric values supplied through OmegaConf environment resolvers.
+
+        ``oc.env`` intentionally returns strings.  Research launchers use it to vary the
+        format-reward scale, so accepting the annotated numeric fields without coercion
+        otherwise makes a valid formatted response fail at ``float + str`` inside
+        :meth:`Sokoban.step`.
+        """
+        self.format_reward = float(self.format_reward)
+        self.success_reward = float(self.success_reward)
+        for name in ("map_partition_modulus", "map_partition_eval_bucket"):
+            value = getattr(self, name)
+            if isinstance(value, (float, np.floating)) and not float(value).is_integer():
+                raise ValueError(f"{name} must be an integer")
+        self.map_partition_modulus = int(self.map_partition_modulus)
+        self.map_partition_eval_bucket = int(self.map_partition_eval_bucket)
+        if self.map_partition not in {None, "train", "eval"}:
+            raise ValueError("map_partition must be 'train', 'eval', or null")
+        if self.map_partition_modulus < 2:
+            raise ValueError("map_partition_modulus must be at least 2")
+        if not 0 <= self.map_partition_eval_bucket < self.map_partition_modulus:
+            raise ValueError("map_partition_eval_bucket must be within the modulus")
 
     # State reward is intentionally not a dataclass field. The shared environment factory
     # removes config.state_reward before constructing this class, then wraps the instance
@@ -130,7 +156,10 @@ class Sokoban(GymImageEnv, HasStateReward):
         await asyncio.to_thread(self.env.reset, seed=seed,
                                 min_solution_steps=self.config.min_solution_steps,
                                 reset_seed_max_tries=self.config.reset_seed_max_tries,
-                                min_solution_bfs_max_depth=self.config.min_solution_bfs_max_depth)
+                                min_solution_bfs_max_depth=self.config.min_solution_bfs_max_depth,
+                                map_partition=self.config.map_partition,
+                                map_partition_modulus=self.config.map_partition_modulus,
+                                map_partition_eval_bucket=self.config.map_partition_eval_bucket)
         self.total_reward = 0.0
         self.valid_actions = []
         obs = await self._render_async(init_obs=True)
