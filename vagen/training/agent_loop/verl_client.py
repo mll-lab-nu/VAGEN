@@ -124,14 +124,6 @@ class VerlClient(InferenceClient):
     async def generate(self, prompt_ids: list[int], **kwargs) -> BackendOutput:
         params = dict(self.sampling_params)
         params.update(kwargs.pop("sampling_params", {}) or {})
-        params = _backend_sampling_params(
-            params,
-            backend=self.backend,
-            request_id=str(self.request_id),
-            call_id=max(self._call_counter - 1, 0),
-            base_seed=self.rollout_seed,
-            full_determinism=self.full_determinism,
-        )
         if self.response_limit:
             asked = params.get("max_new_tokens")
             if asked is None:
@@ -141,6 +133,14 @@ class VerlClient(InferenceClient):
                     f"max_new_tokens={asked}: there is no room left to generate"
                 )
             params["max_new_tokens"] = min(asked, self.response_limit)
+        params = _backend_sampling_params(
+            params,
+            backend=self.backend,
+            request_id=str(self.request_id),
+            call_id=max(self._call_counter - 1, 0),
+            base_seed=self.rollout_seed,
+            full_determinism=self.full_determinism,
+        )
 
         images = self._images.get(self._active) or None
         server_prompt_ids = prompt_ids
