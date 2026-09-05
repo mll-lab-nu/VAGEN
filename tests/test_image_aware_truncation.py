@@ -18,6 +18,8 @@ only thing that distinguishes the silent failure from a correct cut.
 from __future__ import annotations
 
 import inspect
+from types import SimpleNamespace
+
 import pytest
 
 from vagen.models import (
@@ -51,6 +53,11 @@ def _seq(n_images=2):
     for i in range(n_images):
         ids += [VS, PAD, PAD, PAD, VE, 3 + i]
     return ids
+
+
+def test_internvl_image_boundaries_are_detected():
+    processor = SimpleNamespace(start_image_token_id=151669, end_image_token_id=151670)
+    assert vision_sentinel_ids(processor) == {151669, 151670}
 
 
 # ------------------------------------------------------------------ the block boundary

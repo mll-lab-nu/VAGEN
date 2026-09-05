@@ -52,20 +52,23 @@ fi
 step "Install verl"
 "${PIP[@]}" --no-deps -e "$ROOT/verl"
 "${PIP[@]}" accelerate codetiming datasets dill hydra-core numpy pandas peft \
-    pyarrow pybind11 pylatexenc ray tensorboard tensordict torchdata wandb
+    pyarrow pybind11 pylatexenc ray tensorboard "tensordict==0.10.0" \
+    "torchdata==0.11.0" wandb
 
 step "Verify the environment"
-BACKEND="$BACKEND" SKIP_ENGINE="$SKIP_ENGINE" "$PYTHON_BIN" - <<'PY'
+BACKEND="$BACKEND" "$PYTHON_BIN" - <<'PY'
 import importlib
 import importlib.util
 import os
 import sys
+from importlib.metadata import version
+
+from packaging.specifiers import SpecifierSet
 
 backend = os.environ["BACKEND"]
-skipped = os.environ["SKIP_ENGINE"] == "1"
 problems = []
 
-for name in ["torch", "transformers", "trl", "verl", "vagen"] + ([] if skipped else [backend]):
+for name in ["torch", "transformers", "trl", "verl", "vagen", backend]:
     try:
         module = importlib.import_module(name)
         print(f"  {name:<14} {getattr(module, '__version__', 'ok')}")
@@ -75,14 +78,26 @@ for name in ["torch", "transformers", "trl", "verl", "vagen"] + ([] if skipped e
 if not importlib.util.find_spec("flash_attn") and not importlib.util.find_spec("kernels"):
     problems.append("flash attention is unavailable; install `kernels` or flash-attn")
 
-if not skipped:
+requirements = {
+    "transformers": ">=5.5.3,!=5.6.0,<5.11",
+    "tensordict": ">=0.8,!=0.9,<=0.10",
+    backend: "==0.5.13" if backend == "sglang" else "==0.22.0",
+}
+for package, spec in requirements.items():
     try:
-        if backend == "vllm":
-            importlib.import_module("vllm.entrypoints.openai.parser")
-        else:
-            from sglang.srt.managers.io_struct import ContinueGenerationReqInput  # noqa: F401
+        installed = version(package)
+        if installed not in SpecifierSet(spec):
+            problems.append(f"{package} {installed} does not satisfy verl's {spec}")
     except Exception as exc:
-        problems.append(f"{backend}/verl API mismatch: {exc}")
+        problems.append(f"{package}: {exc}")
+
+try:
+    if backend == "vllm":
+        importlib.import_module("vllm.entrypoints.openai.parser")
+    else:
+        from sglang.srt.managers.io_struct import ContinueGenerationReqInput  # noqa: F401
+except Exception as exc:
+    problems.append(f"{backend}/verl API mismatch: {exc}")
 
 if problems:
     print("\nProblems:")

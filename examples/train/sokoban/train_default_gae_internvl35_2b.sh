@@ -37,19 +37,8 @@ fi
 export PYTHONPATH=${VERL:+$VERL:}$V${PYTHONPATH:+:$PYTHONPATH}
 mapfile -t BASE < <(grep -vE '^\s*(#|$)' "$V/vagen/configs/training_defaults.flags" | sed "s|\$V|$V|g")
 
-# InternVL's real Sokoban opening is 938 tokens; reopening from a full 300-token
-# compact summary is 1244. The shared 1000-token prompt region cannot hold that
-# second conversation, so reserve measured headroom explicitly below.
-# InternVL also has no family-specific fused forward in verl. The generic fused forward
-# is text-only and drops pixel_values, so actor/ref would train blind while vLLM sees the
-# image. Keep the native multimodal forward until an adapter exists.
-#
-# The outer InternVL config inherits PretrainedConfig.tie_word_embeddings=True while its
-# Qwen3 text_config and checkpoint both require False (the lm_head and token embedding
-# are distinct). vLLM 0.22's Transformers-5 compatibility shim copies that outer default
-# into text_config, silently discards the trained lm_head, and generates repetitive
-# garbage. Override the outer value at engine construction; this changes no tokens or
-# model output protocol, it only makes rollout load the checkpoint's real output head.
+# InternVL needs extra prompt headroom for compact reopenings and the native multimodal
+# forward. The vLLM override preserves the checkpoint's untied output head.
 PYTHONUNBUFFERED=1 python3 -m vagen.training.main \
     --config-path="$V/vagen/configs" --config-name=vagen_multiturn \
     hydra.searchpath="[file://$VERL/verl/trainer/config]" \
@@ -57,8 +46,11 @@ PYTHONUNBUFFERED=1 python3 -m vagen.training.main \
     "${BASE[@]}" \
     data.train_files="$SCRIPTDIR/train_sokoban_vision_internvl.yaml" \
     data.val_files="$SCRIPTDIR/val_sokoban_vision_internvl.yaml" \
+    "~data.apply_chat_template_kwargs.enable_thinking" \
     +actor_rollout_ref.rollout.engine_kwargs.vllm.reasoning_config.reasoning_start_str="'<think>'" \
     +actor_rollout_ref.rollout.engine_kwargs.vllm.reasoning_config.reasoning_end_str="'</think>'" \
+    +actor_rollout_ref.rollout.engine_kwargs.sglang.reasoning_parser=qwen3 \
+    +actor_rollout_ref.rollout.engine_kwargs.sglang.enable_strict_thinking=True \
     actor_rollout_ref.model.path="$MODEL" \
     actor_rollout_ref.model.use_fused_kernels=False \
     critic.model.path="$MODEL" \

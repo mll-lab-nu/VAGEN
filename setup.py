@@ -55,7 +55,8 @@ setup(
         "vllm": [
             "torch==2.11.0",
             "vllm==0.22.0",          # verl main needs >=0.18.0 for vllm.entrypoints.openai.parser
-            "transformers[kernels]==5.12.1",
+            "transformers[kernels]==5.8.1",
+            "tensordict==0.10.0",
             "torchao>=0.16.0",
             "trl>=0.27,<0.29",
         ],

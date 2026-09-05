@@ -124,6 +124,9 @@ def test_new_vlm_compact_configs_match_measured_prompt_sizes(
         assert "actor_rollout_ref.rollout.val_kwargs.do_sample=True" in text
         assert "reasoning_config.reasoning_start_str" in text
         assert "reasoning_config.reasoning_end_str" in text
+        assert "engine_kwargs.sglang.reasoning_parser=qwen3" in text
+        assert "engine_kwargs.sglang.enable_strict_thinking=True" in text
+        assert "~data.apply_chat_template_kwargs.enable_thinking" in text
         for yaml_path in _script_yamls(text, script):
             for spec in OmegaConf.load(yaml_path).envs:
                 assert spec.config.prompt_format == "free_think"

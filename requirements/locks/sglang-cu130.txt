@@ -1,8 +1,8 @@
-# Candidate training stack: SGLang 0.5.13, CUDA 13.
+# Validated training stack: SGLang 0.5.13, CUDA 13.
 #
 # This is the default selected by `scripts/install.sh`. SGLang 0.5.13's own
 # Transformers pin is inside verl's supported range: >=5.5.3, !=5.6.0, <5.11.
-# Keep this marked as a candidate until the model-family smoke tests complete.
+# Tested with Qwen3-VL, Qwen3.5, GLM-4.6V-Flash, and InternVL3.5 training paths.
 #
 #   bash scripts/install_sglang.sh
 #

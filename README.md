@@ -88,14 +88,17 @@ We frame multi-turn VLM agentic tasks as a Partially Observable Markov Decision 
 ```bash
 conda create -n vagen python=3.12 -y
 conda activate vagen
-git clone --recursive --branch release-ready https://github.com/JamesKrW/VAGEN.git
+git clone --branch dev/bi_level https://github.com/JamesKrW/VAGEN.git
 cd VAGEN
 bash scripts/install.sh  # SGLang 0.5.13 (default)
 ```
 
-This initializes the repository's pinned `verl` submodule when needed and installs the
-default SGLang stack. The script is safe to re-run; set `SKIP_ENGINE=1` to keep an existing
-rollout engine.
+This initializes the pinned `verl` submodule and installs the CUDA 13 stack: Torch 2.11.0,
+SGLang 0.5.13, and Transformers 5.8.1. The script is safe to re-run; set `SKIP_ENGINE=1`
+to verify and keep an existing rollout engine.
+
+The stack completed 10-step Sokoban runs for Qwen3-VL and both Qwen3.5 modes. GLM-4.6V
+and InternVL3.5 also completed actor, critic, update, and evaluation cycles.
 
 Use vLLM instead with:
 
@@ -141,12 +144,15 @@ bash examples/train/sokoban/train_default_gae_compact_qwen25vl3b.sh
 # Qwen2.5-VL: default GAE with state reward
 bash examples/train/sokoban/train_default_gae_sr_qwen25vl3b.sh
 
-# Qwen3-VL, Qwen3.5, InternVL3.5 and GLM-4.6V-Flash all accept
+# Qwen3-VL, Qwen3.5 non-thinking, InternVL3.5 and GLM-4.6V-Flash accept
 # HARNESS=concat|no_concat|compact (concat is the default).
 HARNESS=concat bash examples/train/sokoban/train_default_gae_qwen3vl4b.sh
 HARNESS=concat bash examples/train/sokoban/train_default_gae_qwen35_4b.sh
 HARNESS=concat bash examples/train/sokoban/train_default_gae_internvl35_2b.sh
 HARNESS=concat bash examples/train/sokoban/train_default_gae_glm46v_flash.sh
+
+# Qwen3.5 native thinking (concat)
+bash examples/train/sokoban/train_default_gae_qwen35_4b_think.sh
 
 # Validation only, without starting training
 bash examples/train/sokoban/train_default_gae_internvl35_2b.sh \

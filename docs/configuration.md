@@ -315,7 +315,9 @@ The shared training defaults enable fused kernels, but some model launchers need
 family-specific exceptions:
 
 - **InternVL3.5:** set `actor_rollout_ref.model.use_fused_kernels=False`; the generic fused
-  path is text-only for an unknown VLM. Also keep
+  path is text-only for an unknown VLM. With SGLang 0.5.13, the pinned `verl` shim loads
+  the full processor and safely re-expands pre-tokenized image placeholders. Keep the
+  launcher's `qwen3` reasoning parser and strict-thinking mode. Also keep
   `engine_kwargs.vllm.hf_overrides.tie_word_embeddings=false` when explicitly using vLLM,
   so it loads the checkpoint's separate language-model head.
 - **GLM-4.6V-Flash:** keep native thinking enabled, raw rollout logprobs enabled, and the

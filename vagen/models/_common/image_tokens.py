@@ -156,15 +156,24 @@ def vision_sentinel_ids(source) -> set:
 
     That makes ``vision_start .. vision_end`` the atomic unit for cutting, not the run.
 
-    Declared on the config for Qwen2.5-VL, which verl attaches to the processor. Read the
-    same way as the placeholders themselves: no spelling table.
+    Model families use several attribute names for the same boundary tokens. Read those
+    declared ids directly; do not infer ids from token spellings.
     """
     ids = set()
     for holder in (source, getattr(source, "config", None), getattr(source, "processor", None),
                    getattr(getattr(source, "processor", None), "config", None)):
         if holder is None:
             continue
-        for attr in ("vision_start_token_id", "vision_end_token_id"):
+        for attr in (
+            "vision_start_token_id",
+            "vision_end_token_id",
+            "image_start_token_id",
+            "image_end_token_id",
+            "start_image_token_id",
+            "end_image_token_id",
+            "im_start_id",
+            "im_end_id",
+        ):
             value = getattr(holder, attr, None)
             if isinstance(value, int):
                 ids.add(value)

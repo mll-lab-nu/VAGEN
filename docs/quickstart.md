@@ -5,6 +5,8 @@
 ### Prerequisites
 
 - Python 3.12 exactly — `scripts/install.sh` checks for it and stops otherwise
+- CUDA 13 runtime and driver; a CUDA 13 toolkit with `nvcc` is needed only when a
+  compiled dependency has no matching wheel
 - **GPUs.** The shipped scripts ask for `trainer.n_gpus_per_node` of 4 (most), 8
   (navigation, spatial_gym, and the state-reward judge), 2, or 1 — check the script you
   intend to run. `default_gae` and `ppo` also train a critic the size of the actor, so a
@@ -18,15 +20,16 @@
 conda create -n vagen python=3.12 -y
 conda activate vagen
 
-git clone --recursive https://github.com/mll-lab-nu/VAGEN.git
+git clone --branch dev/bi_level https://github.com/JamesKrW/VAGEN.git
 cd VAGEN
 bash scripts/install.sh
 ```
 
-`scripts/install.sh` is idempotent and installs Torch 2.11.0 / SGLang 0.5.13 /
-Transformers 5.8.1 by default. `BACKEND=vllm bash scripts/install.sh` selects vLLM,
-and `SKIP_ENGINE=1` keeps an existing engine. Install **one** engine per environment because
-the two backends require different `flashinfer` builds.
+`scripts/install.sh` initializes only the required `verl` submodule. It installs Torch
+2.11.0 / SGLang 0.5.13 / Transformers 5.8.1 by default.
+`BACKEND=vllm bash scripts/install.sh` selects vLLM; `SKIP_ENGINE=1` keeps and verifies an
+existing engine. Install **one** engine per environment because the backends require
+different `flashinfer` builds.
 
 For a manual SGLang install, preserve the same two-pass order (the second pass reuses
 the installed Torch while building `causal-conv1d`):

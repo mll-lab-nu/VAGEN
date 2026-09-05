@@ -7,9 +7,11 @@ set -euo pipefail
 ENV=${ENV:-$(python3 -c 'import os, sys; print(os.path.dirname(os.path.dirname(sys.executable)))')}
 MODEL=${MODEL:-Qwen/Qwen3-4B-Instruct-2507}
 PORT=${PORT:-8123}
+HOST=${HOST:-0.0.0.0}
 MEM=${MEM:-0.10}
 BACKEND=${BACKEND:-sglang}
 SEED=${SEED:-42}
+CONTEXT_LENGTH=${CONTEXT_LENGTH:-4096}
 ATTENTION_BACKEND=${ATTENTION_BACKEND:-flashinfer}
 
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
@@ -41,22 +43,22 @@ fi
 
 export CUDA_HOME
 export PATH="$ENV/bin:$CUDA_HOME/bin:$PATH"
-export CPLUS_INCLUDE_PATH="$CUDA_HOME/include:$ENV/targets/x86_64-linux/include:$ENV/include${CPLUS_INCLUDE_PATH:+:$CPLUS_INCLUDE_PATH}"
-export LIBRARY_PATH="$CUDA_HOME/lib64:$ENV/lib:$ENV/targets/x86_64-linux/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
+export CPLUS_INCLUDE_PATH="$CUDA_HOME/include:$ENV/include${CPLUS_INCLUDE_PATH:+:$CPLUS_INCLUDE_PATH}"
+export LIBRARY_PATH="$CUDA_HOME/lib64:$ENV/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
 export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$ENV/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 case "$BACKEND" in
   sglang)
     exec "$ENV/bin/python" -m sglang.launch_server \
-      --host 0.0.0.0 --model-path "$MODEL" --port "$PORT" --tp "$TP" \
-      --mem-fraction-static "$MEM" --context-length 4096 \
+      --host "$HOST" --model-path "$MODEL" --port "$PORT" --tp "$TP" \
+      --mem-fraction-static "$MEM" --context-length "$CONTEXT_LENGTH" \
       --attention-backend "$ATTENTION_BACKEND" --random-seed "$SEED" \
       --enable-deterministic-inference --log-level warning
     ;;
   vllm)
     exec "$ENV/bin/python" -m vllm.entrypoints.openai.api_server \
-      --model "$MODEL" --port "$PORT" --tensor-parallel-size "$TP" \
-      --gpu-memory-utilization "$MEM" --max-model-len 4096 --seed "$SEED"
+      --host "$HOST" --model "$MODEL" --port "$PORT" --tensor-parallel-size "$TP" \
+      --gpu-memory-utilization "$MEM" --max-model-len "$CONTEXT_LENGTH" --seed "$SEED"
     ;;
   *) die "BACKEND must be sglang or vllm (got: $BACKEND)" ;;
 esac
