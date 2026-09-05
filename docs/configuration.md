@@ -249,11 +249,14 @@ per-model, so it lives in the training script rather than here:
 
 ```bash
 +actor_rollout_ref.rollout.engine_kwargs.vllm.reasoning_config.reasoning_start_str="'<think>'" \
-+actor_rollout_ref.rollout.engine_kwargs.vllm.reasoning_config.reasoning_end_str="'</think>'"
++actor_rollout_ref.rollout.engine_kwargs.vllm.reasoning_config.reasoning_end_str="'</think>'" \
++actor_rollout_ref.rollout.engine_kwargs.sglang.reasoning_parser=qwen3 \
++actor_rollout_ref.rollout.engine_kwargs.sglang.enable_strict_thinking=True
 ```
 
-vLLM refuses the request if the budget is set and these are not. The nested quoting is
-required: hydra's override lexer rejects a bare `<think>`.
+Only the selected backend consumes its block. vLLM refuses the request without the
+delimiters; SGLang needs its parser and strict-thinking grammar to enforce the translated
+budget. The nested quoting is required because Hydra rejects a bare `<think>`.
 
 !!! note "A thinking budget bounds the block, not the response"
     Measured on Qwen3.5-4B, `thinking_token_budget: 512` closes the block at exactly 511

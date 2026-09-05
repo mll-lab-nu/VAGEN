@@ -152,6 +152,16 @@ def test_new_vlm_compact_configs_match_measured_prompt_sizes(
             )
 
 
+def test_qwen35_thinking_configures_both_rollout_backends():
+    script = os.path.join(
+        _ROOT, "examples/train/sokoban/train_default_gae_qwen35_4b_think.sh"
+    )
+    text = open(script).read()
+    assert "engine_kwargs.vllm.reasoning_config.reasoning_start_str" in text
+    assert "engine_kwargs.sglang.reasoning_parser=qwen3" in text
+    assert "engine_kwargs.sglang.enable_strict_thinking=True" in text
+
+
 def test_every_example_yaml_is_reachable_from_a_script():
     """★ Seven sokoban yamls were orphans, including the only pair configured for the
     thinking arm -- and they pointed the reader at a training script for a flag that

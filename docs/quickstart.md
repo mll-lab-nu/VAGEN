@@ -28,16 +28,21 @@ Transformers 5.8.1 by default. `BACKEND=vllm bash scripts/install.sh` selects vL
 and `SKIP_ENGINE=1` keeps an existing engine. Install **one** engine per environment because
 the two backends require different `flashinfer` builds.
 
-To do it by hand, the order matters — VAGEN with its engine first, then verl:
+For a manual SGLang install, preserve the same two-pass order (the second pass reuses
+the installed Torch while building `causal-conv1d`):
 
 ```bash
-git submodule update --init --recursive
-
-pip install -e ".[sglang]"         # or ".[vllm]" -- pick one, never both
-pip install --no-deps -e ./verl    # --no-deps: verl's pins would undo the line above
-pip install accelerate codetiming datasets dill hydra-core numpy pandas peft pyarrow \
-            pybind11 pylatexenc ray tensordict torchdata wandb
+git submodule update --init -- verl
+pip install -r requirements/locks/sglang-cu130.txt
+pip install --no-build-isolation --no-deps \
+    -r requirements/locks/sglang-cu130-post.txt
+pip install --no-deps -e . -e ./verl
+pip install codetiming dill pybind11 pylatexenc fire ninja cachetools \
+    gym-sokoban gymnasium "uvicorn<0.41"
 ```
+
+On hosts that cannot fetch GitHub release assets, `causal-conv1d` builds locally from
+PyPI. Ensure `CUDA_HOME` points to a toolkit with `nvcc`; use `MAX_JOBS=8` if RAM is tight.
 
 ## Quick Start
 

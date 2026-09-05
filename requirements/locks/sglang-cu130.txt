@@ -21,11 +21,16 @@ torchvision==0.26.0
 torchaudio==2.11.0
 torchao==0.17.0
 
-sglang[srt,openai]==0.5.13
+sglang==0.5.13
 sglang-kernel==0.4.3
 flashinfer-python[cu13]==0.6.12
 flashinfer-cubin==0.6.12
 torch-memory-saver>=0.0.9.post1
+
+# Qwen3.5's hybrid linear-attention layers. Without these, Transformers falls
+# back to the reference PyTorch kernels, which work but make training impractical.
+fla-core[cuda]==0.5.2
+flash-linear-attention==0.5.2
 
 transformers==5.8.1
 tokenizers==0.22.2
@@ -48,3 +53,5 @@ pyarrow==24.0.0
 hydra-core==1.3.3
 omegaconf==2.3.1
 wandb==0.27.2
+tensorboard==2.21.0
+tyro==1.0.16

@@ -1,4 +1,4 @@
-# Installed AFTER sglang-cu130.txt with --no-deps.
+# Installed AFTER sglang-cu130.txt with --no-deps and --no-build-isolation.
 #
 # trl 0.9.6 declares
 #                      numpy<2.0.0 while verl 0.9.0 declares numpy>=2.0.0, so the
@@ -13,3 +13,7 @@
 #                      bound in it can be overridden without touching training.
 
 trl==0.9.6
+
+# PyPI ships this as source for the current stack. Reusing the already-installed
+# Torch avoids pip creating a second, multi-gigabyte build environment.
+causal-conv1d==1.7.0

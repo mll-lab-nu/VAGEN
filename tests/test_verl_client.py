@@ -41,7 +41,7 @@ class Server:
 
     async def generate(self, request_id, prompt_ids, sampling_params, image_data=None, **kw):
         self.calls.append({"prompt_ids": list(prompt_ids), "images": list(image_data or []),
-                           "sampling": dict(sampling_params)})
+                           "sampling": dict(sampling_params), "kwargs": dict(kw)})
         extra = {}
         if self.engine_prompt is not None:
             extra["prompt_token_ids"] = self.engine_prompt(prompt_ids)
@@ -54,6 +54,19 @@ def _client(server=None, **kw):
 
 def _msg(text, images=()):
     return {"role": "user", "content": [{"type": "text", "text": text}], "images": list(images)}
+
+
+def test_processor_only_receives_kwargs_its_template_uses():
+    unsupported = _client(apply_chat_template_kwargs={"enable_thinking": False})
+    assert unsupported.model.processor_apply_chat_template_kwargs == {}
+
+    processor = Proc()
+    processor.chat_template = "{% if enable_thinking %}think{% endif %}"
+    supported = VerlClient(
+        Server(), Tok(), processor, model_adapter_name="qwen",
+        apply_chat_template_kwargs={"enable_thinking": True},
+    )
+    assert supported.model.processor_apply_chat_template_kwargs == {"enable_thinking": True}
 
 
 @pytest.mark.asyncio
@@ -88,6 +101,20 @@ async def test_the_per_turn_response_limit_is_applied():
     await c.send([_msg("a")])
 
     assert server.calls[0]["sampling"]["max_new_tokens"] == 16
+
+
+@pytest.mark.asyncio
+async def test_sglang_thinking_budget_uses_its_native_request_contract():
+    server = Server()
+    c = _client(
+        server,
+        backend="sglang",
+        sampling_params={"thinking_token_budget": 512},
+    )
+    await c.send([_msg("a")])
+
+    assert server.calls[0]["sampling"]["custom_params"] == {"thinking_budget": 512}
+    assert server.calls[0]["kwargs"]["require_reasoning"] is True
 
 
 @pytest.mark.asyncio

@@ -60,13 +60,16 @@ setup(
             "trl>=0.27,<0.29",
         ],
         # Metadata for the default stack. Use scripts/install.sh rather than installing
-        # this extra directly: cuDNN, flash-attn and trl require the ordered second pass
-        # encoded in scripts/install_sglang.sh.
+        # this extra directly: causal-conv1d and trl require the ordered second pass in
+        # scripts/install_sglang.sh.
         "sglang": [
             "torch==2.11.0",
-            "sglang[srt,openai]==0.5.13",
+            "sglang==0.5.13",
             "transformers==5.8.1",
             "flashinfer-python[cu13]==0.6.12",
+            "fla-core[cuda]==0.5.2",
+            "flash-linear-attention==0.5.2",
+            "causal-conv1d==1.7.0",
             "peft==0.19.1",
         ],
     },

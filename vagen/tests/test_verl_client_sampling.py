@@ -6,7 +6,11 @@ from vagen.training.agent_loop.verl_client import (
 
 def test_sglang_sampling_options_are_translated_and_seeded():
     params = _backend_sampling_params(
-        {"stop": ["</answer>"], "include_stop_str_in_output": True},
+        {
+            "stop": ["</answer>"],
+            "include_stop_str_in_output": True,
+            "thinking_token_budget": 512,
+        },
         backend="sglang",
         request_id="episode-a",
         call_id=2,
@@ -16,6 +20,8 @@ def test_sglang_sampling_options_are_translated_and_seeded():
 
     assert params["no_stop_trim"] is True
     assert "include_stop_str_in_output" not in params
+    assert "thinking_token_budget" not in params
+    assert params["custom_params"]["thinking_budget"] == 512
     assert isinstance(params["sampling_seed"], int)
 
 
@@ -47,6 +53,20 @@ def test_vllm_uses_its_seed_parameter():
 
     assert "sampling_seed" not in params
     assert isinstance(params["seed"], int)
+
+
+def test_vllm_keeps_its_native_thinking_budget_parameter():
+    params = _backend_sampling_params(
+        {"thinking_token_budget": 512},
+        backend="vllm",
+        request_id="episode-a",
+        call_id=0,
+        base_seed=42,
+        full_determinism=False,
+    )
+
+    assert params["thinking_token_budget"] == 512
+    assert "custom_params" not in params
 
 
 def test_sglang_multimodal_prompt_collapses_each_expanded_image_run():

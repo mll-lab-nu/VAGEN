@@ -31,6 +31,13 @@ def _backend_sampling_params(
     """Translate backend-specific options and attach a stable per-call seed."""
     params = dict(params)
     if backend == "sglang":
+        # vLLM exposes this as a first-class sampling argument. SGLang 0.5.13
+        # implements the same control through its strict-thinking grammar.
+        thinking_budget = params.pop("thinking_token_budget", None)
+        if thinking_budget is not None:
+            custom_params = dict(params.get("custom_params") or {})
+            custom_params["thinking_budget"] = int(thinking_budget)
+            params["custom_params"] = custom_params
         include_stop = params.pop("include_stop_str_in_output", None)
         if include_stop is not None:
             params.setdefault("no_stop_trim", bool(include_stop))
@@ -148,12 +155,19 @@ class VerlClient(InferenceClient):
             placeholders, _ = self.model.placeholder_ids()
             server_prompt_ids = _collapse_placeholder_runs(prompt_ids, placeholders)
 
+        server_kwargs = {}
+        if self.backend == "sglang" and (params.get("custom_params") or {}).get(
+            "thinking_budget"
+        ) is not None:
+            server_kwargs["require_reasoning"] = True
+
         output = await self.server_manager.generate(
             request_id=self.request_id,
             prompt_ids=server_prompt_ids,
             sampling_params=params,
             image_data=images,
             mm_processor_kwargs=self.mm_processor_kwargs or None,
+            **server_kwargs,
         )
         extra = getattr(output, "extra_fields", None) or {}
         lo, hi = extra.get("min_global_steps"), extra.get("max_global_steps")
