@@ -9,19 +9,18 @@ training `val-core` number are comparable — provided the configs agree, which 
 
 ```bash
 MODEL_PATH=Qwen/Qwen2.5-VL-3B-Instruct \
-  bash examples/evaluate/sokoban/vllm/eval_qwen25_vl_3b.sh
+  bash examples/evaluate/sokoban/sglang/eval_qwen25_vl_3b.sh
 ```
 
-That starts a vLLM server, runs the config next to it, writes rollouts and a
+That starts an SGLang server, runs the config next to it, writes rollouts and a
 `summary.json`, and shuts the server down. There is one per environment —
-`examples/evaluate/<env>/vllm/` for sokoban, frozenlake, navigation, primitive_skill and
-spatial_gym; the last three also need an environment server or a dataset, and each
-launcher checks for its own and says what to run.
+`examples/evaluate/<env>/sglang/` and `examples/evaluate/<env>/vllm/`; Navigation and
+PrimitiveSkill also need an environment server, while SpatialGym needs its dataset.
 
 Any extra argument is a hydra override:
 
 ```bash
-bash examples/evaluate/sokoban/vllm/eval_qwen25_vl_3b.sh 'envs.0.harness=no_concat'
+bash examples/evaluate/sokoban/sglang/eval_qwen25_vl_3b.sh 'envs.0.harness=no_concat'
 ```
 
 For a native-thinking model such as Qwen3.5, use `wm_think`, configure the server's
@@ -47,13 +46,13 @@ Training writes to `trainer.default_local_dir`, which every shipped script sets 
 `$V/exps/$PROJECT_NAME/$EXPERIMENT_NAME/verl_checkpoints`. What lands there depends on
 `actor_rollout_ref.actor.checkpoint.save_contents`; the scripts ship
 `['model','hf_model','optimizer','extra']`, and it is **`hf_model`** you want — a plain
-HuggingFace directory that vLLM can serve directly.
+HuggingFace directory that either local engine can serve directly.
 
 ```bash
 CKPT=exps/vagen_experiments/sokoban_default_gae_qwen25vl3b/verl_checkpoints
 ls $CKPT                                   # global_step_100/ global_step_200/ ...
 MODEL_PATH=$CKPT/global_step_200/actor/huggingface \
-  bash examples/evaluate/sokoban/vllm/eval_qwen25_vl_3b.sh
+  bash examples/evaluate/sokoban/sglang/eval_qwen25_vl_3b.sh
 ```
 
 Without `hf_model` in `save_contents` you get sharded FSDP state instead, and it has to be
@@ -78,7 +77,7 @@ The policy is a config key, the same one training uses, so an ablation is one ov
 
 ```bash
 for H in concat no_concat compact; do
-  bash examples/evaluate/sokoban/vllm/eval_qwen25_vl_3b.sh "envs.0.harness=$H"
+  bash examples/evaluate/sokoban/sglang/eval_qwen25_vl_3b.sh "envs.0.harness=$H"
 done
 ```
 

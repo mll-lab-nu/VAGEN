@@ -56,11 +56,9 @@ class EnvSpec:
     # reasoning and answers. A bounded turn rather than a truncated one.
     #
     # Model-agnostic here: this is a token count, and nothing in VAGEN knows what a
-    # reasoning block looks like. The delimiters live in engine config
-    # (``rollout.engine_kwargs.vllm.reasoning_config``: either a registered
-    # ``reasoning_parser`` name or an explicit start/end string pair), which is where
-    # per-family knowledge belongs. vLLM refuses the request if this is set and that is
-    # not configured.
+    # reasoning block looks like. Per-family details live in engine config: vLLM uses
+    # ``reasoning_config`` delimiters, while SGLang uses ``reasoning_parser`` with
+    # strict thinking. The launcher must configure the selected backend.
     thinking_token_budget: Optional[int] = None
     # Optional protocol delimiters that end one model turn. Keep the matched text in
     # the response because environment parsers normally need the closing delimiter.

@@ -1,11 +1,8 @@
 #!/bin/bash
 # Evaluate on sokoban against a local vLLM server.
 #
-# The repo calls vLLM "the verified default" and makes the two engines mutually exclusive
-# extras (setup.py), but every eval launcher shipped was an sglang one -- so following the
-# install instructions and then the evaluation instructions left you with an engine no
-# example could drive. vLLM's OpenAI-compatible server is what `run.backend=openai` already
-# talks to; only the base_url changes.
+# vLLM is an explicit alternative to the default SGLang backend. Its OpenAI-compatible
+# server is consumed through the evaluation framework's OpenAI adapter.
 #
 #   MODEL_PATH=/path/to/model bash examples/evaluate/sokoban/vllm/eval_qwen25_vl_3b.sh
 #

@@ -36,6 +36,9 @@ class QwenModelAdapter(ModelAdapter):
                  mm_processor_kwargs=None):
         super().__init__(tokenizer, processor)
         self.apply_chat_template_kwargs = apply_chat_template_kwargs or {}
+        self.processor_apply_chat_template_kwargs = self.processor_template_kwargs(
+            self.apply_chat_template_kwargs
+        )
         self.mm_processor_kwargs = mm_processor_kwargs or {}
         self._ph_cache = None
         self._prefix_cache = None
@@ -52,7 +55,7 @@ class QwenModelAdapter(ModelAdapter):
         if self.processor is not None:
             text = self.processor.apply_chat_template(
                 flat, add_generation_prompt=True, tokenize=False,
-                **self.apply_chat_template_kwargs,
+                **self.processor_apply_chat_template_kwargs,
             )
             inputs = self.processor(
                 text=[text], images=images or None, return_tensors="pt",
@@ -135,7 +138,7 @@ class QwenModelAdapter(ModelAdapter):
             if self.processor is not None:
                 text = self.processor.apply_chat_template(
                     placeholder, add_generation_prompt=False, tokenize=False,
-                    **self.apply_chat_template_kwargs,
+                    **self.processor_apply_chat_template_kwargs,
                 )
                 self._prefix_cache = self.processor(
                     text=[text], return_tensors="pt"

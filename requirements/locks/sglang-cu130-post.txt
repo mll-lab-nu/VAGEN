@@ -1,0 +1,10 @@
+# Installed AFTER sglang-cu130.txt with --no-deps and --no-build-isolation.
+#
+# trl 0.9.6 has a stale numpy<2 declaration, while verl requires numpy>=2.
+# Install it without dependencies; the validated runtime uses numpy 2.2.6.
+
+trl==0.9.6
+
+# PyPI ships this as source for the current stack. Reusing the already-installed
+# Torch avoids pip creating a second, multi-gigabyte build environment.
+causal-conv1d==1.7.0

@@ -44,10 +44,11 @@ if [ -z "$VERL" ]; then
     exit 1
 fi
 export PYTHONPATH=${VERL:+$VERL:}$V${PYTHONPATH:+:$PYTHONPATH}
-mapfile -t BASE < <(grep -vE '^\s*(#|$)' "$V/vagen/configs/baseline_vllm.flags" | sed "s|\$V|$V|g")
+mapfile -t BASE < <(grep -vE '^\s*(#|$)' "$V/vagen/configs/training_defaults.flags" | sed "s|\$V|$V|g")
 
 # Measured opening: 686 tokens; with a 128-token summary the reopened prompt stays
-# below 900. Do not inherit the shared 1000-token ceiling with effectively no margin.
+# below 900. The 0.45 SGLang memory fraction also leaves room for the 10.29B
+# actor/critic optimizer peak while both engines are colocated.
 PYTHONUNBUFFERED=1 python3 -m vagen.training.main \
     --config-path="$V/vagen/configs" --config-name=vagen_multiturn \
     hydra.searchpath="[file://$VERL/verl/trainer/config]" \
@@ -79,10 +80,10 @@ PYTHONUNBUFFERED=1 python3 -m vagen.training.main \
     actor_rollout_ref.rollout.val_kwargs.do_sample=True \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.max_model_len=6000 \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.45 \
     actor_rollout_ref.rollout.max_num_batched_tokens=10000 \
     actor_rollout_ref.rollout.enforce_eager=True \
-    actor_rollout_ref.rollout.free_cache_engine=True \
+    actor_rollout_ref.rollout.free_cache_engine=False \
     actor_rollout_ref.rollout.enable_chunked_prefill=True \
     trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \

@@ -19,11 +19,9 @@
 #    `</think>` and then `<answer>`, and its opening tag is optional precisely because the
 #    template already wrote one.
 #
-# 3. `reasoning_config` below. It tells the engine where a reasoning block starts and ends
-#    so that the yaml's `thinking_token_budget` can be enforced by forcing the closing
-#    token. vLLM REFUSES every request if the budget is set and this is not -- loudly, at
-#    least. This is per-family knowledge, which is why it lives here next to MODEL rather
-#    than in VAGEN: another family spells its delimiters differently.
+# 3. The backend-specific reasoning settings below tell each engine how to enforce the
+#    yaml's `thinking_token_budget`. vLLM uses explicit delimiters; SGLang uses its Qwen3
+#    parser and strict-thinking grammar.
 #
 #    ★ The nested quoting is load-bearing. Hydra's override lexer rejects a bare `<think>`
 #    with LexerNoViableAltException, so the single quotes have to survive the shell and
@@ -66,7 +64,7 @@ if [ -z "$VERL" ]; then
     exit 1
 fi
 export PYTHONPATH=${VERL:+$VERL:}$V${PYTHONPATH:+:$PYTHONPATH}
-mapfile -t BASE < <(grep -vE '^\s*(#|$)' "$V/vagen/configs/baseline_vllm.flags" | sed "s|\$V|$V|g")
+mapfile -t BASE < <(grep -vE '^\s*(#|$)' "$V/vagen/configs/training_defaults.flags" | sed "s|\$V|$V|g")
 
 PYTHONUNBUFFERED=1 python3 -m vagen.training.main \
     --config-path="$V/vagen/configs" --config-name=vagen_multiturn \
@@ -78,6 +76,8 @@ PYTHONUNBUFFERED=1 python3 -m vagen.training.main \
     data.apply_chat_template_kwargs.enable_thinking=True \
     +actor_rollout_ref.rollout.engine_kwargs.vllm.reasoning_config.reasoning_start_str="'<think>'" \
     +actor_rollout_ref.rollout.engine_kwargs.vllm.reasoning_config.reasoning_end_str="'</think>'" \
+    +actor_rollout_ref.rollout.engine_kwargs.sglang.reasoning_parser=qwen3 \
+    +actor_rollout_ref.rollout.engine_kwargs.sglang.enable_strict_thinking=True \
     actor_rollout_ref.model.path="$MODEL" \
     critic.model.path="$MODEL" \
     critic.enable=True \
@@ -92,7 +92,7 @@ PYTHONUNBUFFERED=1 python3 -m vagen.training.main \
     actor_rollout_ref.rollout.max_num_batched_tokens=13312 \
     actor_rollout_ref.rollout.max_model_len=13312 \
     actor_rollout_ref.rollout.enforce_eager=True \
-    actor_rollout_ref.rollout.free_cache_engine=True \
+    actor_rollout_ref.rollout.free_cache_engine=False \
     actor_rollout_ref.rollout.enable_chunked_prefill=True \
     trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \

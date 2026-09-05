@@ -9,13 +9,11 @@ confusion:
 | **The dataset yaml** | which environments, how many, how many turns, per-turn budgets | `data.train_files` / `data.val_files` |
 | **The base config** | everything else, with defaults | [`vagen/configs/vagen_multiturn.yaml`](https://github.com/mll-lab-nu/VAGEN/blob/main/vagen/configs/vagen_multiturn.yaml) |
 
-!!! warning "`baseline_vllm.flags` overrides the base config"
-    Every shipped script sources `vagen/configs/baseline_vllm.flags`, and it wins over
-    `vagen_multiturn.yaml`. Two that matter: `data.max_prompt_length` is **1000** in the
-    flags file and 9000 in the yaml, and `actor_rollout_ref.rollout.name` is **vllm** in
-    the flags file and `sglang` in the yaml. A model launcher can override the flags again
-    later (InternVL uses 1600 prompt tokens and GLM uses 1400), so the final command-line
-    occurrence wins.
+!!! warning "`training_defaults.flags` overrides the base config"
+    Every shipped script sources `vagen/configs/training_defaults.flags`, and it wins over
+    `vagen_multiturn.yaml`. It selects SGLang and sets the shared prompt and worker
+    defaults. A model launcher can override these values later, and extra command-line
+    arguments win last.
 
 ---
 
@@ -251,11 +249,14 @@ per-model, so it lives in the training script rather than here:
 
 ```bash
 +actor_rollout_ref.rollout.engine_kwargs.vllm.reasoning_config.reasoning_start_str="'<think>'" \
-+actor_rollout_ref.rollout.engine_kwargs.vllm.reasoning_config.reasoning_end_str="'</think>'"
++actor_rollout_ref.rollout.engine_kwargs.vllm.reasoning_config.reasoning_end_str="'</think>'" \
++actor_rollout_ref.rollout.engine_kwargs.sglang.reasoning_parser=qwen3 \
++actor_rollout_ref.rollout.engine_kwargs.sglang.enable_strict_thinking=True
 ```
 
-vLLM refuses the request if the budget is set and these are not. The nested quoting is
-required: hydra's override lexer rejects a bare `<think>`.
+Only the selected backend consumes its block. vLLM refuses the request without the
+delimiters; SGLang needs its parser and strict-thinking grammar to enforce the translated
+budget. The nested quoting is required because Hydra rejects a bare `<think>`.
 
 !!! note "A thinking budget bounds the block, not the response"
     Measured on Qwen3.5-4B, `thinking_token_budget: 512` closes the block at exactly 511
@@ -310,18 +311,19 @@ not use it. `SpatialGym` has no `prompt_format`: `prompt_config.enable_think` se
 
 ### Model-family compatibility
 
-The shared vLLM flags enable fused kernels, but the experimental model launchers need
+The shared training defaults enable fused kernels, but some model launchers need
 family-specific exceptions:
 
 - **InternVL3.5:** set `actor_rollout_ref.model.use_fused_kernels=False`; the generic fused
-  path is text-only for an unknown VLM. Also keep
-  `engine_kwargs.vllm.hf_overrides.tie_word_embeddings=false`, so vLLM loads the checkpoint's
-  separate language-model head.
+  path is text-only for an unknown VLM. With SGLang 0.5.13, the pinned `verl` shim loads
+  the full processor and safely re-expands pre-tokenized image placeholders. Keep the
+  launcher's `qwen3` reasoning parser and strict-thinking mode. Also keep
+  `engine_kwargs.vllm.hf_overrides.tie_word_embeddings=false` when explicitly using vLLM,
+  so it loads the checkpoint's separate language-model head.
 - **GLM-4.6V-Flash:** keep native thinking enabled, raw rollout logprobs enabled, and the
   GPT-J-style multimodal RoPE compatibility hook used by its launcher.
 
-The shipped launchers still select vLLM. Installing the SGLang extra does not switch their
-training backend. Before a long run, use the exact launcher and append
+The shipped launchers select SGLang by default. Before a long run, use the exact launcher and append
 `trainer.val_only=true trainer.save_freq=-1 trainer.test_freq=-1` to validate prompt,
 parser, vision inputs and harness together.
 

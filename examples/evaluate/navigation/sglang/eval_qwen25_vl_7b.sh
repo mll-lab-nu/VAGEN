@@ -42,6 +42,8 @@ if [ $((DP_SIZE * TP_SIZE)) -gt "$_gpus" ]; then
 fi
 
 MEM_FRACTION="${QWEN25_VL_7B_MEM:-0.80}"
+MAX_MODEL_LEN="${MAX_MODEL_LEN:-16384}"
+SEED="${SEED:-42}"
 
 DUMP_DIR="${DUMP_DIR:-"$fileroot/rollouts/eval_navigation/${MODEL_NAME}"}"
 mkdir -p "$DUMP_DIR"
@@ -59,6 +61,9 @@ python3 -m sglang.launch_server \
   --tp "${TP_SIZE}" \
   --trust-remote-code \
   --mem-fraction-static "${MEM_FRACTION}" \
+  --context-length "${MAX_MODEL_LEN}" \
+  --random-seed "${SEED}" \
+  --enable-deterministic-inference \
   >"${SERVER_LOG}" 2>&1 &
 SERVER_PID=$!
 

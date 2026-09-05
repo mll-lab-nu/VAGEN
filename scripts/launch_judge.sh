@@ -1,92 +1,64 @@
-#!/bin/bash
-# A small instruct model that turns the agent's descriptions into structured items.
-#
-# It shares every GPU with training rather than taking one for itself: sharded eight
-# ways a 4B model is about a gigabyte of weights per device, so reserving a whole card
-# to hold it wastes an eighth of the node. It takes a small fixed fraction and starts
-# first, leaving the rollout engine to size itself against what remains.
-#
-# Instruct-only on purpose: a thinking model would spend its budget reasoning about a
-# format conversion, on the critical path of every turn of every rollout.
-#
-set -eo pipefail
-# The conda env the judge runs in. Defaults to the one this shell is already using.
-ENV=${ENV:-$(python3 -c 'import sys, os; print(os.path.dirname(os.path.dirname(sys.executable)))' 2>/dev/null || echo "$CONDA_PREFIX")}
+#!/usr/bin/env bash
+# Launch the small state-reward judge alongside training.
+# Override any setting as an environment variable, for example:
+#   PORT=8124 TP=4 MEM=0.12 bash scripts/launch_judge.sh
+set -euo pipefail
+
+ENV=${ENV:-$(python3 -c 'import os, sys; print(os.path.dirname(os.path.dirname(sys.executable)))')}
 MODEL=${MODEL:-Qwen/Qwen3-4B-Instruct-2507}
 PORT=${PORT:-8123}
-# ★ Defaults to the number of visible GPUs, not to 8. Hardcoded, this script died on any
-# smaller node with an engine-init error that never mentions tensor parallelism -- and the
-# node size is the one thing here that is not a property of the model.
-# nvidia-smi rather than torch: this runs before `export PATH="$ENV/bin:$PATH"` below, so
-# `python3` here is whatever the login shell has, and on a real node that is usually a
-# python without torch -- which would report one GPU and silently size TP to 1.
-if [ -n "${CUDA_VISIBLE_DEVICES:-}" ]; then
-  _gpus=$(printf '%s' "$CUDA_VISIBLE_DEVICES" | tr ',' '\n' | grep -c .)
-else
-  _gpus=$(nvidia-smi -L 2>/dev/null | grep -c '^GPU ' || true)
-fi
-[ "${_gpus:-0}" -ge 1 ] 2>/dev/null || _gpus=1
-TP=${TP:-$_gpus}
-if [ "$TP" -gt "$_gpus" ]; then
-  echo "TP=$TP but only $_gpus GPU(s) are visible; vLLM would fail at engine init." >&2
-  exit 1
-fi
+HOST=${HOST:-0.0.0.0}
 MEM=${MEM:-0.10}
-BACKEND=${BACKEND:-vllm}
+BACKEND=${BACKEND:-sglang}
 SEED=${SEED:-42}
+CONTEXT_LENGTH=${CONTEXT_LENGTH:-4096}
 ATTENTION_BACKEND=${ATTENTION_BACKEND:-flashinfer}
 
-# FlashInfer JITs kernels on first use, so CUDA_HOME must name a real toolkit with nvcc.
-# The conda environment carries Python and CUDA runtime libraries but not necessarily the
-# compiler; pointing CUDA_HOME at it made startup fail as `$ENV/bin/nvcc: No such file`.
+die() { printf 'error: %s\n' "$*" >&2; exit 1; }
+[[ -x "$ENV/bin/python" ]] || die "Python not found at $ENV/bin/python (set ENV=/path/to/env)"
+
+if [[ -n "${CUDA_VISIBLE_DEVICES:-}" ]]; then
+    GPU_COUNT=$(awk -F, '{print NF}' <<<"$CUDA_VISIBLE_DEVICES")
+else
+    GPU_COUNT=$(nvidia-smi -L 2>/dev/null | awk '/^GPU / {n++} END {print n+0}')
+fi
+(( GPU_COUNT > 0 )) || GPU_COUNT=1
+TP=${TP:-$GPU_COUNT}
+(( TP <= GPU_COUNT )) || die "TP=$TP but only $GPU_COUNT GPU(s) are visible"
+
+# FlashInfer may JIT kernels, so prefer a system toolkit with nvcc over a
+# runtime-only CUDA package in the conda environment.
 if [ -z "${CUDA_HOME:-}" ] || [ ! -x "$CUDA_HOME/bin/nvcc" ]; then
-  _cuda_version=$(
-    "$ENV/bin/python" -c 'import torch; print(torch.version.cuda or "")' 2>/dev/null || true
-  )
-  for d in "/usr/local/cuda-${_cuda_version}" /usr/local/cuda; do
-    if [ -x "$d/bin/nvcc" ]; then
-      CUDA_HOME=$d
-      break
-    fi
-  done
+    CUDA_VERSION=$("$ENV/bin/python" -c 'import torch; print(torch.version.cuda or "")')
+    for candidate in "/usr/local/cuda-$CUDA_VERSION" /usr/local/cuda; do
+        if [[ -x "$candidate/bin/nvcc" ]]; then
+            CUDA_HOME=$candidate
+            break
+        fi
+    done
 fi
 if [ -z "${CUDA_HOME:-}" ] || [ ! -x "$CUDA_HOME/bin/nvcc" ]; then
-  echo "CUDA toolkit with nvcc not found; set CUDA_HOME=/path/to/cuda." >&2
-  exit 1
+    die "CUDA toolkit with nvcc not found; set CUDA_HOME to its install directory"
 fi
 
 export CUDA_HOME
 export PATH="$ENV/bin:$CUDA_HOME/bin:$PATH"
-# Conda supplies the Python-facing runtime; the toolkit supplies nvcc, headers and lib64.
-export CPLUS_INCLUDE_PATH="$CUDA_HOME/include:$ENV/targets/x86_64-linux/include:$ENV/include${CPLUS_INCLUDE_PATH:+:$CPLUS_INCLUDE_PATH}"
-export LIBRARY_PATH="$CUDA_HOME/lib64:$ENV/lib:$ENV/targets/x86_64-linux/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
+export CPLUS_INCLUDE_PATH="$CUDA_HOME/include:$ENV/include${CPLUS_INCLUDE_PATH:+:$CPLUS_INCLUDE_PATH}"
+export LIBRARY_PATH="$CUDA_HOME/lib64:$ENV/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
 export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$ENV/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 case "$BACKEND" in
   sglang)
     exec "$ENV/bin/python" -m sglang.launch_server \
-      --host 0.0.0.0 \
-      --model-path "$MODEL" \
-      --port "$PORT" \
-      --tp "$TP" \
-      --mem-fraction-static "$MEM" \
-      --context-length 4096 \
-      --attention-backend "$ATTENTION_BACKEND" \
-      --random-seed "$SEED" \
-      --enable-deterministic-inference \
-      --log-level warning
+      --host "$HOST" --model-path "$MODEL" --port "$PORT" --tp "$TP" \
+      --mem-fraction-static "$MEM" --context-length "$CONTEXT_LENGTH" \
+      --attention-backend "$ATTENTION_BACKEND" --random-seed "$SEED" \
+      --enable-deterministic-inference --log-level warning
     ;;
   vllm)
     exec "$ENV/bin/python" -m vllm.entrypoints.openai.api_server \
-      --model "$MODEL" \
-      --port "$PORT" \
-      --tensor-parallel-size "$TP" \
-      --gpu-memory-utilization "$MEM" \
-      --max-model-len 4096 \
-      --seed "$SEED"
+      --host "$HOST" --model "$MODEL" --port "$PORT" --tensor-parallel-size "$TP" \
+      --gpu-memory-utilization "$MEM" --max-model-len "$CONTEXT_LENGTH" --seed "$SEED"
     ;;
-  *)
-    echo "unsupported judge backend: $BACKEND (expected sglang or vllm)" >&2
-    exit 2
-    ;;
+  *) die "BACKEND must be sglang or vllm (got: $BACKEND)" ;;
 esac

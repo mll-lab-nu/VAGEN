@@ -71,7 +71,7 @@ def test_a_local_directory_keeps_its_own_name(tmp_path):
 
 
 def test_every_launcher_derives_the_name_rather_than_hardcoding_one():
-    """★ The reason common.sh exists. The three sglang launchers each hardcoded a constant,
+    """★ The reason common.sh exists. The original sglang launchers hardcoded a constant,
     so every checkpoint scored through them landed in one directory."""
     import glob
     import re

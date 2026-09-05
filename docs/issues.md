@@ -40,9 +40,10 @@ answer-only protocol.
 
 ## 3. `thinking_token_budget` bounds the think block, not the response — and not the cost
 
-For a model with a native reasoning channel (Qwen3-VL, Qwen3.5, GLM), `thinking_token_budget`
-is passed to vLLM, which forces the closing `</think>` once the budget is spent. Measured
-against a live `vllm serve Qwen/Qwen3.5-4B` with `--reasoning-config`:
+For a model with a native reasoning channel (Qwen3-VL, Qwen3.5, GLM),
+`thinking_token_budget` is translated to the selected engine's native control, which
+forces the closing `</think>` once the budget is spent. Measured against a live
+`vllm serve Qwen/Qwen3.5-4B` with `--reasoning-config`:
 
 | `thinking_token_budget` | think tokens | finish_reason | total tokens |
 |---|---|---|---|
@@ -60,9 +61,10 @@ So the budget buys a well-formed `</think>` and a scoreable native-thinking pref
 brevity. Both `free_think` and `wm_think` tell the model to close native reasoning before
 the machine-readable answer; the shipped Qwen3.5 thinking experiment uses `free_think`.
 
-vLLM refuses the request if the budget is set and `reasoning_config` is not; see
-`examples/train/sokoban/train_default_gae_qwen35_4b_think.sh` for the delimiters, which are
-per-model-family knowledge and so live in the script rather than in VAGEN.
+vLLM requires `reasoning_config`. SGLang 0.5.13 uses `reasoning_parser` plus
+`enable_strict_thinking`; VAGEN maps the budget to `custom_params.thinking_budget` and
+marks the request as reasoning. See
+`examples/train/sokoban/train_default_gae_qwen35_4b_think.sh` for both configurations.
 
 ## 4. A `compact_budget` too small fails at runtime, not at startup
 

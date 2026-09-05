@@ -97,7 +97,7 @@ def test_canonical_code_does_not_import_legacy_packages():
 
 def test_dynamic_training_paths_use_the_canonical_training_package():
     agent_config = (PACKAGE / "configs" / "agent_v2.yaml").read_text()
-    flags = (PACKAGE / "configs" / "baseline_vllm.flags").read_text()
+    flags = (PACKAGE / "configs" / "training_defaults.flags").read_text()
     run_config = (PACKAGE / "configs" / "vagen_multiturn.yaml").read_text()
     assert "vagen.training.agent_loop.gym_loop.GymLoop" in agent_config
     assert "vagen.training.agent_loop.multi_output.MultiOutputAgentLoopManager" in flags

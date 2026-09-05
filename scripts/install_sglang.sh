@@ -1,162 +1,133 @@
 #!/usr/bin/env bash
-# Install the pinned SGLang stack verified end to end for VAGEN + verl.
+# Install the verified CUDA 13 stack:
+#   Torch 2.11.0 / SGLang 0.5.13 / Transformers 5.8.1
 #
-# Verified end to end on A100-SXM4-80GB with CUDA 12.8. H200 may require disabling
-# SGLang's memory-saver integration; that runtime workaround is not encoded here.
-#
-#   conda create -p /path/to/env python=3.12 -y && conda activate /path/to/env
+# Usage (inside a fresh Python 3.12 environment):
 #   bash scripts/install_sglang.sh
-#
-# Separate from scripts/install.sh on purpose. That one installs the current stack
-# from setup.py's extras (torch 2.11 / sglang 0.5.15 / transformers 5.12.1), which
-# is what the Qwen3.5 path needs. This one installs torch 2.9.1 / sglang 0.5.8 /
-# transformers 4.57.1, which is the set a full VAGEN + verl + SGLang run was
-# observed to complete on. They are alternatives, not an upgrade path:
-# transformers 4.57.1 has no Qwen3.5, while the newer stack requires the matching
-# SGLang and verl compatibility path. Pick by the model you are training.
-#
-# Versions live in requirements/locks/, not here, so there is one place to change
-# them and this file stays a procedure.
 set -euo pipefail
 
-V=$(cd "$(dirname "$0")/.." && pwd)
-LOCK="$V/requirements/locks/sglang-cu128.txt"
-POST="$V/requirements/locks/sglang-cu128-post.txt"
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+LOCK="$ROOT/requirements/locks/sglang-cu130.txt"
+POST_LOCK="$ROOT/requirements/locks/sglang-cu130-post.txt"
+PYTHON_BIN=${PYTHON_BIN:-python3}
+PIP=("$PYTHON_BIN" -m pip install --no-cache-dir --timeout 180 --retries 10)
 
-say()  { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
-die()  { printf '\033[1;31m[error] %s\033[0m\n' "$*" >&2; exit 1; }
+step() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
+die()  { printf '\033[1;31merror: %s\033[0m\n' "$*" >&2; exit 1; }
 
-command -v python3 >/dev/null || die "no python3 on PATH"
-python3 - <<'PY' || die "this stack is built for Python 3.12"
-import sys; sys.exit(0 if sys.version_info[:2] == (3, 12) else 1)
+command -v "$PYTHON_BIN" >/dev/null || die "$PYTHON_BIN is not on PATH"
+"$PYTHON_BIN" - <<'PY' || die "this stack requires Python 3.12"
+import sys
+raise SystemExit(sys.version_info[:2] != (3, 12))
 PY
-[ -f "$LOCK" ] || die "lock file not found: $LOCK"
-[ -f "$POST" ] || die "override file not found: $POST"
+[[ -f "$LOCK" && -f "$POST_LOCK" ]] || die "SGLang lock files are missing"
 
-PIP="python3 -m pip install --no-cache-dir --timeout 180 --retries 10"
-
-# ---------------------------------------------------------------- 1. verl source
-say "verl submodule"
-# Probes for a file, not the directory: an uninitialised submodule leaves `verl/`
-# present and empty, which passes every existence check and fails every import.
-if [ ! -f "$V/verl/verl/trainer/config/ppo_trainer.yaml" ]; then
-    git -C "$V" submodule update --init --recursive \
-        || die "could not fetch the verl submodule; check the network"
+step "Prepare the verl submodule"
+if [[ ! -f "$ROOT/verl/verl/trainer/config/ppo_trainer.yaml" ]]; then
+    git -C "$ROOT" submodule update --init -- verl || die "could not fetch verl"
 fi
-[ -f "$V/verl/verl/trainer/config/ppo_trainer.yaml" ] || die "verl/ is still empty"
+[[ -f "$ROOT/verl/verl/trainer/config/ppo_trainer.yaml" ]] \
+    || die "verl is empty; run: git submodule update --init -- verl"
 
-# ------------------------------------------------------------------- 2. the lock
-say "pinned stack -- this is the long one"
-$PIP -r "$LOCK" || die "the pinned stack did not resolve; see $LOCK"
+step "Install the pinned runtime"
+"${PIP[@]}" -r "$LOCK" || die "failed to install $LOCK"
 
-# Second pass. Two different reasons live here, both explained in the file: a
-# version override pip would call ResolutionImpossible inside one resolution
-# (cuDNN), and a source build that needs the torch installed above to compile
-# against (flash-attn), which is what --no-build-isolation is for. pip will warn
-# about torch's cuDNN pin; that warning is the expected outcome.
-say "second pass: overrides and source builds (a cuDNN pin warning is expected)"
-# --no-deps is load-bearing, not tidiness. Without it pip re-resolves these three
-# freely and walks the pinned stack backwards: trl 0.9.6's stale numpy<2 bound
-# downgrades numpy to 1.26.4, and flash-attn declares an unbounded `torch`, so pip
-# helpfully installs the newest one -- observed replacing torch 2.9.1+cu128 with
-# 2.14.0+cu130, after which torchvision and sglang both stop importing. Their
-# dependencies are already satisfied by the lock; all that is wanted here is the
-# three packages themselves.
-$PIP --no-deps --no-build-isolation -r "$POST" || die "the second pass failed; see $POST"
+# causal-conv1d may fall back from its GitHub wheel to a local build. Point that
+# build at the system CUDA toolkit and reuse this environment's Torch.
+if [[ -z "${CUDA_HOME:-}" || ! -x "$CUDA_HOME/bin/nvcc" ]]; then
+    CUDA_VERSION=$("$PYTHON_BIN" -c 'import torch; print(torch.version.cuda or "")')
+    for candidate in "/usr/local/cuda-$CUDA_VERSION" /usr/local/cuda; do
+        if [[ -x "$candidate/bin/nvcc" ]]; then
+            CUDA_HOME=$candidate
+            break
+        fi
+    done
+fi
+if [[ -n "${CUDA_HOME:-}" && -x "$CUDA_HOME/bin/nvcc" ]]; then
+    export CUDA_HOME PATH="$CUDA_HOME/bin:$PATH"
+fi
+export MAX_JOBS=${MAX_JOBS:-16}
 
-# ------------------------------------------------------------ 3. vagen and verl
-say "vagen and verl (--no-deps, so the pins above stand)"
-$PIP --no-deps -e "$V"
-$PIP --no-deps -e "$V/verl"
-# verl's own plain dependencies, minus anything the lock already fixes.
-# Deliberately no peft here: the lock pins it, and repeating it unpinned invites
-# pip to re-resolve torch underneath. Everything below is pure Python.
-$PIP codetiming dill pybind11 pylatexenc fire ninja cachetools \
-     gym-sokoban gymnasium "uvicorn<0.41"
+step "Install compiled and compatibility packages"
+"${PIP[@]}" --no-build-isolation --no-deps -r "$POST_LOCK" \
+    || die "failed to install $POST_LOCK (set CUDA_HOME to a toolkit with nvcc if causal-conv1d built from source)"
 
-# ---------------------------------------------------------------- verification
-say "checking the install"
-python3 - <<'PY'
-import ctypes, importlib, importlib.util, sys
+step "Install VAGEN and verl"
+"${PIP[@]}" --no-deps -e "$ROOT"
+"${PIP[@]}" --no-deps -e "$ROOT/verl"
+"${PIP[@]}" codetiming dill pybind11 pylatexenc fire ninja cachetools \
+    gym-sokoban gymnasium "uvicorn<0.41"
+
+step "Verify imports and CUDA support"
+"$PYTHON_BIN" - <<'PY'
+import ctypes
+import importlib
+import sys
+from packaging.version import Version
 
 problems = []
 
-
-def report(name, value):
-    print(f"  {name:<22} {value}")
-
-
-# Versions the rest of this only makes sense against.
-for mod in ["torch", "torchvision", "sglang", "flashinfer", "transformers", "trl", "accelerate", "ray"]:
+def check(name, expected=None):
     try:
-        report(mod, getattr(importlib.import_module(mod), "__version__", "ok"))
+        module = importlib.import_module(name)
+        version = getattr(module, "__version__", "ok")
+        print(f"  {name:<24} {version}")
+        if expected and Version(version).base_version != expected:
+            problems.append(f"{name} is {version}, expected {expected}")
     except Exception as exc:
-        problems.append(f"{mod}: {exc}")
+        problems.append(f"{name}: {exc}")
 
-# Torch <-> CUDA. A wheel built for a different CUDA major than the driver imports
-# fine and dies on the first kernel.
+for name, version in {
+    "torch": "2.11.0",
+    "torchvision": "0.26.0",
+    "sglang": "0.5.13",
+    "flashinfer": "0.6.12",
+    "transformers": "5.8.1",
+    "trl": "0.9.6",
+    "fla": "0.5.2",
+    "causal_conv1d": "1.7.0",
+}.items():
+    check(name, version)
+
 try:
     import torch
-
-    report("torch cuda", f"{torch.version.cuda} / device {'yes' if torch.cuda.is_available() else 'NO'}")
+    print(f"  {'CUDA device':<24} {torch.cuda.get_device_name(0)}")
     if not torch.cuda.is_available():
-        problems.append("torch cannot see a GPU; check the wheel's CUDA build against the driver")
+        problems.append("Torch cannot see a CUDA device")
 except Exception as exc:
-    problems.append(f"torch cuda check failed: {exc}")
+    problems.append(f"CUDA check: {exc}")
 
-# libcudart.so.12 must be loadable, not merely present -- SGLang's compiled
-# extensions link it.
 try:
-    ctypes.CDLL("libcudart.so.12")
-    report("libcudart.so.12", "loadable")
+    ctypes.CDLL("libcudart.so.13")
 except OSError as exc:
-    problems.append(f"libcudart.so.12 is not loadable: {exc}")
+    problems.append(f"libcudart.so.13 is not loadable: {exc}")
 
-# flashinfer-python and flashinfer-cubin must match exactly; a mismatch raises
-# from flashinfer/jit/env.py at import, naming both versions.
 try:
-    importlib.import_module("flashinfer")
+    from transformers.utils.import_utils import (
+        is_causal_conv1d_available,
+        is_flash_linear_attention_available,
+    )
+    if not is_flash_linear_attention_available():
+        problems.append("Transformers cannot use flash-linear-attention")
+    if not is_causal_conv1d_available():
+        problems.append("Transformers cannot use causal-conv1d")
 except Exception as exc:
-    problems.append(f"flashinfer import failed (python/cubin mismatch?): {exc}")
+    problems.append(f"Qwen3.5 fast-path check: {exc}")
 
-# The cuDNN floor SGLang enforces on torch 2.9.x (pytorch/pytorch#168167). torch
-# pins 9.10, which is why the override above exists and why pip warned.
-try:
-    import torch
-    from packaging.version import parse
-
-    cudnn = torch.backends.cudnn.version()
-    report("cudnn", cudnn)
-    if parse(torch.__version__.split("+")[0]) < parse("2.10") and cudnn < 91500:
-        problems.append(f"cuDNN {cudnn} < 9.15 with torch {torch.__version__}; SGLang refuses to start")
-except Exception as exc:
-    problems.append(f"cudnn check failed: {exc}")
-
-# The import whose absence is how a too-old SGLang shows up: as an ImportError
-# from deep inside verl that names neither SGLang nor a version.
 try:
     from sglang.srt.managers.io_struct import ContinueGenerationReqInput  # noqa: F401
-
-    report("sglang symbol", "ContinueGenerationReqInput ok")
 except Exception:
-    problems.append("sglang is too old for this verl: no ContinueGenerationReqInput (needs >= 0.5.6)")
+    problems.append("SGLang lacks ContinueGenerationReqInput (requires >=0.5.6)")
 
-# verl is a checkout on PYTHONPATH, not an installed distribution; importing it is
-# the only way to know the submodule is really there.
-for mod in ["verl", "vagen"]:
-    try:
-        m = importlib.import_module(mod)
-        report(mod, m.__file__)
-    except Exception as exc:
-        problems.append(f"{mod} does not import: {exc}")
+for name in ("verl", "vagen", "tensorboard", "tyro"):
+    check(name)
 
 if problems:
-    print("\n\033[1;31mproblems:\033[0m")
-    for problem in problems:
-        print("  -", problem)
+    print("\nProblems:")
+    print("\n".join(f"  - {problem}" for problem in problems))
     sys.exit(1)
-print("\n\033[1;32mok\033[0m")
+print("\nInstall verified.")
 PY
 
-say "done"
-echo "This environment is ready for the pinned VAGEN SGLang 0.5.8 stack."
+step "Done"
+echo "The VAGEN SGLang environment is ready."
