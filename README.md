@@ -154,7 +154,9 @@ bash examples/train/sokoban/train_default_gae_internvl35_2b.sh \
 ```
 
 See [Configuration](docs/configuration.md) for harnesses, estimators, model-specific flags,
-and state-reward settings.
+and state-reward settings. Training defaults to verl V1 `colocate_async`; see
+[Colocated asynchronous training](docs/colocate-async.md) for its queue, straggler, and
+token-reward contracts and for the temporary V0 rollback switch.
 
 ### Evaluation
 

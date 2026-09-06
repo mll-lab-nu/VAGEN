@@ -398,6 +398,24 @@ that earned it, keeping reward production independent of the selected estimator.
 
 ---
 
+## Asynchronous trainer
+
+Training uses verl V1 `colocate_async` and `TransferQueue>=0.1.9` by default. The core
+switches are `trainer.use_v1: true`, `trainer.v1.trainer_mode: colocate_async`, and
+`transfer_queue.enable: true`; the entrypoint also selects VAGEN's TQ agent-loop manager
+and enables rollout cache offload.
+
+`trainer.v1.colocate_async.max_inflight_steps` bounds still-running training groups by
+policy versions. The default `2` permits two versions and cancels/replaces the entire UID
+group when a third would be crossed. Validation does not use this timeout. Completed but
+old groups remain governed by `trainer.v1.sampler.max_off_policy_threshold` and
+`max_off_policy_strategy`.
+
+See [Colocated asynchronous training](colocate-async.md) for the data boundary, failure
+semantics, and V0 rollback.
+
+---
+
 ## Logging and checkpoints
 
 ```yaml

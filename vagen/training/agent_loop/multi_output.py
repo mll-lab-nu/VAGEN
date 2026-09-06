@@ -40,6 +40,8 @@ from verl.experimental.agent_loop.agent_loop import (
 )
 from verl.protocol import DataProto
 
+from vagen.training.tq_utils import ROLLOUT_SOURCE
+
 #: Which input rollout each output row came from, as an index into the batch the trainer
 #: dispatched. Stamped on the batch *before* it is chunked across workers, so it rides
 #: through ``input_non_tensor_batch`` and gets expanded per row by the same
@@ -53,9 +55,6 @@ from verl.protocol import DataProto
 #: reconstructing it there also handles a rollout that produced *no* rows: its index
 #: simply never appears, so the trainer drops it instead of misaligning everything after
 #: it. See ``SeparateRayPPOTrainer._align_generated_rows`` for the consuming end.
-ROLLOUT_SOURCE = "__vagen_rollout_index__"
-
-
 class MultiOutputAgentLoopWorker(AgentLoopWorker):
     """An ``AgentLoopWorker`` whose agent loops may return a list of outputs.
 
@@ -151,8 +150,17 @@ class MultiOutputAgentLoopWorker(AgentLoopWorker):
     # between the rows of one rollout. Losing turn_idx does not fail -- it makes the
     # episode log sort every turn equal, so a transcript reads as a coherent episode
     # that never happened.
-    ROW_COLUMNS = ("episode_id", "rollout_metadata", "turn_idx", "conversation_id", "episode_turns",
-                   "response_spans", "ends_with_summary")
+    ROW_COLUMNS = (
+        "episode_id",
+        "rollout_metadata",
+        "turn_idx",
+        "conversation_id",
+        "episode_turns",
+        "response_spans",
+        "ends_with_summary",
+        "min_global_steps",
+        "max_global_steps",
+    )
 
     def _vagen_restore_indices(self, output: DataProto, expanded: dict[str, Any] | None) -> DataProto:
         """Put the trajectory index columns back if verl dropped them.

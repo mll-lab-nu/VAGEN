@@ -13,6 +13,7 @@ A lightweight reimplementation built on [VERL](https://github.com/volcengine/ver
 
 - [Quick Start](quickstart.md) - Installation and basic usage
 - [Configuration](configuration.md) - Training configuration reference
+- [Colocate Async](colocate-async.md) - Async scheduling, token-reward contract, and V0 fallback
 - [Evaluation](evaluation.md) - Evaluate a checkpoint, and compare context policies
 - [Custom Environment](custom-environment.md) - Build your own environment
 - [Custom Filter](custom-filter.md) - Preprocess training data

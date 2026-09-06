@@ -35,6 +35,10 @@ setup(
         # use it. Nothing else in the stack pulls it in, so those all died with
         # ModuleNotFoundError on a clean machine.
         "fire",
+        # verl V1 uses TransferQueue for asynchronous rollout/training handoff.  0.1.9
+        # is the first version with checkpoint save/restore, required so in-flight
+        # prompts are not lost when a colocate_async run resumes.
+        "TransferQueue>=0.1.9",
     ],
     # ------------------------------------------------------------- the two rollout engines
     #

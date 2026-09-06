@@ -15,6 +15,7 @@
 Note that we don't combine the main with ray_trainer as ray_trainer is used by other mpain.
 """
 
+import logging
 import os
 import socket
 
@@ -29,30 +30,15 @@ from vagen.training.trainer.ppo_trainer import VagenPPOTrainer
 from verl.trainer.ppo.utils import need_critic, need_reference_policy
 from verl.utils.config import validate_config
 from verl.utils.device import auto_set_device, is_cuda_available
-from verl.utils.import_utils import deprecated
+from verl.utils.import_utils import load_class_from_fqn
 
 
-# Regenerated from verl/trainer/main_ppo.py rather than carried as a fork: the previous
-# copy differed from upstream by exactly one line -- the trainer import -- so a fork bought
-# nothing and froze the entrypoint at 0.6.
-#
-# As of verl 0.9.0 upstream's main_ppo.py is no longer the deprecated one: it dispatches on
-# `trainer.use_v1` (default true) to the unified V1 trainer, and main_ppo_sync.py is gone
-# entirely. What VAGEN launches is the legacy path -- main_ppo_v0.py's SeparateRayPPOTrainer
-# -- and that is what upstream now marks for removal. It outlived its own warning, which
-# still reads "removed in v0.9.0", so read the deadline as 0.10.0 rather than as passed.
-#
-# Known debt, unchanged in shape but not in target: V1's PPOTrainer has no _fit_* hooks at
-# all. It offers on_* lifecycle callbacks plus concrete _compute_advantage /
-# _compute_metrics / _save_checkpoint / _validate, so porting VagenV0Mixin's six hooks means
-# re-attaching each one to a differently named method -- and a mismatch is silent, exactly
-# the way ppo_trainer.py describes. V1 additionally requires TransferQueue (not a declared
-# verl dependency, not installed in this env) and TQ variants of the agent loop, which is
-# where the no-concat multi-output behaviour lives.
-@deprecated(
-    "vagen.training.main launches verl's legacy SeparateRayPPOTrainer, which upstream plans to "
-    "remove (expect v0.10.0) in favour of the unified V1 trainer; that port is not done yet."
-)
+logger = logging.getLogger(__name__)
+
+_V0_MANAGER = "vagen.training.agent_loop.multi_output.MultiOutputAgentLoopManager"
+_V1_MANAGER = "vagen.training.agent_loop.tq.VagenAgentLoopManagerTQ"
+
+
 @hydra.main(config_path="config", config_name="ppo_trainer", version_base=None)
 def main(config):
     """Main entry point for PPO training with Hydra configuration management.
@@ -63,7 +49,39 @@ def main(config):
     # Automatically set `config.trainer.device = npu` when running on Ascend NPU.
     auto_set_device(config)
     config = migrate_legacy_reward_impl(config)
+    _prepare_trainer_mode(config)
+    validate_config(
+        config=config,
+        use_reference_policy=need_reference_policy(config),
+        use_critic=need_critic(config),
+    )
     run_ppo(config)
+
+
+def _prepare_trainer_mode(config) -> None:
+    """Select the matching VAGEN manager and TQ runtime for V0 or V1."""
+    use_v1 = bool(config.trainer.get("use_v1", True))
+    manager_path = "actor_rollout_ref.rollout.agent.agent_loop_manager_class"
+    current_manager = OmegaConf.select(config, manager_path)
+    if use_v1:
+        mode = str(config.trainer.v1.trainer_mode)
+        if mode != "colocate_async":
+            raise ValueError(
+                "VAGEN's V1 integration currently requires "
+                "trainer.v1.trainer_mode=colocate_async"
+            )
+        config.transfer_queue.enable = True
+        config.actor_rollout_ref.rollout.free_cache_engine = True
+        if current_manager in (None, _V0_MANAGER):
+            OmegaConf.update(config, manager_path, _V1_MANAGER, merge=False, force_add=True)
+    else:
+        config.transfer_queue.enable = False
+        # The separated V0 trainer performs its first weight sync before putting
+        # SGLang to sleep; cache offload makes that transition invalid on this path.
+        config.actor_rollout_ref.rollout.free_cache_engine = False
+        if current_manager in (None, _V1_MANAGER):
+            OmegaConf.update(config, manager_path, _V0_MANAGER, merge=False, force_add=True)
+        logger.warning("Using VAGEN's legacy V0 trainer; set trainer.use_v1=True to use colocate_async")
 
 
 def _propagate_determinism_env(config) -> None:
@@ -132,7 +150,9 @@ def run_ppo(config, task_runner_class=None) -> None:
         ray.init(**OmegaConf.to_container(ray_init_kwargs))
 
     if task_runner_class is None:
-        task_runner_class = ray.remote(num_cpus=1)(TaskRunner)  # please make sure main_task is not scheduled on head
+        runner_cls = TaskRunnerV1 if bool(config.trainer.get("use_v1", True)) else TaskRunner
+        # Please make sure the main task is not scheduled on the head node.
+        task_runner_class = ray.remote(num_cpus=1)(runner_cls)
 
     # Create a remote instance of the TaskRunner class, and
     # Execute the `run` method of the TaskRunner instance remotely and wait for it to complete
@@ -163,6 +183,79 @@ def run_ppo(config, task_runner_class=None) -> None:
     timeline_json_file = config.ray_kwargs.get("timeline_json_file", None)
     if timeline_json_file:
         ray.timeline(filename=timeline_json_file)
+
+
+class TaskRunnerV1:
+    """Build VAGEN's trainer and TQ agent-loop adapter inside one Ray actor."""
+
+    def __init__(self):
+        self.config = None
+        self.trainer = None
+        self.agent_loop_manager = None
+
+    def _init_agent_loop_manager(self):
+        manager_fqn = (
+            self.config.actor_rollout_ref.rollout.get("agent", {}).get(
+                "agent_loop_manager_class"
+            )
+            or _V1_MANAGER
+        )
+        manager_cls = load_class_from_fqn(manager_fqn, "AgentLoopManager")
+        self.agent_loop_manager = manager_cls.create(
+            config=self.config,
+            llm_client=self.trainer.get_llm_client(),
+            teacher_client=self.trainer.get_teacher_client(),
+            reward_loop_worker_handles=self.trainer.get_reward_handles(),
+        )
+
+    def run(self, config):
+        from packaging.version import InvalidVersion, Version
+        from pprint import pprint
+
+        import transfer_queue as tq
+        from verl.utils.logging_utils import configure_verl_logging
+
+        from vagen.training.trainer.v1 import VagenPPOTrainerColocateAsync
+
+        version = getattr(tq, "__version__", "0")
+        try:
+            version_supported = Version(version) >= Version("0.1.9")
+        except InvalidVersion:
+            version_supported = False
+        if not version_supported:
+            raise RuntimeError(
+                f"VAGEN colocate_async requires transfer_queue>=0.1.9, found {version}"
+            )
+
+        configure_verl_logging()
+        config.transfer_queue.enable = True
+        pprint(OmegaConf.to_container(config, resolve=True))
+        OmegaConf.resolve(config)
+        self.config = config
+
+        tq.init(config.transfer_queue)
+        succeeded = False
+        try:
+            self.trainer = VagenPPOTrainerColocateAsync(config=config)
+            self.trainer.init()
+            self._init_agent_loop_manager()
+            self.trainer.fit(self.agent_loop_manager)
+            succeeded = True
+        finally:
+            try:
+                manager = self.agent_loop_manager
+                if manager is not None and hasattr(manager, "cancel_all"):
+                    try:
+                        manager.cancel_all()
+                    except Exception:  # noqa: BLE001 - preserve the training exception
+                        logger.exception("Could not settle VAGEN rollout tasks during shutdown")
+            finally:
+                try:
+                    tracking = getattr(self.trainer, "logger", None)
+                    if tracking is not None:
+                        tracking.finish(exit_code=0 if succeeded else 1)
+                finally:
+                    tq.close()
 
 
 class TaskRunner:

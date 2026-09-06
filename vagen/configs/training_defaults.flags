@@ -24,9 +24,9 @@ actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1
 actor_rollout_ref.rollout.name=sglang
 actor_rollout_ref.rollout.mode=async
 actor_rollout_ref.rollout.multi_turn.enable=True
-# The legacy separated trainer performs its first weight sync before putting SGLang to
-# sleep. Disabling cache offload avoids an invalid resume-before-sleep transition.
-actor_rollout_ref.rollout.free_cache_engine=False
+# V1 colocate_async sleeps the rollout while actor/critic training occupies the GPUs,
+# then restores it with the next policy version before background generation resumes.
+actor_rollout_ref.rollout.free_cache_engine=True
 actor_rollout_ref.rollout.skip_tokenizer_init=False
 
 actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=1
@@ -43,4 +43,12 @@ critic.fsdp.optimizer_offload=True
 
 # Select VAGEN's multi-output agent loop instead of verl's default rollout path.
 actor_rollout_ref.rollout.agent.agent_loop_config_path=$V/vagen/configs/agent_v2.yaml
-+actor_rollout_ref.rollout.agent.agent_loop_manager_class=vagen.training.agent_loop.multi_output.MultiOutputAgentLoopManager
+actor_rollout_ref.rollout.agent.agent_loop_manager_class=vagen.training.agent_loop.tq.VagenAgentLoopManagerTQ
+
+# VAGEN's default path is the V1 colocated asynchronous scheduler.  Set
+# trainer.use_v1=False to retain the legacy separated trainer during rollout parity
+# checks; the entrypoint swaps the manager back to MultiOutputAgentLoopManager there.
+trainer.use_v1=True
+trainer.v1.trainer_mode=colocate_async
+trainer.v1.colocate_async.max_inflight_steps=2
+transfer_queue.enable=True
