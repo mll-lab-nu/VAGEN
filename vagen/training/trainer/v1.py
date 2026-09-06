@@ -259,7 +259,7 @@ class VagenV1Mixin(VagenLogicMixin):
         }
         if rollout_correction:
             output["loss_mask"] = output["response_mask"].clone()
-        tq.kv_batch_put(
+        batch = tq.kv_batch_put(
             keys=batch.keys,
             partition_id=batch.partition_id,
             fields=TensorDict(output, batch_size=len(batch)),
@@ -578,6 +578,18 @@ class VagenV1Mixin(VagenLogicMixin):
             logger_.flush()
         return super().on_train_end()
 
+    def _vagen_shutdown_dataloaders(self) -> None:
+        """Stop multiprocessing loader children before Ray tears down this actor."""
+        self.train_dataloader_it = None
+        for name in ("train_dataloader", "val_dataloader"):
+            loader = getattr(self, name, None)
+            iterator = getattr(loader, "_iterator", None)
+            shutdown = getattr(iterator, "_shutdown_workers", None)
+            if shutdown is not None:
+                shutdown()
+            if loader is not None and hasattr(loader, "_iterator"):
+                loader._iterator = None
+
     def _shutdown_dump_executor(self):
         """Drain every VAGEN background sink on all V1 exit paths.
 
@@ -590,6 +602,7 @@ class VagenV1Mixin(VagenLogicMixin):
         logger_ = getattr(self, "_vagen_val_logger", None)
         if logger_ is not None:
             logger_.flush()
+        self._vagen_shutdown_dataloaders()
         return super()._shutdown_dump_executor()
 
 

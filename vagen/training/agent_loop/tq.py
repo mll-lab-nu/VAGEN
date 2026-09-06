@@ -44,6 +44,13 @@ async def _settle(tasks: list[asyncio.Task[Any]]) -> list[BaseException]:
     return [result for result in results if isinstance(result, BaseException)]
 
 
+def _trajectory_indices(batch: TensorDict):
+    """Mirror the legacy agent loop's fallback for datasets without ``index``."""
+    if "index" in batch:
+        return batch["index"]
+    return list(range(len(batch)))
+
+
 @ray.remote
 class VagenAgentLoopWorkerTQ(AgentLoopWorker):
     """V1 worker that preserves VAGEN's row and reward semantics in TQ."""
@@ -64,7 +71,9 @@ class VagenAgentLoopWorkerTQ(AgentLoopWorker):
         if "agent_name" not in batch:
             batch["agent_name"] = NonTensorData(config.agent.default_agent_loop)
 
-        trajectory_info = await get_trajectory_info(batch["global_steps"], batch["index"], validate)
+        trajectory_info = await get_trajectory_info(
+            batch["global_steps"], _trajectory_indices(batch), validate
+        )
         for i in range(len(batch)):
             prompt = {}
             for key, value in batch.items():

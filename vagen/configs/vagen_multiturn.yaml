@@ -41,6 +41,9 @@ actor_rollout_ref:
   hybrid_engine: True   
   rollout:
     name: sglang        
+    # verl's V1 agent-loop sampling adapter reads this field directly, while the
+    # rollout YAML shipped by the pinned verl revision does not define it yet.
+    repetition_penalty: 1.0
     free_cache_engine: True
     multi_turn:
       enable: True       

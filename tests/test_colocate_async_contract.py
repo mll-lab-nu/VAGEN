@@ -132,6 +132,56 @@ def test_default_training_flags_select_colocate_async():
     assert "transfer_queue.enable=True" in flags
 
 
+def test_vagen_config_supplies_v1_sampling_defaults_missing_from_pinned_verl():
+    config = OmegaConf.load("vagen/configs/vagen_multiturn.yaml")
+    assert config.actor_rollout_ref.rollout.repetition_penalty == 1.0
+
+
+def test_v1_inherits_best_actor_validation_hook():
+    from vagen.training.trainer.v1 import VagenV1Mixin
+
+    assert hasattr(VagenV1Mixin, "_vagen_maybe_save_best_actor")
+
+
+def test_v1_shutdown_stops_dataloader_workers_before_ray_teardown():
+    from vagen.training.trainer.v1 import VagenV1Mixin
+
+    class Iterator:
+        calls = 0
+
+        def _shutdown_workers(self):
+            self.calls += 1
+
+    train_iterator, val_iterator = Iterator(), Iterator()
+    trainer = VagenV1Mixin.__new__(VagenV1Mixin)
+    trainer.train_dataloader_it = object()
+    trainer.train_dataloader = SimpleNamespace(_iterator=train_iterator)
+    trainer.val_dataloader = SimpleNamespace(_iterator=val_iterator)
+
+    trainer._vagen_shutdown_dataloaders()
+
+    assert trainer.train_dataloader_it is None
+    assert train_iterator.calls == val_iterator.calls == 1
+    assert trainer.train_dataloader._iterator is None
+    assert trainer.val_dataloader._iterator is None
+
+
+def test_tq_worker_accepts_vagen_dataset_without_an_index_column():
+    import torch
+    from tensordict import TensorDict
+
+    from vagen.training.agent_loop.tq import _trajectory_indices
+
+    batch = TensorDict({"input_ids": torch.zeros(2, 1)}, batch_size=[2])
+    assert _trajectory_indices(batch) == [0, 1]
+
+    indexed = TensorDict(
+        {"input_ids": torch.zeros(2, 1), "index": torch.tensor([7, 9])},
+        batch_size=[2],
+    )
+    assert _trajectory_indices(indexed).tolist() == [7, 9]
+
+
 @pytest.mark.asyncio
 async def test_tq_worker_rejects_empty_sessions_and_preserves_each_rows_token_reward(
     monkeypatch,
@@ -251,12 +301,14 @@ def test_v1_advantage_persists_value_mask_and_turn_id(monkeypatch):
         )
     stored = list_of_dict_to_tensordict(rows)
     writes = {}
+    written_meta = object()
 
     def fake_get(*, select_fields, **_kwargs):
         return stored.select(*select_fields).clone(recurse=True)
 
     def fake_put(*, fields, **_kwargs):
         writes.update(dict(fields.items()))
+        return written_meta
 
     monkeypatch.setattr(v1.tq, "kv_batch_get", fake_get)
     monkeypatch.setattr(v1.tq, "kv_batch_put", fake_put)
@@ -286,8 +338,9 @@ def test_v1_advantage_persists_value_mask_and_turn_id(monkeypatch):
         partition_id="train",
     )
 
-    trainer._compute_advantage(meta, {})
+    result = trainer._compute_advantage(meta, {})
 
+    assert result is written_meta
     assert {"advantages", "returns", "value_mask", "turn_id"} <= writes.keys()
     assert [row.tolist() for row in writes["value_mask"].unbind()] == [[1, 0], [1]]
     assert [row.tolist() for row in writes["turn_id"].unbind()] == [[0, 0], [1]]
