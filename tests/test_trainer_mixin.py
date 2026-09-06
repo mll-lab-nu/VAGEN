@@ -530,6 +530,39 @@ def test_batch_without_images_is_skipped():
     assert t._vagen_image_actors == {}
 
 
+def test_rollout_metadata_is_flattened_into_jsonl_columns():
+    """Artifact metadata is carried outside reward metrics until the dump boundary."""
+    seen = {}
+
+    class _Base:
+        def _log_rollout_data(
+            self, batch, reward_extra_infos_dict, timing_raw, rollout_data_dir
+        ):
+            seen.update(reward_extra_infos_dict)
+
+    class _MetadataTrainer(VagenV0Mixin, _Base):
+        pass
+
+    metadata = np.empty(2, dtype=object)
+    metadata[:] = [
+        {"scene_id": "scene-a", "sample_id": "sample-a"},
+        {"scene_id": "scene-b"},
+    ]
+    batch = types.SimpleNamespace(
+        non_tensor_batch={"rollout_metadata": metadata}
+    )
+
+    _MetadataTrainer()._log_rollout_data(
+        batch, {"reward": [1.0, 0.0]}, {}, "/unused"
+    )
+
+    assert seen == {
+        "reward": [1.0, 0.0],
+        "sample_id": ["sample-a", None],
+        "scene_id": ["scene-a", "scene-b"],
+    }
+
+
 def test_in_flight_writes_are_capped(monkeypatch):
     """★ An environment that renders every turn queues frames faster than they are
     written; without the cap the driver's object store grows without bound."""

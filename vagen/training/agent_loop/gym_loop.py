@@ -410,6 +410,18 @@ class GymLoop(VagenGymAgentLoopBase):
                  harness) -> list[AgentLoopOutput]:
         rows = client.rows()
         outputs = []
+        # Environments may opt static episode facts into the rollout artifact without
+        # putting them in the model-visible prompt.  Keep this as an opaque dictionary:
+        # the harness still speaks only messages and the trainer does not need to know
+        # what a scene/sample identifier means.
+        rollout_metadata = (getattr(result, "info", {}) or {}).get(
+            "rollout_metadata", {}
+        ) or {}
+        if not isinstance(rollout_metadata, dict):
+            raise TypeError(
+                "environment info['rollout_metadata'] must be a dict, got "
+                f"{type(rollout_metadata).__name__}"
+            )
         finalize_state_scores = getattr(env, "finalized_state_scores", None)
         state_scores = (
             finalize_state_scores(result.turns)
@@ -577,6 +589,11 @@ class GymLoop(VagenGymAgentLoopBase):
                         # "it was never well-formed", and a mean over NaN is visibly NaN
                         # rather than quietly depressed.
                         "image_data": images,
+                        # Static environment identity used by offline consumers (for
+                        # example graph construction).  It is deliberately separate
+                        # from reward_extra_info: strings such as scene_id are metadata,
+                        # not metrics to aggregate.
+                        "rollout_metadata": dict(rollout_metadata),
                         "last_turn": row is rows[-1],
                         # `row is rows[-1]`, not `conversation_id == len(rows) - 1`:
                         # conversation_id is the ordinal assigned when the conversation

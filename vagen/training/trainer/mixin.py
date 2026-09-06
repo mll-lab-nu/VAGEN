@@ -51,6 +51,24 @@ from vagen.utils.wandb_episodes import EpisodeTableLogger
 logger = logging.getLogger(__name__)
 
 
+def rollout_metadata_columns(values) -> dict[str, list]:
+    """Turn per-row metadata dictionaries into aligned JSONL columns.
+
+    ``rollout_metadata`` is an opaque env-to-artifact channel.  Flattening happens only
+    at the logging boundary so neither the harness nor the trainer needs environment-
+    specific field names, while existing artifact readers can keep consuming top-level
+    keys such as ``scene_id``.
+    """
+    rows = []
+    for value in values:
+        if not isinstance(value, dict):
+            value = getattr(value, "data", value)
+        rows.append(dict(value) if isinstance(value, dict) else {})
+
+    names = sorted({name for row in rows for name in row if isinstance(name, str)})
+    return {name: [row.get(name) for row in rows] for name in names}
+
+
 class VagenLogicMixin:
     """What VAGEN adds on top of verl's PPO loop. Bound to no verl method name."""
 
@@ -537,6 +555,24 @@ class VagenV0Mixin(VagenLogicMixin):
             inputs = replace_image_tokens_for_logging(inputs, processor)
             outputs = replace_image_tokens_for_logging(outputs, processor)
         return super()._dump_generations(inputs, outputs, *args, **kwargs)
+
+    def _log_rollout_data(
+        self, batch, reward_extra_infos_dict: dict, timing_raw: dict, rollout_data_dir: str
+    ):
+        """Include env-selected metadata in the JSONL rollout artifact.
+
+        The values remain ordinary non-tensor columns during training and therefore do
+        not enter reward aggregation.  Only this dump boundary flattens the dictionaries
+        for backward-compatible consumers such as GraphRL.
+        """
+        columns = dict(reward_extra_infos_dict)
+        metadata = batch.non_tensor_batch.get("rollout_metadata")
+        if metadata is not None:
+            for name, values in rollout_metadata_columns(metadata).items():
+                columns.setdefault(name, values)
+        return super()._log_rollout_data(
+            batch, columns, timing_raw, rollout_data_dir
+        )
 
     #: What the episode log needs from a validation batch. Named here rather than in
     #: verl: these are our columns, produced by our agent loop and our validation merge,
