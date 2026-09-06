@@ -29,7 +29,7 @@ from vagen.training.tq_utils import (
     unwrap_non_tensor,
 )
 from vagen.training.trainer.logic import collect_registry_metrics
-from vagen.training.trainer.mixin import VagenLogicMixin
+from vagen.training.trainer.mixin import VagenLogicMixin, rollout_metadata_columns
 from vagen.utils.concat_val_multi_turn import concat_val_multi_turn
 from vagen.utils.episode_log import describe_columns, rows_from_validation
 from vagen.utils.wandb_episodes import EpisodeTableLogger
@@ -457,12 +457,17 @@ class VagenV1Mixin(VagenLogicMixin):
 
         val_data_dir = self.config.trainer.get("validation_data_dir", None)
         if val_data_dir:
+            dump_columns = reward_columns | {"uid": sample_uids}
+            for name, values in rollout_metadata_columns(
+                merged_extras.get("rollout_metadata", [])
+            ).items():
+                dump_columns.setdefault(name, values)
             self._dump_generations(
                 inputs=sample_inputs,
                 outputs=sample_outputs,
                 gts=sample_gts,
                 scores=sample_scores,
-                reward_extra_infos_dict=reward_columns | {"uid": sample_uids},
+                reward_extra_infos_dict=dump_columns,
                 dump_path=val_data_dir,
             )
 
@@ -533,6 +538,12 @@ class VagenV1Mixin(VagenLogicMixin):
                 values = rows.non_tensor_batch.get(name)
                 if values is not None:
                     dump_columns[name] = [values[index] for index in ordered]
+            metadata = rows.non_tensor_batch.get("rollout_metadata")
+            if metadata is not None:
+                for name, values in rollout_metadata_columns(
+                    metadata[index] for index in ordered
+                ).items():
+                    dump_columns.setdefault(name, values)
 
             self._dump_generations(
                 inputs=inputs,

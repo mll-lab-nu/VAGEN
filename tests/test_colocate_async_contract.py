@@ -65,9 +65,21 @@ def test_tq_boundary_rejects_misaligned_token_rewards(response_ids, rewards, sco
 def test_padding_rows_do_not_inherit_a_real_episode_identity():
     columns = trajectory_columns(
         [
-            {"episode_id": "episode-real", "group_idx": "group", "traj_idx": 0, "turn_idx": 0},
+            {
+                "episode_id": "episode-real",
+                "group_idx": "group",
+                "traj_idx": 0,
+                "turn_idx": 0,
+                "rollout_metadata": {"scene_id": "scene-a"},
+            },
             # V1 creates this by copying the first row's extra_fields.
-            {"episode_id": "episode-real", "group_idx": "group", "traj_idx": 0, "turn_idx": 0},
+            {
+                "episode_id": "episode-real",
+                "group_idx": "group",
+                "traj_idx": 0,
+                "turn_idx": 0,
+                "rollout_metadata": {"scene_id": "scene-a"},
+            },
         ],
         keys=["group_0_0", "padabc_0_0"],
         uids=["group", "padabc"],
@@ -76,6 +88,10 @@ def test_padding_rows_do_not_inherit_a_real_episode_identity():
     assert columns["episode_id"].tolist() == ["episode-real", "padabc_0_0"]
     assert columns["group_idx"].tolist() == ["group", "padabc"]
     assert columns["response_spans"].tolist() == [None, []]
+    assert columns["rollout_metadata"].tolist() == [
+        {"scene_id": "scene-a"},
+        {},
+    ]
 
 
 def test_conversation_tracks_the_policy_version_interval():
@@ -295,6 +311,7 @@ def test_v1_advantage_persists_value_mask_and_turn_id(monkeypatch):
                     "conversation_id": turn,
                     "response_spans": [(0, width)],
                     "episode_turns": 2,
+                    "rollout_metadata": {"scene_id": "scene-a"},
                     "reward_extra_info": {},
                 },
             }
@@ -365,4 +382,8 @@ def test_v1_advantage_persists_value_mask_and_turn_id(monkeypatch):
     assert dumped["reward_extra_infos_dict"]["episode_id"] == [
         "episode-a",
         "episode-a",
+    ]
+    assert dumped["reward_extra_infos_dict"]["scene_id"] == [
+        "scene-a",
+        "scene-a",
     ]

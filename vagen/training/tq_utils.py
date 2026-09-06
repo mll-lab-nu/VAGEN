@@ -28,6 +28,7 @@ TRAJECTORY_EXTRA_FIELDS = (
     "ends_with_summary",
     "last_turn",
     "image_data",
+    "rollout_metadata",
     "reward_extra_info",
 )
 
@@ -153,6 +154,7 @@ def trajectory_columns(
                 ends_with_summary=False,
                 last_turn=True,
                 image_data=[],
+                rollout_metadata={},
                 reward_extra_info={},
             )
         else:
