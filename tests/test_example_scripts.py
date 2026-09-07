@@ -45,9 +45,10 @@ def test_sglang_is_the_default_rollout_engine():
     defaults = open("vagen/configs/training_defaults.flags").read()
     installer = open("scripts/install.sh").read()
     assert "actor_rollout_ref.rollout.name=sglang" in defaults
-    assert "actor_rollout_ref.rollout.free_cache_engine=True" in defaults
+    assert "actor_rollout_ref.rollout.free_cache_engine=False" in defaults
+    assert "trainer.use_v1=False" in defaults
     assert "trainer.v1.trainer_mode=colocate_async" in defaults
-    assert "transfer_queue.enable=True" in defaults
+    assert "transfer_queue.enable=False" in defaults
     assert 'export BACKEND=${BACKEND:-sglang}' in installer
     for path in SCRIPTS:
         text = open(path).read()

@@ -60,7 +60,7 @@ def main(config):
 
 def _prepare_trainer_mode(config) -> None:
     """Select the matching VAGEN manager and TQ runtime for V0 or V1."""
-    use_v1 = bool(config.trainer.get("use_v1", True))
+    use_v1 = bool(config.trainer.get("use_v1", False))
     manager_path = "actor_rollout_ref.rollout.agent.agent_loop_manager_class"
     current_manager = OmegaConf.select(config, manager_path)
     if use_v1:
@@ -150,7 +150,7 @@ def run_ppo(config, task_runner_class=None) -> None:
         ray.init(**OmegaConf.to_container(ray_init_kwargs))
 
     if task_runner_class is None:
-        runner_cls = TaskRunnerV1 if bool(config.trainer.get("use_v1", True)) else TaskRunner
+        runner_cls = TaskRunnerV1 if bool(config.trainer.get("use_v1", False)) else TaskRunner
         # Please make sure the main task is not scheduled on the head node.
         task_runner_class = ray.remote(num_cpus=1)(runner_cls)
 

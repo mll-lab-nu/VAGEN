@@ -44,17 +44,19 @@ actor_rollout_ref:
     # verl's V1 agent-loop sampling adapter reads this field directly, while the
     # rollout YAML shipped by the pinned verl revision does not define it yet.
     repetition_penalty: 1.0
-    free_cache_engine: True
+    free_cache_engine: False
     multi_turn:
       enable: True       
     agent:
-      agent_loop_manager_class: vagen.training.agent_loop.tq.VagenAgentLoopManagerTQ
+      agent_loop_manager_class: vagen.training.agent_loop.multi_output.MultiOutputAgentLoopManager
 
 # ============================================================================
 # Trainer Configuration
 # ============================================================================
 trainer:
-  use_v1: True
+  # Compatibility default. Set true as the only required knob for colocate_async;
+  # the entrypoint derives TransferQueue, manager, and cache-offload settings.
+  use_v1: False
   v1:
     trainer_mode: colocate_async
     colocate_async:
@@ -145,9 +147,9 @@ trainer:
     max_pending: 2          # Max pending async image dump tasks (prevents IO from blocking training)
     png_compress_level: 0   # PNG compression level (0 = no compression, fastest)
 
-# V1 uses TransferQueue as the transport between background rollouts and training.
+# Enabled automatically when trainer.use_v1=true.
 transfer_queue:
-  enable: True
+  enable: False
 
 # ============================================================================
 # Algorithm Configuration

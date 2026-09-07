@@ -1,9 +1,9 @@
 # Colocated asynchronous training
 
-VAGEN trains with verl V1's `colocate_async` scheduler by default. Rollouts keep
-running in the background; as soon as enough prompt groups finish, the trainer samples
-them from TransferQueue and starts the next update instead of waiting for the slowest
-episode.
+VAGEN preserves its established V0 trainer by default. Setting `trainer.use_v1=true`
+selects verl V1's `colocate_async` scheduler: rollouts keep running in the background;
+as soon as enough prompt groups finish, the trainer samples them from TransferQueue and
+starts the next update instead of waiting for the slowest episode.
 
 ## Boundary
 
@@ -32,7 +32,29 @@ and `turn_id` back to TransferQueue.
 
 ## Configuration
 
-The shipped defaults select this path:
+The shipped defaults keep V0 selected:
+
+```yaml
+trainer:
+  use_v1: false
+
+transfer_queue:
+  enable: false
+
+actor_rollout_ref:
+  rollout:
+    free_cache_engine: false
+    agent:
+      agent_loop_manager_class: vagen.training.agent_loop.multi_output.MultiOutputAgentLoopManager
+```
+
+Opt into colocate_async with one command-line override:
+
+```bash
+bash examples/train/sokoban/train_default_gae_qwen25vl3b.sh trainer.use_v1=true
+```
+
+The entrypoint derives the complete V1 configuration from that knob:
 
 ```yaml
 trainer:
@@ -73,13 +95,12 @@ keys before actor/critic model work. `reward_variance_top_p` keeps its advantage
 A custom legacy `DataProto` filter is not automatically safe in V1; implement it as a
 custom V1 replay-buffer sampler so it can select keys before model work starts.
 
-For rollout-parity investigations, the old path remains available:
+Switch back to the default V0 path explicitly with:
 
 ```bash
 trainer.use_v1=false
 ```
 
-The entrypoint then disables TransferQueue, restores
-`MultiOutputAgentLoopManager`, and turns `free_cache_engine` off. This switch is a
-temporary rollback path, not a second set of harness semantics: both modes execute the
-same `GymLoop` and `run_episode()` implementation.
+The entrypoint then disables TransferQueue, restores `MultiOutputAgentLoopManager`, and
+turns `free_cache_engine` off. Both modes execute the same `GymLoop` and
+`run_episode()` implementation.

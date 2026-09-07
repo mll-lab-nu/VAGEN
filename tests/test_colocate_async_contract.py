@@ -140,12 +140,24 @@ def test_v1_side_channels_are_written_back_to_transfer_queue():
     assert 'output["loss_mask"] = output["response_mask"].clone()' in source
 
 
-def test_default_training_flags_select_colocate_async():
+def test_default_training_flags_preserve_v0_and_keep_v1_as_one_knob_opt_in():
     flags = Path("vagen/configs/training_defaults.flags").read_text(encoding="utf-8")
-    assert "trainer.use_v1=True" in flags
+    assert "trainer.use_v1=False" in flags
     assert "trainer.v1.trainer_mode=colocate_async" in flags
-    assert "vagen.training.agent_loop.tq.VagenAgentLoopManagerTQ" in flags
-    assert "transfer_queue.enable=True" in flags
+    assert "vagen.training.agent_loop.multi_output.MultiOutputAgentLoopManager" in flags
+    assert "actor_rollout_ref.rollout.free_cache_engine=False" in flags
+    assert "transfer_queue.enable=False" in flags
+
+
+def test_vagen_config_defaults_to_v0_but_keeps_colocate_async_configured():
+    config = OmegaConf.load("vagen/configs/vagen_multiturn.yaml")
+    assert config.trainer.use_v1 is False
+    assert config.trainer.v1.trainer_mode == "colocate_async"
+    assert config.transfer_queue.enable is False
+    assert config.actor_rollout_ref.rollout.free_cache_engine is False
+    assert config.actor_rollout_ref.rollout.agent.agent_loop_manager_class == (
+        "vagen.training.agent_loop.multi_output.MultiOutputAgentLoopManager"
+    )
 
 
 def test_vagen_config_supplies_v1_sampling_defaults_missing_from_pinned_verl():
