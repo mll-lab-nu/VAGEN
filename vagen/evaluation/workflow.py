@@ -2,13 +2,15 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 from PIL import Image
 import os
+import base64
+import hashlib
 import json
 import asyncio
 import uuid
 import logging
 
 from vagen.evaluation.backends import EvaluationBackend
-from vagen.evaluation.backends._common.rendering import _now_tag
+from vagen.evaluation.backends._common.rendering import parse_data_url, _now_tag
 from vagen.evaluation.serialization import sanitize_for_json
 from vagen.envs import GymEnvAdapter
 from vagen.rollout import run_episode
@@ -84,16 +86,45 @@ class GenericVisionInferenceWorkflow:
         user_imgs_per_turn: List[List[Image.Image]],
         metrics: Optional[Dict[str, Any]] = None,
         dump_root: Optional[str] = None,
+        conversations: Optional[List[List[Dict[str, Any]]]] = None,
     ) -> None:
-        """Persist messages/images/transcript and optional metrics."""
+        """Persist messages/images/transcript/sft samples and optional metrics.
+
+        Images are stored once each under ``images/<sha1>.png`` (a fresh-context harness
+        re-sends the same target and reference frames every turn) and every message part
+        points at its file, so ``messages.json`` and ``sft.json`` are self-contained.
+        ``sft.json`` holds one LLaMA-Factory sharegpt sample per conversation the client
+        opened -- under no_concat that is one per turn, under concat one per episode --
+        with ``<image>`` placeholders in the text and the file paths in ``images``.
+        """
         base_dir = dump_root or self.dump_dir
         if not base_dir:
             return
         folder = os.path.join(base_dir, rid)
         os.makedirs(folder, exist_ok=True)
+        img_dir = os.path.join(folder, "images")
+        os.makedirs(img_dir, exist_ok=True)
         # Sanitize metrics for JSON
         if metrics is not None:
             metrics = sanitize_for_json(metrics)
+
+        saved: Dict[str, str] = {}   # sha1 -> relative path
+
+        def store(part: Dict[str, Any]) -> Optional[str]:
+            """Write the image of an image part once; return its path relative to the rollout folder."""
+            url = (part.get("image_url") or {}).get("url") if isinstance(part.get("image_url"), dict) else part.get("image_url")
+            parsed = parse_data_url(url) if isinstance(url, str) else None
+            if parsed is None:
+                return url if isinstance(url, str) else None
+            raw = base64.b64decode(parsed[1])
+            digest = hashlib.sha1(raw).hexdigest()[:16]
+            if digest not in saved:
+                ext = "png" if "png" in parsed[0] else "jpg"
+                rel = f"images/{digest}.{ext}"
+                with open(os.path.join(folder, rel), "wb") as f:
+                    f.write(raw)
+                saved[digest] = rel
+            return saved[digest]
 
         def shadow(m: Dict[str, Any]) -> Dict[str, Any]:
             r = m.get("role", "")
@@ -101,35 +132,54 @@ class GenericVisionInferenceWorkflow:
             if isinstance(c, list):
                 parts = []
                 for p in c:
-                    if p.get("type") == "text":
+                    if p.get("type") in ("text", "input_text", "output_text"):
                         parts.append({"type": "text", "text": p.get("text", "")})
-                    elif p.get("type") == "image_url":
-                        parts.append({"type": "image_url", "image_url": {"url": "<data_url>"}})
-                out = {"role": r, "content": parts}
-            else:
-                out = {"role": r, "content": c}
-            return out
+                    elif p.get("type") in ("image_url", "input_image"):
+                        parts.append({"type": "image_url", "image_url": {"url": store(p)}})
+                return {"role": r, "content": parts}
+            return {"role": r, "content": c}
 
-        # messages.json
-        await asyncio.to_thread(
-            lambda: open(os.path.join(folder, "messages.json"), "w", encoding="utf-8").write(
-                json.dumps([shadow(m) for m in messages], ensure_ascii=False, indent=2)
-            )
-        )
-        # assistant_texts.json
-        await asyncio.to_thread(
-            lambda: open(os.path.join(folder, "assistant_texts.json"), "w", encoding="utf-8").write(
-                json.dumps(assistant_texts, ensure_ascii=False, indent=2)
-            )
-        )
+        def sft_sample(conv: List[Dict[str, Any]], index: int) -> Dict[str, Any]:
+            """LLaMA-Factory sharegpt (role/content) sample: text with <image> markers + image paths."""
+            out_msgs, images = [], []
+            for m in conv:
+                c = m.get("content")
+                if isinstance(c, list):
+                    text = []
+                    for p in c:
+                        if p.get("type") in ("text", "input_text", "output_text"):
+                            text.append(p.get("text", ""))
+                        elif p.get("type") in ("image_url", "input_image"):
+                            path = store(p)
+                            if path:
+                                images.append(path)
+                                text.append("<image>")
+                    content = "".join(text)
+                else:
+                    content = c or ""
+                out_msgs.append({"role": m.get("role", ""), "content": content})
+            return {"messages": out_msgs, "images": images, "meta": {"rollout_id": rid, "conversation": index}}
 
-        # Save user images
-        img_dir = os.path.join(folder, "images")
-        os.makedirs(img_dir, exist_ok=True)
-        for t, imgs in enumerate(user_imgs_per_turn, start=1):
-            for i, img in enumerate(imgs, start=1):
-                path = os.path.join(img_dir, f"turn_{t:02d}_{i:02d}.png")
-                await asyncio.to_thread(img.save, path, "PNG")
+        def write_json(name: str, obj: Any) -> None:
+            with open(os.path.join(folder, name), "w", encoding="utf-8") as f:
+                json.dump(obj, f, ensure_ascii=False, indent=2)
+
+        # messages.json: everything the client sent, in order, image parts pointing at files
+        await asyncio.to_thread(write_json, "messages.json", [shadow(m) for m in messages])
+        await asyncio.to_thread(write_json, "assistant_texts.json", assistant_texts)
+        if conversations:
+            samples = [sft_sample(conv, i) for i, conv in enumerate(conversations) if conv]
+            if metrics is not None:
+                for smp in samples:
+                    smp["meta"]["success"] = metrics.get("success")
+                    smp["meta"]["finish_reason"] = metrics.get("finish_reason")
+            await asyncio.to_thread(write_json, "sft.json", samples)
+        # Frames the harness never sent (an environment observation nobody rendered) are not
+        # in the messages; keep them too so nothing is lost.
+        if not saved:
+            for t, imgs in enumerate(user_imgs_per_turn, start=1):
+                for i, img in enumerate(imgs, start=1):
+                    await asyncio.to_thread(img.save, os.path.join(img_dir, f"turn_{t:02d}_{i:02d}.png"), "PNG")
 
         # transcript.txt
         def to_line(m: Dict[str, Any]) -> str:
@@ -283,8 +333,10 @@ class GenericVisionInferenceWorkflow:
         # The transcript is what the client actually sent, across every conversation the
         # harness opened. Under no_concat and compact that is more than one, and reading
         # only the last would report a fraction of the episode.
+        conversations: List[List[Dict[str, Any]]] = []
         for conv in client.conversations():
-            messages.extend(client.messages(conv.conversation_id))
+            conversations.append(client.messages(conv.conversation_id))
+            messages.extend(conversations[-1])
         assistant_texts = [_text_of(m) for m in messages if m.get("role") == "assistant"]
 
         if outcome is not None:
@@ -367,6 +419,7 @@ class GenericVisionInferenceWorkflow:
                 user_imgs_per_turn,
                 metrics=sanitize_for_json(metrics),
                 dump_root=dump_root,
+                conversations=conversations,
             )
 
             result = {
@@ -427,6 +480,7 @@ class GenericVisionInferenceWorkflow:
                         user_imgs_per_turn,
                         metrics=minimal_metrics,
                         dump_root=dump_root,
+                        conversations=conversations,
                     )
             except Exception:
                 pass
