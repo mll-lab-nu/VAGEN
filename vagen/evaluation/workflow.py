@@ -88,14 +88,16 @@ class GenericVisionInferenceWorkflow:
         dump_root: Optional[str] = None,
         conversations: Optional[List[List[Dict[str, Any]]]] = None,
     ) -> None:
-        """Persist messages/images/transcript/sft samples and optional metrics.
+        """Persist the rollout: ``sft.json``, ``transcript.txt``, ``images/``, ``metrics.json``.
 
-        Images are stored once each under ``images/<sha1>.png`` (a fresh-context harness
-        re-sends the same target and reference frames every turn) and every message part
-        points at its file, so ``messages.json`` and ``sft.json`` are self-contained.
-        ``sft.json`` holds one LLaMA-Factory sharegpt sample per conversation the client
-        opened -- under no_concat that is one per turn, under concat one per episode --
-        with ``<image>`` placeholders in the text and the file paths in ``images``.
+        ``sft.json`` is the machine-readable record AND the training format: one
+        LLaMA-Factory sharegpt sample per conversation the client opened -- under no_concat
+        that is one per turn, under concat one per episode -- with ``<image>`` placeholders
+        in the text and file paths in ``images``. Flattening its samples reproduces the
+        whole exchange in order, which is why no separate ``messages.json`` is written.
+
+        Images are stored once each under ``images/<sha1>.png``: a fresh-context harness
+        re-sends the same target and reference frames every turn.
         """
         base_dir = dump_root or self.dump_dir
         if not base_dir:
@@ -126,19 +128,6 @@ class GenericVisionInferenceWorkflow:
                 saved[digest] = rel
             return saved[digest]
 
-        def shadow(m: Dict[str, Any]) -> Dict[str, Any]:
-            r = m.get("role", "")
-            c = m.get("content")
-            if isinstance(c, list):
-                parts = []
-                for p in c:
-                    if p.get("type") in ("text", "input_text", "output_text"):
-                        parts.append({"type": "text", "text": p.get("text", "")})
-                    elif p.get("type") in ("image_url", "input_image"):
-                        parts.append({"type": "image_url", "image_url": {"url": store(p)}})
-                return {"role": r, "content": parts}
-            return {"role": r, "content": c}
-
         def sft_sample(conv: List[Dict[str, Any]], index: int) -> Dict[str, Any]:
             """LLaMA-Factory sharegpt (role/content) sample: text with <image> markers + image paths."""
             out_msgs, images = [], []
@@ -164,11 +153,11 @@ class GenericVisionInferenceWorkflow:
             with open(os.path.join(folder, name), "w", encoding="utf-8") as f:
                 json.dump(obj, f, ensure_ascii=False, indent=2)
 
-        # messages.json: everything the client sent, in order, image parts pointing at files
-        await asyncio.to_thread(write_json, "messages.json", [shadow(m) for m in messages])
         await asyncio.to_thread(write_json, "assistant_texts.json", assistant_texts)
-        if conversations:
-            samples = [sft_sample(conv, i) for i, conv in enumerate(conversations) if conv]
+        # sft.json: the exchange, per conversation. Without `conversations` (an error before
+        # the first call) fall back to one sample holding whatever was sent.
+        if conversations or messages:
+            samples = [sft_sample(conv, i) for i, conv in enumerate(conversations or [messages]) if conv]
             if metrics is not None:
                 for smp in samples:
                     smp["meta"]["success"] = metrics.get("success")

@@ -141,10 +141,12 @@ dump_dir/
     ├── summary.json                    # aggregated metrics
     └── {YYYYmmdd-HHMMSS}-{uuid8}/
         ├── metrics.json                # per-episode results (success, reward, finish_reason)
-        ├── messages.json               # full conversation history
+        ├── sft.json                    # the exchange, one LLaMA-Factory sharegpt sample
+        │                               # per conversation (no_concat: one per turn):
+        │                               # messages[role/content with <image>], images[paths], meta
         ├── assistant_texts.json        # model replies only
         ├── transcript.txt              # human-readable conversation
-        └── images/
+        └── images/                     # one file per distinct frame, named by content hash
             └── turn_01_01.png          # 1-indexed; turn 01 is the reset observation
 ```
 
