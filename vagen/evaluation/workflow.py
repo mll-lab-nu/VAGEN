@@ -354,7 +354,13 @@ class GenericVisionInferenceWorkflow:
                 # of room". The turn count can, and only the second is worth a name.
                 finish_reason = "max_turns"
             elif outcome.truncated:
-                finish_reason = "no_room"
+                # A harness names why it stopped -- `no_room` for an exhausted budget,
+                # `empty_generation` for a reply that carried no content -- by way of
+                # `truncate(reason)`. Overwriting every one of them with `no_room`
+                # turned distinct failures into one, and the one it chose reads as an
+                # accounting problem rather than a model that returned nothing.
+                finish_reason = (getattr(outcome, "info", None)
+                                 or {}).get("rollout_stop_reason") or "no_room"
             else:
                 finish_reason = "max_turns"
         else:

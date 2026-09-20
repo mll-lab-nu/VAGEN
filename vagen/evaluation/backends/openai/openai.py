@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 import os
 from typing import Any, Dict, Iterable, List, Tuple
 from openai import AsyncAzureOpenAI, AsyncOpenAI
@@ -6,6 +7,18 @@ from PIL import Image
 from vagen.evaluation.backends._common.base import EvaluationBackend
 from vagen.evaluation.backends._common.rendering import pil_to_dataurl_png, compile_text_images_for_order
 from vagen.evaluation.backends._common.registry import register_adapter, register_client
+
+
+logger = logging.getLogger(__name__)
+
+
+class OutputBudgetExceeded(RuntimeError):
+    """The endpoint stopped at ``max_tokens`` before writing any content.
+
+    Raised rather than returned empty so the episode is recorded as an error and
+    can be re-run, instead of being written as a failure that resume then treats
+    as finished work.
+    """
 
 
 @register_client("openai", "openai_responses")
@@ -67,4 +80,26 @@ class OpenAIAdapter(EvaluationBackend):
             messages=messages,
             **chat_config,
         )
-        return resp.choices[0].message.content or ""
+        choice = resp.choices[0]
+        content = choice.message.content or ""
+        # `finish_reason` carries the only signal that separates "the model declined"
+        # from "the model was cut off". A reasoning model spends its output budget on
+        # hidden thinking before it writes anything, so a budget that is merely too
+        # small comes back as `length` with no content -- indistinguishable, once the
+        # reason is dropped, from a refusal or a content filter. A harness then re-asks
+        # against the same budget, which cannot help, and scores the episode as a
+        # failure. Measured on one reasoning model at high effort, that silently took
+        # out 29% of its rows.
+        reason = getattr(choice, "finish_reason", None)
+        if reason == "length" and not content.strip():
+            raise OutputBudgetExceeded(
+                f"{self.model} stopped at its output budget with no content "
+                f"(finish_reason=length). Raise max_tokens, or "
+                f"response_length_per_turn if a harness sets the per-call limit: "
+                f"hidden reasoning is billed against it."
+            )
+        if reason == "length":
+            logger.warning(
+                "%s was truncated at its output budget after %d characters; "
+                "keeping the partial reply.", self.model, len(content))
+        return content
