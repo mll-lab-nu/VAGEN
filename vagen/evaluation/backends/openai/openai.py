@@ -1,6 +1,8 @@
 from __future__ import annotations
 import logging
 import os
+
+import httpx
 from typing import Any, Dict, Iterable, List, Tuple
 from openai import AsyncAzureOpenAI, AsyncOpenAI
 from PIL import Image
@@ -21,11 +23,40 @@ class OutputBudgetExceeded(RuntimeError):
     """
 
 
+def _transport(cfg: Dict[str, Any]) -> Dict[str, Any]:
+    """Connection pool and retry budget, shared by both clients.
+
+    Two defaults are wrong for an evaluation that runs many episodes at once
+    against a hosted endpoint.
+
+    httpx keeps 20 connections alive, so asking for 256 concurrent requests still
+    sent them a few at a time -- measured 6 requests a second at 32 concurrent
+    where the latency implied 20. The pool is sized to the concurrency instead.
+
+    The SDK retries twice, which is not enough against a per-minute quota. A
+    quota is a queue, not a verdict: the request is fine and will be served
+    shortly. Measured against one deployment, two retries left 88% of calls
+    returning 429 and 27% of episodes recorded as failures with nothing wrong
+    with them; eight brought that to 1.8% without touching concurrency.
+    """
+    pool = int(cfg.get("max_connections", os.getenv("LLM_MAX_CONNECTIONS", "1024")))
+    return {
+        "http_client": httpx.AsyncClient(
+            limits=httpx.Limits(max_connections=pool, max_keepalive_connections=pool),
+            timeout=httpx.Timeout(float(cfg.get("timeout", 600.0)), connect=20.0),
+        ),
+        "max_retries": int(cfg.get("max_retries", os.getenv("LLM_MAX_RETRIES", "8"))),
+    }
+
+
 @register_client("openai", "openai_responses")
 def build_client_openai(cfg: Dict[str, Any]) -> AsyncOpenAI:
     api_key = cfg.get("api_key") or os.getenv("OPENAI_API_KEY", "")
     base_url = cfg.get("base_url")
-    return AsyncOpenAI(api_key=api_key, base_url=base_url) if base_url else AsyncOpenAI(api_key=api_key)
+    kwargs = {"api_key": api_key, **_transport(cfg)}
+    if base_url:
+        kwargs["base_url"] = base_url
+    return AsyncOpenAI(**kwargs)
 
 
 @register_client("azure", "azure_responses")
@@ -35,7 +66,8 @@ def build_client_azure(cfg: Dict[str, Any]) -> AsyncAzureOpenAI:
     api_version = cfg.get("azure_api_version") or os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
     if not endpoint or not api_key:
         raise ValueError("Azure endpoint/api_key missing.")
-    return AsyncAzureOpenAI(api_version=api_version, azure_endpoint=endpoint, api_key=api_key)
+    return AsyncAzureOpenAI(api_version=api_version, azure_endpoint=endpoint,
+                            api_key=api_key, **_transport(cfg))
 
 @register_adapter("openai", "azure")
 class OpenAIAdapter(EvaluationBackend):
