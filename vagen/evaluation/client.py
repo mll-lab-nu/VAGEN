@@ -93,6 +93,8 @@ class ChatClient(InferenceClient):
         #: conversation id -> the API messages sent so far. The harness decides *which*
         #: messages a call carries; this only remembers what they rendered to.
         self._api_messages: dict[str, list[dict]] = {}
+        #: conversation id -> the adapter's raw API response for each assistant turn, in order
+        self._raw_responses: dict[str, list] = {}
 
     # ------------------------------------------------------------------ bookkeeping
     def _open(self, conversation_id: str | None) -> str:
@@ -103,6 +105,10 @@ class ChatClient(InferenceClient):
     def messages(self, conversation_id: str) -> list[dict]:
         """What was actually sent, for the transcript dump."""
         return list(self._api_messages.get(conversation_id) or [])
+
+    def raw_responses(self, conversation_id: str) -> list:
+        """Raw API responses of every assistant turn of one conversation (see generate)."""
+        return list(self._raw_responses.get(conversation_id) or [])
 
     # ------------------------------------------------------------------ encoding
     def encode(self, messages: list[dict]) -> list[int]:
@@ -180,6 +186,10 @@ class ChatClient(InferenceClient):
         # Recorded so the transcript shows the exchange and not just what we sent.
         if self._active is not None and text:
             self._api_messages[self._active].append(self.adapter.format_assistant_turn(text))
+        # The raw response (content + hidden-reasoning fields + usage) for the dump; kept
+        # even when the content was empty so raw_responses.json lines up with the calls made.
+        if self._active is not None:
+            self._raw_responses.setdefault(self._active, []).append(getattr(self.adapter, "last_raw", None))
         return BackendOutput(text=text, token_ids=[0] * self._size(text, []))
 
 

@@ -1,4 +1,5 @@
 from __future__ import annotations
+import json
 import logging
 import os
 
@@ -69,6 +70,17 @@ def build_client_azure(cfg: Dict[str, Any]) -> AsyncAzureOpenAI:
     return AsyncAzureOpenAI(api_version=api_version, azure_endpoint=endpoint,
                             api_key=api_key, **_transport(cfg))
 
+def _raw_dump(resp: Any) -> Any:
+    """JSON-safe copy of an SDK response object (pydantic model_dump), or its repr."""
+    try:
+        return resp.model_dump(mode="json")
+    except Exception:  # noqa: BLE001
+        try:
+            return json.loads(resp.model_dump_json())
+        except Exception:  # noqa: BLE001
+            return {"repr": repr(resp)}
+
+
 @register_adapter("openai", "azure")
 class OpenAIAdapter(EvaluationBackend):
     """
@@ -114,6 +126,10 @@ class OpenAIAdapter(EvaluationBackend):
         )
         choice = resp.choices[0]
         content = choice.message.content or ""
+        # The whole response, verbatim, for the rollout dump (raw_responses.json). Reasoning
+        # models return their thinking OUTSIDE ``message.content`` (OpenRouter: ``message.reasoning``
+        # / ``reasoning_details``); returning only the content threw it away.
+        self.last_raw = _raw_dump(resp)
         # `finish_reason` carries the only signal that separates "the model declined"
         # from "the model was cut off". A reasoning model spends its output budget on
         # hidden thinking before it writes anything, so a budget that is merely too

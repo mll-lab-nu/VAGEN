@@ -87,8 +87,10 @@ class GenericVisionInferenceWorkflow:
         metrics: Optional[Dict[str, Any]] = None,
         dump_root: Optional[str] = None,
         conversations: Optional[List[List[Dict[str, Any]]]] = None,
+        raw_responses: Optional[List[List[Any]]] = None,
     ) -> None:
-        """Persist the rollout: ``sft.json``, ``transcript.txt``, ``images/``, ``metrics.json``.
+        """Persist the rollout: ``sft.json``, ``transcript.txt``, ``images/``, ``metrics.json``,
+        ``raw_responses.json`` (the model's raw API responses, one list per conversation).
 
         ``sft.json`` is the machine-readable record AND the training format: one
         LLaMA-Factory sharegpt sample per conversation the client opened -- under no_concat
@@ -154,6 +156,8 @@ class GenericVisionInferenceWorkflow:
                 json.dump(obj, f, ensure_ascii=False, indent=2)
 
         await asyncio.to_thread(write_json, "assistant_texts.json", assistant_texts)
+        if raw_responses is not None:
+            await asyncio.to_thread(write_json, "raw_responses.json", sanitize_for_json(raw_responses))
         # sft.json: the exchange, per conversation. Without `conversations` (an error before
         # the first call) fall back to one sample holding whatever was sent.
         if conversations or messages:
@@ -323,8 +327,10 @@ class GenericVisionInferenceWorkflow:
         # harness opened. Under no_concat and compact that is more than one, and reading
         # only the last would report a fraction of the episode.
         conversations: List[List[Dict[str, Any]]] = []
+        raw_responses: List[List[Any]] = []          # one list per conversation, one entry per assistant turn
         for conv in client.conversations():
             conversations.append(client.messages(conv.conversation_id))
+            raw_responses.append(client.raw_responses(conv.conversation_id))
             messages.extend(conversations[-1])
         assistant_texts = [_text_of(m) for m in messages if m.get("role") == "assistant"]
 
@@ -415,6 +421,7 @@ class GenericVisionInferenceWorkflow:
                 metrics=sanitize_for_json(metrics),
                 dump_root=dump_root,
                 conversations=conversations,
+                raw_responses=raw_responses,
             )
 
             result = {
@@ -476,6 +483,7 @@ class GenericVisionInferenceWorkflow:
                         metrics=minimal_metrics,
                         dump_root=dump_root,
                         conversations=conversations,
+                        raw_responses=raw_responses,
                     )
             except Exception:
                 pass
