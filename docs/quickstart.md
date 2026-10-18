@@ -20,7 +20,7 @@
 conda create -n vagen python=3.12 -y
 conda activate vagen
 
-git clone --branch dev/bi_level https://github.com/JamesKrW/VAGEN.git
+git clone https://github.com/mll-lab-nu/VAGEN.git
 cd VAGEN
 bash scripts/install.sh
 ```
