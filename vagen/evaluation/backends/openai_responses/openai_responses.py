@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Tuple
 from PIL import Image
 from vagen.evaluation.backends._common.base import EvaluationBackend
 from vagen.evaluation.backends._common.rendering import pil_to_dataurl_png, compile_text_images_for_order
+from vagen.evaluation.backends._common.options import filter_chat_kwargs
 from vagen.evaluation.backends._common.registry import register_adapter
 
 
@@ -39,10 +40,22 @@ class OpenAIResponsesAdapter(EvaluationBackend):
         return {"role": "assistant", "content": [{"type": "output_text", "text": text}]}
 
     async def acompletion(self, messages: List[Dict[str, Any]], **chat_config: Any) -> str:
+        """Translate the shared token limit to the Responses API's parameter.
+
+        If a native limit is also configured, keep the smaller one so it cannot
+        relax the evaluation client's per-turn ceiling.
+        """
+        params = filter_chat_kwargs(chat_config)
+        max_tokens = params.pop("max_tokens", None)
+        if max_tokens is not None:
+            native_limit = params.get("max_output_tokens")
+            params["max_output_tokens"] = (
+                min(max_tokens, native_limit) if native_limit is not None else max_tokens
+            )
 
         resp = await self.client.responses.create(
             model=self.model,
             input=messages,
-            **chat_config,
+            **params,
         )
         return resp.output_text or ""
