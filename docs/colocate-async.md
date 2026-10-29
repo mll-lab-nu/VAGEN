@@ -79,11 +79,22 @@ actor_rollout_ref:
 checkpoint/restore, so finished rows and in-flight prompt markers remain consistent with
 a resumed trainer checkpoint.
 
-`max_inflight_steps` limits a still-running training group by policy versions. At the
-default value of 2, a group may span two versions; on the third it is cancelled as one
-atomic UID group, marked failed, evicted, and replaced by the async replay buffer. It is
-separate from `trainer.v1.sampler.max_off_policy_threshold`, which governs already
-completed groups. Validation is never cancelled by this limit.
+`max_inflight_steps` bounds a training group's span, `step - submitted_step + 1`, the
+measure verl's replay buffer uses. A still-running group that exceeds it is cancelled at
+the next step begin as one atomic UID group, marked failed, evicted, and replaced by the
+async replay buffer. A group that completes between two such checks is held to the same
+bound by the replay buffer: the entrypoint lowers
+`trainer.v1.sampler.max_off_policy_threshold` (verl default 8) to `max_inflight_steps`
+when it is larger, and refuses `max_off_policy_strategy=wait`, which would wait for
+stale groups instead of cancelling them. `max_inflight_steps=0` disables both and leaves
+the sampler settings as given. Validation is never cancelled by this limit.
+
+`actor_rollout_ref.rollout.full_determinism` is refused under V1: episodes complete out
+of order and prompt uids are random, so stable episode ids cannot be guaranteed unique.
+
+When a validation sets a new best score and `trainer.save_best_actor` is on, the rollout
+replicas, which validation leaves generating, are aborted and put to sleep for the actor
+save, then synced and resumed, as at a step boundary.
 
 An empty episode is also a failed group. This matters for GRPO: no sibling trajectory
 from that UID is trained after one session fails or produces no row.
@@ -91,7 +102,8 @@ from that UID is trained after one session fails or produces no row.
 ## Filters and fallback
 
 The built-in `reward_variance` and `reward_variance_top_p` filters run on completed TQ
-keys before actor/critic model work. `reward_variance_top_p` keeps its advantage scaling.
+keys before actor/critic model work. `reward_variance_top_p` keeps its advantage scaling,
+and critic metrics mask sentinel returns with `value_mask` as in V0.
 A custom legacy `DataProto` filter is not automatically safe in V1; implement it as a
 custom V1 replay-buffer sampler so it can select keys before model work starts.
 

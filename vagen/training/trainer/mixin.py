@@ -541,6 +541,18 @@ class VagenLogicMixin:
         except (TypeError, ValueError):
             return None
 
+    def _vagen_best_actor_due(self):
+        """The validation score when it beats every earlier one and should be saved, else None."""
+        if not bool(self.config.trainer.get("save_best_actor", True)):
+            return None
+        score = self._vagen_best_val_score()
+        if score is None:
+            return None
+        best = getattr(self, "_vagen_best_val", None)
+        if best is not None and score <= best:
+            return None
+        return score
+
     def _vagen_maybe_save_best_actor(self) -> None:
         """Keep a copy of the actor from the best-validating step.
 
@@ -557,14 +569,8 @@ class VagenLogicMixin:
         checkpoint that is slightly better at writing tags over one slightly better at
         solving. `trainer.save_best_actor: false` turns the whole thing off.
         """
-        if not bool(self.config.trainer.get("save_best_actor", True)):
-            return
-        score = self._vagen_best_val_score()
+        score = self._vagen_best_actor_due()
         if score is None:
-            return
-
-        best = getattr(self, "_vagen_best_val", None)
-        if best is not None and score <= best:
             return
         self._vagen_best_val = score
 

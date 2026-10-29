@@ -71,6 +71,13 @@ def _prepare_trainer_mode(config) -> bool:
                 "VAGEN's V1 integration currently requires "
                 "trainer.v1.trainer_mode=colocate_async"
             )
+        if bool(config.actor_rollout_ref.rollout.get("full_determinism", False)):
+            raise ValueError(
+                "actor_rollout_ref.rollout.full_determinism is not supported with "
+                "trainer.use_v1=True: colocate_async completes episodes out of order and "
+                "its prompt uids are random, so stable episode ids would collide"
+            )
+        _bound_v1_staleness(config)
         config.transfer_queue.enable = True
         config.actor_rollout_ref.rollout.free_cache_engine = True
         if current_manager in (None, _V0_MANAGER):
@@ -90,6 +97,35 @@ def _prepare_trainer_mode(config) -> bool:
             OmegaConf.update(config, manager_path, _V0_MANAGER, merge=False, force_add=True)
         logger.warning("Using VAGEN's legacy V0 trainer; set trainer.use_v1=True to use colocate_async")
     return use_v1
+
+
+def _bound_v1_staleness(config) -> None:
+    """Make verl's replay buffer enforce VAGEN's ``max_inflight_steps`` too.
+
+    VAGEN cancels in-flight groups older than ``max_inflight_steps`` at each step begin,
+    which only saves compute: a group that completes between two checks reaches the
+    replay buffer, whose own ``max_off_policy_threshold`` (verl default 8) decides
+    whether it is trained on. Both use the same span, ``step - submitted_step + 1``, so
+    lowering the buffer's threshold to the same value makes the bound hold for every
+    sampled group. verl's ``wait`` strategy blocks for stale groups to finish instead,
+    which is the opposite of cancelling them.
+    """
+    max_inflight = int(
+        OmegaConf.select(config, "trainer.v1.colocate_async.max_inflight_steps", default=0) or 0
+    )
+    if max_inflight <= 0:
+        return
+    strategy = OmegaConf.select(config, "trainer.v1.sampler.max_off_policy_strategy", default="drop")
+    if strategy != "drop":
+        raise ValueError(
+            "trainer.v1.colocate_async.max_inflight_steps cancels stale groups, which "
+            f"contradicts trainer.v1.sampler.max_off_policy_strategy={strategy}; "
+            "set max_inflight_steps=0 to use it"
+        )
+    threshold_path = "trainer.v1.sampler.max_off_policy_threshold"
+    threshold = OmegaConf.select(config, threshold_path, default=None)
+    if threshold is None or int(threshold) > max_inflight:
+        OmegaConf.update(config, threshold_path, max_inflight, merge=False, force_add=True)
 
 
 def _propagate_determinism_env(config) -> None:

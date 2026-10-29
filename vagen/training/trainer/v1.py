@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
 from typing import Any, Iterable
 
 import numpy as np
@@ -24,6 +23,7 @@ from vagen.models import replace_image_tokens_for_logging
 from vagen.training.filters import FILTER_REGISTRY
 from vagen.training.metrics import METRIC_REGISTRY
 from vagen.training.tq_utils import (
+    extend_aligned_columns,
     parse_tq_trajectory_key,
     trajectory_columns,
     unwrap_non_tensor,
@@ -141,14 +141,18 @@ class VagenV1Mixin(VagenLogicMixin):
             )
 
     def _vagen_filter_tq(self, batch: KVBatchMeta, metrics: dict) -> KVBatchMeta:
-        """Run the shipped reward-variance filters before V1 pads the row batch."""
+        """Run the shipped reward-variance filters before V1 pads the row batch.
+
+        What the advantage step needs from here (the filter's loss scale, and that the
+        custom metrics were already taken on the unfiltered rows) is kept on the trainer,
+        not in ``batch.extra_info``: verl replaces the KVBatchMeta in between with the one
+        ``tq.kv_batch_put`` returns, whose ``extra_info`` comes from the TQ server.
+        """
         cfg = self.config.get("filter", None)
         data = self._vagen_filter_data(batch)
         self._vagen_collect_metrics(data, metrics)
+        self._vagen_pending_advantage = {"metrics_collected": True, "scale": 1.0}
         if not (cfg and cfg.get("enable", False)):
-            if batch.extra_info is None:
-                batch.extra_info = {}
-            batch.extra_info["vagen_metrics_collected"] = True
             return batch
         if cfg.name not in self._SUPPORTED_LEGACY_FILTERS:
             raise ValueError(
@@ -164,9 +168,7 @@ class VagenV1Mixin(VagenLogicMixin):
         if dropped_keys:
             tq.kv_clear(keys=dropped_keys, partition_id=batch.partition_id)
 
-        extra_info = dict(batch.extra_info or {})
-        extra_info["vagen_metrics_collected"] = True
-        extra_info["vagen_advantage_scale"] = float(
+        self._vagen_pending_advantage["scale"] = float(
             metrics.get("filter/train/top_p/loss_scale", 1.0)
         )
         return KVBatchMeta(
@@ -174,16 +176,15 @@ class VagenV1Mixin(VagenLogicMixin):
             keys=[batch.keys[index] for index in indices],
             tags=[batch.tags[index] for index in indices],
             fields=batch.fields,
-            extra_info=extra_info,
+            extra_info=dict(batch.extra_info or {}),
         )
 
     def _balance_batch(self, batch: KVBatchMeta, metrics, logging_prefix="global_seqlen", keep_minibatch=False):
         # Reward-variance filters need neither values nor log-probs.  Applying them here
         # avoids doing model work for rows that will be discarded and lets V1's own
         # padding utility restore all downstream divisibility constraints afterwards.
-        if not (batch.extra_info or {}).get("vagen_filter_applied", False):
-            batch = self._vagen_filter_tq(batch, metrics)
-            batch.extra_info["vagen_filter_applied"] = True
+        # verl calls this once per sampled batch, before any model work on it.
+        batch = self._vagen_filter_tq(batch, metrics)
         return super()._balance_batch(
             batch,
             metrics,
@@ -231,11 +232,13 @@ class VagenV1Mixin(VagenLogicMixin):
         )
         data = self._vagen_write_value_mask(data)
 
-        scale = float((batch.extra_info or {}).get("vagen_advantage_scale", 1.0))
+        # Set by _vagen_filter_tq for this batch; consumed so it cannot leak into the next.
+        pending = self.__dict__.pop("_vagen_pending_advantage", None) or {}
+        scale = float(pending.get("scale", 1.0))
         if scale != 1.0:
             data.batch["advantages"] = data.batch["advantages"] * scale
 
-        if not (batch.extra_info or {}).get("vagen_metrics_collected", False):
+        if not pending.get("metrics_collected", False):
             real_indices = [
                 index for index, tag in enumerate(batch.tags) if not tag.get("is_padding", False)
             ]
@@ -252,6 +255,7 @@ class VagenV1Mixin(VagenLogicMixin):
         for side_channel in ("value_mask", "turn_id"):
             if side_channel in data.batch:
                 write_fields.append(side_channel)
+        self._vagen_wrote_value_mask = "value_mask" in write_fields
 
         output = {
             field: response_to_nested(data.batch[field], response_mask)
@@ -265,6 +269,15 @@ class VagenV1Mixin(VagenLogicMixin):
             fields=TensorDict(output, batch_size=len(batch)),
         )
         return batch
+
+    def _metric_extra_fields(self) -> list[str]:
+        # Estimators that supervise only some positions write sentinel returns elsewhere
+        # and mark the real ones in value_mask; compute_data_metrics masks returns with it,
+        # but only if the metric fetch brings it along.
+        fields = list(super()._metric_extra_fields())
+        if getattr(self, "_vagen_wrote_value_mask", False):
+            fields.append("value_mask")
+        return fields
 
     def _compute_metrics(self, batch, metrics, timing_raw, global_steps, epoch):
         super()._compute_metrics(batch, metrics, timing_raw, global_steps, epoch)
@@ -365,7 +378,7 @@ class VagenV1Mixin(VagenLogicMixin):
         sample_scores: list[float] = []
         sample_turns: list[int] = []
         data_sources: list[str] = []
-        merged_extras: defaultdict[str, list[Any]] = defaultdict(list)
+        merged_extras: dict[str, list[Any]] = {}
 
         import uuid
 
@@ -431,6 +444,7 @@ class VagenV1Mixin(VagenLogicMixin):
                 if row_rewards is not None:
                     reward_by_session.setdefault(pair, row_rewards[index])
 
+            n_prior = len(sample_uids)
             sample_uids.extend(group for group, _ in session_pairs)
             sample_inputs.extend(inputs)
             sample_outputs.extend(outputs)
@@ -443,8 +457,7 @@ class VagenV1Mixin(VagenLogicMixin):
                 else None
                 for pair in session_pairs
             )
-            for name, values in merged.non_tensor_batch.items():
-                merged_extras[name].extend(list(values))
+            extend_aligned_columns(merged_extras, merged.non_tensor_batch, n_prior, len(sample_uids))
 
             tq.kv_clear(keys=batch.keys, partition_id=batch.partition_id)
 
@@ -579,7 +592,18 @@ class VagenV1Mixin(VagenLogicMixin):
         if logger_ is not None:
             logger_.flush()
         self.metrics = getattr(self, "_vagen_last_val_metrics", {})
-        self._vagen_maybe_save_best_actor()
+        if self._vagen_best_actor_due() is None:
+            return
+        # Validation runs after on_step_end has resumed the colocated rollout replicas, and
+        # the actor save needs the GPU memory they hold. Put them to sleep the way
+        # on_sample_end does, save, then sync and resume them the way on_step_end does.
+        self.checkpoint_manager.abort_replicas()
+        self.checkpoint_manager.sleep_replicas()
+        try:
+            self._vagen_maybe_save_best_actor()
+        finally:
+            self.checkpoint_manager.update_weights(self.global_steps)
+            self.checkpoint_manager.resume_generation_replicas()
 
     def on_train_end(self):
         self._vagen_flush_images()

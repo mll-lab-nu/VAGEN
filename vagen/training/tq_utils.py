@@ -55,6 +55,20 @@ def trajectory_identity(kwargs: dict[str, Any]) -> tuple[Any, Any]:
     return unwrap_non_tensor(group_idx), unwrap_non_tensor(traj_idx)
 
 
+def extend_aligned_columns(
+    columns: dict[str, list[Any]], new: dict[str, Iterable[Any]], n_prior: int, n_total: int
+) -> None:
+    """Append one batch's columns, keeping every column ``n_total`` long.
+
+    A column only some batches carry (one environment reports a field another does not)
+    is padded with None before and after, so row i of every column is the same sample.
+    """
+    for name, values in new.items():
+        columns.setdefault(name, [None] * n_prior).extend(list(values))
+    for column in columns.values():
+        column.extend([None] * (n_total - len(column)))
+
+
 def parse_tq_trajectory_key(key: str) -> tuple[str, int, int]:
     """Parse V1's ``{uid}_{session_id}_{output_index}`` trajectory key."""
     fields = str(key).rsplit("_", 2)

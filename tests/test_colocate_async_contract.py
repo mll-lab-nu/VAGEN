@@ -134,6 +134,77 @@ def test_entrypoint_switches_the_manager_with_the_trainer_generation():
     assert config.actor_rollout_ref.rollout.agent.agent_loop_manager_class == _V0_MANAGER
 
 
+def _v1_config(**colocate_async):
+    return OmegaConf.create(
+        {
+            "trainer": {
+                "use_v1": True,
+                "v1": {
+                    "trainer_mode": "colocate_async",
+                    "colocate_async": colocate_async,
+                    "sampler": {"max_off_policy_threshold": 8, "max_off_policy_strategy": "drop"},
+                },
+            },
+            "actor_rollout_ref": {"rollout": {"free_cache_engine": False, "agent": {}}},
+            "transfer_queue": {"enable": False},
+        }
+    )
+
+
+def test_replay_buffer_enforces_the_inflight_bound():
+    """Groups finishing between two cancel checks must not outlive max_inflight_steps."""
+    from vagen.training.main import _prepare_trainer_mode
+
+    config = _v1_config(max_inflight_steps=2)
+    _prepare_trainer_mode(config)
+    assert config.trainer.v1.sampler.max_off_policy_threshold == 2
+
+    tighter = _v1_config(max_inflight_steps=2)
+    tighter.trainer.v1.sampler.max_off_policy_threshold = 1
+    _prepare_trainer_mode(tighter)
+    assert tighter.trainer.v1.sampler.max_off_policy_threshold == 1
+
+    disabled = _v1_config(max_inflight_steps=0)
+    _prepare_trainer_mode(disabled)
+    assert disabled.trainer.v1.sampler.max_off_policy_threshold == 8
+
+
+def test_inflight_cancel_contradicts_the_wait_strategy():
+    from vagen.training.main import _prepare_trainer_mode
+
+    config = _v1_config(max_inflight_steps=2)
+    config.trainer.v1.sampler.max_off_policy_strategy = "wait"
+    with pytest.raises(ValueError, match="max_off_policy_strategy"):
+        _prepare_trainer_mode(config)
+
+
+def test_v1_refuses_full_determinism():
+    from vagen.training.main import _prepare_trainer_mode
+
+    config = _v1_config()
+    config.actor_rollout_ref.rollout.full_determinism = True
+    with pytest.raises(ValueError, match="full_determinism"):
+        _prepare_trainer_mode(config)
+
+
+def test_validation_columns_stay_aligned_across_batches():
+    from vagen.training.tq_utils import extend_aligned_columns
+
+    columns: dict = {}
+    extend_aligned_columns(columns, {"episode_id": ["a1", "a2"]}, 0, 2)
+    extend_aligned_columns(columns, {"episode_id": ["b1"], "traj_success": [True]}, 2, 3)
+    extend_aligned_columns(columns, {"episode_id": ["c1"]}, 3, 4)
+    assert columns["episode_id"] == ["a1", "a2", "b1", "c1"]
+    assert columns["traj_success"] == [None, None, True, None]
+
+
+def test_v1_filter_state_does_not_ride_on_extra_info():
+    """verl swaps the KVBatchMeta for kv_batch_put's return between filter and advantage."""
+    source = Path("vagen/training/trainer/v1.py").read_text(encoding="utf-8")
+    assert 'extra_info["vagen_advantage_scale"]' not in source
+    assert "_vagen_pending_advantage" in source
+
+
 def test_v1_side_channels_are_written_back_to_transfer_queue():
     source = Path("vagen/training/trainer/v1.py").read_text(encoding="utf-8")
     assert 'for side_channel in ("value_mask", "turn_id")' in source
