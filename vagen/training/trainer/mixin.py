@@ -51,6 +51,24 @@ from vagen.utils.wandb_episodes import EpisodeTableLogger
 logger = logging.getLogger(__name__)
 
 
+def rollout_metadata_columns(values) -> dict[str, list]:
+    """Turn per-row metadata dictionaries into aligned JSONL columns.
+
+    ``rollout_metadata`` is an opaque env-to-artifact channel.  Flattening happens only
+    at the logging boundary so neither the harness nor the trainer needs environment-
+    specific field names, and artifact readers see each metadata key as an ordinary
+    top-level column.
+    """
+    rows = []
+    for value in values:
+        if not isinstance(value, dict):
+            value = getattr(value, "data", value)
+        rows.append(dict(value) if isinstance(value, dict) else {})
+
+    names = sorted({name for row in rows for name in row if isinstance(name, str)})
+    return {name: [row.get(name) for row in rows] for name in names}
+
+
 class VagenLogicMixin:
     """What VAGEN adds on top of verl's PPO loop. Bound to no verl method name."""
 
@@ -503,6 +521,78 @@ class VagenLogicMixin:
 
         return os.path.isdir(self._vagen_ckpt_dir_for_step())
 
+    #: Where the best-scoring actor is kept, under `trainer.default_local_dir`.
+    VAGEN_BEST_ACTOR_DIR = "best_actor"
+
+    def _vagen_best_val_score(self):
+        """The validation score to select on: mean ``val-core/<env>/reward/mean@1``.
+
+        Averaged across environments when a run validates on several, so a two-env run
+        does not silently select on whichever key happens to sort first. Returns None
+        when validation produced no such key, which is the honest answer for a step that
+        did not validate.
+        """
+        metrics = getattr(self, "metrics", None) or {}
+        keys = [k for k in metrics if k.startswith("val-core/") and k.endswith("/reward/mean@1")]
+        if not keys:
+            return None
+        try:
+            return sum(float(metrics[k]) for k in keys) / len(keys)
+        except (TypeError, ValueError):
+            return None
+
+    def _vagen_best_actor_due(self):
+        """The validation score when it beats every earlier one and should be saved, else None."""
+        if not bool(self.config.trainer.get("save_best_actor", True)):
+            return None
+        score = self._vagen_best_val_score()
+        if score is None:
+            return None
+        best = getattr(self, "_vagen_best_val", None)
+        if best is not None and score <= best:
+            return None
+        return score
+
+    def _vagen_maybe_save_best_actor(self) -> None:
+        """Keep a copy of the actor from the best-validating step.
+
+        ★ The actor only, and in its own directory. The periodic checkpoint exists to
+        *resume* -- it carries the critic and the optimiser and it is what
+        `latest_checkpointed_iteration.txt` points at. This one exists to be *used*, so it
+        carries none of that and, crucially, does not touch that file: writing it would
+        make a resume rewind to whichever step happened to validate best, which is not
+        where training was.
+
+        Selection is on reward rather than success rate because that is what was asked
+        for. Worth knowing which you are getting: `val-core/.../reward` includes the
+        format bonus (0.10 of a 1.20 maximum at the shipped weights), so it prefers a
+        checkpoint that is slightly better at writing tags over one slightly better at
+        solving. `trainer.save_best_actor: false` turns the whole thing off.
+        """
+        score = self._vagen_best_actor_due()
+        if score is None:
+            return
+        self._vagen_best_val = score
+
+        path = os.path.join(self.config.trainer.default_local_dir, self.VAGEN_BEST_ACTOR_DIR)
+        try:
+            self.actor_rollout_wg.save_checkpoint(path, None, self.global_steps)
+            os.makedirs(path, exist_ok=True)
+            with open(os.path.join(path, "best.json"), "w") as fh:
+                json.dump({"global_step": self.global_steps, "val_core_reward": score}, fh, indent=1)
+        except Exception as exc:  # noqa: BLE001
+            # A failed bookkeeping save must not end a training run that is going fine.
+            logger.warning(
+                "[vagen] could not save the best actor at step %s: %s", self.global_steps, exc
+            )
+            return
+        logger.info(
+            "[vagen] new best val-core reward %.4f at step %s -> %s",
+            score,
+            self.global_steps,
+            path,
+        )
+
 
 class VagenV0Mixin(VagenLogicMixin):
     """Binds :class:`VagenLogicMixin` to verl v0.8.0's ``_fit_*`` hook names."""
@@ -537,6 +627,24 @@ class VagenV0Mixin(VagenLogicMixin):
             inputs = replace_image_tokens_for_logging(inputs, processor)
             outputs = replace_image_tokens_for_logging(outputs, processor)
         return super()._dump_generations(inputs, outputs, *args, **kwargs)
+
+    def _log_rollout_data(
+        self, batch, reward_extra_infos_dict: dict, timing_raw: dict, rollout_data_dir: str
+    ):
+        """Include env-selected metadata in the JSONL rollout artifact.
+
+        The values remain ordinary non-tensor columns during training and therefore do
+        not enter reward aggregation.  Only this dump boundary flattens the dictionaries
+        into top-level columns.
+        """
+        columns = dict(reward_extra_infos_dict)
+        metadata = batch.non_tensor_batch.get("rollout_metadata")
+        if metadata is not None:
+            for name, values in rollout_metadata_columns(metadata).items():
+                columns.setdefault(name, values)
+        return super()._log_rollout_data(
+            batch, columns, timing_raw, rollout_data_dir
+        )
 
     #: What the episode log needs from a validation batch. Named here rather than in
     #: verl: these are our columns, produced by our agent loop and our validation merge,
@@ -579,69 +687,6 @@ class VagenV0Mixin(VagenLogicMixin):
             logger_.flush()
         self._vagen_maybe_save_best_actor()
         return out
-
-    #: Where the best-scoring actor is kept, under `trainer.default_local_dir`.
-    VAGEN_BEST_ACTOR_DIR = "best_actor"
-
-    def _vagen_best_val_score(self):
-        """The validation score to select on: mean ``val-core/<env>/reward/mean@1``.
-
-        Averaged across environments when a run validates on several, so a two-env run
-        does not silently select on whichever key happens to sort first. Returns None
-        when validation produced no such key, which is the honest answer for a step that
-        did not validate -- `_fit_validate` is called every step and only sometimes runs.
-        """
-        metrics = getattr(self, "metrics", None) or {}
-        keys = [k for k in metrics
-                if k.startswith("val-core/") and k.endswith("/reward/mean@1")]
-        if not keys:
-            return None
-        try:
-            return sum(float(metrics[k]) for k in keys) / len(keys)
-        except (TypeError, ValueError):
-            return None
-
-    def _vagen_maybe_save_best_actor(self) -> None:
-        """Keep a copy of the actor from the best-validating step.
-
-        ★ The actor only, and in its own directory. The periodic checkpoint exists to
-        *resume* -- it carries the critic and the optimiser and it is what
-        `latest_checkpointed_iteration.txt` points at. This one exists to be *used*, so it
-        carries none of that and, crucially, does not touch that file: writing it would
-        make a resume rewind to whichever step happened to validate best, which is not
-        where training was.
-
-        Selection is on reward rather than success rate because that is what was asked
-        for. Worth knowing which you are getting: `val-core/.../reward` includes the
-        format bonus (0.10 of a 1.20 maximum at the shipped weights), so it prefers a
-        checkpoint that is slightly better at writing tags over one slightly better at
-        solving. `trainer.save_best_actor: false` turns the whole thing off.
-        """
-        if not bool(self.config.trainer.get("save_best_actor", True)):
-            return
-        score = self._vagen_best_val_score()
-        if score is None:
-            return
-
-        best = getattr(self, "_vagen_best_val", None)
-        if best is not None and score <= best:
-            return
-        self._vagen_best_val = score
-
-        path = os.path.join(self.config.trainer.default_local_dir, self.VAGEN_BEST_ACTOR_DIR)
-        try:
-            self.actor_rollout_wg.save_checkpoint(path, None, self.global_steps)
-            os.makedirs(path, exist_ok=True)
-            with open(os.path.join(path, "best.json"), "w") as fh:
-                json.dump({"global_step": self.global_steps,
-                           "val_core_reward": score}, fh, indent=1)
-        except Exception as exc:  # noqa: BLE001
-            # A failed bookkeeping save must not end a training run that is going fine.
-            logger.warning("[vagen] could not save the best actor at step %s: %s",
-                           self.global_steps, exc)
-            return
-        logger.info("[vagen] new best val-core reward %.4f at step %s -> %s",
-                    score, self.global_steps, path)
 
     def _maybe_log_val_generations(self, inputs, outputs, scores, extras=None):
         """Hand validation episodes to the logger. The assembling lives in utils.

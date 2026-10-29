@@ -42,7 +42,8 @@ fi
 
 if [[ "$SKIP_ENGINE" == 1 ]]; then
     step "Install VAGEN without changing the rollout engine"
-    "${PIP[@]}" -e "$ROOT"
+    # TransferQueue comes with the engine extras, which this path skips.
+    "${PIP[@]}" -e "$ROOT" "TransferQueue>=0.1.9"
 else
     step "Install VAGEN with $BACKEND"
     "${PIP[@]}" -e "${ROOT}[${BACKEND}]" \
@@ -68,7 +69,7 @@ from packaging.specifiers import SpecifierSet
 backend = os.environ["BACKEND"]
 problems = []
 
-for name in ["torch", "transformers", "trl", "verl", "vagen", backend]:
+for name in ["torch", "transformers", "trl", "transfer_queue", "verl", "vagen", backend]:
     try:
         module = importlib.import_module(name)
         print(f"  {name:<14} {getattr(module, '__version__', 'ok')}")
@@ -81,6 +82,7 @@ if not importlib.util.find_spec("flash_attn") and not importlib.util.find_spec("
 requirements = {
     "transformers": ">=5.5.3,!=5.6.0,<5.11",
     "tensordict": ">=0.8,!=0.9,<=0.10",
+    "TransferQueue": ">=0.1.9",
     backend: "==0.5.13" if backend == "sglang" else "==0.22.0",
 }
 for package, spec in requirements.items():

@@ -83,7 +83,9 @@ async def test_no_configured_limit_keeps_the_api_default(config):
     )
 
     assert result == "done"
-    create.assert_awaited_once_with(model="test-model", input=[])
+    create.assert_awaited_once_with(
+        model="test-model", input=[], reasoning={"summary": "auto"}
+    )
 
 
 @pytest.mark.asyncio
@@ -100,3 +102,41 @@ async def test_evaluation_response_limit_reaches_the_responses_sdk(sdk_client):
 
     assert result.text == "move left"
     assert post.call_args.kwargs["body"]["max_output_tokens"] == 77
+
+
+@pytest.mark.asyncio
+async def test_summary_retry_keeps_the_translated_ceiling(sdk_client):
+    client, post = sdk_client
+    post.side_effect = [
+        ValueError("reasoning summary is not supported"),
+        SimpleNamespace(output_text="retried"),
+        SimpleNamespace(output_text="later"),
+    ]
+    adapter = OpenAIResponsesAdapter(client, "test-model")
+
+    assert (
+        await adapter.acompletion([], max_tokens=128, max_output_tokens=64) == "retried"
+    )
+    assert (
+        await adapter.acompletion([], max_tokens=128, max_output_tokens=64) == "later"
+    )
+
+    bodies = [call.kwargs["body"] for call in post.call_args_list]
+    assert len(bodies) == 3
+    assert all(body["max_output_tokens"] == 64 for body in bodies)
+    assert all("max_tokens" not in body for body in bodies)
+    assert bodies[0]["reasoning"] == {"summary": "auto"}
+    assert all("reasoning" not in body for body in bodies[1:])
+
+
+@pytest.mark.asyncio
+async def test_token_mapping_keeps_the_upstream_raw_response():
+    raw = {"id": "response-test", "output": []}
+    response = SimpleNamespace(output_text="done", model_dump=lambda **kwargs: raw)
+    create = AsyncMock(return_value=response)
+    client = SimpleNamespace(responses=SimpleNamespace(create=create))
+    adapter = OpenAIResponsesAdapter(client, "test-model")
+
+    assert await adapter.acompletion([], max_tokens=128) == "done"
+    assert adapter.last_raw == raw
+    assert create.call_args.kwargs["max_output_tokens"] == 128

@@ -398,6 +398,25 @@ that earned it, keeping reward production independent of the selected estimator.
 
 ---
 
+## Asynchronous trainer
+
+Training preserves the established V0 trainer by default. Append the single override
+`trainer.use_v1=true` to any launcher to select verl V1 `colocate_async`. The entrypoint
+then enables TransferQueue, selects VAGEN's TQ agent-loop manager, and enables rollout
+cache offload; those derived settings should not be toggled independently.
+
+`trainer.v1.colocate_async.max_inflight_steps` (default `2`) bounds a training group's
+span, `step - submitted_step + 1`. Running groups over it are cancelled and replaced as a
+whole UID group; completed ones are held to it by lowering
+`trainer.v1.sampler.max_off_policy_threshold` to the same value, and
+`max_off_policy_strategy=wait` is refused while it is on. `0` disables it. Validation is
+never cancelled.
+
+See [Colocated asynchronous training](colocate-async.md) for the data boundary, failure
+semantics, and switching contract.
+
+---
+
 ## Logging and checkpoints
 
 ```yaml
