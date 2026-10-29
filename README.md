@@ -88,7 +88,7 @@ We frame multi-turn VLM agentic tasks as a Partially Observable Markov Decision 
 ```bash
 conda create -n vagen python=3.12 -y
 conda activate vagen
-git clone --branch dev/bi_level https://github.com/JamesKrW/VAGEN.git
+git clone https://github.com/JamesKrW/VAGEN.git
 cd VAGEN
 bash scripts/install.sh  # SGLang 0.5.13 (default)
 ```
