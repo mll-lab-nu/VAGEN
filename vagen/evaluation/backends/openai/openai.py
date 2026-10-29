@@ -20,8 +20,13 @@ class OutputBudgetExceeded(RuntimeError):
 
     Raised rather than returned empty so the episode is recorded as an error and
     can be re-run, instead of being written as a failure that resume then treats
-    as finished work.
+    as finished work. Carries the raw response: its usage is the evidence of where
+    the budget went.
     """
+
+    def __init__(self, raw_response: Any, message: str):
+        super().__init__(message)
+        self.raw_response = raw_response
 
 
 def _transport(cfg: Dict[str, Any]) -> Dict[str, Any]:
@@ -39,6 +44,10 @@ def _transport(cfg: Dict[str, Any]) -> Dict[str, Any]:
     shortly. Measured against one deployment, two retries left 88% of calls
     returning 429 and 27% of episodes recorded as failures with nothing wrong
     with them; eight brought that to 1.8% without touching concurrency.
+
+    These retries sit under ThrottledAdapter's own (``max_retries`` in the backend
+    config), so the two multiply. The SDK's count therefore has its own key,
+    ``sdk_max_retries``, rather than sharing ``max_retries`` and squaring it.
     """
     pool = int(cfg.get("max_connections", os.getenv("LLM_MAX_CONNECTIONS", "1024")))
     return {
@@ -46,7 +55,7 @@ def _transport(cfg: Dict[str, Any]) -> Dict[str, Any]:
             limits=httpx.Limits(max_connections=pool, max_keepalive_connections=pool),
             timeout=httpx.Timeout(float(cfg.get("timeout", 600.0)), connect=20.0),
         ),
-        "max_retries": int(cfg.get("max_retries", os.getenv("LLM_MAX_RETRIES", "8"))),
+        "max_retries": int(cfg.get("sdk_max_retries", os.getenv("LLM_MAX_RETRIES", "8"))),
     }
 
 
@@ -150,6 +159,7 @@ class OpenAIAdapter(EvaluationBackend):
         reason = getattr(choice, "finish_reason", None)
         if reason == "length" and not content.strip():
             raise OutputBudgetExceeded(
+                self.last_raw,
                 f"{self.model} stopped at its output budget with no content "
                 f"(finish_reason=length). Raise max_tokens, or "
                 f"response_length_per_turn if a harness sets the per-call limit: "

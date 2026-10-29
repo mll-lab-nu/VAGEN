@@ -41,9 +41,18 @@ def test_retries_outlast_a_per_minute_quota(build, cfg):
     (build_client_azure, AZURE),
 ])
 def test_config_overrides_the_defaults(build, cfg):
-    client = build({**cfg, "max_connections": 32, "max_retries": 1})
+    client = build({**cfg, "max_connections": 32, "sdk_max_retries": 1})
     assert _limits(client) == (32, 32)
     assert client.max_retries == 1
+
+
+@pytest.mark.parametrize("build,cfg", [
+    (build_client_openai, {"api_key": "k"}),
+    (build_client_azure, AZURE),
+])
+def test_adapter_retry_count_does_not_reach_the_sdk(build, cfg):
+    """`max_retries` is ThrottledAdapter's; sharing it with the SDK would square it."""
+    assert build({**cfg, "max_retries": 1}).max_retries == 8
 
 
 def test_env_overrides_the_defaults(monkeypatch):

@@ -16,6 +16,10 @@ class OpenAIResponsesAdapter(EvaluationBackend):
     def __init__(self, client, model: str):
         self.client = client
         self.model = model
+        #: Raw response of the most recent call, read by ChatClient for raw_responses.json.
+        self.last_raw: Any = None
+        #: Set once the endpoint rejects `reasoning.summary`; it is not asked for again.
+        self._summary_refused = False
 
     def _segments_to_content(self, segs: List[Tuple[str, Any]]) -> List[Dict[str, Any]]:
         content: List[Dict[str, Any]] = []
@@ -41,20 +45,25 @@ class OpenAIResponsesAdapter(EvaluationBackend):
     async def acompletion(self, messages: List[Dict[str, Any]], **chat_config: Any) -> str:
         kwargs = dict(chat_config)
         # Ask for the reasoning summary as well: the raw thinking never leaves the API, the
-        # summary is the only trace of it we can store (raw_responses.json).
-        reasoning = kwargs.get("reasoning") if isinstance(kwargs.get("reasoning"), dict) else {}
-        kwargs["reasoning"] = {**reasoning}
-        kwargs["reasoning"].setdefault("summary", "auto")
+        # summary is the only trace of it we can store (raw_responses.json). Only when the
+        # caller's `reasoning` is absent or a dict we can extend, and only until the
+        # endpoint has refused it once.
+        reasoning = kwargs.get("reasoning")
+        asked = False
+        if not self._summary_refused and (reasoning is None or isinstance(reasoning, dict)):
+            if "summary" not in (reasoning or {}):
+                kwargs["reasoning"] = {**(reasoning or {}), "summary": "auto"}
+                asked = True
         try:
             resp = await self.client.responses.create(model=self.model, input=messages, **kwargs)
         except Exception as e:  # noqa: BLE001 - a deployment that rejects `summary` gets one retry without it
             # A non-reasoning model may reject the `reasoning` block as a whole, and the
-            # error need not mention `summary`; either way, retry once as originally asked.
+            # error need not mention `summary`; either way, retry as originally asked and
+            # stop adding it, so every later call does not pay for a failed request first.
             msg = str(e).lower()
-            if ("summary" in msg or "reasoning" in msg) and "summary" in kwargs["reasoning"]:
-                kwargs["reasoning"] = {k: v for k, v in kwargs["reasoning"].items() if k != "summary"}
-                if not kwargs["reasoning"]:
-                    del kwargs["reasoning"]
+            if asked and ("summary" in msg or "reasoning" in msg):
+                self._summary_refused = True
+                kwargs = dict(chat_config)
                 resp = await self.client.responses.create(model=self.model, input=messages, **kwargs)
             else:
                 raise

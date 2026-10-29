@@ -181,7 +181,15 @@ class ChatClient(InferenceClient):
             params["max_tokens"] = limit
 
         messages = self._api_messages.get(self._active) or []
-        text = await self.adapter.acompletion(messages, **params)
+        try:
+            text = await self.adapter.acompletion(messages, **params)
+        except Exception as exc:
+            # A call that failed after the endpoint answered (e.g. an exhausted output
+            # budget) still has a response worth keeping in raw_responses.json.
+            raw = getattr(exc, "raw_response", None)
+            if self._active is not None and raw is not None:
+                self._raw_responses.setdefault(self._active, []).append(raw)
+            raise
         text = text if isinstance(text, str) else ""
         # Recorded so the transcript shows the exchange and not just what we sent.
         if self._active is not None and text:

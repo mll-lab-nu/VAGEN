@@ -10,7 +10,7 @@ import uuid
 import logging
 
 from vagen.evaluation.backends import EvaluationBackend
-from vagen.evaluation.backends._common.rendering import parse_data_url, _now_tag
+from vagen.evaluation.backends._common.rendering import parse_data_url, pil_to_dataurl_png, _now_tag
 from vagen.evaluation.serialization import sanitize_for_json
 from vagen.envs import GymEnvAdapter
 from vagen.rollout import run_episode
@@ -99,7 +99,9 @@ class GenericVisionInferenceWorkflow:
         whole exchange in order, which is why no separate ``messages.json`` is written.
 
         Images are stored once each under ``images/<sha1>.png``: a harness that re-sends
-        earlier frames would otherwise write the same picture once per turn.
+        earlier frames would otherwise write the same picture once per turn. Every
+        environment frame is stored, including ones never sent to the model (the final
+        observation after the last action is the usual one).
         """
         base_dir = dump_root or self.dump_dir
         if not base_dir:
@@ -155,24 +157,29 @@ class GenericVisionInferenceWorkflow:
             with open(os.path.join(folder, name), "w", encoding="utf-8") as f:
                 json.dump(obj, f, ensure_ascii=False, indent=2)
 
-        await asyncio.to_thread(write_json, "assistant_texts.json", assistant_texts)
-        if raw_responses is not None:
-            await asyncio.to_thread(write_json, "raw_responses.json", sanitize_for_json(raw_responses))
-        # sft.json: the exchange, per conversation. Without `conversations` (an error before
-        # the first call) fall back to one sample holding whatever was sent.
-        if conversations or messages:
-            samples = [sft_sample(conv, i) for i, conv in enumerate(conversations or [messages]) if conv]
-            if metrics is not None:
-                for smp in samples:
-                    smp["meta"]["success"] = metrics.get("success")
-                    smp["meta"]["finish_reason"] = metrics.get("finish_reason")
-            await asyncio.to_thread(write_json, "sft.json", samples)
-        # Frames the harness never sent (an environment observation nobody rendered) are not
-        # in the messages; keep them too so nothing is lost.
-        if not saved:
-            for t, imgs in enumerate(user_imgs_per_turn, start=1):
-                for i, img in enumerate(imgs, start=1):
-                    await asyncio.to_thread(img.save, os.path.join(img_dir, f"turn_{t:02d}_{i:02d}.png"), "PNG")
+        def write_episode() -> None:
+            # Decoding, hashing and writing every frame is too slow for the event loop that
+            # is serving the other episodes' requests, so all of it runs in one thread.
+            write_json("assistant_texts.json", assistant_texts)
+            if raw_responses is not None:
+                write_json("raw_responses.json", sanitize_for_json(raw_responses))
+            # sft.json: the exchange, per conversation. Without `conversations` (an error
+            # before the first call) fall back to one sample holding whatever was sent.
+            if conversations or messages:
+                samples = [sft_sample(conv, i) for i, conv in enumerate(conversations or [messages]) if conv]
+                if metrics is not None:
+                    for smp in samples:
+                        smp["meta"]["success"] = metrics.get("success")
+                        smp["meta"]["finish_reason"] = metrics.get("finish_reason")
+                write_json("sft.json", samples)
+            # Frames the model never saw are in no message -- always the observation after
+            # the last action, which is the one showing how the episode ended. Same
+            # encoding as the OpenAI adapter, so a frame that was sent is not written twice.
+            for imgs in user_imgs_per_turn:
+                for img in imgs:
+                    store({"image_url": {"url": pil_to_dataurl_png(img)}})
+
+        await asyncio.to_thread(write_episode)
 
         # transcript.txt
         def to_line(m: Dict[str, Any]) -> str:
@@ -327,7 +334,7 @@ class GenericVisionInferenceWorkflow:
         # harness opened. Under no_concat and compact that is more than one, and reading
         # only the last would report a fraction of the episode.
         conversations: List[List[Dict[str, Any]]] = []
-        raw_responses: List[List[Any]] = []          # one list per conversation, one entry per assistant turn
+        raw_responses: List[List[Any]] = []          # one list per conversation, one entry per model call
         for conv in client.conversations():
             conversations.append(client.messages(conv.conversation_id))
             raw_responses.append(client.raw_responses(conv.conversation_id))
