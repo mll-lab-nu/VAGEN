@@ -70,7 +70,7 @@ def test_padding_rows_do_not_inherit_a_real_episode_identity():
                 "group_idx": "group",
                 "traj_idx": 0,
                 "turn_idx": 0,
-                "rollout_metadata": {"scene_id": "scene-a"},
+                "rollout_metadata": {"level_id": "level-a"},
             },
             # V1 creates this by copying the first row's extra_fields.
             {
@@ -78,7 +78,7 @@ def test_padding_rows_do_not_inherit_a_real_episode_identity():
                 "group_idx": "group",
                 "traj_idx": 0,
                 "turn_idx": 0,
-                "rollout_metadata": {"scene_id": "scene-a"},
+                "rollout_metadata": {"level_id": "level-a"},
             },
         ],
         keys=["group_0_0", "padabc_0_0"],
@@ -89,7 +89,7 @@ def test_padding_rows_do_not_inherit_a_real_episode_identity():
     assert columns["group_idx"].tolist() == ["group", "padabc"]
     assert columns["response_spans"].tolist() == [None, []]
     assert columns["rollout_metadata"].tolist() == [
-        {"scene_id": "scene-a"},
+        {"level_id": "level-a"},
         {},
     ]
 
@@ -323,7 +323,7 @@ def test_v1_advantage_persists_value_mask_and_turn_id(monkeypatch):
                     "conversation_id": turn,
                     "response_spans": [(0, width)],
                     "episode_turns": 2,
-                    "rollout_metadata": {"scene_id": "scene-a"},
+                    "rollout_metadata": {"level_id": "level-a"},
                     "reward_extra_info": {},
                 },
             }
@@ -395,7 +395,7 @@ def test_v1_advantage_persists_value_mask_and_turn_id(monkeypatch):
         "episode-a",
         "episode-a",
     ]
-    assert dumped["reward_extra_infos_dict"]["scene_id"] == [
-        "scene-a",
-        "scene-a",
+    assert dumped["reward_extra_infos_dict"]["level_id"] == [
+        "level-a",
+        "level-a",
     ]

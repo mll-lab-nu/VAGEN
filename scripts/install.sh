@@ -42,7 +42,8 @@ fi
 
 if [[ "$SKIP_ENGINE" == 1 ]]; then
     step "Install VAGEN without changing the rollout engine"
-    "${PIP[@]}" -e "$ROOT"
+    # TransferQueue comes with the engine extras, which this path skips.
+    "${PIP[@]}" -e "$ROOT" "TransferQueue>=0.1.9"
 else
     step "Install VAGEN with $BACKEND"
     "${PIP[@]}" -e "${ROOT}[${BACKEND}]" \

@@ -63,6 +63,15 @@ def _prepare_trainer_mode(config) -> None:
     use_v1 = bool(config.trainer.get("use_v1", False))
     manager_path = "actor_rollout_ref.rollout.agent.agent_loop_manager_class"
     current_manager = OmegaConf.select(config, manager_path)
+    # Each trainer works with exactly one cache-offload setting, so it is derived rather
+    # than read. Say so when that overrides an explicit value instead of dropping it.
+    wanted_offload = use_v1
+    if bool(config.actor_rollout_ref.rollout.get("free_cache_engine", wanted_offload)) != wanted_offload:
+        logger.warning(
+            "actor_rollout_ref.rollout.free_cache_engine is forced to %s under trainer.use_v1=%s",
+            wanted_offload,
+            use_v1,
+        )
     if use_v1:
         mode = str(config.trainer.v1.trainer_mode)
         if mode != "colocate_async":
