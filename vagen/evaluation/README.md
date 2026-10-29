@@ -104,6 +104,11 @@ backends:
 
 **`default_chat_config`** — Top-level fallback: applied to any env that doesn't define its own `chat_config`.
 
+For `openai_responses` and `azure_responses`, the adapter translates the shared
+`max_tokens` limit to `max_output_tokens`. If both are configured, the smaller
+non-null limit wins, so a native API setting cannot raise the per-turn ceiling.
+An unset limit leaves the API default unchanged.
+
 For a native-thinking vLLM model, the request-side `thinking_token_budget` also requires
 the server-side reasoning delimiters. The local launchers accept them through
 `VLLM_REASONING_CONFIG`, for example:
