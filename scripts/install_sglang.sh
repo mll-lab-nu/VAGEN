@@ -86,6 +86,7 @@ for name, version in {
     "trl": "0.9.6",
     "fla": "0.5.2",
     "causal_conv1d": "1.7.0",
+    "transfer_queue": "0.1.9",
 }.items():
     check(name, version)
 

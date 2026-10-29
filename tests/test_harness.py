@@ -22,7 +22,7 @@ class Client:
         total = sum(self.size([message]) for message in messages) + self.n
         return types.SimpleNamespace(
             text=f"reply-{self.n}",
-            token_ids=[self.n],
+            is_empty=False,
             conversation_id=f"c{1 + sum('Summary so far:' in str(call[0]) for call in self.calls)}",
             usage=types.SimpleNamespace(
                 prompt_tokens=total - 1,

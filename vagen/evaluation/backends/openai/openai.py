@@ -1,6 +1,10 @@
 from __future__ import annotations
+import json
+import logging
 import os
-from typing import Any, Dict, Iterable, List, Tuple
+
+import httpx
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 from openai import AsyncAzureOpenAI, AsyncOpenAI
 from PIL import Image
 from vagen.evaluation.backends._common.base import EvaluationBackend
@@ -8,11 +12,61 @@ from vagen.evaluation.backends._common.rendering import pil_to_dataurl_png, comp
 from vagen.evaluation.backends._common.registry import register_adapter, register_client
 
 
+logger = logging.getLogger(__name__)
+
+
+class OutputBudgetExceeded(RuntimeError):
+    """The endpoint stopped at ``max_tokens`` before writing any content.
+
+    Raised rather than returned empty so the episode is recorded as an error and
+    can be re-run, instead of being written as a failure that resume then treats
+    as finished work. Carries the raw response: its usage is the evidence of where
+    the budget went.
+    """
+
+    def __init__(self, raw_response: Any, message: str):
+        super().__init__(message)
+        self.raw_response = raw_response
+
+
+def _transport(cfg: Dict[str, Any]) -> Dict[str, Any]:
+    """Connection pool and retry budget, shared by both clients.
+
+    Two defaults are wrong for an evaluation that runs many episodes at once
+    against a hosted endpoint.
+
+    httpx keeps 20 connections alive, so asking for 256 concurrent requests still
+    sent them a few at a time -- measured 6 requests a second at 32 concurrent
+    where the latency implied 20. The pool is sized to the concurrency instead.
+
+    The SDK retries twice, which is not enough against a per-minute quota. A
+    quota is a queue, not a verdict: the request is fine and will be served
+    shortly. Measured against one deployment, two retries left 88% of calls
+    returning 429 and 27% of episodes recorded as failures with nothing wrong
+    with them; eight brought that to 1.8% without touching concurrency.
+
+    These retries sit under ThrottledAdapter's own (``max_retries`` in the backend
+    config), so the two multiply. The SDK's count therefore has its own key,
+    ``sdk_max_retries``, rather than sharing ``max_retries`` and squaring it.
+    """
+    pool = int(cfg.get("max_connections", os.getenv("LLM_MAX_CONNECTIONS", "1024")))
+    return {
+        "http_client": httpx.AsyncClient(
+            limits=httpx.Limits(max_connections=pool, max_keepalive_connections=pool),
+            timeout=httpx.Timeout(float(cfg.get("timeout", 600.0)), connect=20.0),
+        ),
+        "max_retries": int(cfg.get("sdk_max_retries", os.getenv("LLM_MAX_RETRIES", "8"))),
+    }
+
+
 @register_client("openai", "openai_responses")
 def build_client_openai(cfg: Dict[str, Any]) -> AsyncOpenAI:
     api_key = cfg.get("api_key") or os.getenv("OPENAI_API_KEY", "")
     base_url = cfg.get("base_url")
-    return AsyncOpenAI(api_key=api_key, base_url=base_url) if base_url else AsyncOpenAI(api_key=api_key)
+    kwargs = {"api_key": api_key, **_transport(cfg)}
+    if base_url:
+        kwargs["base_url"] = base_url
+    return AsyncOpenAI(**kwargs)
 
 
 @register_client("azure", "azure_responses")
@@ -22,7 +76,19 @@ def build_client_azure(cfg: Dict[str, Any]) -> AsyncAzureOpenAI:
     api_version = cfg.get("azure_api_version") or os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
     if not endpoint or not api_key:
         raise ValueError("Azure endpoint/api_key missing.")
-    return AsyncAzureOpenAI(api_version=api_version, azure_endpoint=endpoint, api_key=api_key)
+    return AsyncAzureOpenAI(api_version=api_version, azure_endpoint=endpoint,
+                            api_key=api_key, **_transport(cfg))
+
+def _raw_dump(resp: Any) -> Any:
+    """JSON-safe copy of an SDK response object (pydantic model_dump), or its repr."""
+    try:
+        return resp.model_dump(mode="json")
+    except Exception:  # noqa: BLE001
+        try:
+            return json.loads(resp.model_dump_json())
+        except Exception:  # noqa: BLE001
+            return {"repr": repr(resp)}
+
 
 @register_adapter("openai", "azure")
 class OpenAIAdapter(EvaluationBackend):
@@ -40,7 +106,16 @@ class OpenAIAdapter(EvaluationBackend):
     ):
         self.client = client
         self.model = model
+        #: Raw response of the most recent call, read by ChatClient for raw_responses.json.
+        self.last_raw: Any = None
 
+    def is_retryable_error(self, exc: BaseException) -> Optional[bool]:
+        # The same budget would be exhausted the same way: a retry only pays for another
+        # full max_tokens of hidden reasoning. Fail the call so the episode is recorded as
+        # an error and re-run after the budget is raised.
+        if isinstance(exc, OutputBudgetExceeded):
+            return False
+        return None
 
     def _segments_to_content(self, segs: List[Tuple[str, Any]]) -> List[Dict[str, Any]]:
         content: List[Dict[str, Any]] = []
@@ -67,4 +142,31 @@ class OpenAIAdapter(EvaluationBackend):
             messages=messages,
             **chat_config,
         )
-        return resp.choices[0].message.content or ""
+        choice = resp.choices[0]
+        content = choice.message.content or ""
+        # The whole response, verbatim, for the rollout dump (raw_responses.json). Reasoning
+        # models return their thinking OUTSIDE ``message.content`` (OpenRouter: ``message.reasoning``
+        # / ``reasoning_details``); returning only the content threw it away.
+        self.last_raw = _raw_dump(resp)
+        # `finish_reason` carries the only signal that separates "the model declined"
+        # from "the model was cut off". A reasoning model spends its output budget on
+        # hidden thinking before it writes anything, so a budget that is merely too
+        # small comes back as `length` with no content -- indistinguishable, once the
+        # reason is dropped, from a refusal or a content filter. A harness then re-asks
+        # against the same budget, which cannot help, and scores the episode as a
+        # failure. Measured on one reasoning model at high effort, that silently took
+        # out 29% of its rows.
+        reason = getattr(choice, "finish_reason", None)
+        if reason == "length" and not content.strip():
+            raise OutputBudgetExceeded(
+                self.last_raw,
+                f"{self.model} stopped at its output budget with no content "
+                f"(finish_reason=length). Raise max_tokens, or "
+                f"response_length_per_turn if a harness sets the per-call limit: "
+                f"hidden reasoning is billed against it."
+            )
+        if reason == "length":
+            logger.warning(
+                "%s was truncated at its output budget after %d characters; "
+                "keeping the partial reply.", self.model, len(content))
+        return content

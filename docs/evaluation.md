@@ -93,10 +93,12 @@ subclass works here too, by registered name or as an import path — see
 ├── summary.json                 # success_rate, avg_cumulative_reward, avg_turns
 └── <timestamp>-<uuid8>/
     ├── metrics.json             # one episode: success, reward, finish_reason, model
-    ├── messages.json            # every conversation the harness opened
+    ├── sft.json                 # every conversation the harness opened, one LLaMA-Factory
+    │                            # sharegpt sample each: messages with <image>, image paths
+    ├── raw_responses.json       # the backend's raw API response for every model call
     ├── assistant_texts.json
     ├── transcript.txt
-    └── images/turn_01_01.png    # 1-indexed; turn 01 is the reset observation
+    └── images/<sha1>.png        # one file per distinct frame, named by content hash
 ```
 
 `finish_reason` is one of `done`, `max_turns`, `no_room` (the conversation ran out of
