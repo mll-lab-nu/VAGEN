@@ -88,19 +88,13 @@ We frame multi-turn VLM agentic tasks as a Partially Observable Markov Decision 
 ```bash
 conda create -n vagen python=3.12 -y
 conda activate vagen
-git clone https://github.com/JamesKrW/VAGEN.git
+git clone https://github.com/mll-lab-nu/VAGEN.git
 cd VAGEN
 bash scripts/install.sh  # SGLang 0.5.13 (default)
 ```
 
-This initializes the pinned `verl` submodule and installs the CUDA 13 stack: Torch 2.11.0,
-SGLang 0.5.13, and Transformers 5.8.1. The script is safe to re-run; set `SKIP_ENGINE=1`
-to verify and keep an existing rollout engine.
 
-The stack completed 10-step Sokoban runs for Qwen3-VL and both Qwen3.5 modes. GLM-4.6V
-and InternVL3.5 also completed actor, critic, update, and evaluation cycles.
-
-Use vLLM instead with:
+If you want to use vLLM instead with:
 
 ```bash
 BACKEND=vllm bash scripts/install.sh    # vLLM 0.22.0
