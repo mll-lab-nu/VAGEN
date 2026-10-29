@@ -20,13 +20,14 @@
 conda create -n vagen python=3.12 -y
 conda activate vagen
 
-git clone --branch dev/bi_level https://github.com/JamesKrW/VAGEN.git
+git clone https://github.com/mll-lab-nu/VAGEN.git
 cd VAGEN
 bash scripts/install.sh
 ```
 
-`scripts/install.sh` initializes only the required `verl` submodule. It installs Torch
-2.11.0 / SGLang 0.5.13 / Transformers 5.8.1 by default.
+`scripts/install.sh` initializes only the required `verl` submodule (VAGEN's verl 0.9 fork,
+branch `vagen-main`). It installs Torch 2.11.0 / SGLang 0.5.13 / Transformers 5.8.1 /
+TransferQueue 0.1.9 by default; TransferQueue is used only by `trainer.use_v1=true`.
 `BACKEND=vllm bash scripts/install.sh` selects vLLM; `SKIP_ENGINE=1` keeps and verifies an
 existing engine. Install **one** engine per environment because the backends require
 different `flashinfer` builds.

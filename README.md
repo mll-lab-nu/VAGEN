@@ -66,6 +66,8 @@ We frame multi-turn VLM agentic tasks as a Partially Observable Markov Decision 
 
 
 ## News
+**[2026/10]**: Optional verl V1 `colocate_async` training (`trainer.use_v1=true`; the existing trainer stays the default), see [Colocated asynchronous training](docs/colocate-async.md). Evaluation dumps now write `sft.json` (LLaMA-Factory format), `raw_responses.json`, and content-addressed `images/<sha1>.png` instead of `messages.json` and `turn_XX_YY.png`. Environments can attach `info["rollout_metadata"]` to rollout dumps.
+
 **[2026/08]**: Added support for Verl 0.9.0, decoupled the environment and harness layer. This is a major update. The last commit before these changes is [here](https://github.com/mll-lab-nu/VAGEN/tree/vagen-lite-verl-v0.6.1-final); please check out the tag if you need the previous codebase.
 
 **[2026/02]** We have migrated the `main` branch to VAGEN-Lite, a lightweight and clean reimplementation built on VERL agent-loop for easy customization and stable performance. For the previous full-featured release, please visit the [vagen-legacy](https://github.com/mll-lab-nu/VAGEN/tree/vagen-legacy) branch.
@@ -85,6 +87,9 @@ We frame multi-turn VLM agentic tasks as a Partially Observable Markov Decision 
 
 ## Installation
 
+Requires Python 3.12 and a CUDA 13 driver. See [Quick Start](docs/quickstart.md) for GPU
+sizing and a manual install.
+
 ```bash
 conda create -n vagen python=3.12 -y
 conda activate vagen
@@ -93,8 +98,13 @@ cd VAGEN
 bash scripts/install.sh  # SGLang 0.5.13 (default)
 ```
 
+`scripts/install.sh` initializes the pinned `verl` submodule (VAGEN's verl 0.9 fork,
+[JamesKrW/verl `vagen-main`](https://github.com/JamesKrW/verl/tree/vagen-main)) and installs
+the CUDA 13 stack: Torch 2.11.0, SGLang 0.5.13, Transformers 5.8.1, and TransferQueue 0.1.9
+(used only by `trainer.use_v1=true`). It is safe to re-run; `SKIP_ENGINE=1` keeps and
+verifies an existing rollout engine.
 
-If you want to use vLLM instead with:
+To use vLLM instead:
 
 ```bash
 BACKEND=vllm bash scripts/install.sh    # vLLM 0.22.0
@@ -400,7 +410,7 @@ filter:
   name: reward_variance_top_p # registered by vagen.training.filters
   filter_kwargs: 
     top_p: 0.9 
-  enable: False # set to true to enable filtering, recommended for grpo trainining
+  enable: False # set to true to enable filtering, recommended for GRPO training
 ```
 
 
