@@ -56,8 +56,8 @@ def rollout_metadata_columns(values) -> dict[str, list]:
 
     ``rollout_metadata`` is an opaque env-to-artifact channel.  Flattening happens only
     at the logging boundary so neither the harness nor the trainer needs environment-
-    specific field names, while existing artifact readers can keep consuming top-level
-    keys such as ``scene_id``.
+    specific field names, and artifact readers see each metadata key as an ordinary
+    top-level column.
     """
     rows = []
     for value in values:
@@ -563,7 +563,7 @@ class VagenV0Mixin(VagenLogicMixin):
 
         The values remain ordinary non-tensor columns during training and therefore do
         not enter reward aggregation.  Only this dump boundary flattens the dictionaries
-        for backward-compatible consumers such as GraphRL.
+        into top-level columns.
         """
         columns = dict(reward_extra_infos_dict)
         metadata = batch.non_tensor_batch.get("rollout_metadata")

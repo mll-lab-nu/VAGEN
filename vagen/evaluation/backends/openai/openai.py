@@ -4,7 +4,7 @@ import logging
 import os
 
 import httpx
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 from openai import AsyncAzureOpenAI, AsyncOpenAI
 from PIL import Image
 from vagen.evaluation.backends._common.base import EvaluationBackend
@@ -97,7 +97,16 @@ class OpenAIAdapter(EvaluationBackend):
     ):
         self.client = client
         self.model = model
+        #: Raw response of the most recent call, read by ChatClient for raw_responses.json.
+        self.last_raw: Any = None
 
+    def is_retryable_error(self, exc: BaseException) -> Optional[bool]:
+        # The same budget would be exhausted the same way: a retry only pays for another
+        # full max_tokens of hidden reasoning. Fail the call so the episode is recorded as
+        # an error and re-run after the budget is raised.
+        if isinstance(exc, OutputBudgetExceeded):
+            return False
+        return None
 
     def _segments_to_content(self, segs: List[Tuple[str, Any]]) -> List[Dict[str, Any]]:
         content: List[Dict[str, Any]] = []

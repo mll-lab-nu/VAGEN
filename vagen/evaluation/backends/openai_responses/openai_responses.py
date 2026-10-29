@@ -48,7 +48,10 @@ class OpenAIResponsesAdapter(EvaluationBackend):
         try:
             resp = await self.client.responses.create(model=self.model, input=messages, **kwargs)
         except Exception as e:  # noqa: BLE001 - a deployment that rejects `summary` gets one retry without it
-            if "summary" in str(e).lower() and "summary" in kwargs["reasoning"]:
+            # A non-reasoning model may reject the `reasoning` block as a whole, and the
+            # error need not mention `summary`; either way, retry once as originally asked.
+            msg = str(e).lower()
+            if ("summary" in msg or "reasoning" in msg) and "summary" in kwargs["reasoning"]:
                 kwargs["reasoning"] = {k: v for k, v in kwargs["reasoning"].items() if k != "summary"}
                 if not kwargs["reasoning"]:
                     del kwargs["reasoning"]

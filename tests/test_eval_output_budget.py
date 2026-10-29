@@ -72,3 +72,25 @@ def test_missing_finish_reason_is_tolerated():
     message = SimpleNamespace(content="ok")
     resp = SimpleNamespace(choices=[SimpleNamespace(message=message)], usage=None)
     assert _call(resp) == "ok"
+
+
+def test_exhausted_budget_is_not_retried():
+    """ThrottledAdapter retries anything without a status code; this must not be one.
+
+    The same budget runs out the same way, so each retry only buys another full
+    max_tokens of hidden reasoning before the episode fails anyway.
+    """
+    from vagen.evaluation.backends._common.retry import ThrottledAdapter, ThrottleRetryPolicy
+
+    calls = []
+
+    class _Counting(_Client):
+        async def _create(self, **kwargs):
+            calls.append(kwargs)
+            return self._response
+
+    inner = OpenAIAdapter(client=_Counting(_response("", "length")), model="a-reasoning-model")
+    adapter = ThrottledAdapter(inner, ThrottleRetryPolicy(max_retries=3, min_backoff=0, max_backoff=0))
+    with pytest.raises(OutputBudgetExceeded):
+        asyncio.run(adapter.acompletion([{"role": "user", "content": "hi"}]))
+    assert len(calls) == 1

@@ -545,8 +545,8 @@ def test_rollout_metadata_is_flattened_into_jsonl_columns():
 
     metadata = np.empty(2, dtype=object)
     metadata[:] = [
-        {"scene_id": "scene-a", "sample_id": "sample-a"},
-        {"scene_id": "scene-b"},
+        {"level_id": "level-a", "sample_id": "sample-a"},
+        {"level_id": "level-b"},
     ]
     batch = types.SimpleNamespace(
         non_tensor_batch={"rollout_metadata": metadata}
@@ -559,7 +559,7 @@ def test_rollout_metadata_is_flattened_into_jsonl_columns():
     assert seen == {
         "reward": [1.0, 0.0],
         "sample_id": ["sample-a", None],
-        "scene_id": ["scene-a", "scene-b"],
+        "level_id": ["level-a", "level-b"],
     }
 
 

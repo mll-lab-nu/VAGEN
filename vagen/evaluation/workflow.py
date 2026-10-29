@@ -98,8 +98,8 @@ class GenericVisionInferenceWorkflow:
         in the text and file paths in ``images``. Flattening its samples reproduces the
         whole exchange in order, which is why no separate ``messages.json`` is written.
 
-        Images are stored once each under ``images/<sha1>.png``: a fresh-context harness
-        re-sends the same target and reference frames every turn.
+        Images are stored once each under ``images/<sha1>.png``: a harness that re-sends
+        earlier frames would otherwise write the same picture once per turn.
         """
         base_dir = dump_root or self.dump_dir
         if not base_dir:

@@ -59,7 +59,7 @@ class _Result:
     turns = 4
     info = {
         "rollout_metadata": {
-            "scene_id": "scene-test",
+            "level_id": "level-test",
             "sample_id": "sample-test",
         }
     }
@@ -80,7 +80,7 @@ def test_every_row_carries_the_whole_identity_chain():
             assert key in f, f"the loop stopped publishing {key}"
         assert f["episode_id"] == "ep-abc"
         assert f["group_idx"] == "g-1"
-        assert f["rollout_metadata"]["scene_id"] == "scene-test"
+        assert f["rollout_metadata"]["level_id"] == "level-test"
 
 
 def test_every_per_row_column_the_loop_publishes_survives_the_trip_to_the_trainer():
