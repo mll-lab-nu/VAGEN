@@ -49,29 +49,21 @@ def main(config):
     # Automatically set `config.trainer.device = npu` when running on Ascend NPU.
     auto_set_device(config)
     config = migrate_legacy_reward_impl(config)
-    _prepare_trainer_mode(config)
-    validate_config(
-        config=config,
-        use_reference_policy=need_reference_policy(config),
-        use_critic=need_critic(config),
-    )
+    if _prepare_trainer_mode(config):
+        # V0's TaskRunner validates inside its Ray actor; TaskRunnerV1 does not.
+        validate_config(
+            config=config,
+            use_reference_policy=need_reference_policy(config),
+            use_critic=need_critic(config),
+        )
     run_ppo(config)
 
 
-def _prepare_trainer_mode(config) -> None:
-    """Select the matching VAGEN manager and TQ runtime for V0 or V1."""
+def _prepare_trainer_mode(config) -> bool:
+    """Select the matching VAGEN manager and TQ runtime for V0 or V1; return use_v1."""
     use_v1 = bool(config.trainer.get("use_v1", False))
     manager_path = "actor_rollout_ref.rollout.agent.agent_loop_manager_class"
     current_manager = OmegaConf.select(config, manager_path)
-    # Each trainer works with exactly one cache-offload setting, so it is derived rather
-    # than read. Say so when that overrides an explicit value instead of dropping it.
-    wanted_offload = use_v1
-    if bool(config.actor_rollout_ref.rollout.get("free_cache_engine", wanted_offload)) != wanted_offload:
-        logger.warning(
-            "actor_rollout_ref.rollout.free_cache_engine is forced to %s under trainer.use_v1=%s",
-            wanted_offload,
-            use_v1,
-        )
     if use_v1:
         mode = str(config.trainer.v1.trainer_mode)
         if mode != "colocate_async":
@@ -87,10 +79,17 @@ def _prepare_trainer_mode(config) -> None:
         config.transfer_queue.enable = False
         # The separated V0 trainer performs its first weight sync before putting
         # SGLang to sleep; cache offload makes that transition invalid on this path.
+        # The shipped default is already False, so True here was asked for explicitly.
+        if bool(config.actor_rollout_ref.rollout.get("free_cache_engine", False)):
+            logger.warning(
+                "actor_rollout_ref.rollout.free_cache_engine=True is not supported by the V0 "
+                "trainer and is forced to False; set trainer.use_v1=True to use cache offload"
+            )
         config.actor_rollout_ref.rollout.free_cache_engine = False
         if current_manager in (None, _V1_MANAGER):
             OmegaConf.update(config, manager_path, _V0_MANAGER, merge=False, force_add=True)
         logger.warning("Using VAGEN's legacy V0 trainer; set trainer.use_v1=True to use colocate_async")
+    return use_v1
 
 
 def _propagate_determinism_env(config) -> None:
