@@ -43,4 +43,12 @@ critic.fsdp.optimizer_offload=True
 
 # Select VAGEN's multi-output agent loop instead of verl's default rollout path.
 actor_rollout_ref.rollout.agent.agent_loop_config_path=$V/vagen/configs/agent_v2.yaml
-+actor_rollout_ref.rollout.agent.agent_loop_manager_class=vagen.training.agent_loop.multi_output.MultiOutputAgentLoopManager
+actor_rollout_ref.rollout.agent.agent_loop_manager_class=vagen.training.agent_loop.multi_output.MultiOutputAgentLoopManager
+
+# Preserve VAGEN's established trainer by default. Append trainer.use_v1=True to any
+# launcher to opt into colocate_async; the entrypoint then derives the matching manager,
+# TransferQueue state and cache-offload setting from this single switch.
+trainer.use_v1=False
+trainer.v1.trainer_mode=colocate_async
+trainer.v1.colocate_async.max_inflight_steps=2
+transfer_queue.enable=False

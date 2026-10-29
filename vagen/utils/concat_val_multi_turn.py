@@ -328,6 +328,7 @@ def concat_val_multi_turn(
             "image_data": merged_images,
             "reward_extra_info": reward_extra_info,
             "episode_id": _first("episode_id"),
+            "rollout_metadata": _first("rollout_metadata", {}),
             # The episode as it was spoken, conversation by conversation. The
             # concatenated response above is what gets trained on; this is what gets read.
             "conversations": conversations,

@@ -10,7 +10,7 @@ python -m vagen.evaluation --config path/to/config.yaml
 
 CLI overrides (OmegaConf dotlist):
 ```bash
-python -m vagen.evaluation --config config.yaml run.backend=claude backends.claude.model=claude-opus-4-6
+python -m vagen.evaluation --config config.yaml backends.openrouter.model=anthropic/claude-sonnet-4.5
 ```
 
 Below is a complete example, abridged from `examples/evaluate/frozenlake/config.yaml` —
@@ -51,26 +51,18 @@ experiment:
   default_max_turns: 5                              # fallback if env omits max_turns
 
 run:
-  backend: "openai"              # which backend to use (see backends section)
+  backend: "openrouter"          # the one built-in backend (see backends section)
   base_seed: 0                   # global seed offset added to all env seeds
   max_concurrent_jobs: 64        # max episodes running in parallel
   resume: skip_completed         # skip_completed | off | force_rerun
   live_summary: true             # write summary.json after each episode finishes
 
 backends:
-  sglang:                                 # for local model serving
-    base_url: "http://127.0.0.1:30000/v1"
-    api_key: "EMPTY"
-    model: ""                             # set by sglang launch script
-    max_concurrency: 2
-    max_retries: 6
-    min_backoff: 0.5
-    max_backoff: 8.0
-
-  openai:                                 # for API-based models
-    api_key: ""                           # or export OPENAI_API_KEY
-    base_url: null
-    model: "gpt-4.1-mini"
+  openrouter:
+    api_key: ""                           # or export OPENROUTER_API_KEY; a local server needs none
+    base_url: null                        # OpenRouter; or a local vLLM/SGLang server,
+                                          # e.g. "http://127.0.0.1:8311/v1"
+    model: "openai/gpt-4o-mini"
     max_concurrency: 8                    # max concurrent API requests (rate limit gate)
     max_retries: 6                        # retry count on transient errors
     min_backoff: 0.5                      # exponential backoff lower bound (seconds)
@@ -93,7 +85,7 @@ backends:
 | `max_turns` | int | Max agent–env turns per episode |
 | `split` | str | Dataset split identifier (default: `"default"`) |
 | `config` | dict | Kwargs passed to the environment constructor |
-| `chat_config` | dict | Kwargs passed to the LLM completion call (temperature, etc.). `max_tokens` is clamped to `response_length_per_turn` when that is set |
+| `chat_config` | dict | The OpenRouter request body minus `model` and `messages` (`temperature`, `max_tokens`, `reasoning`, ...), sent as written: a key the provider does not support, or a misspelled one, is ignored rather than rejected. `max_tokens` is clamped to `response_length_per_turn` when that is set |
 | `harness` | str | Context policy: `concat` (default) \| `no_concat` \| `compact`, a registered name, or an import path `module:Class`. Any `BaseHarness` subclass works |
 | `response_length_per_turn` | int | Hard cap on one generation; becomes the call's `max_tokens` |
 | `max_response_length` | int | The response region a conversation must fit. Optional — unset, there is no accounting |
@@ -122,7 +114,7 @@ VLLM_REASONING_CONFIG='{"reasoning_start_str":"<think>","reasoning_end_str":"</t
 - `default_max_turns` — Fallback max_turns if env doesn't specify one
 
 **`run`**:
-- `backend` — Which backend to use. The names with a block in `vagen/configs/eval_default.yaml`: `openai` | `azure` | `sglang` | `vllm` | `together` | `claude` | `gemini`. Any other name needs a `backends.<name>:` block of its own; without one the run stops and lists what is configured.
+- `backend` — `openrouter`, the one built-in backend. Requests use OpenRouter's format, which `chat_config` is written in; `base_url` points it at OpenRouter or at a local vLLM/SGLang server. Any other name needs a registered adapter and a `backends.<name>:` block (see Custom Adapters).
 - `max_concurrent_jobs` — Episode-level parallelism (how many episodes run at once)
 - `resume` — `skip_completed` (default) skips episodes already completed **by the same model**; `force_rerun` deletes the previous rollouts and runs everything again; `off` runs everything and keeps what is there. Note YAML reads a bare `off` as the boolean `False`; both are accepted
 - `live_summary` — Refresh `summary.json` after each episode
@@ -132,6 +124,13 @@ VLLM_REASONING_CONFIG='{"reasoning_start_str":"<think>","reasoning_end_str":"</t
 - `model` — Model identifier
 - `max_concurrency` — Request-level concurrency gate (API rate limit)
 - `max_retries`, `min_backoff`, `max_backoff` — Retry policy with exponential backoff
+- `sdk_max_retries`, `max_connections` — OpenAI SDK retries (default 8, env `LLM_MAX_RETRIES`)
+  and HTTP connection pool (default 1024, env `LLM_MAX_CONNECTIONS`); SDK retries run inside each
+  `max_retries` attempt, so the two multiply
+
+A model behind any other API (Azure OpenAI, Anthropic, Gemini, ...) is evaluated through an
+external program that exposes it in OpenRouter's format, such as a LiteLLM proxy: point
+`backends.openrouter.base_url` at it.
 
 ### Output structure
 
@@ -141,11 +140,14 @@ dump_dir/
     ├── summary.json                    # aggregated metrics
     └── {YYYYmmdd-HHMMSS}-{uuid8}/
         ├── metrics.json                # per-episode results (success, reward, finish_reason)
-        ├── messages.json               # full conversation history
+        ├── sft.json                    # the exchange, one LLaMA-Factory sharegpt sample
+        │                               # per conversation (no_concat: one per turn):
+        │                               # messages[role/content with <image>], images[paths], meta
+        ├── raw_responses.json          # raw API response of every model call, per conversation
         ├── assistant_texts.json        # model replies only
         ├── transcript.txt              # human-readable conversation
-        └── images/
-            └── turn_01_01.png          # 1-indexed; turn 01 is the reset observation
+        └── images/                     # one file per distinct frame, named by content hash
+            └── <hash>.png              # first 16 hex digits of its SHA-1 (.jpg for JPEG frames)
 ```
 
 ## 2. Scripts
@@ -154,7 +156,7 @@ Typical run script:
 
 ```bash
 #!/bin/bash
-# Run FrozenLake eval with sglang backend
+# Run FrozenLake eval
 cd /path/to/VAGEN
 python -m vagen.evaluation \
     --config examples/evaluate/frozenlake/config.yaml
@@ -163,11 +165,10 @@ python -m vagen.evaluation \
 Override model or backend on the fly:
 
 ```bash
-# Switch to OpenAI
+# Another model on OpenRouter
 python -m vagen.evaluation \
     --config examples/evaluate/frozenlake/config.yaml \
-    run.backend=openai \
-    backends.openai.model=gpt-4o-mini \
+    backends.openrouter.model=openai/gpt-4o-mini \
     experiment.dump_dir=./rollouts/gpt4o_mini
 ```
 

@@ -32,78 +32,23 @@ experiment:
   default_max_turns: 5
 
 run:
-  backend: "openai"
+  backend: "openrouter"
   base_seed: 0
   max_concurrent_jobs: 16
   resume: skip_completed
   live_summary: true
 
+# One backend: OpenRouter's request format (OpenAI Chat Completions plus its extensions
+# such as `reasoning`), which chat_config is written in. base_url points it at OpenRouter
+# or at any server that speaks the same format: a local vLLM/SGLang server, or a program
+# that exposes a model served some other way (Azure, Anthropic, Gemini, ...) in this
+# format, such as a LiteLLM proxy.
 backends:
-  openai:
-    api_key: ""               # or export OPENAI_API_KEY
-    base_url: null
-    model: "gpt-4o-mini"
+  openrouter:
+    api_key: ""               # or export OPENROUTER_API_KEY; a local server needs none
+    base_url: null            # https://openrouter.ai/api/v1; e.g. http://127.0.0.1:8311/v1
+    model: "openai/gpt-4o-mini"
     max_concurrency: 8
-    max_retries: 6
-    min_backoff: 0.5
-    max_backoff: 8.0
-
-  azure:
-    azure_endpoint: ""        # or export AZURE_OPENAI_ENDPOINT
-    azure_api_key: ""         # or export AZURE_API_KEY
-    azure_api_version: "2024-12-01-preview"
-    deployment: "gpt-5"
-    model: ${backends.azure.deployment}
-    max_concurrency: 4
-    max_retries: 6
-    min_backoff: 0.5
-    max_backoff: 8.0
-
-  sglang:
-    base_url: "http://127.0.0.1:30000/v1"
-    api_key: "EMPTY"
-    model: ""
-    max_concurrency: 2
-    max_retries: 6
-    min_backoff: 0.5
-    max_backoff: 8.0
-
-  vllm:
-    # ★ Not 8000, which is vLLM's own default: navigation's and primitive_skill's
-    # ENVIRONMENT servers (vagen/envs/*/serve.py) default to 8000 too, so a policy server
-    # left on it collides with the environment the policy is meant to be acting in -- and
-    # the symptom is the environment answering chat completions, or the reverse. Start the
-    # policy server with `--port 8311` to match, as examples/evaluate/*/vllm/ do.
-    base_url: "http://127.0.0.1:8311/v1"
-    api_key: "EMPTY"
-    model: ""
-    max_concurrency: 2
-    max_retries: 6
-    min_backoff: 0.5
-    max_backoff: 8.0
-
-  together:
-    base_url: "https://api.together.xyz/v1"
-    api_key: ""               # or export TOGETHER_API_KEY
-    model: "meta-llama/Llama-3.1-8B-Instruct-Turbo"
-    max_concurrency: 2
-    max_retries: 6
-    min_backoff: 0.5
-    max_backoff: 8.0
-
-  claude:
-    api_key: ""               # or export ANTHROPIC_API_KEY
-    base_url: null
-    model: "claude-sonnet-4-5"
-    max_concurrency: 2
-    max_retries: 6
-    min_backoff: 0.5
-    max_backoff: 8.0
-
-  gemini:
-    api_key: ""               # or export GEMINI_API_KEY
-    model: "gemini-2.5-pro"
-    max_concurrency: 2
     max_retries: 6
     min_backoff: 0.5
     max_backoff: 8.0

@@ -89,3 +89,18 @@ def test_the_evaluation_path_imports_no_training_dependency(rel):
         f"directly, or transitively through a VAGEN training package that is free of one "
         f"only until someone adds it. Shared helpers belong in the owning axis's _common package."
     )
+
+
+@pytest.mark.parametrize(
+    "rel",
+    [path for path in FILES if path.startswith("vagen/harness/")],
+)
+def test_harnesses_do_not_read_token_metadata(rel):
+    """Only the environment reward adapter may inspect ids/tokenizer metadata."""
+    with open(os.path.join(_ROOT, rel), encoding="utf-8") as f:
+        tree = ast.parse(f.read(), filename=rel)
+    attrs = {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)}
+    assert not ({"token_ids", "tokenizer"} & attrs), (
+        f"{rel} reads raw token metadata; expose a backend-neutral client result instead. "
+        "The only allowed consumer is the environment's token-level reward path."
+    )

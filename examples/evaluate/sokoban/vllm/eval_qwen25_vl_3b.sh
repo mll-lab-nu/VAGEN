@@ -1,8 +1,8 @@
 #!/bin/bash
 # Evaluate on sokoban against a local vLLM server.
 #
-# vLLM is an explicit alternative to the default SGLang backend. Its OpenAI-compatible
-# server is consumed through the evaluation framework's OpenAI adapter.
+# vLLM is an explicit alternative to the default SGLang server. Its OpenAI-compatible
+# server is reached through the evaluation backend's base_url.
 #
 #   MODEL_PATH=/path/to/model bash examples/evaluate/sokoban/vllm/eval_qwen25_vl_3b.sh
 #
@@ -39,10 +39,9 @@ vagen_serve_vllm "$MODEL_PATH" "$PORT" "$TP_SIZE" "$MEM_FRACTION" \
                  "$MAX_MODEL_LEN" "$MAX_IMAGES" "${LOG_DIR}/vllm_server_$$.log"
 
 python -m vagen.evaluation --config "${CONFIG}" \
-  run.backend=openai \
-  backends.openai.base_url="http://127.0.0.1:${PORT}/v1" \
-  backends.openai.model="${MODEL_PATH}" \
-  backends.openai.api_key=EMPTY \
+  backends.openrouter.base_url="http://127.0.0.1:${PORT}/v1" \
+  backends.openrouter.model="${MODEL_PATH}" \
+  backends.openrouter.api_key=EMPTY \
   fileroot="${fileroot}" \
   experiment.dump_dir="${DUMP_DIR}" \
   "$@" \

@@ -460,7 +460,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "overrides",
         nargs="*",
-        help="Optional OmegaConf dotlist overrides, e.g. run.backend=sglang run.max_concurrent_jobs=8",
+        help="Optional OmegaConf dotlist overrides, e.g. backends.openrouter.model=openai/gpt-4o run.max_concurrent_jobs=8",
     )
     return parser.parse_args()
 
@@ -480,8 +480,9 @@ def _resolve_defaults(cfg_path: str, cfg: DictConfig, _visited: Optional[set] = 
           - ../shared/backends    # relative path also works
 
         # only the fields you want to override
-        run:
-          backend: "claude"
+        backends:
+          openrouter:
+            model: "anthropic/claude-sonnet-4.5"
         experiment:
           dump_dir: ${fileroot}/rollouts/claude
     """
@@ -545,8 +546,8 @@ def _load_config(cfg_path: str, overrides: List[str]) -> DictConfig:
             except yaml.YAMLError as exc:
                 raise ValueError(f"override {item!r}: {raw!r} is not valid YAML") from exc
             # ★ A YAML timestamp is not a config value. `2024-12-01` loads as a date, which
-            # OmegaConf refuses as an unsupported type -- and it is a real API version
-            # string (backends.azure.azure_api_version). Dates have no other use here.
+            # OmegaConf refuses as an unsupported type -- and API version strings look
+            # exactly like that. Dates have no other use here.
             if isinstance(value, (datetime.date, datetime.datetime)):
                 value = raw
             key = key.strip()
@@ -637,7 +638,7 @@ def main() -> None:
     cfg = _resolve_paths_in_config(cfg, base_dir)
 
     run_cfg = cfg.get("run") or {}
-    backend = str(run_cfg.get("backend", "openai")).lower()
+    backend = str(run_cfg.get("backend", "openrouter")).lower()
     resume_mode = _resume_mode(run_cfg.get("resume", "skip_completed"))
     live_summary = bool(run_cfg.get("live_summary", False))
     max_concurrent = int(run_cfg.get("max_concurrent_jobs", 4))
@@ -653,9 +654,9 @@ def main() -> None:
             f"{sorted(backends_cfg)}. Add a `backends.{backend}:` block, or pick one of those."
         )
     backend_cfg: Dict[str, Any] = backends_cfg[backend]
-    model = backend_cfg.get("model") or backend_cfg.get("deployment")
+    model = backend_cfg.get("model")
     if not model:
-        raise ValueError(f"[{backend}] requires 'model' (or 'deployment' for Azure) in backends.{backend}.*")
+        raise ValueError(f"[{backend}] requires 'model' in backends.{backend}.*")
 
     env_specs = _parse_env_specs(cfg)
     default_max_turns = (cfg.get("experiment") or {}).get("default_max_turns")

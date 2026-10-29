@@ -86,11 +86,15 @@ def _is_non_retryable(exc: BaseException) -> bool:
     failure. Measured: `500 with 'invalid' in body` -> retry=False, against
     `500 server` -> retry=True.
     """
+    # A bug in our own code fails identically every time; retrying it only adds the
+    # backoff before the same traceback.
+    if isinstance(exc, (TypeError, NameError, ImportError)):
+        return True
     code = _get_status_code(exc)
     if code is not None:
-        # 4xx is the client's fault and will not change on a retry. 429 is the exception:
-        # it is a request to wait, not a refusal.
-        return 400 <= code < 500 and code != 429
+        # 4xx is the client's fault and will not change on a retry. 408 and 429 are the
+        # exceptions: a timeout and a request to wait, not refusals.
+        return 400 <= code < 500 and code not in (408, 429)
 
     name = exc.__class__.__name__.lower()
     msg = str(exc).lower()
@@ -135,6 +139,11 @@ class ThrottledAdapter(EvaluationBackend):
 
     def format_assistant_turn(self, text: str) -> Dict[str, Any]:
         return self.inner.format_assistant_turn(text)
+
+    @property
+    def last_raw(self) -> Any:
+        """The inner adapter's last raw API response (see OpenRouterAdapter.last_raw)."""
+        return getattr(self.inner, "last_raw", None)
 
     async def acompletion(self, messages: List[Dict[str, Any]], **chat_config: Any) -> str:
         attempt = 0

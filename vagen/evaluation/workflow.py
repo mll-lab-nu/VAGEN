@@ -2,13 +2,15 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 from PIL import Image
 import os
+import base64
+import hashlib
 import json
 import asyncio
 import uuid
 import logging
 
 from vagen.evaluation.backends import EvaluationBackend
-from vagen.evaluation.backends._common.rendering import _now_tag
+from vagen.evaluation.backends._common.rendering import parse_data_url, pil_to_dataurl_png, _now_tag
 from vagen.evaluation.serialization import sanitize_for_json
 from vagen.envs import GymEnvAdapter
 from vagen.rollout import run_episode
@@ -84,52 +86,100 @@ class GenericVisionInferenceWorkflow:
         user_imgs_per_turn: List[List[Image.Image]],
         metrics: Optional[Dict[str, Any]] = None,
         dump_root: Optional[str] = None,
+        conversations: Optional[List[List[Dict[str, Any]]]] = None,
+        raw_responses: Optional[List[List[Any]]] = None,
     ) -> None:
-        """Persist messages/images/transcript and optional metrics."""
+        """Persist the rollout: ``sft.json``, ``transcript.txt``, ``images/``, ``metrics.json``,
+        ``raw_responses.json`` (the model's raw API responses, one list per conversation).
+
+        ``sft.json`` is the machine-readable record AND the training format: one
+        LLaMA-Factory sharegpt sample per conversation the client opened -- under no_concat
+        that is one per turn, under concat one per episode -- with ``<image>`` placeholders
+        in the text and file paths in ``images``. Flattening its samples reproduces the
+        whole exchange in order, which is why no separate ``messages.json`` is written.
+
+        Images are stored once each under ``images/<hash>.png``: a harness that re-sends
+        earlier frames would otherwise write the same picture once per turn. Every
+        environment frame is stored, including ones never sent to the model (the final
+        observation after the last action is the usual one).
+        """
         base_dir = dump_root or self.dump_dir
         if not base_dir:
             return
         folder = os.path.join(base_dir, rid)
         os.makedirs(folder, exist_ok=True)
+        img_dir = os.path.join(folder, "images")
+        os.makedirs(img_dir, exist_ok=True)
         # Sanitize metrics for JSON
         if metrics is not None:
             metrics = sanitize_for_json(metrics)
 
-        def shadow(m: Dict[str, Any]) -> Dict[str, Any]:
-            r = m.get("role", "")
-            c = m.get("content")
-            if isinstance(c, list):
-                parts = []
-                for p in c:
-                    if p.get("type") == "text":
-                        parts.append({"type": "text", "text": p.get("text", "")})
-                    elif p.get("type") == "image_url":
-                        parts.append({"type": "image_url", "image_url": {"url": "<data_url>"}})
-                out = {"role": r, "content": parts}
-            else:
-                out = {"role": r, "content": c}
-            return out
+        saved: Dict[str, str] = {}   # sha1 -> relative path
 
-        # messages.json
-        await asyncio.to_thread(
-            lambda: open(os.path.join(folder, "messages.json"), "w", encoding="utf-8").write(
-                json.dumps([shadow(m) for m in messages], ensure_ascii=False, indent=2)
-            )
-        )
-        # assistant_texts.json
-        await asyncio.to_thread(
-            lambda: open(os.path.join(folder, "assistant_texts.json"), "w", encoding="utf-8").write(
-                json.dumps(assistant_texts, ensure_ascii=False, indent=2)
-            )
-        )
+        def store(part: Dict[str, Any]) -> Optional[str]:
+            """Write the image of an image part once; return its path relative to the rollout folder."""
+            url = (part.get("image_url") or {}).get("url") if isinstance(part.get("image_url"), dict) else part.get("image_url")
+            parsed = parse_data_url(url) if isinstance(url, str) else None
+            if parsed is None:
+                return url if isinstance(url, str) else None
+            raw = base64.b64decode(parsed[1])
+            digest = hashlib.sha1(raw).hexdigest()[:16]
+            if digest not in saved:
+                ext = "png" if "png" in parsed[0] else "jpg"
+                rel = f"images/{digest}.{ext}"
+                with open(os.path.join(folder, rel), "wb") as f:
+                    f.write(raw)
+                saved[digest] = rel
+            return saved[digest]
 
-        # Save user images
-        img_dir = os.path.join(folder, "images")
-        os.makedirs(img_dir, exist_ok=True)
-        for t, imgs in enumerate(user_imgs_per_turn, start=1):
-            for i, img in enumerate(imgs, start=1):
-                path = os.path.join(img_dir, f"turn_{t:02d}_{i:02d}.png")
-                await asyncio.to_thread(img.save, path, "PNG")
+        def sft_sample(conv: List[Dict[str, Any]], index: int) -> Dict[str, Any]:
+            """LLaMA-Factory sharegpt (role/content) sample: text with <image> markers + image paths."""
+            out_msgs, images = [], []
+            for m in conv:
+                c = m.get("content")
+                if isinstance(c, list):
+                    text = []
+                    for p in c:
+                        if p.get("type") in ("text", "input_text", "output_text"):
+                            text.append(p.get("text", ""))
+                        elif p.get("type") in ("image_url", "input_image"):
+                            path = store(p)
+                            if path:
+                                images.append(path)
+                                text.append("<image>")
+                    content = "".join(text)
+                else:
+                    content = c or ""
+                out_msgs.append({"role": m.get("role", ""), "content": content})
+            return {"messages": out_msgs, "images": images, "meta": {"rollout_id": rid, "conversation": index}}
+
+        def write_json(name: str, obj: Any) -> None:
+            with open(os.path.join(folder, name), "w", encoding="utf-8") as f:
+                json.dump(obj, f, ensure_ascii=False, indent=2)
+
+        def write_episode() -> None:
+            # Decoding, hashing and writing every frame is too slow for the event loop that
+            # is serving the other episodes' requests, so all of it runs in one thread.
+            write_json("assistant_texts.json", assistant_texts)
+            if raw_responses is not None:
+                write_json("raw_responses.json", sanitize_for_json(raw_responses))
+            # sft.json: the exchange, per conversation. Without `conversations` (an error
+            # before the first call) fall back to one sample holding whatever was sent.
+            if conversations or messages:
+                samples = [sft_sample(conv, i) for i, conv in enumerate(conversations or [messages]) if conv]
+                if metrics is not None:
+                    for smp in samples:
+                        smp["meta"]["success"] = metrics.get("success")
+                        smp["meta"]["finish_reason"] = metrics.get("finish_reason")
+                write_json("sft.json", samples)
+            # Frames the model never saw are in no message -- always the observation after
+            # the last action, which is the one showing how the episode ended. Same
+            # encoding as the OpenAI adapter, so a frame that was sent is not written twice.
+            for imgs in user_imgs_per_turn:
+                for img in imgs:
+                    store({"image_url": {"url": pil_to_dataurl_png(img)}})
+
+        await asyncio.to_thread(write_episode)
 
         # transcript.txt
         def to_line(m: Dict[str, Any]) -> str:
@@ -283,8 +333,12 @@ class GenericVisionInferenceWorkflow:
         # The transcript is what the client actually sent, across every conversation the
         # harness opened. Under no_concat and compact that is more than one, and reading
         # only the last would report a fraction of the episode.
+        conversations: List[List[Dict[str, Any]]] = []
+        raw_responses: List[List[Any]] = []          # one list per conversation, one entry per model call
         for conv in client.conversations():
-            messages.extend(client.messages(conv.conversation_id))
+            conversations.append(client.messages(conv.conversation_id))
+            raw_responses.append(client.raw_responses(conv.conversation_id))
+            messages.extend(conversations[-1])
         assistant_texts = [_text_of(m) for m in messages if m.get("role") == "assistant"]
 
         if outcome is not None:
@@ -313,7 +367,13 @@ class GenericVisionInferenceWorkflow:
                 # of room". The turn count can, and only the second is worth a name.
                 finish_reason = "max_turns"
             elif outcome.truncated:
-                finish_reason = "no_room"
+                # A harness names why it stopped -- `no_room` for an exhausted budget,
+                # `empty_generation` for a reply that carried no content -- by way of
+                # `truncate(reason)`. Overwriting every one of them with `no_room`
+                # turned distinct failures into one, and the one it chose reads as an
+                # accounting problem rather than a model that returned nothing.
+                finish_reason = (getattr(outcome, "info", None)
+                                 or {}).get("rollout_stop_reason") or "no_room"
             else:
                 finish_reason = "max_turns"
         else:
@@ -367,6 +427,8 @@ class GenericVisionInferenceWorkflow:
                 user_imgs_per_turn,
                 metrics=sanitize_for_json(metrics),
                 dump_root=dump_root,
+                conversations=conversations,
+                raw_responses=raw_responses,
             )
 
             result = {
@@ -427,6 +489,8 @@ class GenericVisionInferenceWorkflow:
                         user_imgs_per_turn,
                         metrics=minimal_metrics,
                         dump_root=dump_root,
+                        conversations=conversations,
+                        raw_responses=raw_responses,
                     )
             except Exception:
                 pass

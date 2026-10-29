@@ -23,7 +23,7 @@ class Client:
         # Two ordinary calls make the next turn cross budget=20.
         total = (8, 15, 18, 9, 16, 19)[min(self.n - 1, 5)]
         return types.SimpleNamespace(
-            text=text, token_ids=[1], conversation_id="old" if self.n <= 3 else "new",
+            text=text, is_empty=False, conversation_id="old" if self.n <= 3 else "new",
             usage=types.SimpleNamespace(total_tokens=total, response_tokens=total - 4),
         )
 

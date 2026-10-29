@@ -46,17 +46,17 @@ experiment:
   default_max_turns: 11
 
 run:
-  backend: "openai"
+  backend: "openrouter"
   base_seed: 0
   max_concurrent_jobs: 3
   resume: skip_completed
   live_summary: true
 
 backends:
-  openai:
-    api_key: ""               # or export OPENAI_API_KEY
+  openrouter:
+    api_key: ""               # or export OPENROUTER_API_KEY
     base_url: null
-    model: "gpt-4.1-mini"
+    model: "openai/gpt-4.1-mini"
     max_concurrency: 3
     max_retries: 6
     min_backoff: 1.0

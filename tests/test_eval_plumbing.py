@@ -237,7 +237,7 @@ def test_the_summary_counts_one_run_not_two(tmp_path):
 # --------------------------------------------------------- config overrides
 @pytest.mark.parametrize("override,ok", [
     ("run.backend=vllm", True),
-    ("backends.openai.model=foo", True),
+    ("backends.openrouter.model=foo", True),
     ("envs.0.seed=[1,60,1]", True),
     # EnvSpec defines it, the yaml leaves it at the default, and it is the documented way
     # to evaluate under another context policy -- the case this check must not refuse.

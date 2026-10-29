@@ -1,5 +1,12 @@
 from setuptools import setup, find_packages
 
+# verl V1 (trainer.use_v1=True, colocate_async) hands rollouts to training through
+# TransferQueue. 0.1.9 is the first version with checkpoint save/restore, required so
+# in-flight prompts are not lost when a colocate_async run resumes. It belongs to the
+# training stacks, not to install_requires: it pulls in ray, and an evaluation-only
+# install never starts a trainer.
+_TRANSFER_QUEUE = "TransferQueue>=0.1.9"
+
 setup(
     name="vagen",
     version="26.8.14",
@@ -59,6 +66,7 @@ setup(
             "tensordict==0.10.0",
             "torchao>=0.16.0",
             "trl>=0.27,<0.29",
+            _TRANSFER_QUEUE,
         ],
         # Metadata for the default stack. Use scripts/install.sh rather than installing
         # this extra directly: causal-conv1d and trl require the ordered second pass in
@@ -72,6 +80,7 @@ setup(
             "flash-linear-attention==0.5.2",
             "causal-conv1d==1.7.0",
             "peft==0.19.1",
+            _TRANSFER_QUEUE,
         ],
     },
     # 3.12, not 3.10: the source parses under 3.10, but verl's installer fetches a

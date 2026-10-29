@@ -42,6 +42,10 @@ class Row:
     #: Without these a conversation is one undifferentiated blob and its turns cannot be
     #: told apart, which is why turn numbering had silently become conversation numbering.
     response_spans: list[tuple[int, int]] = field(default_factory=list)
+    #: Oldest/newest policy versions used while generating this conversation.  They
+    #: differ when colocate_async aborts a request for an update and later resumes it.
+    min_global_steps: int | None = None
+    max_global_steps: int | None = None
     #: Which conversation this is, counting from 0 in the order they were opened.
     #:
     #: Not the position in ``rows()``. A conversation the model never spoke in is dropped
@@ -82,6 +86,8 @@ class Conversation:
     response_spans: list[tuple[int, int]] = field(default_factory=list)
     # Length of the newest context span; the only region an adoption can resize.
     _tail_context_len: int | None = None
+    min_global_steps: int | None = None
+    max_global_steps: int | None = None
 
     # ------------------------------------------------------------------ writing
     def add_context(self, ids: list[int]) -> None:
@@ -114,6 +120,14 @@ class Conversation:
         self._last_response = (start, len(self.mask))
         self.response_spans.append(self._last_response)
         self._tail_context_len = 0
+
+    def observe_weights_version(self, version: tuple[int, int] | None) -> None:
+        """Extend the policy-version interval represented by this conversation."""
+        if version is None:
+            return
+        low, high = map(int, version)
+        self.min_global_steps = low if self.min_global_steps is None else min(self.min_global_steps, low)
+        self.max_global_steps = high if self.max_global_steps is None else max(self.max_global_steps, high)
 
     # ---------------------------------------------------------------- adopting
     def adopt_prompt(self, engine_ids: list[int]) -> None:
@@ -211,6 +225,8 @@ class Conversation:
             scores=list(self.scores),
             logprobs_complete=self._logprobs_complete,
             response_spans=list(self.response_spans),
+            min_global_steps=self.min_global_steps,
+            max_global_steps=self.max_global_steps,
         )
 
     def add_reward(self, reward: float | list[float]) -> None:

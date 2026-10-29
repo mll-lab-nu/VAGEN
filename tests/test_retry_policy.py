@@ -29,8 +29,9 @@ def test_every_server_error_is_retried(code):
     assert _is_retryable(_Err("server side", code), CODES)
 
 
-def test_a_rate_limit_is_retried_and_the_rest_of_4xx_is_not():
+def test_a_rate_limit_or_timeout_is_retried_and_the_rest_of_4xx_is_not():
     assert _is_retryable(_Err("slow down", 429), CODES)
+    assert _is_retryable(_Err("request timeout", 408), CODES)
     for code in (400, 401, 403, 404, 422):
         assert not _is_retryable(_Err("your fault", code), CODES)
 
@@ -55,3 +56,9 @@ def test_wording_still_decides_when_there_is_no_code():
     assert _is_non_retryable(_Err("authentication failed"))
     assert _is_non_retryable(_Err("api key not found"))
     assert not _is_non_retryable(_Err("upstream exploded"))
+
+
+def test_a_bug_on_our_side_is_not_retried():
+    """A chat_config key the SDK does not take raises TypeError before any request; it
+    fails the same way on every attempt."""
+    assert not _is_retryable(TypeError("create() got an unexpected keyword argument 'max_token'"), CODES)

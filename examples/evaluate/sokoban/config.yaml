@@ -50,7 +50,7 @@ envs:
       # followed by the same structured suffix. InternVL and GLM can still use the
       # simpler action-only protocol:
       #   bash run_eval.sh config.yaml envs.0.config.prompt_format=answer \
-      #     backends.openai.model=OpenGVLab/InternVL3_5-2B-hf
+      #     backends.openrouter.model=OpenGVLab/InternVL3_5-2B-hf
       # GLM's launcher may use prompt_format=answer when only the action needs markup.
       prompt_format: wm
       # ★ Not the training default (True), and deliberately so -- this is the one field
@@ -90,17 +90,17 @@ experiment:
   default_max_turns: 5
 
 run:
-  backend: "openai"
+  backend: "openrouter"
   base_seed: 0
   max_concurrent_jobs: 4
   resume: skip_completed
   live_summary: true
 
 backends:
-  openai:
-    api_key: ""               # or export OPENAI_API_KEY
+  openrouter:
+    api_key: ""               # or export OPENROUTER_API_KEY
     base_url: null
-    model: "gpt-4o-mini"
+    model: "openai/gpt-4o-mini"
     max_concurrency: 2
     max_retries: 6
     min_backoff: 0.5

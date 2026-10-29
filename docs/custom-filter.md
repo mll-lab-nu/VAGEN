@@ -2,6 +2,12 @@
 
 VAGEN supports custom filters to preprocess training data before optimization. This feature is inspired by [RAGEN](https://github.com/RAGEN-AI/RAGEN).
 
+The two built-in filters work on both the default V0 trainer and the optional V1
+`colocate_async` path. The function-registration API below is the V0 `DataProto`
+extension point. In V1, a new custom filter must be implemented as a custom replay-buffer
+sampler (`trainer.v1.sampler.custom_sampler`) so it selects TransferQueue keys before
+actor/critic model work starts; selecting rows afterwards would train the wrong batch.
+
 ## Built-in Filters
 
 | Filter | Description |

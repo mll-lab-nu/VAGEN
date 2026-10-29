@@ -48,9 +48,9 @@ source "${SCRIPT_DIR}/../../wait_for_server.sh"
 wait_for_server
 
 python -m vagen.evaluation --config "$CONFIG" \
-  run.backend=sglang \
-  backends.sglang.base_url="http://127.0.0.1:${PORT}/v1" \
-  backends.sglang.model="$MODEL_PATH" \
+  backends.openrouter.base_url="http://127.0.0.1:${PORT}/v1" \
+  backends.openrouter.model="$MODEL_PATH" \
+  backends.openrouter.api_key=EMPTY \
   fileroot="$fileroot" \
   experiment.dump_dir="$DUMP_DIR" \
   "$@" \
