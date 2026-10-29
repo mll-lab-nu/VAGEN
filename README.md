@@ -17,7 +17,7 @@
   <a href="https://arxiv.org/abs/2510.16907"><img src="https://img.shields.io/badge/📜_Paper-B31B1B?style=for-the-badge&logo=arXiv&logoColor=white" alt="Paper"></a>
   <a href="https://vagen.readthedocs.io/en/latest"><img src="https://img.shields.io/badge/📚_Documentation-4285F4?style=for-the-badge&logoColor=white" alt="Documentation"></a>
   <a href="https://mll-lab.notion.site/vagen"><img src="https://img.shields.io/badge/📝_Blog-FF5722?style=for-the-badge&logoColor=white" alt="Blog"></a>
-  <a href="https://wandb.ai/ragen-V/vagen-final/reports/VAGEN-Experimental-Results--VmlldzoxMzM2NzczNA"><img src="https://img.shields.io/badge/📊_Experiment_Log-FB8C00?style=for-the-badge&logoColor=white" alt="Experiment Log"></a>
+  <a href="https://wandb.ai/ragen-V/vagen-final/reports/VAGEN-Experiment-Log--VmlldzoxMzM2NzczNA?accessToken=c9539vj7s3yxh8qu4rykmgi1kz47935mu9pvkind70m2tt6bdin6tx263ec7yqei"><img src="https://img.shields.io/badge/📊_Experiment_Log-FB8C00?style=for-the-badge&logoColor=white" alt="Experiment Log"></a>
   <a href="https://vagen-ai.github.io/"><img src="https://img.shields.io/badge/🌐_Website-00C851?style=for-the-badge&logoColor=white" alt="Website"></a>
 </p>
 
@@ -85,6 +85,9 @@ We frame multi-turn VLM agentic tasks as a Partially Observable Markov Decision 
 
 ## Installation
 
+Requires Python 3.12 and a CUDA 13 driver. See [Quick Start](docs/quickstart.md) for GPU
+sizing and a manual install.
+
 ```bash
 conda create -n vagen python=3.12 -y
 conda activate vagen
@@ -93,8 +96,13 @@ cd VAGEN
 bash scripts/install.sh  # SGLang 0.5.13 (default)
 ```
 
+`scripts/install.sh` initializes the pinned `verl` submodule (VAGEN's verl 0.9 fork,
+[JamesKrW/verl `vagen-main`](https://github.com/JamesKrW/verl/tree/vagen-main)) and installs
+the CUDA 13 stack: Torch 2.11.0, SGLang 0.5.13, Transformers 5.8.1, and TransferQueue 0.1.9
+(used only by `trainer.use_v1=true`). It is safe to re-run; `SKIP_ENGINE=1` keeps and
+verifies an existing rollout engine.
 
-If you want to use vLLM instead with:
+To use vLLM instead:
 
 ```bash
 BACKEND=vllm bash scripts/install.sh    # vLLM 0.22.0
@@ -154,7 +162,10 @@ bash examples/train/sokoban/train_default_gae_internvl35_2b.sh \
 ```
 
 See [Configuration](docs/configuration.md) for harnesses, estimators, model-specific flags,
-and state-reward settings.
+and state-reward settings. Training keeps the established V0 path by default. Append
+`trainer.use_v1=true` to any launcher to select verl V1 `colocate_async`; see
+[Colocated asynchronous training](docs/colocate-async.md) for its queue, straggler, and
+token-reward contracts.
 
 ### Evaluation
 
@@ -397,7 +408,7 @@ filter:
   name: reward_variance_top_p # registered by vagen.training.filters
   filter_kwargs: 
     top_p: 0.9 
-  enable: False # set to true to enable filtering, recommended for grpo trainining
+  enable: False # set to true to enable filtering, recommended for GRPO training
 ```
 
 

@@ -41,13 +41,29 @@ actor_rollout_ref:
   hybrid_engine: True   
   rollout:
     name: sglang        
+    # verl's V1 agent-loop sampling adapter reads this field directly, while the
+    # rollout YAML shipped by the pinned verl revision does not define it yet.
+    repetition_penalty: 1.0
+    free_cache_engine: False
     multi_turn:
       enable: True       
+    agent:
+      agent_loop_manager_class: vagen.training.agent_loop.multi_output.MultiOutputAgentLoopManager
 
 # ============================================================================
 # Trainer Configuration
 # ============================================================================
 trainer:
+  # Compatibility default. Set true as the only required knob for colocate_async;
+  # the entrypoint derives TransferQueue, manager, and cache-offload settings.
+  use_v1: False
+  v1:
+    trainer_mode: colocate_async
+    colocate_async:
+      num_warmup_batches: 1
+      # A straggler may span at most this many policy versions.  Cancellation is
+      # training-only; validation always waits for every requested episode.
+      max_inflight_steps: 2
   val_before_train: True
   # ★ A VAGEN run is bounded by trainer.total_training_steps, which every example script
   # sets. But verl's fit loop is `for epoch in range(total_epochs)` -- steps only stop it
@@ -126,11 +142,14 @@ trainer:
   # turn budget -- which is what it used to do -- a summary at compact_budget=4000 could
   # be 8000 tokens, and every environment step would cost two generations.
   compact_summary_budget: null
-
   log_image:
     enable: false           # Whether to log environment-rendered images to logger (e.g. wandb)
     max_pending: 2          # Max pending async image dump tasks (prevents IO from blocking training)
     png_compress_level: 0   # PNG compression level (0 = no compression, fastest)
+
+# Enabled automatically when trainer.use_v1=true.
+transfer_queue:
+  enable: False
 
 # ============================================================================
 # Algorithm Configuration

@@ -50,6 +50,11 @@ class Response:
     call_id: int = 0
     tokenizer: Any = field(default=None, repr=False, compare=False)
 
+    @property
+    def is_empty(self) -> bool:
+        """Backend-neutral signal that no action survived the client's retries."""
+        return self.token_ids is not None and not self.token_ids
+
 
 @dataclass
 class BackendOutput:
@@ -66,9 +71,7 @@ class BackendOutput:
     stop_reason: Optional[str] = None
     #: The policy versions this response was generated across. They differ when a partial
     #: rollout resumed after a weight update, and then the response is on-policy for
-    #: neither -- which is the only thing that says so. Carried rather than used: nothing
-    #: reads them yet, and an off-policy correction that wanted to would otherwise have to
-    #: reach back into the client to add them.
+    #: neither. The conversation tape carries the interval to V1's TQ staleness tags.
     weights_version: Optional[tuple[int, int]] = None
 
 
@@ -214,6 +217,7 @@ class InferenceClient(ABC):
                     "multi_modal_inputs is built from ours.", got, expected, got - expected)
             conversation.adopt_prompt(output.prompt_token_ids)
         conversation.add_response(output.token_ids, output.logprobs)
+        conversation.observe_weights_version(output.weights_version)
         self._call_to_response[call_id] = (
             conversation_id,
             conversation.response_spans[-1],

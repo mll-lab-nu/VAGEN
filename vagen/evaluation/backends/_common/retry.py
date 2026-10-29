@@ -136,6 +136,11 @@ class ThrottledAdapter(EvaluationBackend):
     def format_assistant_turn(self, text: str) -> Dict[str, Any]:
         return self.inner.format_assistant_turn(text)
 
+    @property
+    def last_raw(self) -> Any:
+        """The inner adapter's last raw API response (see OpenAIAdapter.last_raw)."""
+        return getattr(self.inner, "last_raw", None)
+
     async def acompletion(self, messages: List[Dict[str, Any]], **chat_config: Any) -> str:
         attempt = 0
         while True:

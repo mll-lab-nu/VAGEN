@@ -132,6 +132,9 @@ VLLM_REASONING_CONFIG='{"reasoning_start_str":"<think>","reasoning_end_str":"</t
 - `model` — Model identifier
 - `max_concurrency` — Request-level concurrency gate (API rate limit)
 - `max_retries`, `min_backoff`, `max_backoff` — Retry policy with exponential backoff
+- `sdk_max_retries`, `max_connections` — OpenAI/Azure SDK retries (default 8, env `LLM_MAX_RETRIES`)
+  and HTTP connection pool (default 1024, env `LLM_MAX_CONNECTIONS`); SDK retries run inside each
+  `max_retries` attempt, so the two multiply
 
 ### Output structure
 
@@ -141,11 +144,14 @@ dump_dir/
     ├── summary.json                    # aggregated metrics
     └── {YYYYmmdd-HHMMSS}-{uuid8}/
         ├── metrics.json                # per-episode results (success, reward, finish_reason)
-        ├── messages.json               # full conversation history
+        ├── sft.json                    # the exchange, one LLaMA-Factory sharegpt sample
+        │                               # per conversation (no_concat: one per turn):
+        │                               # messages[role/content with <image>], images[paths], meta
+        ├── raw_responses.json          # raw API response of every model call, per conversation
         ├── assistant_texts.json        # model replies only
         ├── transcript.txt              # human-readable conversation
-        └── images/
-            └── turn_01_01.png          # 1-indexed; turn 01 is the reset observation
+        └── images/                     # one file per distinct frame, named by content hash
+            └── <sha1>.png              # every environment frame, including the final one
 ```
 
 ## 2. Scripts

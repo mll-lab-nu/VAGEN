@@ -92,7 +92,6 @@ PYTHONUNBUFFERED=1 python3 -m vagen.training.main \
     actor_rollout_ref.rollout.max_num_batched_tokens=13312 \
     actor_rollout_ref.rollout.max_model_len=13312 \
     actor_rollout_ref.rollout.enforce_eager=True \
-    actor_rollout_ref.rollout.free_cache_engine=False \
     actor_rollout_ref.rollout.enable_chunked_prefill=True \
     trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \

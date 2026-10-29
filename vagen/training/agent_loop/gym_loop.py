@@ -36,11 +36,10 @@ from vagen.models import (
 )
 from vagen.rollout import EpisodeUnusable, run_episode
 from vagen.envs._common.adapter import GymEnvAdapter, _accepts_response
+from vagen.training.tq_utils import ROLLOUT_SOURCE, trajectory_identity
 
 logger = logging.getLogger(__file__)
 logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
-
-_ROLLOUT_SOURCE = "__vagen_rollout_index__"
 
 # Which environments can have their reasoning scored is no longer a table here: each
 # environment declares its own `STATE_REWARD_SPEC`. See `envs/_common/rewards/factory.py`.
@@ -56,7 +55,7 @@ def _stable_rollout_id(kwargs: dict[str, Any]) -> str:
     fields = (
         kwargs.get("env_name"),
         kwargs.get("seed"),
-        kwargs.get(_ROLLOUT_SOURCE),
+        kwargs.get(ROLLOUT_SOURCE),
         kwargs.get("traj_idx"),
     )
     payload = "\x1f".join("" if value is None else str(value) for value in fields)
@@ -102,6 +101,13 @@ class GymLoop(VagenGymAgentLoopBase):
 
     @rollout_trace_op
     async def run(self, sampling_params: dict[str, Any], **kwargs) -> list[AgentLoopOutput]:
+        # V0 names these axes group_idx/traj_idx; V1 TransferQueue names the same
+        # identities uid/session_id.  Normalize once at the rollout boundary so the
+        # harness and environment remain completely unaware of the scheduler in use.
+        kwargs = dict(kwargs)
+        group_idx, traj_idx = trajectory_identity(kwargs)
+        kwargs.setdefault("group_idx", group_idx)
+        kwargs.setdefault("traj_idx", traj_idx)
         # No silent default: falling back to a single turn would look like a working
         # run whose episodes all stop after one step, which is nearly invisible --
         # every row is well-formed, just short. The same value constructs TurnLimit and
@@ -410,6 +416,18 @@ class GymLoop(VagenGymAgentLoopBase):
                  harness) -> list[AgentLoopOutput]:
         rows = client.rows()
         outputs = []
+        # Environments may opt static episode facts into the rollout artifact without
+        # putting them in the model-visible prompt.  Keep this as an opaque dictionary:
+        # the harness still speaks only messages and the trainer does not need to know
+        # what an identifier in it means.
+        rollout_metadata = (getattr(result, "info", {}) or {}).get(
+            "rollout_metadata", {}
+        ) or {}
+        if not isinstance(rollout_metadata, dict):
+            raise TypeError(
+                "environment info['rollout_metadata'] must be a dict, got "
+                f"{type(rollout_metadata).__name__}"
+            )
         finalize_state_scores = getattr(env, "finalized_state_scores", None)
         state_scores = (
             finalize_state_scores(result.turns)
@@ -577,6 +595,10 @@ class GymLoop(VagenGymAgentLoopBase):
                         # "it was never well-formed", and a mean over NaN is visibly NaN
                         # rather than quietly depressed.
                         "image_data": images,
+                        # Static per-episode facts for offline consumers of the rollout
+                        # dump.  Deliberately separate from reward_extra_info: string
+                        # identifiers are metadata, not metrics to aggregate.
+                        "rollout_metadata": dict(rollout_metadata),
                         "last_turn": row is rows[-1],
                         # `row is rows[-1]`, not `conversation_id == len(rows) - 1`:
                         # conversation_id is the ordinal assigned when the conversation
@@ -621,6 +643,12 @@ class GymLoop(VagenGymAgentLoopBase):
                         # row -- so without this the only turn count anything can see
                         # says every episode was a single turn.
                         "episode_turns": int(result.turns),
+                        # V1 uses these tags to measure and bound policy staleness.  A
+                        # concat conversation can span several abort/resume cycles, so
+                        # the tape records the full version interval, not only the last
+                        # generation call.
+                        "min_global_steps": getattr(row, "min_global_steps", None),
+                        "max_global_steps": getattr(row, "max_global_steps", None),
                     },
                 )
             )

@@ -43,7 +43,7 @@ class BaseHarness(ABC):
     @staticmethod
     def empty(response) -> bool:
         """Whether a backend exhausted its retries without producing an action."""
-        return response.token_ids is not None and not response.token_ids
+        return bool(response.is_empty)
 
 
 def assistant(text: str) -> Msg:
