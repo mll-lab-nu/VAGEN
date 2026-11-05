@@ -28,6 +28,18 @@ class VagenPPOTrainer(VagenV0Mixin, SeparateRayPPOTrainer):
         # After super(): reads self.config, which the base sets up.
         self._vagen_init()
 
+    @property
+    def _actor_role(self) -> Role:
+        """``ActorRolloutRef`` when the reference policy is fused into the actor worker.
+
+        ``main.py`` fuses it whenever KL is on (``use_kl_in_reward`` or
+        ``use_kl_loss``) without LoRA, the same choice ``RayPPOTrainer`` makes; the
+        role is ``ActorRollout`` otherwise.
+        """
+        if Role.ActorRolloutRef in self.role_worker_mapping:
+            return Role.ActorRolloutRef
+        return Role.ActorRollout
+
     def _create_actor_rollout_classes(self):
         """Place actor and rollout on one pool (hybrid engine).
 
@@ -35,22 +47,15 @@ class VagenPPOTrainer(VagenV0Mixin, SeparateRayPPOTrainer):
         "separation" is precisely about *where* actor and rollout go, and each async
         strategy answers that differently -- ``OneStepOffRayTrainer`` registers a bare
         ``Role.Actor`` on its own pool. Everything else in the base is already written
-        for the colocated case: ``_init_models`` looks up ``Role.ActorRollout``.
+        for the colocated case without a fused reference: ``_init_models`` looks up
+        ``Role.ActorRollout``, which :meth:`_init_models` below reconciles.
         """
         if not self.hybrid_engine:
             raise NotImplementedError(
                 "VagenPPOTrainer places actor and rollout together; for separated "
                 "placement use one of verl's async trainers as the base instead"
             )
-        role = Role.ActorRollout
-        if role not in self.role_worker_mapping:
-            # `_init_models` indexes all_wg by str(Role.ActorRollout), so a mapping
-            # built around ActorRolloutRef ('actor_rollout_ref') would surface as a
-            # bare KeyError several steps later.
-            raise NotImplementedError(
-                f"expected {role} in role_worker_mapping, found {sorted(map(str, self.role_worker_mapping))}; "
-                "a fused reference policy is not supported on this path yet"
-            )
+        role = self._actor_role
 
         resource_pool = self.resource_pool_manager.get_resource_pool(role)
         self.resource_pool_to_cls[resource_pool][str(role)] = RayClassWithInitArgs(
@@ -59,6 +64,37 @@ class VagenPPOTrainer(VagenV0Mixin, SeparateRayPPOTrainer):
             distillation_config=self.config.get("distillation"),
             role=str(role),
         )
+
+    def _create_reference_policy_class(self):
+        """Skip the standalone reference worker when the actor worker already holds it.
+
+        The base registers ``Role.RefPolicy`` whenever a reference policy is needed, but
+        ``main.py`` never maps that role in the fused case, so the lookup would raise.
+        """
+        if self._actor_role == Role.ActorRolloutRef:
+            return
+        super()._create_reference_policy_class()
+
+    def _init_models(self):
+        """Initialise the fused worker group once and serve both roles from it.
+
+        Mirrors ``RayPPOTrainer``: the ``actor_rollout_ref`` group is the actor, the
+        rollout and the reference at once. It is exposed under the ``ActorRollout`` key
+        the base reads, and the base's own ``RefPolicy`` lookup is skipped for the
+        duration of the call -- that group was never spawned, and initialising the fused
+        one a second time as the reference would build its engines twice.
+        """
+        if self._actor_role != Role.ActorRolloutRef:
+            super()._init_models()
+            return
+        fused = self.all_wg[str(Role.ActorRolloutRef)]
+        self.all_wg[str(Role.ActorRollout)] = fused
+        self.use_reference_policy = False
+        try:
+            super()._init_models()
+        finally:
+            self.use_reference_policy = True
+        self.ref_policy_wg = fused
 
     def _get_gen_batch(self, batch):
         """Move the placeholder prompt tensors out of the batch before generation.
@@ -111,7 +147,7 @@ class VagenPPOTrainer(VagenV0Mixin, SeparateRayPPOTrainer):
         self.llm_server_manager = LLMServerManager.create(
             config=self.config,
             worker_group=self.actor_rollout_wg,
-            rollout_resource_pool=self.resource_pool_manager.get_resource_pool(Role.ActorRollout),
+            rollout_resource_pool=self.resource_pool_manager.get_resource_pool(self._actor_role),
         )
 
         # Streaming reward computation needs either no reward model, or one on its own
