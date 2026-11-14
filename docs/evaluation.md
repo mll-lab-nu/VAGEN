@@ -65,8 +65,10 @@ Without `hf_model` in `save_contents` you get sharded FSDP state instead, and it
 merged first — `python -m verl.model_merger` in the submodule.
 
 With `trainer.save_best_actor: true` (the default) the actor from the best-validating step
-is kept separately under `best_actor/`, selected on the mean of
-`val-core/<env>/reward/mean@1` across environments.
+is kept separately under `best_actor/` (weights in `best_actor/huggingface`, the step and
+score in `best_actor/best.json`), selected on `trainer.best_actor.metric`: by default the
+mean of `val-core/<env>/reward/mean@1` across environments;
+`val-aux/<env>/traj_success/mean@1` selects on success rate.
 
 !!! warning "Put the model in the dump directory"
     Rollouts are keyed on `(env, seed, tag_id, model)` and `resume: skip_completed` skips

@@ -425,6 +425,9 @@ trainer:
   log_val_generations: 32
   val_log_select: balanced        # balanced | first | failures | successes | worst | best
   save_best_actor: true
+  best_actor:
+    metric: "val-core/*/reward/mean@1"   # a val metric name, or a glob; matches are averaged
+    mode: max                     # max | min
   save_freq: 100                  # ★ NOT the default. verl's is -1, i.e. never save
   max_actor_ckpt_to_keep: 1
   max_critic_ckpt_to_keep: 1
@@ -442,6 +445,14 @@ trainer:
     A requeued job resumes from the last checkpoint (`resume_mode: auto`), so `save_freq` is
     how much work a preemption costs. At 15 minutes a step against a 48-hour limit,
     `save_freq: 100` throws away up to 25 hours of it; `25` costs at most 6.
+
+`save_best_actor` keeps the actor of the step with the best `best_actor.metric` in
+`best_actor/`, beside the periodic checkpoints rather than among them:
+`max_actor_ckpt_to_keep` never prunes it, a save that fails half-way leaves the previous
+one whole, and a resumed run (`resume_mode: auto` or `resume_path`) reads the score to beat
+back from `best_actor/best.json`. A changed metric or mode starts a new bar. To select on
+success rather than reward, which includes the format bonus:
+`trainer.best_actor.metric=val-aux/<env>/traj_success/mean@1`.
 
 ---
 

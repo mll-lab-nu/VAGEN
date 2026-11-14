@@ -98,18 +98,22 @@ trainer:
   # Reward the reasoning as well as the outcome: the agent's <perception> and
   # <prediction> are scored against the real layout and the scores are paid to the
   # tokens that carry them. Needs a judge endpoint; see scripts/launch_judge.sh.
-  # Keep a copy of the actor from the best-validating step, selected on
-  # mean val-core/<env>/reward/mean@1.
+  # Keep a copy of the actor from the best-validating step, selected on best_actor below.
   #
   # ★ The actor only, in its own `best_actor/` directory, and it deliberately does not
   # touch `latest_checkpointed_iteration.txt`: the periodic checkpoint exists to *resume*
   # (critic + optimiser), this one exists to be *used*. Writing that file would make a
   # resume rewind to whichever step validated best, which is not where training was.
-  #
-  # Note what "reward" includes: the format bonus is 0.10 of a 1.20 maximum at the shipped
-  # weights, so selection mildly prefers writing tags over solving. Select on
-  # val-aux/<env>/traj_success/mean@1 instead if that matters more.
+  # max_actor_ckpt_to_keep never prunes it, and a resumed run reads its score back from
+  # best_actor/best.json, so only a better step replaces it.
   save_best_actor: True
+  best_actor:
+    # A validation metric name, or a glob whose matches are averaged (the default averages
+    # across environments). Note what "reward" includes: the format bonus is 0.10 of a
+    # 1.20 maximum at the shipped weights, so it mildly prefers writing tags over solving;
+    # val-aux/<env>/traj_success/mean@1 selects on success instead.
+    metric: "val-core/*/reward/mean@1"
+    mode: max                      # max | min
   # ★ There is no state_reward here, deliberately. Scoring the agent's <perception> and
   # <prediction> is configured in the ENVIRONMENT's own block -- envs[].config.state_reward
   # in the train/val yaml -- alongside the judge endpoint that answers for it. Whether an

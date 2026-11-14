@@ -26,9 +26,12 @@ filtering there would train on the unfiltered batch and then discard the result.
 
 from __future__ import annotations
 
+import fnmatch
 import json
 import logging
+import math
 import os
+import shutil
 
 import numpy as np
 import torch
@@ -69,6 +72,25 @@ def rollout_metadata_columns(values) -> dict[str, list]:
     return {name: [row.get(name) for row in rows] for name in names}
 
 
+def finish_interrupted_best_actor_swap(path: str) -> None:
+    """Return ``path`` to one whole checkpoint after a best-actor save that did not finish.
+
+    The save writes ``<path>.tmp``, moves ``path`` aside to ``<path>.old``, then renames
+    ``.tmp`` into place. Dying between the two renames leaves only ``.old``, which is
+    moved back; anything else left over is an unfinished copy or an already-replaced one.
+    Never raises: it runs on the validation path, where bookkeeping must not end a run.
+    """
+    staging, retired = path + ".tmp", path + ".old"
+    if os.path.isdir(retired) and not os.path.isdir(path):
+        try:
+            os.replace(retired, path)
+        except OSError as exc:
+            logger.warning("[vagen] could not move %s back to %s: %s", retired, path, exc)
+            return  # `.old` is the only copy left; keep it
+    shutil.rmtree(retired, ignore_errors=True)
+    shutil.rmtree(staging, ignore_errors=True)
+
+
 class VagenLogicMixin:
     """What VAGEN adds on top of verl's PPO loop. Bound to no verl method name."""
 
@@ -81,6 +103,9 @@ class VagenLogicMixin:
         self._vagen_check_estimator_has_its_critic()
         self._vagen_check_estimator_is_undiscounted()
         self._vagen_check_turn_level_loss_has_what_it_needs()
+        if self.config.trainer.get("save_best_actor", True):
+            # A bad `trainer.best_actor` stops the run here, not at the first validation.
+            self._vagen_best_actor_rule()
         self._hf_upload_manager = HFUploadManager(self.config)
         self._vagen_image_actors: dict = {}
         self._vagen_image_futures: list = []
@@ -523,35 +548,108 @@ class VagenLogicMixin:
 
     #: Where the best-scoring actor is kept, under `trainer.default_local_dir`.
     VAGEN_BEST_ACTOR_DIR = "best_actor"
+    #: What `trainer.best_actor.metric` defaults to: the rule before it was configurable.
+    VAGEN_BEST_ACTOR_METRIC = "val-core/*/reward/mean@1"
+
+    def _vagen_best_actor_rule(self) -> tuple[str, str]:
+        """``(metric, mode)`` from ``trainer.best_actor``; refuses a mode other than max/min."""
+        cfg = self.config.trainer.get("best_actor", None) or {}
+        metric = str(cfg.get("metric", None) or self.VAGEN_BEST_ACTOR_METRIC)
+        mode = str(cfg.get("mode", None) or "max").lower()
+        if mode not in ("max", "min"):
+            raise ValueError(f"trainer.best_actor.mode must be 'max' or 'min', got {mode!r}")
+        return metric, mode
 
     def _vagen_best_val_score(self):
-        """The validation score to select on: mean ``val-core/<env>/reward/mean@1``.
+        """This step's value of ``trainer.best_actor.metric``, or None.
 
-        Averaged across environments when a run validates on several, so a two-env run
-        does not silently select on whichever key happens to sort first. Returns None
-        when validation produced no such key, which is the honest answer for a step that
-        did not validate.
+        The metric is a validation metric name, or an ``fnmatch`` pattern whose matches
+        are averaged: the default, ``val-core/*/reward/mean@1``, averages across
+        environments so a two-env run does not silently select on whichever key happens
+        to sort first. Returns None when validation produced no such key, which is the
+        honest answer for a step that did not validate -- and for a non-finite value,
+        which would otherwise compare as unbeatable or as never beaten.
         """
         metrics = getattr(self, "metrics", None) or {}
-        keys = [k for k in metrics if k.startswith("val-core/") and k.endswith("/reward/mean@1")]
+        metric, _ = self._vagen_best_actor_rule()
+        keys = [metric] if metric in metrics else [
+            k for k in metrics if fnmatch.fnmatchcase(str(k), metric)
+        ]
         if not keys:
+            validated = sorted(str(k) for k in metrics if str(k).startswith("val-"))
+            if validated and not getattr(self, "_vagen_best_metric_warned", False):
+                # Validation ran and nothing matched: a typo would otherwise mean no best
+                # actor is ever kept, and nothing says so.
+                self._vagen_best_metric_warned = True
+                logger.warning(
+                    "[vagen] trainer.best_actor.metric=%r matches no validation metric "
+                    "(have e.g. %s); no best actor is kept until one does",
+                    metric,
+                    validated[:5],
+                )
             return None
         try:
-            return sum(float(metrics[k]) for k in keys) / len(keys)
+            score = sum(float(metrics[k]) for k in keys) / len(keys)
         except (TypeError, ValueError):
             return None
+        return score if math.isfinite(score) else None
 
     def _vagen_best_actor_due(self):
-        """The validation score when it beats every earlier one and should be saved, else None."""
+        """The validation score when it beats the kept one and should be saved, else None."""
         if not bool(self.config.trainer.get("save_best_actor", True)):
             return None
         score = self._vagen_best_val_score()
         if score is None:
             return None
-        best = getattr(self, "_vagen_best_val", None)
-        if best is not None and score <= best:
+        best = self._vagen_best_actor_bar()
+        if best is None:
+            return score
+        _, mode = self._vagen_best_actor_rule()
+        # A tie is not an improvement, in either direction.
+        return score if (score > best if mode == "max" else score < best) else None
+
+    def _vagen_best_actor_path(self) -> str:
+        return os.path.join(self.config.trainer.default_local_dir, self.VAGEN_BEST_ACTOR_DIR)
+
+    def _vagen_best_actor_bar(self):
+        """The score to beat: read once from ``best_actor/best.json``, then kept in memory.
+
+        ★ Read back rather than reset. A requeued job is a new process, and starting from
+        no bar let its first validation, however bad, replace the best actor of the
+        attempt before. Not read under ``resume_mode: disable`` -- a fresh run -- nor when
+        the record was selected under another metric or mode, whose numbers do not
+        compare; the first validation then replaces it.
+        """
+        if not hasattr(self, "_vagen_best_val"):
+            self._vagen_best_val = self._vagen_read_best_actor_score()
+        return self._vagen_best_val
+
+    def _vagen_read_best_actor_score(self):
+        path = self._vagen_best_actor_path()
+        finish_interrupted_best_actor_swap(path)
+        if self.config.trainer.get("resume_mode", "auto") == "disable":
             return None
-        return score
+        try:
+            with open(os.path.join(path, "best.json")) as fh:
+                record = json.load(fh)
+        except (OSError, ValueError):
+            return None
+        rule = self._vagen_best_actor_rule()
+        # A record from before the rule was configurable has only `val_core_reward`.
+        recorded = (record.get("metric", self.VAGEN_BEST_ACTOR_METRIC), record.get("mode", "max"))
+        score = record.get("score", record.get("val_core_reward"))
+        if recorded != rule or not isinstance(score, (int, float)) or not math.isfinite(score):
+            logger.warning(
+                "[vagen] %s was selected on %s=%s; selecting on %s=%s, the next validation "
+                "replaces it",
+                path, recorded[0], recorded[1], rule[0], rule[1],
+            )
+            return None
+        logger.info(
+            "[vagen] best actor to beat: %s=%.4f from step %s",
+            rule[0], score, record.get("global_step"),
+        )
+        return float(score)
 
     def _vagen_maybe_save_best_actor(self) -> None:
         """Keep a copy of the actor from the best-validating step.
@@ -559,38 +657,55 @@ class VagenLogicMixin:
         ★ The actor only, and in its own directory. The periodic checkpoint exists to
         *resume* -- it carries the critic and the optimiser and it is what
         `latest_checkpointed_iteration.txt` points at. This one exists to be *used*, so it
-        carries none of that and, crucially, does not touch that file: writing it would
+        carries no critic and, crucially, does not touch that file: writing it would
         make a resume rewind to whichever step happened to validate best, which is not
         where training was.
 
-        Selection is on reward rather than success rate because that is what was asked
-        for. Worth knowing which you are getting: `val-core/.../reward` includes the
-        format bonus (0.10 of a 1.20 maximum at the shipped weights), so it prefers a
+        ★ Saved to ``best_actor.tmp`` and renamed into place, never saved at
+        ``best_actor/`` directly. verl's checkpoint manager registers every path it saves
+        for ``max_actor_ckpt_to_keep`` retention, so a copy saved at ``best_actor/`` was
+        deleted by the next periodic save -- under V0, whose validation runs before the
+        save, by the save of the very step that validated whenever ``test_freq`` and
+        ``save_freq`` coincide. The path retention holds is now the staging one, gone by
+        the time retention runs. The rename also means a save that dies half-way leaves
+        the previous best whole. (It assumes the actor save is synchronous, as it is on
+        the FSDP engines.)
+
+        Selection is ``trainer.best_actor``: ``metric`` and ``mode``. Worth knowing what
+        the default, mean `val-core/<env>/reward/mean@1`, selects for: reward includes
+        the format bonus (0.10 of a 1.20 maximum at the shipped weights), so it prefers a
         checkpoint that is slightly better at writing tags over one slightly better at
-        solving. `trainer.save_best_actor: false` turns the whole thing off.
+        solving; `val-aux/<env>/traj_success/mean@1` selects on success.
+        `trainer.save_best_actor: false` turns the whole thing off.
         """
         score = self._vagen_best_actor_due()
         if score is None:
             return
-        self._vagen_best_val = score
-
-        path = os.path.join(self.config.trainer.default_local_dir, self.VAGEN_BEST_ACTOR_DIR)
+        metric, mode = self._vagen_best_actor_rule()
+        path = self._vagen_best_actor_path()
+        staging, retired = path + ".tmp", path + ".old"
         try:
-            self.actor_rollout_wg.save_checkpoint(path, None, self.global_steps)
-            os.makedirs(path, exist_ok=True)
-            with open(os.path.join(path, "best.json"), "w") as fh:
-                json.dump({"global_step": self.global_steps, "val_core_reward": score}, fh, indent=1)
+            finish_interrupted_best_actor_swap(path)
+            self.actor_rollout_wg.save_checkpoint(staging, None, self.global_steps)
+            os.makedirs(staging, exist_ok=True)
+            record = {"global_step": self.global_steps, "metric": metric, "mode": mode, "score": score}
+            with open(os.path.join(staging, "best.json"), "w") as fh:
+                json.dump(record, fh, indent=1)
+            if os.path.isdir(path):
+                os.replace(path, retired)
+            os.replace(staging, path)
+            shutil.rmtree(retired, ignore_errors=True)
         except Exception as exc:  # noqa: BLE001
             # A failed bookkeeping save must not end a training run that is going fine.
             logger.warning(
                 "[vagen] could not save the best actor at step %s: %s", self.global_steps, exc
             )
+            finish_interrupted_best_actor_swap(path)  # back to the previous best, whole
             return
+        # Only once it is on disk: the bar describes what `best_actor/` holds.
+        self._vagen_best_val = score
         logger.info(
-            "[vagen] new best val-core reward %.4f at step %s -> %s",
-            score,
-            self.global_steps,
-            path,
+            "[vagen] new best %s %.4f at step %s -> %s", metric, score, self.global_steps, path
         )
 
 

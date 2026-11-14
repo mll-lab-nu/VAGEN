@@ -18,8 +18,8 @@
 # this readable: sokoban_default_gae_qwen25vl3b-global_step_400.
 vagen_model_name() {
   local path="${1%/}" step exp
-  # `best_actor` as well as `global_step_N`: trainer.val_log keeps the best-validating actor
-  # under <exp>/verl_checkpoints/best_actor/actor/huggingface, and docs/evaluation.md tells
+  # `best_actor` as well as `global_step_N`: trainer.save_best_actor keeps the best-validating
+  # actor under <exp>/verl_checkpoints/best_actor/huggingface, and docs/evaluation.md tells
   # the reader that is where the checkpoint to score lives. Matching only global_step_ sent
   # every run's best actor to the same `huggingface` directory.
   step="$(printf '%s' "$path" | grep -oE 'global_step_[0-9]+|best_actor' | tail -1 || true)"
