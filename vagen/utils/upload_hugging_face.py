@@ -50,13 +50,11 @@ class HFUploadActor:
             except Exception:
                 pass
         self.repo_id = repo_id
-
-        self.api.create_repo(
-            repo_id=self.repo_id,
-            repo_type="model",
-            exist_ok=True,
-            private=private,
-        )
+        self.private = private
+        # Created by the first upload, inside its error handling. Raising here killed the
+        # actor, and the trainer then died on its next flush() -- e.g. with HF_HUB_OFFLINE=1,
+        # where create_repo raises OfflineModeIsEnabled.
+        self._repo_created = False
         print(f"[HFUpload] Initialized upload actor for repo: {self.repo_id}")
 
     def upload(self, local_path: str, global_step: int, path_in_repo: str = "",
@@ -82,6 +80,14 @@ class HFUploadActor:
             else f"Upload checkpoint at global_step_{global_step}"
         )
         try:
+            if not self._repo_created:
+                self.api.create_repo(
+                    repo_id=self.repo_id,
+                    repo_type="model",
+                    exist_ok=True,
+                    private=self.private,
+                )
+                self._repo_created = True
             self.api.upload_folder(
                 repo_id=self.repo_id,
                 folder_path=local_path,
@@ -218,7 +224,20 @@ class HFUploadManager:
               f"(contents: {contents_desc})")
 
     def flush(self):
-        """Block until any pending upload finishes."""
-        if self._pending_future is not None:
-            ray.get(self._pending_future)
-            self._pending_future = None
+        """Block until any pending upload finishes.
+
+        Never raises: an upload copies a checkpoint that is already on disk, so losing
+        one -- the Hub unreachable, offline mode, the upload actor gone -- is reported and
+        training carries on.
+        """
+        future, self._pending_future = self._pending_future, None
+        if future is None:
+            return
+        try:
+            ray.get(future)
+        except ray.exceptions.RayActorError as exc:
+            # A dead actor stays dead; stop scheduling uploads on it.
+            self._actor = None
+            print(f"[HFUpload] Warning: upload actor died, HF uploads are off for this run: {exc}")
+        except Exception as exc:  # noqa: BLE001
+            print(f"[HFUpload] Warning: upload failed, training continues: {exc}")
